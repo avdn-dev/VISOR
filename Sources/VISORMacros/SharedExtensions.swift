@@ -289,7 +289,6 @@ struct ReactionMethodInfo {
 // MARK: - ClassAnalysis
 
 /// Single-pass analysis of a `ClassDeclSyntax` member list.
-/// Replaces 7 separate computed-property traversals with one iteration.
 struct ClassAnalysis {
   var storedLetProperties: [StoredProperty] = []
   var boundProperties: [BoundPropertyInfo] = []
@@ -297,7 +296,11 @@ struct ClassAnalysis {
   var reactionMethods: [ReactionMethodInfo] = []
   var invalidReactionMethods: [String] = []
   var hasStartObserving = false
+  var startObservingBodyText: String?
   var hasInitializer = false
+  /// Return type of `computeState()` if declared (e.g. "ViewModelState<Int>").
+  var computeStateReturnType: String?
+  var hasUserDeclaredState = false
 
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
@@ -327,12 +330,15 @@ struct ClassAnalysis {
               type: typeAnnotation.type.trimmedDescription))
           }
         } else if bindingKind == "var" {
-          // @Bound properties
           guard
             let binding = varDecl.bindings.first,
             let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
           else {
             continue
+          }
+
+          if identifier.identifier.text == "state" {
+            hasUserDeclaredState = true
           }
 
           guard let boundAttr = varDecl.attributes.lazy
@@ -364,6 +370,16 @@ struct ClassAnalysis {
         // startObserving check
         if funcDecl.name.text == "startObserving" {
           hasStartObserving = true
+          startObservingBodyText = funcDecl.body?.statements.trimmedDescription
+        }
+
+        // computeState check
+        if funcDecl.name.text == "computeState"
+            && funcDecl.signature.parameterClause.parameters.isEmpty
+        {
+          if let returnType = funcDecl.signature.returnClause?.type.trimmedDescription {
+            computeStateReturnType = returnType
+          }
         }
 
         // @Reaction methods

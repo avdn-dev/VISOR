@@ -22,6 +22,9 @@ enum VISORDiagnostic: DiagnosticMessage {
   case malformedBoundKeyPath(propertyName: String)
   case invalidReactionParameter(methodName: String)
   case malformedLazyViewModelsArgument
+  case computeStateConflictsWithState
+  case computeStateInvalidReturnType
+  case manualStartObservingMissingMethod(methodName: String)
 
   // MARK: Internal
 
@@ -51,41 +54,25 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Reaction on '\(methodName)': method must have exactly one parameter"
     case .malformedLazyViewModelsArgument:
       "@LazyViewModels: unrecognized argument (expected ViewModel.self)"
+    case .computeStateConflictsWithState:
+      "computeState() cannot coexist with a user-declared 'state' property; remove one"
+    case .computeStateInvalidReturnType:
+      "computeState() must return ViewModelState<...>"
+    case .manualStartObservingMissingMethod(let methodName):
+      "startObserving() does not call \(methodName)(); state derivation will not run"
     }
   }
 
   var diagnosticID: MessageID {
-    switch self {
-    case .missingContent:
-      MessageID(domain: "VISOR", id: "missingContent")
-    case .missingLoadedView:
-      MessageID(domain: "VISOR", id: "missingLoadedView")
-    case .bothLoadedViewAndContent:
-      MessageID(domain: "VISOR", id: "bothLoadedViewAndContent")
-    case .singleViewModelInLazyViewModels:
-      MessageID(domain: "VISOR", id: "singleViewModelInLazyViewModels")
-    case .notAClass:
-      MessageID(domain: "VISOR", id: "notAClass")
-    case .notAStruct:
-      MessageID(domain: "VISOR", id: "notAStruct")
-    case .missingArguments:
-      MessageID(domain: "VISOR", id: "missingArguments")
-    case .missingObservable:
-      MessageID(domain: "VISOR", id: "missingObservable")
-    case .invalidBoundDependency:
-      MessageID(domain: "VISOR", id: "invalidBoundDependency")
-    case .malformedBoundKeyPath:
-      MessageID(domain: "VISOR", id: "malformedBoundKeyPath")
-    case .invalidReactionParameter:
-      MessageID(domain: "VISOR", id: "invalidReactionParameter")
-    case .malformedLazyViewModelsArgument:
-      MessageID(domain: "VISOR", id: "malformedLazyViewModelsArgument")
-    }
+    // Strips associated values from e.g. "notAStruct(macroName: \"Foo\")" → "notAStruct"
+    let caseName = String(describing: self).prefix(while: { $0 != "(" })
+    return MessageID(domain: "VISOR", id: String(caseName))
   }
 
   var severity: DiagnosticSeverity {
     switch self {
-    case .missingObservable, .malformedBoundKeyPath, .malformedLazyViewModelsArgument, .singleViewModelInLazyViewModels:
+    case .missingObservable, .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
+         .singleViewModelInLazyViewModels, .manualStartObservingMissingMethod:
       .warning
     case .invalidBoundDependency:
       .error

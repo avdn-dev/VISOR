@@ -63,7 +63,37 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       """
     members.append(typealiasDecl)
 
-    // 3. Generate observe methods from @Bound properties
+    var allObserveMethodNames: [String] = []
+
+    // 3. Generate state property and deriveState() from computeState()
+    if let returnType = analysis.computeStateReturnType {
+      if analysis.hasUserDeclaredState {
+        context.diagnose(Diagnostic(
+          node: Syntax(declaration),
+          message: VISORDiagnostic.computeStateConflictsWithState))
+      } else if !returnType.hasPrefix("ViewModelState<") {
+        context.diagnose(Diagnostic(
+          node: Syntax(declaration),
+          message: VISORDiagnostic.computeStateInvalidReturnType))
+      } else {
+        let stateDecl: DeclSyntax = """
+          private(set) var state: \(raw: returnType) = .loading
+          """
+        members.append(stateDecl)
+
+        allObserveMethodNames.append("deriveState")
+        let deriveMethod: DeclSyntax = """
+          func deriveState() async {
+              for await newState in VISOR.valuesOf({ self.computeState() }) {
+                  self.state = newState
+              }
+          }
+          """
+        members.append(deriveMethod)
+      }
+    }
+
+    // 4. Generate observe methods from @Bound properties
     let boundProps = analysis.boundProperties
     let storedLetNames = Set(properties.map(\.name))
     var validBounds: [BoundPropertyInfo] = []
@@ -79,14 +109,12 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 3a. Diagnose malformed @Bound key paths
+    // 4a. Diagnose malformed @Bound key paths
     for propertyName in analysis.malformedBoundAttributes {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName)))
     }
-
-    var allObserveMethodNames: [String] = []
 
     // Generate observe methods for each @Bound property
     for prop in validBounds {
@@ -102,7 +130,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       members.append(observeMethod)
     }
 
-    // 3b. Diagnose invalid @Reaction methods
+    // 4b. Diagnose invalid @Reaction methods
     for methodName in analysis.invalidReactionMethods {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
@@ -110,8 +138,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     }
 
     // Generate observe wrappers for @Reaction methods
-    let reactions = analysis.reactionMethods
-    for reaction in reactions {
+    for reaction in analysis.reactionMethods {
       let methodName = "observe\(reaction.methodName.capitalizedFirst)"
       allObserveMethodNames.append(methodName)
       if reaction.isAsync {
@@ -135,9 +162,19 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 3c. Generate startObserving() combining @Bound + @Reaction (if no manual implementation)
-    if !allObserveMethodNames.isEmpty && !analysis.hasStartObserving {
-      if allObserveMethodNames.count == 1 {
+    // 5. Generate startObserving() or warn about missing calls in manual implementation
+    if !allObserveMethodNames.isEmpty {
+      if analysis.hasStartObserving {
+        // Warn for each generated method not referenced in the manual body
+        let body = analysis.startObservingBodyText ?? ""
+        for methodName in allObserveMethodNames {
+          if !body.contains(methodName) {
+            context.diagnose(Diagnostic(
+              node: Syntax(declaration),
+              message: VISORDiagnostic.manualStartObservingMissingMethod(methodName: methodName)))
+          }
+        }
+      } else if allObserveMethodNames.count == 1 {
         let observingDecl: DeclSyntax = """
           func startObserving() async {
               await \(raw: allObserveMethodNames[0])()
@@ -161,7 +198,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 4. Generate static var preview
+    // 6. Generate static var preview
     let preview: DeclSyntax
     if properties.isEmpty {
       preview = """
