@@ -1735,6 +1735,246 @@ struct ViewModelMacroTests {
   }
 
   @Test
+  func `computeState with Reaction generates combined startObserving`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class ItemsViewModel {
+        func computeState() -> ViewModelState<Int> {
+          .loaded(state: 0)
+        }
+        @Reaction(\\.service.pending)
+        func handlePending(pending: String?) { }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class ItemsViewModel {
+        func computeState() -> ViewModelState<Int> {
+          .loaded(state: 0)
+        }
+        func handlePending(pending: String?) { }
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<ItemsViewModel>
+
+          private(set) var state: ViewModelState<Int> = .loading
+
+          func deriveState() async {
+              for await newState in VISOR.valuesOf({ self.computeState() }) {
+                  self.state = newState
+              }
+          }
+
+          func observeHandlePending() async {
+              for await pending in VISOR.valuesOf({ self.service.pending }) {
+                  self.handlePending(pending: pending)
+              }
+          }
+
+          func startObserving() async {
+              await withDiscardingTaskGroup { group in
+                  group.addTask { await self.deriveState() }
+                  group.addTask { await self.observeHandlePending() }
+              }
+          }
+
+          #if DEBUG
+          static var preview: ItemsViewModel {
+            ItemsViewModel(
+              service: StubMyService()
+            )
+          }
+          #endif
+      }
+
+      extension ItemsViewModel: @MainActor ViewModel {
+      }
+
+      extension ItemsViewModel: PreviewProviding {
+          #if !DEBUG
+          static var preview: ItemsViewModel {
+              fatalError()
+          }
+          #endif
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `computeState with no dependencies generates standalone deriveState`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class SimpleViewModel {
+        private var count = 0
+        func computeState() -> ViewModelState<Int> {
+          .loaded(state: count)
+        }
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class SimpleViewModel {
+        private var count = 0
+        func computeState() -> ViewModelState<Int> {
+          .loaded(state: count)
+        }
+
+          typealias Factory = ViewModelFactory<SimpleViewModel>
+
+          private(set) var state: ViewModelState<Int> = .loading
+
+          func deriveState() async {
+              for await newState in VISOR.valuesOf({ self.computeState() }) {
+                  self.state = newState
+              }
+          }
+
+          func startObserving() async {
+              await deriveState()
+          }
+
+          #if DEBUG
+          static var preview: SimpleViewModel {
+            SimpleViewModel()
+          }
+          #endif
+      }
+
+      extension SimpleViewModel: @MainActor ViewModel {
+      }
+
+      extension SimpleViewModel: PreviewProviding {
+          #if !DEBUG
+          static var preview: SimpleViewModel {
+              fatalError()
+          }
+          #endif
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `computeState with parameters is not detected`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        var state: ViewModelState<Int> { .loading }
+        func computeState(for value: Int) -> ViewModelState<Int> { .loading }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        var state: ViewModelState<Int> { .loading }
+        func computeState(for value: Int) -> ViewModelState<Int> { .loading }
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          #if DEBUG
+          static var preview: MyViewModel {
+            MyViewModel(
+              service: StubMyService()
+            )
+          }
+          #endif
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+
+      extension MyViewModel: PreviewProviding {
+          #if !DEBUG
+          static var preview: MyViewModel {
+              fatalError()
+          }
+          #endif
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `computeState with complex generic type`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class ListViewModel {
+        func computeState() -> ViewModelState<[String]> {
+          .loaded(state: [])
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class ListViewModel {
+        func computeState() -> ViewModelState<[String]> {
+          .loaded(state: [])
+        }
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<ListViewModel>
+
+          private(set) var state: ViewModelState<[String]> = .loading
+
+          func deriveState() async {
+              for await newState in VISOR.valuesOf({ self.computeState() }) {
+                  self.state = newState
+              }
+          }
+
+          func startObserving() async {
+              await deriveState()
+          }
+
+          #if DEBUG
+          static var preview: ListViewModel {
+            ListViewModel(
+              service: StubMyService()
+            )
+          }
+          #endif
+      }
+
+      extension ListViewModel: @MainActor ViewModel {
+      }
+
+      extension ListViewModel: PreviewProviding {
+          #if !DEBUG
+          static var preview: ListViewModel {
+              fatalError()
+          }
+          #endif
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
   func `Manual startObserving missing Bound observe method emits warning`() {
     assertMacroExpansion(
       """

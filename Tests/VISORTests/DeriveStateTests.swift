@@ -78,6 +78,17 @@ private final class CounterViewModel: ViewModel {
 @MainActor
 struct DeriveStateTests {
 
+    // MARK: - Initial State
+
+    @Test
+    func `initial state is loading before observation starts`() {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+        #expect(vm.state == .loading)
+    }
+
+    // MARK: - Basic Derivation
+
     @Test(.timeLimit(.minutes(1)))
     func `derives state from service dependency`() async {
         let source = CounterSource()
@@ -124,6 +135,55 @@ struct DeriveStateTests {
 
             vm.clearError()
             await expect(\.state, equals: .loaded(state: 10))
+        }
+    }
+
+    // MARK: - Full Lifecycle
+
+    @Test(.timeLimit(.minutes(1)))
+    func `transitions through all four states`() async {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            // loading → empty (count starts at 0, not loading, no error)
+            await expect(\.state, equals: .empty)
+
+            // empty → loading
+            vm.load()
+            await expect(\.state, equals: .loading)
+
+            // loading → loaded
+            source.count = 42
+            vm.finishLoading()
+            await expect(\.state, equals: .loaded(state: 42))
+
+            // loaded → error
+            vm.setError("something broke")
+            await expect(\.state, equals: .error("something broke"))
+
+            // error → loaded (clear error, count still 42)
+            vm.clearError()
+            await expect(\.state, equals: .loaded(state: 42))
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `rapid mutations settle to correct final state`() async {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .empty)
+
+            // Rapidly change the source multiple times
+            source.count = 1
+            source.count = 2
+            source.count = 3
+            source.count = 100
+
+            // Should settle to the final value
+            await expect(\.state, equals: .loaded(state: 100))
         }
     }
 
