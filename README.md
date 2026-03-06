@@ -180,6 +180,43 @@ final class HomeViewModel {
 
 The method must take exactly one parameter whose type matches the observed property. When multiple `@Bound` or `@Reaction` annotations exist, `startObserving()` runs them concurrently in a `withDiscardingTaskGroup`.
 
+### `computeState()` / `deriveState()`
+
+When a ViewModel's state depends on multiple internal properties (loading flags, error messages, fetched data), define a `computeState()` method and the `@ViewModel` macro generates the state-derivation wiring automatically:
+
+```swift
+@Observable
+@ViewModel
+final class ItemsViewModel {
+  private var isLoading = false
+  private var items: [Item] = []
+  private var errorMessage: String?
+
+  func computeState() -> ViewModelState<ItemsState> {
+    if isLoading { return .loading }
+    if let errorMessage { return .error(errorMessage) }
+    if items.isEmpty { return .empty }
+    return .loaded(state: ItemsState(items: items))
+  }
+
+  private let itemsService: ItemsService
+}
+```
+
+The macro detects `computeState()` and generates:
+
+1. **`private(set) var state: ViewModelState<...> = .loading`** — the stored state property, starting in `.loading`
+2. **`func deriveState() async`** — observes `computeState()` via `valuesOf()` and assigns back to `state`, with automatic deduplication of consecutive equal values
+3. **`startObserving()`** — includes `deriveState()` alongside any `@Bound`/`@Reaction` observers
+
+This pattern is useful when state is a pure function of multiple internal properties rather than a single observed dependency. The `computeState()` function acts as a reducer — you mutate internal properties and state automatically recomputes.
+
+**Requirements:**
+- Must return `ViewModelState<...>` (compile-time error otherwise)
+- Must take no parameters (methods with parameters are not detected)
+- Cannot coexist with a user-declared `state` property (compile-time error)
+- If you provide a manual `startObserving()`, include `deriveState()` in it (warning if missing)
+
 ### `@LazyViewModel`
 
 Apply to a View struct for single-ViewModel lazy initialization:
@@ -227,7 +264,7 @@ Property names are derived from ViewModel type names (e.g., `SettingsViewModel` 
 
 ### `@Stubbable`
 
-Apply to a protocol to auto-generate a `Stub<Name>` class for previews and tests (DEBUG only):
+Apply to a protocol to auto-generate a `Stub<Name>` class for previews and tests:
 
 ```swift
 @Stubbable
@@ -263,7 +300,7 @@ Methods with return values get a `<methodName>ReturnValue` property you can set.
 
 ### `@Spyable`
 
-Apply to a protocol to auto-generate a `Spy<Name>` test double with call recording (DEBUG only):
+Apply to a protocol to auto-generate a `Spy<Name>` test double with call recording:
 
 ```swift
 @Spyable
