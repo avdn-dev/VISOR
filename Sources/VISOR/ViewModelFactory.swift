@@ -25,6 +25,8 @@ import Observation
 /// ```swift
 /// .previewFactory(for: CameraViewModel.self)
 /// ```
+/// - Note: `@Observable` is required for `@Environment` injection even though all
+///   stored properties are `@ObservationIgnored`.
 @Observable
 public final class ViewModelFactory<VM: ViewModel> {
   @ObservationIgnored private let _make: (AnyObject?) -> VM
