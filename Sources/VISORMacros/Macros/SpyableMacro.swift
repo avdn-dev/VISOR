@@ -34,8 +34,10 @@ public struct SpyableMacro: PeerMacro {
 
     let properties = analysis.properties
     let methods = analysis.methods
+    let access = accessLevel(of: protocolDecl)
+    let prefix = access.isEmpty ? "" : "\(access) "
 
-    var members = generatePropertyDeclarations(properties)
+    var members = generatePropertyDeclarations(properties, access: access)
     // Each method generates ~6-8 member lines + 1 Call case; reserve to avoid reallocations.
     members.reserveCapacity(members.count + methods.count * 8 + (methods.isEmpty ? 0 : 3))
 
@@ -45,32 +47,32 @@ public struct SpyableMacro: PeerMacro {
 
     for method in methods {
       members.append("  // -- \(method.name) --")
-      members.append("  var \(method.name)CallCount = 0")
+      members.append("  \(prefix)var \(method.name)CallCount = 0")
 
       // Track received args
       if method.parameters.count == 1 {
         let param = method.parameters[0]
         let capName = param.internalName.capitalizedFirst
-        members.append("  var \(method.name)Received\(capName): \(param.type)?")
-        members.append("  var \(method.name)ReceivedInvocations: [\(param.type)] = []")
+        members.append("  \(prefix)var \(method.name)Received\(capName): \(param.type)?")
+        members.append("  \(prefix)var \(method.name)ReceivedInvocations: [\(param.type)] = []")
       } else if method.parameters.count > 1 {
         let tupleType = "(" + method.parameters.map { "\($0.internalName): \($0.type)" }.joined(separator: ", ") + ")"
-        members.append("  var \(method.name)ReceivedArguments: \(tupleType)?")
-        members.append("  var \(method.name)ReceivedInvocations: [\(tupleType)] = []")
+        members.append("  \(prefix)var \(method.name)ReceivedArguments: \(tupleType)?")
+        members.append("  \(prefix)var \(method.name)ReceivedInvocations: [\(tupleType)] = []")
       }
 
       // Return value storage
       if let returnType = method.returnType {
         let defaultVal = defaultValue(for: returnType)
         if let defaultVal {
-          members.append("  var \(method.name)ReturnValue: \(returnType) = \(defaultVal)")
+          members.append("  \(prefix)var \(method.name)ReturnValue: \(returnType) = \(defaultVal)")
         } else {
-          members.append("  var \(method.name)ReturnValue: \(returnType)!")
+          members.append("  \(prefix)var \(method.name)ReturnValue: \(returnType)!")
         }
       }
 
       // Method implementation
-      let sig = buildMethodSignature(method)
+      let sig = buildMethodSignature(method, access: access)
       var bodyLines: [String] = []
       bodyLines.append("    \(method.name)CallCount += 1")
 
@@ -108,24 +110,27 @@ public struct SpyableMacro: PeerMacro {
 
     // Call enum and calls array
     if !methods.isEmpty {
-      members.append("  enum Call {")
+      members.append("  \(prefix)enum Call {")
       for c in callCases {
         members.append(c)
       }
       members.append("  }")
-      members.append("  var calls: [Call] = []")
+      members.append("  \(prefix)var calls: [Call] = []")
+    }
+
+    // Public classes need an explicit init (the synthesized default init is internal)
+    if access == "public" {
+      members.append("  public init() {}")
     }
 
     let bodyStr = members.joined(separator: "\n")
     let spyName = "Spy\(protocolName)"
 
     let result: DeclSyntax = """
-      #if DEBUG
       @Observable
-      class \(raw: spyName): \(raw: protocolName) {
+      \(raw: prefix)class \(raw: spyName): \(raw: protocolName) {
       \(raw: bodyStr)
       }
-      #endif
       """
     return [result]
   }

@@ -42,7 +42,6 @@ struct SpyableMacroTests {
         func save(_ item: Item) async throws
       }
 
-      #if DEBUG
       @Observable
       class SpyDataService: DataService {
         var items: [Item] = []
@@ -70,7 +69,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -91,7 +89,6 @@ struct SpyableMacroTests {
         func reset()
       }
 
-      #if DEBUG
       @Observable
       class SpyLogService: LogService {
         // -- log --
@@ -116,7 +113,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -135,7 +131,6 @@ struct SpyableMacroTests {
         func search(query: String, limit: Int) async throws -> [String]
       }
 
-      #if DEBUG
       @Observable
       class SpySearchService: SearchService {
         // -- search --
@@ -155,7 +150,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -174,7 +168,6 @@ struct SpyableMacroTests {
         func currentTheme() -> Theme
       }
 
-      #if DEBUG
       @Observable
       class SpyThemeService: ThemeService {
         // -- currentTheme --
@@ -190,7 +183,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -207,11 +199,9 @@ struct SpyableMacroTests {
       protocol EmptyService {
       }
 
-      #if DEBUG
       @Observable
       class SpyEmptyService: EmptyService {
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -230,12 +220,10 @@ struct SpyableMacroTests {
         var currentTheme: Theme { get }
       }
 
-      #if DEBUG
       @Observable
       class SpyThemeService: ThemeService {
         var currentTheme: Theme! = nil
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -254,7 +242,6 @@ struct SpyableMacroTests {
         func perform(with item: Item) async throws
       }
 
-      #if DEBUG
       @Observable
       class SpyItemService: ItemService {
         // -- perform --
@@ -272,7 +259,114 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
+      """,
+      macros: testMacros)
+  }
+
+  // MARK: - Access Level Propagation
+
+  @Test
+  func `Public protocol generates public spy`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      public protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      public protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      public class SpyDataService: DataService {
+        public var items: [Item] = []
+        // -- fetch --
+        public var fetchCallCount = 0
+        public var fetchReturnValue: [Item] = []
+        public func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return fetchReturnValue
+        }
+        public enum Call {
+          case fetch
+        }
+        public var calls: [Call] = []
+        public init() {}
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Package protocol generates package spy`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      package class SpyDataService: DataService {
+        package var items: [Item] = []
+        // -- fetch --
+        package var fetchCallCount = 0
+        package var fetchReturnValue: [Item] = []
+        package func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return fetchReturnValue
+        }
+        package enum Call {
+          case fetch
+        }
+        package var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Fileprivate protocol generates fileprivate spy`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      fileprivate protocol DataService {
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      fileprivate protocol DataService {
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      fileprivate class SpyDataService: DataService {
+        // -- fetch --
+        fileprivate var fetchCallCount = 0
+        fileprivate var fetchReturnValue: [Item] = []
+        fileprivate func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return fetchReturnValue
+        }
+        fileprivate enum Call {
+          case fetch
+        }
+        fileprivate var calls: [Call] = []
+      }
       """,
       macros: testMacros)
   }
@@ -297,7 +391,6 @@ struct SpyableMacroTests {
         func reset()
       }
 
-      #if DEBUG
       @Observable
       class SpyExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
@@ -313,7 +406,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -394,7 +486,6 @@ struct SpyableMacroTests {
         func doWork()
       }
 
-      #if DEBUG
       @Observable
       class SpyHasStatic: HasStatic {
         // -- doWork --
@@ -408,7 +499,6 @@ struct SpyableMacroTests {
         }
         var calls: [Call] = []
       }
-      #endif
       """,
       diagnostics: [
         DiagnosticSpec(message: "@Spyable skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
@@ -432,12 +522,10 @@ struct SpyableMacroTests {
         subscript(index: Int) -> String { get }
       }
 
-      #if DEBUG
       @Observable
       class SpyHasSubscript: HasSubscript {
         var name: String = ""
       }
-      #endif
       """,
       diagnostics: [
         DiagnosticSpec(message: "@Spyable skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),

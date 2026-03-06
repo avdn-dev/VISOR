@@ -146,16 +146,17 @@ struct ProtocolAnalysis {
 
 // MARK: - Property Declaration Helper
 
-func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo]) -> [String] {
-  properties.map { prop in
+func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: String = "") -> [String] {
+  let prefix = access.isEmpty ? "" : "\(access) "
+  return properties.map { prop in
     if let customDefault = prop.stubbableDefault {
-      return "  var \(prop.name): \(prop.type) = \(customDefault)"
+      return "  \(prefix)var \(prop.name): \(prop.type) = \(customDefault)"
     } else {
       let defaultVal = defaultValue(for: prop.type) ?? "nil"
       let typeStr = defaultVal == "nil" && !prop.type.hasSuffix("?") && !prop.type.hasPrefix("Optional<")
         ? "\(prop.type)!"
         : prop.type
-      return "  var \(prop.name): \(typeStr) = \(defaultVal)"
+      return "  \(prefix)var \(prop.name): \(typeStr) = \(defaultVal)"
     }
   }
 }
@@ -209,7 +210,7 @@ func defaultValue(for type: String) -> String? {
 
 // MARK: - Method Signature Helper
 
-func buildMethodSignature(_ method: ProtocolMethodInfo) -> String {
+func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> String {
   let params = method.parameters.map { param in
     if let label = param.externalLabel {
       if label == param.internalName {
@@ -220,7 +221,8 @@ func buildMethodSignature(_ method: ProtocolMethodInfo) -> String {
     return "_ \(param.internalName): \(param.type)"
   }.joined(separator: ", ")
 
-  var sig = "func \(method.name)(\(params))"
+  let prefix = access.isEmpty ? "" : "\(access) "
+  var sig = "\(prefix)func \(method.name)(\(params))"
   if method.isAsync { sig += " async" }
   if method.isThrowing { sig += " throws" }
   if let ret = method.returnType { sig += " -> \(ret)" }
@@ -488,4 +490,19 @@ func validateProtocolForTestDouble(
   }
 
   return true
+}
+
+/// Returns the access-level keyword for a protocol (e.g. "public") or empty string.
+/// `internal` is omitted (returns "") because it's Swift's default access level —
+/// emitting it explicitly would just add noise to the generated code.
+func accessLevel(of protocolDecl: ProtocolDeclSyntax) -> String {
+  for modifier in protocolDecl.modifiers {
+    switch modifier.name.text {
+    case "open", "public", "package", "fileprivate", "private":
+      return modifier.name.text
+    default:
+      continue
+    }
+  }
+  return ""
 }

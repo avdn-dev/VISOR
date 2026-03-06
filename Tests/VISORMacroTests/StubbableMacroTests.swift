@@ -44,7 +44,6 @@ struct StubbableMacroTests {
         func save(_ item: Item) async throws
       }
 
-      #if DEBUG
       @Observable
       class StubDataService: DataService {
         var items: [Item] = []
@@ -53,7 +52,6 @@ struct StubbableMacroTests {
         func fetch() async throws -> [Item] { fetchReturnValue }
         func save(_ item: Item) async throws { }
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -86,7 +84,6 @@ struct StubbableMacroTests {
         var optional: String? { get }
       }
 
-      #if DEBUG
       @Observable
       class StubConfigService: ConfigService {
         var name: String = ""
@@ -98,7 +95,6 @@ struct StubbableMacroTests {
         var mapping: [String: Int] = [:]
         var optional: String? = nil
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -117,13 +113,11 @@ struct StubbableMacroTests {
         func currentTheme() -> Theme
       }
 
-      #if DEBUG
       @Observable
       class StubThemeService: ThemeService {
         var currentThemeReturnValue: Theme!
         func currentTheme() -> Theme { currentThemeReturnValue }
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -140,11 +134,9 @@ struct StubbableMacroTests {
       protocol EmptyService {
       }
 
-      #if DEBUG
       @Observable
       class StubEmptyService: EmptyService {
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -163,13 +155,11 @@ struct StubbableMacroTests {
         func search(query: String, limit: Int) async throws -> [Result]
       }
 
-      #if DEBUG
       @Observable
       class StubSearchService: SearchService {
         var searchReturnValue: [Result] = []
         func search(query: String, limit: Int) async throws -> [Result] { searchReturnValue }
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -188,13 +178,95 @@ struct StubbableMacroTests {
         func get(key: String) -> Data?
       }
 
-      #if DEBUG
       @Observable
       class StubCacheService: CacheService {
         var getReturnValue: Data? = nil
         func get(key: String) -> Data? { getReturnValue }
       }
-      #endif
+      """,
+      macros: testMacros)
+  }
+
+  // MARK: - Access Level Propagation
+
+  @Test
+  func `Public protocol generates public stub`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      public protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+        func save(_ item: Item) async throws
+      }
+      """,
+      expandedSource: """
+      public protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+        func save(_ item: Item) async throws
+      }
+
+      @Observable
+      public class StubDataService: DataService {
+        public var items: [Item] = []
+        public var fetchReturnValue: [Item] = []
+        public func fetch() async throws -> [Item] { fetchReturnValue }
+        public func save(_ item: Item) async throws { }
+        public init() {}
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Package protocol generates package stub`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      package class StubDataService: DataService {
+        package var items: [Item] = []
+        package var fetchReturnValue: [Item] = []
+        package func fetch() async throws -> [Item] { fetchReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Fileprivate protocol generates fileprivate stub`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      fileprivate protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      fileprivate protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      fileprivate class StubDataService: DataService {
+        fileprivate var items: [Item] = []
+        fileprivate var fetchReturnValue: [Item] = []
+        fileprivate func fetch() async throws -> [Item] { fetchReturnValue }
+      }
       """,
       macros: testMacros)
   }
@@ -215,12 +287,10 @@ struct StubbableMacroTests {
         var status: ExtractionStatus { get }
       }
 
-      #if DEBUG
       @Observable
       class StubExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -241,13 +311,11 @@ struct StubbableMacroTests {
         var theme: Theme { get }
       }
 
-      #if DEBUG
       @Observable
       class StubExtractionService: ExtractionService {
         var count: Int = 0
         var theme: Theme! = nil
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -270,14 +338,12 @@ struct StubbableMacroTests {
         var name: String { get }
       }
 
-      #if DEBUG
       @Observable
       class StubExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
         var count: Int = 0
         var name: String = ""
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -296,12 +362,10 @@ struct StubbableMacroTests {
         var updates: AsyncStream<Int> { get }
       }
 
-      #if DEBUG
       @Observable
       class StubStreamService: StreamService {
         var updates: AsyncStream<Int> = AsyncStream { $0.finish() }
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -320,12 +384,10 @@ struct StubbableMacroTests {
         var tags: Set<String> { get }
       }
 
-      #if DEBUG
       @Observable
       class StubTagService: TagService {
         var tags: Set<String> = []
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -344,12 +406,10 @@ struct StubbableMacroTests {
         func perform(with item: Item) async throws
       }
 
-      #if DEBUG
       @Observable
       class StubItemService: ItemService {
         func perform(with item: Item) async throws { }
       }
-      #endif
       """,
       macros: testMacros)
   }
@@ -452,12 +512,10 @@ struct StubbableMacroTests {
         subscript(index: Int) -> String { get }
       }
 
-      #if DEBUG
       @Observable
       class StubHasSubscript: HasSubscript {
         var name: String = ""
       }
-      #endif
       """,
       diagnostics: [
         DiagnosticSpec(message: "@Stubbable skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),

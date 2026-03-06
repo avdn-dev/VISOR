@@ -47,8 +47,10 @@ public struct StubbableMacro: PeerMacro {
 
     let properties = analysis.properties
     let methods = analysis.methods
+    let access = accessLevel(of: protocolDecl)
+    let prefix = access.isEmpty ? "" : "\(access) "
 
-    var members = generatePropertyDeclarations(properties)
+    var members = generatePropertyDeclarations(properties, access: access)
 
     // Generate methods
     for method in methods {
@@ -56,28 +58,31 @@ public struct StubbableMacro: PeerMacro {
         let defaultVal = defaultValue(for: returnType)
         let retVarName = "\(method.name)ReturnValue"
         if let defaultVal {
-          members.append("  var \(retVarName): \(returnType) = \(defaultVal)")
+          members.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
         } else {
-          members.append("  var \(retVarName): \(returnType)!")
+          members.append("  \(prefix)var \(retVarName): \(returnType)!")
         }
-        let sig = buildMethodSignature(method)
+        let sig = buildMethodSignature(method, access: access)
         members.append("  \(sig) { \(retVarName) }")
       } else {
-        let sig = buildMethodSignature(method)
+        let sig = buildMethodSignature(method, access: access)
         members.append("  \(sig) { }")
       }
+    }
+
+    // Public classes need an explicit init (the synthesized default init is internal)
+    if access == "public" {
+      members.append("  public init() {}")
     }
 
     let body = members.joined(separator: "\n")
     let stubName = "Stub\(protocolName)"
 
     let result: DeclSyntax = """
-      #if DEBUG
       @Observable
-      class \(raw: stubName): \(raw: protocolName) {
+      \(raw: prefix)class \(raw: stubName): \(raw: protocolName) {
       \(raw: body)
       }
-      #endif
       """
     return [result]
   }
