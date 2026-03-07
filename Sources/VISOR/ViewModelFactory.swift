@@ -21,11 +21,7 @@ import Observation
 /// CameraViewModel.Factory { CameraViewModel(service: liveService) }
 /// ```
 ///
-/// Usage (preview via `PreviewProviding`):
-/// ```swift
-/// .previewFactory(for: CameraViewModel.self)
-/// ```
-/// - Note: `@Observable` is required for `@Environment` injection even though all
+/// - Note: `@Observable` is required for `@Environment` injection even though
 ///   stored properties are `@ObservationIgnored`.
 @Observable
 public final class ViewModelFactory<VM: ViewModel> {
@@ -52,16 +48,4 @@ public final class ViewModelFactory<VM: ViewModel> {
   public func makeViewModel(router: AnyObject? = nil) -> VM {
     _make(router)
   }
-}
-
-// MARK: - PreviewProviding
-
-/// Marker protocol enabling `ViewModelFactory<VM>.preview`.
-///
-/// `@ViewModel` auto-generates conformance and a `static var preview` member.
-/// In DEBUG, the preview uses `Stub*` types for dependencies.
-/// In release, a fatalError fallback satisfies the conformance (never called).
-public protocol PreviewProviding {
-  associatedtype PreviewInstance = Self
-  static var preview: PreviewInstance { get }
 }

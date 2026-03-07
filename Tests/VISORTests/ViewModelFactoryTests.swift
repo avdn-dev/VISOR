@@ -7,7 +7,7 @@ import Testing
 
 @Observable
 @MainActor
-private final class FactoryTestVM: ViewModel, PreviewProviding {
+private final class FactoryTestVM: ViewModel {
   struct State: Equatable {
     var value = 0
   }
@@ -16,10 +16,6 @@ private final class FactoryTestVM: ViewModel, PreviewProviding {
 
   init(value: Int = 0) {
     self.initialValue = value
-  }
-
-  static var preview: FactoryTestVM {
-    FactoryTestVM(value: 42)
   }
 }
 
@@ -69,13 +65,6 @@ struct ViewModelFactoryTests {
     #expect(a !== b)
   }
 
-  @Test
-  func `preview works with PreviewProviding type`() {
-    let factory = ViewModelFactory<FactoryTestVM>.preview
-    let vm = factory.makeViewModel()
-    #expect(vm.initialValue == 42)
-  }
-
   // MARK: - Routed Factory Tests
 
   @Test
@@ -110,16 +99,6 @@ struct ViewModelFactoryTests {
     }
     let result = factory.makeViewModel(router: router)
     #expect(result.routerID == ObjectIdentifier(router))
-  }
-
-  // MARK: - Preview Factory Fresh Instances
-
-  @Test
-  func `preview factory creates fresh instance each call`() {
-    let factory = ViewModelFactory<FactoryTestVM>.preview
-    let a = factory.makeViewModel()
-    let b = factory.makeViewModel()
-    #expect(a !== b)
   }
 
   // MARK: - Closure Captures External State

@@ -198,40 +198,10 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 8. Generate static var preview
-    let preview: DeclSyntax
-    if properties.isEmpty {
-      preview = """
-        #if DEBUG
-        static var preview: \(raw: className) {
-          \(raw: className)()
-        }
-        #endif
-        """
-    } else {
-      let stubArgs = properties.map { prop in
-        if prop.isRouterType {
-          return "\(prop.name): \(prop.type)()"
-        }
-        return "\(prop.name): Stub\(prop.type)()"
-      }.joined(separator: ",\n      ")
-
-      preview = """
-        #if DEBUG
-        static var preview: \(raw: className) {
-          \(raw: className)(
-            \(raw: stubArgs)
-          )
-        }
-        #endif
-        """
-    }
-    members.append(preview)
-
     return members
   }
 
-  // MARK: - ExtensionMacro (adds ViewModel + PreviewProviding conformance)
+  // MARK: - ExtensionMacro (adds ViewModel conformance)
 
   public static func expansion(
     of _: AttributeSyntax,
@@ -241,21 +211,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     in _: some MacroExpansionContext)
     throws -> [ExtensionDeclSyntax]
   {
-    let name = type.trimmedDescription
-
     let viewModelExt = makeProtocolExtension(for: type, conformingTo: "ViewModel")
 
-    // PreviewProviding conformance.
-    // In DEBUG the witness is the generated `static var preview` member.
-    // In release a fatalError fallback satisfies the requirement (never called).
-    let previewExt: DeclSyntax = """
-      extension \(raw: name): PreviewProviding {
-        #if !DEBUG
-        static var preview: \(raw: name) { fatalError() }
-        #endif
-      }
-      """
-
-    return [viewModelExt, previewExt.cast(ExtensionDeclSyntax.self)]
+    return [viewModelExt]
   }
 }

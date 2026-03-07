@@ -26,7 +26,7 @@ struct ViewModelMacroTests {
   // MARK: - Init Generation
 
   @Test
-  func `Generates memberwise init, Factory typealias, preview, and PreviewProviding`() {
+  func `Generates memberwise init and Factory typealias`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -54,26 +54,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService(),
-              store: StubDataStore()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -108,25 +91,9 @@ struct ViewModelMacroTests {
         private let service: MyService
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -161,25 +128,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -212,25 +163,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -242,7 +177,7 @@ struct ViewModelMacroTests {
   // MARK: - No Dependencies
 
   @Test
-  func `No dependencies produces Factory typealias and empty preview`() {
+  func `No dependencies produces Factory typealias only`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -257,23 +192,9 @@ struct ViewModelMacroTests {
         var state = State()
 
           typealias Factory = ViewModelFactory<SimpleViewModel>
-
-          #if DEBUG
-          static var preview: SimpleViewModel {
-            SimpleViewModel()
-          }
-          #endif
       }
 
       extension SimpleViewModel: @MainActor ViewModel {
-      }
-
-      extension SimpleViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: SimpleViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -308,25 +229,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       macros: testMacros)
@@ -414,25 +319,9 @@ struct ViewModelMacroTests {
           func startObserving() async {
               await observeIsCameraDenied()
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              permissionService: StubPermissionService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -497,25 +386,9 @@ struct ViewModelMacroTests {
                   group.addTask { await self.observeConnections() }
               }
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              connectionService: StubConnectionService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -586,27 +459,9 @@ struct ViewModelMacroTests {
                   group.addTask { await self.observeIsSending() }
               }
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              widgetService: StubWidgetService(),
-              connectionService: StubConnectionService(),
-              sharingService: StubSharingService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -641,25 +496,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -695,25 +534,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -749,25 +572,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -803,25 +610,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -859,25 +650,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -914,25 +689,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       macros: testMacros)
@@ -966,25 +725,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1011,23 +754,9 @@ struct ViewModelMacroTests {
         var state = State()
 
           typealias Factory = ViewModelFactory<SimpleViewModel>
-
-          #if DEBUG
-          static var preview: SimpleViewModel {
-            SimpleViewModel()
-          }
-          #endif
       }
 
       extension SimpleViewModel: @MainActor ViewModel {
-      }
-
-      extension SimpleViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: SimpleViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       macros: testMacros)
@@ -1070,25 +799,9 @@ struct ViewModelMacroTests {
           func startObserving() async {
               await observeHandleDeepLink()
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              router: StubDeepLinkRouter()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1132,25 +845,9 @@ struct ViewModelMacroTests {
           func startObserving() async {
               await observeHandleUploadState()
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              uploadService: StubUploadService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1210,26 +907,9 @@ struct ViewModelMacroTests {
                   group.addTask { await self.observeHandleDeepLink() }
               }
           }
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              service: StubMyService(),
-              router: StubDeepLinkRouter()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1263,25 +943,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              router: StubDeepLinkRouter()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1294,7 +958,7 @@ struct ViewModelMacroTests {
   // MARK: - Router Type Detection
 
   @Test
-  func `Router property uses direct init instead of Stub prefix`() {
+  func `Router property included in init`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -1318,26 +982,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              router: Router<AppScene>(),
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1388,25 +1035,9 @@ struct ViewModelMacroTests {
                   self.updateState(\\.items, to: value)
               }
           }
-
-          #if DEBUG
-          static var preview: ItemsViewModel {
-            ItemsViewModel(
-              service: StubMyService()
-            )
-          }
-          #endif
       }
 
       extension ItemsViewModel: @MainActor ViewModel {
-      }
-
-      extension ItemsViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: ItemsViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [
@@ -1438,26 +1069,9 @@ struct ViewModelMacroTests {
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          #if DEBUG
-          static var preview: MyViewModel {
-            MyViewModel(
-              serviceA: StubServiceA(),
-              serviceB: StubServiceB()
-            )
-          }
-          #endif
       }
 
       extension MyViewModel: @MainActor ViewModel {
-      }
-
-      extension MyViewModel: PreviewProviding {
-          #if !DEBUG
-          static var preview: MyViewModel {
-              fatalError()
-          }
-          #endif
       }
       """,
       diagnostics: [

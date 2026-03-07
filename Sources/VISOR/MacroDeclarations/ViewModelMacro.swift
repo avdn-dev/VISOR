@@ -11,9 +11,7 @@
 /// 1. Memberwise `init` from stored `let` properties (skipped if init already exists)
 /// 2. `ViewModel` protocol conformance via extension
 /// 3. `typealias Factory = ViewModelFactory<ClassName>`
-/// 4. `static var preview` (using `Stub*` types for dependencies)
-/// 5. `PreviewProviding` conformance
-/// 6. `startObserving()` combining `@Bound` (from State struct) and `@Reaction` observation methods
+/// 4. `startObserving()` combining `@Bound` (from State struct) and `@Reaction` observation methods
 ///
 /// ## State + Action pattern
 ///
@@ -74,8 +72,8 @@
 /// **Important:** Do not store the Task from calling `startObserving()` on `self`
 /// (e.g. `self.task = Task { await self.startObserving() }`), as this creates a
 /// retain cycle. Use SwiftUI's `.task` modifier or the `observing()` test DSL instead.
-@attached(member, names: named(init), named(Factory), named(preview), named(startObserving), arbitrary)
-@attached(extension, conformances: ViewModel, PreviewProviding)
+@attached(member, names: named(init), named(Factory), named(startObserving), arbitrary)
+@attached(extension, conformances: ViewModel)
 public macro ViewModel() = #externalMacro(
   module: "VISORMacros",
   type: "ViewModelMacro")
