@@ -290,8 +290,6 @@ struct ClassAnalysis {
   var hasStartObserving = false
   var startObservingBodyText: String?
   var hasInitializer = false
-  var hasUserDeclaredState = false
-
   // v2: Action/perform detection
   var hasActionEnum = false
   var hasPerformMethod = false
@@ -353,10 +351,6 @@ struct ClassAnalysis {
             let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
           else {
             continue
-          }
-
-          if identifier.identifier.text == "state" {
-            hasUserDeclaredState = true
           }
 
           // Detect v1 @Bound on class-level var (migration warning)
