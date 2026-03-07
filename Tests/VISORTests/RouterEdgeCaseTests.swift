@@ -114,4 +114,73 @@ struct RouterEdgeCaseTests {
     router.popToRoot()
     #expect(router.navigationPath.isEmpty)
   }
+
+  // MARK: - Different sheet overwrites previous
+
+  @Test
+  func `presenting different sheet overwrites previous`() {
+    let router = Router<TestScene>(level: 0)
+    router.present(sheet: .preferences)
+    router.present(sheet: .profile)
+    #expect(router.presentingSheet == .profile)
+  }
+
+  // MARK: - Different fullScreen overwrites previous
+
+  @Test
+  func `presenting different fullScreen overwrites previous`() {
+    let router = Router<TestScene>(level: 0)
+    router.present(fullScreen: .onboarding)
+    router.present(fullScreen: .tutorial)
+    #expect(router.presentingFullScreen == .tutorial)
+  }
+
+  // MARK: - Grandchild setActive
+
+  @Test
+  func `grandchild setActive deactivates direct parent`() {
+    let root = Router<TestScene>(level: 0)
+    let child = root.childRouter(for: .home)
+    let grandchild = child.childRouter(for: .home)
+
+    // setActive only resignActive on direct parent, not grandparent
+    child.setActive()
+    grandchild.setActive()
+    #expect(grandchild.isActive)
+    #expect(!child.isActive)
+    // root was already deactivated when child.setActive() was called
+    #expect(!root.isActive)
+  }
+
+  // MARK: - resignActive on root then setActive restores
+
+  @Test
+  func `resignActive on root then setActive restores`() {
+    let root = Router<TestScene>(level: 0)
+    #expect(root.isActive)
+
+    root.resignActive()
+    #expect(!root.isActive)
+
+    root.setActive()
+    #expect(root.isActive)
+  }
+
+  // MARK: - Child state preserved across tab switches
+
+  @Test
+  func `childRouter state preserved across tab switches`() {
+    let root = Router<TestScene>(level: 0)
+    let homeChild = root.childRouter(for: .home)
+    let settingsChild = root.childRouter(for: .settings)
+
+    homeChild.push(.detail(id: "home-1"))
+    settingsChild.push(.detail(id: "settings-1"))
+
+    root.select(tab: .settings)
+    root.select(tab: .home)
+
+    #expect(homeChild.navigationPath == [.detail(id: "home-1")])
+    #expect(settingsChild.navigationPath == [.detail(id: "settings-1")])
+  }
 }

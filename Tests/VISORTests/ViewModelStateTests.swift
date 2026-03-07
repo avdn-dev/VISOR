@@ -144,4 +144,90 @@ struct ViewModelStateTests {
     let set = Set(states)
     #expect(set.count == 4)
   }
+
+  // MARK: - Sendable
+
+  @Test
+  func `Sendable conformance allows cross-isolation transfer`() async {
+    let state: ViewModelState<Int> = .loaded(state: 42)
+    let result = await Task.detached { state }.value
+    #expect(result == .loaded(state: 42))
+  }
+
+  // MARK: - Void State
+
+  @Test
+  func `Works with Void state type`() {
+    let loaded: ViewModelState<Void> = .loaded(state: ())
+    #expect(loaded.loadedState != nil)
+
+    let loading: ViewModelState<Void> = .loading
+    #expect(loading.loadedState == nil)
+
+    let empty: ViewModelState<Void> = .empty
+    #expect(empty.loadedState == nil)
+
+    let error: ViewModelState<Void> = .error("fail")
+    #expect(error.loadedState == nil)
+  }
+
+  // MARK: - Nested State
+
+  @Test
+  func `Nested ViewModelState type`() {
+    let inner: ViewModelState<Int> = .loaded(state: 5)
+    let outer: ViewModelState<ViewModelState<Int>> = .loaded(state: inner)
+    #expect(outer.loadedState == .loaded(state: 5))
+  }
+
+  // MARK: - Dictionary State
+
+  @Test
+  func `loadedState with dictionary state`() {
+    let state: ViewModelState<[String: Int]> = .loaded(state: ["a": 1, "b": 2])
+    #expect(state.loadedState == ["a": 1, "b": 2])
+  }
+
+  // MARK: - Tuple-like Struct State
+
+  @Test
+  func `loadedState with tuple-like struct`() {
+    struct Pair: Equatable { let first: Int; let second: String }
+    let state: ViewModelState<Pair> = .loaded(state: Pair(first: 1, second: "x"))
+    #expect(state.loadedState == Pair(first: 1, second: "x"))
+  }
+
+  // MARK: - Switch Exhaustiveness
+
+  @Test
+  func `switch exhaustiveness covers all cases`() {
+    let cases: [ViewModelState<Int>] = [.loading, .empty, .loaded(state: 0), .error("x")]
+    var branchesHit = 0
+    for state in cases {
+      switch state {
+      case .loading: branchesHit += 1
+      case .empty: branchesHit += 1
+      case .loaded: branchesHit += 1
+      case .error: branchesHit += 1
+      }
+    }
+    #expect(branchesHit == 4)
+  }
+
+  // MARK: - Pairwise Inequality
+
+  @Test
+  func `Equatable loaded vs error are not equal`() {
+    let a: ViewModelState<Int> = .loaded(state: 0)
+    let b: ViewModelState<Int> = .error("zero")
+    #expect(a != b)
+  }
+
+  // MARK: - Hashable Distinct Errors
+
+  @Test
+  func `Hashable different error messages produce distinct set entries`() {
+    let set: Set<ViewModelState<Int>> = [.error("a"), .error("b")]
+    #expect(set.count == 2)
+  }
 }

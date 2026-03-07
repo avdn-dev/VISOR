@@ -186,4 +186,126 @@ struct ObservationSequenceTests {
     #expect(u1 == 55)
     #expect(u2 == 55)
   }
+
+  // MARK: - Deduplicating: same value twice then different
+
+  @Test(.timeLimit(.minutes(1)))
+  func `deduplicating same value twice then different`() async throws {
+    let service = TestService()
+
+    var received = [Int]()
+    let task = Task {
+      for await value in ObservationSequence(deduplicating: { service.count }).stream {
+        received.append(value)
+        if received.count >= 3 { break }
+      }
+    }
+
+    try await yieldForTracking()
+
+    service.count = 5
+    try await yieldForTracking()
+
+    // Same value again — should be skipped
+    service.count = 5
+    try await yieldForTracking()
+
+    service.count = 10
+    _ = await task.value
+    #expect(received == [0, 5, 10])
+  }
+
+  // MARK: - Observing string property
+
+  @Test(.timeLimit(.minutes(1)))
+  func `observing string property`() async throws {
+    let service = TestService()
+
+    var iterator = ObservationSequence { service.name }.stream.makeAsyncIterator()
+    let initial = await iterator.next()
+    #expect(initial == "initial")
+
+    try await yieldForTracking()
+
+    service.name = "updated"
+    let updated = await iterator.next()
+    #expect(updated == "updated")
+  }
+
+  // MARK: - Untracked property change does not trigger emission
+
+  @Test(.timeLimit(.minutes(1)))
+  func `untracked property change does not trigger emission`() async throws {
+    let service = TestService()
+
+    var countEmissions = 0
+    let task = Task {
+      for await _ in ObservationSequence({ service.count }).stream {
+        countEmissions += 1
+        if countEmissions >= 2 { break }
+      }
+    }
+
+    try await yieldForTracking()
+
+    // Change a different property — should NOT trigger count stream
+    service.name = "changed"
+    try await Task.sleep(for: .milliseconds(100))
+
+    // Now change count to trigger the second emission and break
+    service.count = 1
+
+    _ = await task.value
+    #expect(countEmissions == 2)
+  }
+
+  // MARK: - Iterator returns nil after stream finishes
+
+  @Test(.timeLimit(.minutes(1)))
+  func `iterator returns nil after stream finishes`() async throws {
+    let service = TestService()
+    let stream = ObservationSequence { service.count }.stream
+
+    let task = Task {
+      var count = 0
+      for await _ in stream {
+        count += 1
+      }
+      return count
+    }
+
+    try await yieldForTracking()
+    task.cancel()
+    let emitted = await task.value
+    // After cancellation the for-await loop exits (next returns nil)
+    #expect(emitted >= 1)
+  }
+
+  // MARK: - Deduplicating init with string type
+
+  @Test(.timeLimit(.minutes(1)))
+  func `deduplicating init with string type`() async throws {
+    let service = TestService()
+
+    var received = [String]()
+    let task = Task {
+      for await value in ObservationSequence(deduplicating: { service.name }).stream {
+        received.append(value)
+        if received.count >= 3 { break }
+      }
+    }
+
+    try await yieldForTracking()
+
+    service.name = "hello"
+    try await yieldForTracking()
+
+    // Same value — should be skipped
+    service.name = "hello"
+    try await yieldForTracking()
+
+    service.name = "world"
+    _ = await task.value
+    #expect(received == ["initial", "hello", "world"])
+  }
 }

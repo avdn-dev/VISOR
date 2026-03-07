@@ -19,6 +19,7 @@ enum TestPush: PushDestination {
 
 enum TestSheet: String, SheetDestination {
   case preferences
+  case profile
 
   var id: String { rawValue }
 
@@ -29,6 +30,7 @@ enum TestSheet: String, SheetDestination {
 
 enum TestFullScreen: String, FullScreenDestination {
   case onboarding
+  case tutorial
 
   var id: String { rawValue }
 

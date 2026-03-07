@@ -373,4 +373,130 @@ struct RouterTests {
 
     #expect(root.selectedTab == nil) // root was inactive, ignored
   }
+
+  // MARK: - Navigate to all 4 destination types
+
+  @Test
+  func `navigate to all 4 destination types in sequence`() {
+    let router = Router<TestScene>(level: 0)
+
+    router.navigate(to: .tab(.settings))
+    #expect(router.selectedTab == .settings)
+
+    router.navigate(to: .push(.detail(id: "1")))
+    #expect(router.navigationPath == [.detail(id: "1")])
+
+    router.navigate(to: .sheet(.preferences))
+    #expect(router.presentingSheet == .preferences)
+
+    router.navigate(to: .fullScreen(.onboarding))
+    #expect(router.presentingFullScreen == .onboarding)
+  }
+
+  // MARK: - Case-insensitive scheme
+
+  @Test
+  func `configureDeepLinks is case-insensitive for scheme`() {
+    let root = Router<TestScene>(level: 0)
+    root.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["settings"], destination: .tab(.settings)),
+    ])
+
+    let result = root.deepLinkHandler?(URL(string: "TEST://settings")!)
+    #expect(result == .tab(.settings))
+  }
+
+  // MARK: - Empty parsers
+
+  @Test
+  func `configureDeepLinks with empty parsers returns nil`() {
+    let root = Router<TestScene>(level: 0)
+    root.configureDeepLinks(scheme: "test", parsers: [])
+
+    let result = root.deepLinkHandler?(URL(string: "test://settings")!)
+    #expect(result == nil)
+  }
+
+  // MARK: - No parser matches
+
+  @Test
+  func `configureDeepLinks when no parser matches returns nil`() {
+    let root = Router<TestScene>(level: 0)
+    root.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["settings"], destination: .tab(.settings)),
+    ])
+
+    let result = root.deepLinkHandler?(URL(string: "test://unknown")!)
+    #expect(result == nil)
+  }
+
+  // MARK: - Direct deepLinkHandler assignment
+
+  @Test
+  func `deepLinkHandler set directly works`() {
+    let root = Router<TestScene>(level: 0)
+    root.deepLinkHandler = { _ in .tab(.home) }
+
+    let result = root.deepLinkHandler?(URL(string: "anything://whatever")!)
+    #expect(result == .tab(.home))
+  }
+
+  // MARK: - Deep link sheet on active root
+
+  @Test
+  func `deep link sheet on active root presents sheet`() {
+    let root = Router<TestScene>(level: 0)
+    root.deepLinkOpen(to: .sheet(.preferences))
+    #expect(root.presentingSheet == .preferences)
+  }
+
+  // MARK: - setActive idempotent
+
+  @Test
+  func `setActive is idempotent`() {
+    let root = Router<TestScene>(level: 0)
+    let child = root.childRouter(for: .home)
+
+    child.setActive()
+    child.setActive()
+    #expect(child.isActive)
+    #expect(!root.isActive)
+  }
+
+  // MARK: - selectAndPush preserves existing path
+
+  @Test
+  func `selectAndPush on child with existing items preserves path`() {
+    let root = Router<TestScene>(level: 0)
+    let child = root.childRouter(for: .settings)
+    child.push(.nested)
+
+    root.selectAndPush(tab: .settings, destination: .detail(id: "new"))
+    #expect(child.navigationPath == [.nested, .detail(id: "new")])
+    #expect(root.selectedTab == .settings)
+  }
+
+  // MARK: - selectAndPush then popToRoot on child
+
+  @Test
+  func `selectAndPush then popToRoot on child clears only child`() {
+    let root = Router<TestScene>(level: 0)
+    root.selectAndPush(tab: .settings, destination: .detail(id: "1"))
+    let child = root.childRouter(for: .settings)
+
+    child.popToRoot()
+    #expect(child.navigationPath.isEmpty)
+    #expect(root.selectedTab == .settings)
+  }
+
+  // MARK: - Child router propagates deepLinkHandler
+
+  @Test
+  func `childRouter propagates deepLinkHandler on creation`() {
+    let root = Router<TestScene>(level: 0)
+    root.deepLinkHandler = { _ in .tab(.home) }
+
+    let child = root.childRouter(for: .home)
+    #expect(child.deepLinkHandler != nil)
+  }
 }

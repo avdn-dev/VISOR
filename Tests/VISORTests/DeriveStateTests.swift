@@ -11,6 +11,89 @@ private final class CounterSource {
     var count = 0
 }
 
+/// Simulates a boolean flag dependency.
+@Observable
+@MainActor
+private final class FlagSource {
+    var isEnabled = false
+}
+
+/// ViewModel with no external dependencies — derives state from internal properties only.
+@Observable
+@MainActor
+private final class InternalOnlyViewModel: ViewModel {
+    private(set) var state: ViewModelState<String> = .loading
+
+    var text = ""
+    var isReady = false
+
+    func computeState() -> ViewModelState<String> {
+        if !isReady { return .loading }
+        if text.isEmpty { return .empty }
+        return .loaded(state: text)
+    }
+
+    func deriveState() async {
+        for await newState in valuesOf({ self.computeState() }) {
+            self.state = newState
+        }
+    }
+
+    func startObserving() async {
+        await deriveState()
+    }
+}
+
+/// ViewModel depending on both CounterSource and FlagSource.
+@Observable
+@MainActor
+private final class MultiSourceViewModel: ViewModel {
+    private(set) var state: ViewModelState<String> = .loading
+
+    private var count = 0
+    private var isEnabled = false
+
+    private let counterSource: CounterSource
+    private let flagSource: FlagSource
+
+    init(counterSource: CounterSource, flagSource: FlagSource) {
+        self.counterSource = counterSource
+        self.flagSource = flagSource
+    }
+
+    func computeState() -> ViewModelState<String> {
+        if !isEnabled { return .empty }
+        if count == 0 { return .loading }
+        return .loaded(state: "count=\(count)")
+    }
+
+    func startObserving() async {
+        await withDiscardingTaskGroup { group in
+            group.addTask { await self.deriveState() }
+            group.addTask { await self.observeCounter() }
+            group.addTask { await self.observeFlag() }
+        }
+    }
+
+    private func deriveState() async {
+        for await newState in valuesOf({ self.computeState() }) {
+            self.state = newState
+        }
+    }
+
+    private func observeCounter() async {
+        for await value in valuesOf({ self.counterSource.count }) {
+            self.count = value
+        }
+    }
+
+    private func observeFlag() async {
+        for await value in valuesOf({ self.flagSource.isEnabled }) {
+            self.isEnabled = value
+        }
+    }
+}
+
 /// ViewModel using the computeState() pattern.
 /// Manually implements what `@ViewModel` would generate (stored state, deriveState,
 /// startObserving) so the runtime behavior can be tested independently of the macro.
@@ -256,5 +339,150 @@ struct DeriveStateTests {
         observeTask.cancel()
 
         #expect(stateEmissions == [.loading, .empty, .loaded(state: 5), .loaded(state: 10)])
+    }
+
+    // MARK: - Internal-Only VM
+
+    @Test(.timeLimit(.minutes(1)))
+    func `internal-only VM derives state without external dependencies`() async {
+        let vm = InternalOnlyViewModel()
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .loading)
+
+            vm.isReady = true
+            await expect(\.state, equals: .empty)
+
+            vm.text = "hello"
+            await expect(\.state, equals: .loaded(state: "hello"))
+        }
+    }
+
+    // MARK: - Multiple Service Dependencies
+
+    @Test(.timeLimit(.minutes(1)))
+    func `multiple service dependencies feeding computeState`() async {
+        let counter = CounterSource()
+        let flag = FlagSource()
+        let vm = MultiSourceViewModel(counterSource: counter, flagSource: flag)
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .empty)
+
+            flag.isEnabled = true
+            await expect(\.state, equals: .loading)
+
+            counter.count = 5
+            await expect(\.state, equals: .loaded(state: "count=5"))
+        }
+    }
+
+    // MARK: - State Stable After Cancellation
+
+    @Test(.timeLimit(.minutes(1)))
+    func `state stable after observation task cancelled`() async throws {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        let task = Task { await vm.startObserving() }
+        try await yieldForTracking()
+        try await yieldForTracking()
+
+        source.count = 5
+        try await yieldForTracking()
+
+        task.cancel()
+        try await Task.sleep(for: .milliseconds(100))
+
+        let stateAfterCancel = vm.state
+        source.count = 999
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(vm.state == stateAfterCancel)
+    }
+
+    // MARK: - Restart Observation After Cancellation
+
+    @Test(.timeLimit(.minutes(1)))
+    func `restart observation after cancellation`() async throws {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        // First observation
+        let task1 = Task { await vm.startObserving() }
+        try await yieldForTracking()
+        try await yieldForTracking()
+
+        source.count = 3
+        try await yieldForTracking()
+
+        task1.cancel()
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Second observation
+        await observing(vm) { expect in
+            await expect(\.state, equals: .loaded(state: 3))
+
+            source.count = 10
+            await expect(\.state, equals: .loaded(state: 10))
+        }
+    }
+
+    // MARK: - Interleaved Loading and Error
+
+    @Test(.timeLimit(.minutes(1)))
+    func `interleaved loading and error settle correctly`() async {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .empty)
+
+            vm.load()
+            await expect(\.state, equals: .loading)
+
+            vm.setError("oops")
+            vm.finishLoading()
+            // Error takes priority
+            await expect(\.state, satisfies: {
+                if case .error = $0 { return true }
+                return false
+            })
+
+            vm.clearError()
+            await expect(\.state, equals: .empty)
+        }
+    }
+
+    // MARK: - Empty to Loaded
+
+    @Test(.timeLimit(.minutes(1)))
+    func `empty to loaded when count goes positive`() async {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .empty)
+
+            source.count = 1
+            await expect(\.state, equals: .loaded(state: 1))
+        }
+    }
+
+    // MARK: - Loaded to Empty
+
+    @Test(.timeLimit(.minutes(1)))
+    func `loaded to empty when count returns to zero`() async {
+        let source = CounterSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state, equals: .empty)
+
+            source.count = 5
+            await expect(\.state, equals: .loaded(state: 5))
+
+            source.count = 0
+            await expect(\.state, equals: .empty)
+        }
     }
 }
