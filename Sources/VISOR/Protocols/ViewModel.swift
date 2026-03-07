@@ -6,8 +6,6 @@
 //
 
 @_exported import Observation
-import SwiftUI
-
 // MARK: - Loadable
 
 /// A standalone enum for per-field loading semantics within State structs.
@@ -116,18 +114,3 @@ extension ViewModel {
   }
 }
 
-// MARK: - binding(for:action:) (action-routed Binding helper)
-
-extension ViewModel {
-  /// Creates a `Binding` that routes writes through `perform` for full dedup + logging.
-  /// Used for fields where mutation has side effects.
-  public func binding<V>(
-    for keyPath: WritableKeyPath<State, V>,
-    action: @escaping (V) -> Action
-  ) -> Binding<V> {
-    Binding(
-      get: { self.state[keyPath: keyPath] },
-      set: { self.send(action($0)) }
-    )
-  }
-}
