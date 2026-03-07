@@ -27,19 +27,19 @@ public struct NavigationContainer<Scene: NavigationScene, Content: View>: View {
   public init(
     parentRouter: Router<Scene>,
     tab: Scene.Tab,
-    @ViewBuilder content: @escaping () -> Content)
+    @ViewBuilder content: () -> Content)
   {
     self._router = State(initialValue: parentRouter.childRouter(for: tab))
-    self.content = content
+    self.content = content()
   }
 
   /// Create a NavigationContainer for a modal (sheet or full-screen cover).
   public init(
     parentRouter: Router<Scene>,
-    @ViewBuilder content: @escaping () -> Content)
+    @ViewBuilder content: () -> Content)
   {
     self._router = State(initialValue: parentRouter.childRouter())
-    self.content = content
+    self.content = content()
   }
 
   // MARK: Public
@@ -60,7 +60,7 @@ public struct NavigationContainer<Scene: NavigationScene, Content: View>: View {
   // MARK: Private
 
   @State private var router: Router<Scene>
-  private let content: () -> Content
+  private let content: Content
 }
 
 // MARK: - InnerContainer
@@ -71,11 +71,11 @@ public struct NavigationContainer<Scene: NavigationScene, Content: View>: View {
 private struct InnerContainer<Scene: NavigationScene, Content: View>: View {
 
   @Bindable var router: Router<Scene>
-  let content: () -> Content
+  let content: Content
 
   var body: some View {
     NavigationStack(path: $router.navigationPath) {
-      content()
+      content
         .navigationDestination(for: Scene.Push.self) { destination in
           destination.destinationView
         }

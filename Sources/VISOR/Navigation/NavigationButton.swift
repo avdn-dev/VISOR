@@ -15,28 +15,28 @@ public struct NavigationButton<Scene: NavigationScene, Label: View>: View {
   /// Create a button that pushes a destination.
   public init(
     push destination: Scene.Push,
-    @ViewBuilder label: @escaping () -> Label)
+    @ViewBuilder label: () -> Label)
   {
     action = { router in router.push(destination) }
-    self.label = label
+    self.label = label()
   }
 
   /// Create a button that presents a sheet.
   public init(
     sheet destination: Scene.Sheet,
-    @ViewBuilder label: @escaping () -> Label)
+    @ViewBuilder label: () -> Label)
   {
     action = { router in router.present(sheet: destination) }
-    self.label = label
+    self.label = label()
   }
 
   /// Create a button that presents a full-screen cover.
   public init(
     fullScreen destination: Scene.FullScreen,
-    @ViewBuilder label: @escaping () -> Label)
+    @ViewBuilder label: () -> Label)
   {
     action = { router in router.present(fullScreen: destination) }
-    self.label = label
+    self.label = label()
   }
 
   // MARK: Public
@@ -45,7 +45,7 @@ public struct NavigationButton<Scene: NavigationScene, Label: View>: View {
     Button {
       action(router)
     } label: {
-      label()
+      label
     }
   }
 
@@ -53,5 +53,5 @@ public struct NavigationButton<Scene: NavigationScene, Label: View>: View {
 
   @Environment(Router<Scene>.self) private var router
   private let action: (Router<Scene>) -> Void
-  private let label: () -> Label
+  private let label: Label
 }
