@@ -15,8 +15,11 @@
 /// ```swift
 /// @ViewModel
 /// final class ConnectionsViewModel {
-///   @Bound(\Self.connectionService) var isAuthenticated = false
-///   @Bound(\Self.connectionService) var connections: [Connection] = []
+///   struct State: Equatable {
+///     @Bound(\ConnectionsViewModel.connectionService) var isAuthenticated = false
+///     @Bound(\ConnectionsViewModel.connectionService) var connections: [Connection] = []
+///   }
+///   var state = State()
 ///   private let connectionService: ConnectionService
 /// }
 /// ```
