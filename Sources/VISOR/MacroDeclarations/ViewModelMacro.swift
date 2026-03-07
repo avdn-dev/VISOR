@@ -13,44 +13,59 @@
 /// 3. `typealias Factory = ViewModelFactory<ClassName>`
 /// 4. `static var preview` (using `Stub*` types for dependencies)
 /// 5. `PreviewProviding` conformance
-/// 6. `startObserving()` combining `@Bound`, `@Reaction`, and `deriveState()` observation methods
-/// 7. `private(set) var state` + `deriveState()` when `computeState()` is declared
+/// 6. `startObserving()` combining `@Bound` (from State struct) and `@Reaction` observation methods
 ///
-/// ## `computeState()` / `deriveState()`
+/// ## State + Action pattern
 ///
-/// When state depends on multiple internal properties, define a `computeState()` method
-/// returning `ViewModelState<...>` and the macro generates the wiring:
+/// Define a nested `struct State: Equatable` with all view state, and an optional
+/// `enum Action` with a `perform(_ action: Action) async` method:
 ///
 /// ```swift
 /// @Observable
 /// @ViewModel
 /// final class ItemsViewModel {
-///   private var isLoading = false
-///   private var items: [Item] = []
-///
-///   func computeState() -> ViewModelState<ItemsState> {
-///     if isLoading { return .loading }
-///     if items.isEmpty { return .empty }
-///     return .loaded(state: ItemsState(items: items))
+///   struct State: Equatable {
+///     var items: Loadable<[Item]> = .loading
+///     @Bound(\ItemsViewModel.service) var isAuthenticated = false
 ///   }
 ///
-///   private let itemsService: ItemsService
+///   enum Action {
+///     case refresh
+///     case delete(Item.ID)
+///   }
+///
+///   var state = State()
+///
+///   func perform(_ action: Action) async {
+///     switch action {
+///     case .refresh:
+///       updateState(\.items, to: .loading)
+///       let result = await service.fetchAll()
+///       updateState(\.items, to: .loaded(result))
+///     case .delete(let id):
+///       try? await service.delete(id)
+///     }
+///   }
+///
+///   private let service: ItemsService
 /// }
 /// ```
 ///
-/// The macro generates:
-/// - `private(set) var state: ViewModelState<ItemsState> = .loading`
-/// - `func deriveState() async` — observes `computeState()` via `valuesOf()`, writes to `state`
-/// - `startObserving()` includes `deriveState()` alongside any `@Bound`/`@Reaction` observers
+/// ## @Bound inside State
 ///
-/// **Requirements:**
-/// - `computeState()` must return `ViewModelState<...>` and take no parameters
-/// - Cannot coexist with a user-declared `state` property
-/// - If you provide a manual `startObserving()`, include `deriveState()` (warning if missing)
+/// `@Bound` annotations on State struct properties generate observe methods that
+/// use `updateState` for deduplication:
+/// ```swift
+/// func observeIsAuthenticated() async {
+///   for await value in VISOR.valuesOf({ self.service.isAuthenticated }) {
+///     self.updateState(\.isAuthenticated, to: value)
+///   }
+/// }
+/// ```
 ///
 /// ## Generated `startObserving()` and self-capture
 ///
-/// When multiple `@Bound`/`@Reaction`/`deriveState` methods exist, `startObserving()` uses
+/// When multiple `@Bound`/`@Reaction` methods exist, `startObserving()` uses
 /// `withDiscardingTaskGroup` with `group.addTask { await self.observeX() }`.
 /// The strong `self` capture is intentional: structured concurrency guarantees all
 /// child tasks complete before the group returns, so `self` is never retained beyond

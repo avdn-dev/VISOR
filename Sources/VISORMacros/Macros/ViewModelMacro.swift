@@ -63,38 +63,37 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       """
     members.append(typealiasDecl)
 
-    var allObserveMethodNames: [String] = []
-
-    // 3. Generate state property and deriveState() from computeState()
-    if let returnType = analysis.computeStateReturnType {
-      if analysis.hasUserDeclaredState {
-        context.diagnose(Diagnostic(
-          node: Syntax(declaration),
-          message: VISORDiagnostic.computeStateConflictsWithState))
-      } else if !returnType.hasPrefix("ViewModelState<") {
-        context.diagnose(Diagnostic(
-          node: Syntax(declaration),
-          message: VISORDiagnostic.computeStateInvalidReturnType))
-      } else {
-        let stateDecl: DeclSyntax = """
-          private(set) var state: \(raw: returnType) = .loading
-          """
-        members.append(stateDecl)
-
-        allObserveMethodNames.append("deriveState")
-        let deriveMethod: DeclSyntax = """
-          func deriveState() async {
-              for await newState in VISOR.valuesOf({ self.computeState() }) {
-                  self.state = newState
-              }
-          }
-          """
-        members.append(deriveMethod)
-      }
+    // 3. Action/perform diagnostics
+    if analysis.hasActionEnum && !analysis.hasPerformMethod {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.actionWithoutPerform))
     }
 
-    // 4. Generate observe methods from @Bound properties
-    let boundProps = analysis.boundProperties
+    if analysis.hasPerformMethod && !analysis.performIsAsync {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.performNotAsync))
+    }
+
+    // 4. v1 @Bound on class var (migration aid)
+    for name in analysis.classLevelBoundProperties {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.boundOnClassVar(propertyName: name)))
+    }
+
+    // 5. @Bound on let inside State
+    for name in analysis.boundOnLetProperties {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.boundOnLetProperty(propertyName: name)))
+    }
+
+    var allObserveMethodNames: [String] = []
+
+    // 6. Generate observe methods from @Bound properties inside State
+    let boundProps = analysis.stateBoundProperties
     let storedLetNames = Set(properties.map(\.name))
     var validBounds: [BoundPropertyInfo] = []
     for prop in boundProps {
@@ -109,28 +108,29 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 4a. Diagnose malformed @Bound key paths
-    for propertyName in analysis.malformedBoundAttributes {
+    // 6a. Diagnose malformed @Bound key paths inside State
+    for propertyName in analysis.malformedStateBoundAttributes {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName)))
     }
 
-    // Generate observe methods for each @Bound property
+    // Generate observe methods for each @Bound property (using updateState)
     for prop in validBounds {
       let methodName = "observe\(prop.propertyName.capitalizedFirst)"
       allObserveMethodNames.append(methodName)
+      let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax = """
         func \(raw: methodName)() async {
             for await value in VISOR.valuesOf({ self.\(raw: prop.dependencyName).\(raw: prop.propertyName) }) {
-                self.\(raw: prop.propertyName) = value
+                self.updateState(\(raw: keyPath), to: value)
             }
         }
         """
       members.append(observeMethod)
     }
 
-    // 4b. Diagnose invalid @Reaction methods
+    // 6b. Diagnose invalid @Reaction methods
     for methodName in analysis.invalidReactionMethods {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
@@ -162,7 +162,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 5. Generate startObserving() or warn about missing calls in manual implementation
+    // 7. Generate startObserving() or warn about missing calls in manual implementation
     if !allObserveMethodNames.isEmpty {
       if analysis.hasStartObserving {
         // Warn for each generated method not referenced in the manual body
@@ -198,7 +198,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 6. Generate static var preview
+    // 8. Generate static var preview
     let preview: DeclSyntax
     if properties.isEmpty {
       preview = """

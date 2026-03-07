@@ -14,35 +14,24 @@ private final class IntegrationSource {
 @Observable
 @MainActor
 private final class IntegrationVM: ViewModel {
-    private(set) var state: ViewModelState<Int> = .loading
-    private var count = 0
+    struct State: Equatable {
+        var count = 0
+    }
+
+    var state = State()
     private let source: IntegrationSource
 
     init(source: IntegrationSource) {
         self.source = source
     }
 
-    func computeState() -> ViewModelState<Int> {
-        if count == 0 { return .empty }
-        return .loaded(state: count)
-    }
-
     func startObserving() async {
-        await withDiscardingTaskGroup { group in
-            group.addTask { await self.deriveState() }
-            group.addTask { await self.observeCount() }
-        }
-    }
-
-    private func deriveState() async {
-        for await newState in valuesOf({ self.computeState() }) {
-            self.state = newState
-        }
+        await observeCount()
     }
 
     private func observeCount() async {
         for await value in valuesOf({ self.source.count }) {
-            self.count = value
+            self.updateState(\.count, to: value)
         }
     }
 }
@@ -50,8 +39,8 @@ private final class IntegrationVM: ViewModel {
 @Observable
 @MainActor
 private final class RoutedIntegrationVM: ViewModel {
-    typealias State = Void
-    var state: ViewModelState<Void> = .loading
+    struct State: Equatable {}
+    var state = State()
     let routerID: ObjectIdentifier
 
     init(routerID: ObjectIdentifier) {
@@ -65,7 +54,7 @@ private final class RoutedIntegrationVM: ViewModel {
 @MainActor
 struct IntegrationTests {
 
-    // MARK: - Factory → VM → observing
+    // MARK: - Factory -> VM -> observing
 
     @Test(.timeLimit(.minutes(1)))
     func `Factory creates VM that works with observing DSL`() async {
@@ -74,10 +63,10 @@ struct IntegrationTests {
         let vm = factory.makeViewModel()
 
         await observing(vm) { expect in
-            await expect(\.state, equals: .empty)
+            await expect(\.state.count, equals: 0)
 
             source.count = 42
-            await expect(\.state, equals: .loaded(state: 42))
+            await expect(\.state.count, equals: 42)
         }
     }
 
@@ -105,8 +94,8 @@ struct IntegrationTests {
         try? await yieldForTracking()
         try? await yieldForTracking()
 
-        #expect(vm1.state == .loaded(state: 7))
-        #expect(vm2.state == .loaded(state: 7))
+        #expect(vm1.state.count == 7)
+        #expect(vm2.state.count == 7)
     }
 
     // MARK: - Router navigation does not interfere with VM observation
@@ -118,13 +107,13 @@ struct IntegrationTests {
         let router = Router<TestScene>(level: 0)
 
         await observing(vm) { expect in
-            await expect(\.state, equals: .empty)
+            await expect(\.state.count, equals: 0)
 
             router.push(.detail(id: "1"))
             router.present(sheet: .preferences)
 
             source.count = 10
-            await expect(\.state, equals: .loaded(state: 10))
+            await expect(\.state.count, equals: 10)
 
             #expect(router.navigationPath.count == 1)
             #expect(router.presentingSheet == .preferences)
@@ -174,15 +163,15 @@ struct IntegrationTests {
         // First observing block
         await observing(vm) { expect in
             source.count = 1
-            await expect(\.state, equals: .loaded(state: 1))
+            await expect(\.state.count, equals: 1)
         }
 
         // Second observing block picks up current state
         await observing(vm) { expect in
-            await expect(\.state, equals: .loaded(state: 1))
+            await expect(\.state.count, equals: 1)
 
             source.count = 2
-            await expect(\.state, equals: .loaded(state: 2))
+            await expect(\.state.count, equals: 2)
         }
     }
 }

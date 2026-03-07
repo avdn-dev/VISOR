@@ -11,12 +11,12 @@ private final class ObserveSource {
 @Observable
 @MainActor
 private final class BoundViewModel: ViewModel {
-  var state: ViewModelState<String> {
-    isActive ? .loaded(state: "active") : .loading
+  struct State: Equatable {
+    var isActive = false
+    var count = 0
   }
 
-  var isActive = false
-  var count = 0
+  var state = State()
 
   private let source: ObserveSource
 
@@ -30,8 +30,8 @@ private final class BoundViewModel: ViewModel {
 
   private func observeCount() async {
     for await value in valuesOf({ self.source.count }) {
-      self.count = value
-      self.isActive = value > 0
+      self.updateState(\.count, to: value)
+      self.updateState(\.isActive, to: value > 0)
     }
   }
 }
@@ -79,19 +79,19 @@ struct ObserveTests {
 
     try await yieldForTracking()
 
-    // Set to 1 (different from 0 → emits)
+    // Set to 1 (different from 0 -> emits)
     source.count = 1
     try await yieldForTracking()
 
-    // Set to 1 again (same → should NOT emit)
+    // Set to 1 again (same -> should NOT emit)
     source.count = 1
     try await yieldForTracking()
 
-    // Set to 2 (different → emits, third value, loop breaks)
+    // Set to 2 (different -> emits, third value, loop breaks)
     source.count = 2
 
     _ = await task.value
-    // Should be [0, 1, 2] — the duplicate 1 was skipped
+    // Should be [0, 1, 2] -- the duplicate 1 was skipped
     #expect(received == [0, 1, 2])
   }
 
@@ -129,7 +129,7 @@ struct ObserveTests {
     try await yieldForTracking()
     source.count = 1
     try await yieldForTracking()
-    // Same value — non-Equatable overload does NOT deduplicate
+    // Same value -- non-Equatable overload does NOT deduplicate
     source.count = 1
     try await yieldForTracking()
     source.count = 2
@@ -147,7 +147,7 @@ struct ObserveTests {
 
     var received = [String]()
     let task = Task {
-      for await value in valuesOf({ "\(vm.count)-\(vm.isActive)" }) {
+      for await value in valuesOf({ "\(vm.state.count)-\(vm.state.isActive)" }) {
         received.append(value)
         if received.count >= 3 { break }
       }
@@ -261,7 +261,7 @@ struct ObserveLatestTests {
     var completed = [Int]()
     let task = Task {
       await latestValuesOf({ source.count }) { value in
-        // Simulate long-running work — only the latest should complete
+        // Simulate long-running work -- only the latest should complete
         try? await Task.sleep(for: .milliseconds(200))
         if !Task.isCancelled {
           completed.append(value)
@@ -272,7 +272,7 @@ struct ObserveLatestTests {
     // Wait for initial (0) handler to start
     try await yieldForTracking()
 
-    // Rapidly set 1, 2, 3 — only the last should complete its handler
+    // Rapidly set 1, 2, 3 -- only the last should complete its handler
     source.count = 1
     try await Task.sleep(for: .milliseconds(10))
     source.count = 2
@@ -384,7 +384,7 @@ struct ExpectationDSLTests {
 
     await observing(vm) { expect in
       source.count = 42
-      await expect(\.count, equals: 42)
+      await expect(\.state.count, equals: 42)
     }
   }
 
@@ -394,10 +394,10 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      await expect(\.isActive, equals: false)
+      await expect(\.state.isActive, equals: false)
 
       source.count = 1
-      await expect(\.isActive, isNot: false)
+      await expect(\.state.isActive, isNot: false)
     }
   }
 
@@ -408,9 +408,7 @@ struct ExpectationDSLTests {
 
     await observing(vm) { expect in
       source.count = 5
-      await expect(\.state, satisfies: {
-        if case .loaded = $0 { true } else { false }
-      })
+      await expect(\.state.isActive, equals: true)
     }
   }
 
@@ -421,14 +419,14 @@ struct ExpectationDSLTests {
 
     await observing(vm) { expect in
       source.count = 1
-      await expect(\.count, equals: 1)
+      await expect(\.state.count, equals: 1)
     }
 
     // After observing returns, further changes should NOT propagate
-    let countBefore = vm.count
+    let countBefore = vm.state.count
     source.count = 999
     try await Task.sleep(for: .milliseconds(100))
-    #expect(vm.count == countBefore)
+    #expect(vm.state.count == countBefore)
   }
 
   // MARK: - equals returns immediately when already correct
@@ -440,23 +438,7 @@ struct ExpectationDSLTests {
     // count starts at 0
 
     await observing(vm) { expect in
-      await expect(\.count, equals: 0)
-    }
-  }
-
-  // MARK: - satisfies with multi-condition predicate
-
-  @Test(.timeLimit(.minutes(1)))
-  func `satisfies with multi-condition predicate`() async {
-    let source = ObserveSource()
-    let vm = BoundViewModel(source: source)
-
-    await observing(vm) { expect in
-      source.count = 5
-      await expect(\.state, satisfies: {
-        if case .loaded(let s) = $0 { return s == "active" }
-        return false
-      })
+      await expect(\.state.count, equals: 0)
     }
   }
 
@@ -469,7 +451,7 @@ struct ExpectationDSLTests {
     // isActive starts as false
 
     await observing(vm) { expect in
-      await expect(\.isActive, isNot: true)
+      await expect(\.state.isActive, isNot: true)
     }
   }
 
@@ -481,13 +463,13 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      await expect(\.count, equals: 0)
+      await expect(\.state.count, equals: 0)
 
       source.count = 1
-      await expect(\.count, equals: 1)
+      await expect(\.state.count, equals: 1)
 
       source.count = 10
-      await expect(\.count, equals: 10)
+      await expect(\.state.count, equals: 10)
     }
   }
 
@@ -502,7 +484,7 @@ struct ExpectationDSLTests {
     do {
       try await observing(vm) { expect in
         source.count = 1
-        await expect(\.count, equals: 1)
+        await expect(\.state.count, equals: 1)
         throw TestError()
       }
     } catch {
@@ -510,9 +492,9 @@ struct ExpectationDSLTests {
     }
 
     // After throwing, further changes should NOT propagate
-    let countBefore = vm.count
+    let countBefore = vm.state.count
     source.count = 999
     try await Task.sleep(for: .milliseconds(100))
-    #expect(vm.count == countBefore)
+    #expect(vm.state.count == countBefore)
   }
 }

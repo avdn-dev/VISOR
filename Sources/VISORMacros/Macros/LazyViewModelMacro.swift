@@ -11,26 +11,9 @@ import SwiftSyntaxMacros
 
 // MARK: - LazyViewModelMacro
 
-public struct LazyViewModelMacro: MemberMacro, ExtensionMacro {
+public struct LazyViewModelMacro: MemberMacro {
 
   // MARK: Public
-
-  // MARK: ExtensionMacro - adds LazyViewModelView conformance (Mode A only)
-
-  public static func expansion(
-    of _: AttributeSyntax,
-    attachedTo declaration: some DeclGroupSyntax,
-    providingExtensionsOf type: some TypeSyntaxProtocol,
-    conformingTo _: [TypeSyntax],
-    in _: some MacroExpansionContext)
-    throws -> [ExtensionDeclSyntax]
-  {
-    // Mode B (content property) — no LazyViewModelView conformance needed
-    if let structDecl = declaration.as(StructDeclSyntax.self), structDecl.hasContentProperty {
-      return []
-    }
-    return [makeProtocolExtension(for: type, conformingTo: "LazyViewModelView")]
-  }
 
   // MARK: MemberMacro - generates all declarations
 
@@ -51,78 +34,31 @@ public struct LazyViewModelMacro: MemberMacro, ExtensionMacro {
       return []
     }
 
-    let hasLoadedView = structDecl.hasLoadedViewMethod
     let hasContent = structDecl.hasContentProperty
 
-    // Validate: can't have both
-    if hasLoadedView && hasContent {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.bothLoadedViewAndContent))
-      return []
+    // Validate: must have content
+    if !hasContent {
+      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingContent))
     }
 
-    // Validate: must have one
-    if !hasLoadedView && !hasContent {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingLoadedView))
-    }
-
-    if hasContent {
-      // Mode B: content property — simplified body, no makeViewModel, no state switch
-      return [
-        "@Environment(\\.router) private var containerRouter",
-        "@Environment(\(raw: factoryType).self) private var factory",
-        "@State private var _viewModel: \(raw: viewModelType)?",
-        "var viewModel: \(raw: viewModelType) { _viewModel! }",
-        """
-        var body: some View {
-            Group {
-                if _viewModel != nil {
-                    content
-                } else {
-                    Color.clear
-                }
-            }
-            .task {
-                if _viewModel == nil {
-                    _viewModel = factory.makeViewModel(router: containerRouter)
-                }
-            }
-            .task(id: _viewModel != nil) {
-                guard let vm = _viewModel else { return }
-                await vm.startObserving()
-            }
-        }
-        """,
-      ]
-    }
-
-    // Mode A: loadedView method — full state switch with makeViewModel
+    // Content property — simplified body, no makeViewModel, no state switch
     return [
       "@Environment(\\.router) private var containerRouter",
       "@Environment(\(raw: factoryType).self) private var factory",
       "@State private var _viewModel: \(raw: viewModelType)?",
       "var viewModel: \(raw: viewModelType) { _viewModel! }",
-      "func makeViewModel() -> \(raw: viewModelType) { factory.makeViewModel(router: containerRouter) }",
       """
       var body: some View {
           Group {
-              if let viewModel = _viewModel {
-                  switch viewModel.state {
-                  case .loading:
-                      loadingView
-                  case .empty:
-                      emptyView
-                  case .loaded(let state):
-                      loadedView(state: state)
-                  case .error(let message):
-                      errorView(message: message)
-                  }
+              if _viewModel != nil {
+                  content
               } else {
                   Color.clear
               }
           }
           .task {
               if _viewModel == nil {
-                  _viewModel = makeViewModel()
+                  _viewModel = factory.makeViewModel(router: containerRouter)
               }
           }
           .task(id: _viewModel != nil) {

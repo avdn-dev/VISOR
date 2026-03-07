@@ -253,14 +253,6 @@ extension StructDeclSyntax {
     }
   }
 
-  var hasLoadedViewMethod: Bool {
-    memberBlock.members.contains { member in
-      guard let funcDecl = member.decl.as(FunctionDeclSyntax.self) else {
-        return false
-      }
-      return funcDecl.name.text == "loadedView"
-    }
-  }
 }
 
 // MARK: - StoredProperty
@@ -293,22 +285,46 @@ struct ReactionMethodInfo {
 /// Single-pass analysis of a `ClassDeclSyntax` member list.
 struct ClassAnalysis {
   var storedLetProperties: [StoredProperty] = []
-  var boundProperties: [BoundPropertyInfo] = []
-  var malformedBoundAttributes: [String] = []
   var reactionMethods: [ReactionMethodInfo] = []
   var invalidReactionMethods: [String] = []
   var hasStartObserving = false
   var startObservingBodyText: String?
   var hasInitializer = false
-  /// Return type of `computeState()` if declared (e.g. "ViewModelState<Int>").
-  var computeStateReturnType: String?
   var hasUserDeclaredState = false
+
+  // v2: Action/perform detection
+  var hasActionEnum = false
+  var hasPerformMethod = false
+  var performIsAsync = false
+
+  // v2: @Bound inside State struct
+  var stateBoundProperties: [BoundPropertyInfo] = []
+  var malformedStateBoundAttributes: [String] = []
+  var boundOnLetProperties: [String] = []
+
+  // v2: @Bound on class-level var (migration warning)
+  var classLevelBoundProperties: [String] = []
 
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
       // Initializer check
       if member.decl.is(InitializerDeclSyntax.self) {
         hasInitializer = true
+        continue
+      }
+
+      // Nested struct/enum declarations
+      if let structDecl = member.decl.as(StructDeclSyntax.self) {
+        if structDecl.name.text == "State" {
+          scanStateStruct(structDecl)
+        }
+        continue
+      }
+
+      if let enumDecl = member.decl.as(EnumDeclSyntax.self) {
+        if enumDecl.name.text == "Action" {
+          hasActionEnum = true
+        }
         continue
       }
 
@@ -343,25 +359,12 @@ struct ClassAnalysis {
             hasUserDeclaredState = true
           }
 
-          guard let boundAttr = varDecl.attributes.lazy
+          // Detect v1 @Bound on class-level var (migration warning)
+          if let _ = varDecl.attributes.lazy
             .compactMap({ $0.as(AttributeSyntax.self) })
             .first(where: { $0.attributeName.trimmedDescription == "Bound" })
-          else {
-            continue
-          }
-
-          // Try to parse the key-path argument
-          if let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
-             let firstArg = arguments.first,
-             let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self),
-             let firstComponent = keyPathExpr.components.first,
-             case .property(let property) = firstComponent.component
           {
-            boundProperties.append(BoundPropertyInfo(
-              propertyName: identifier.identifier.text,
-              dependencyName: property.declName.baseName.text))
-          } else {
-            malformedBoundAttributes.append(identifier.identifier.text)
+            classLevelBoundProperties.append(identifier.identifier.text)
           }
         }
         continue
@@ -375,12 +378,12 @@ struct ClassAnalysis {
           startObservingBodyText = funcDecl.body?.statements.trimmedDescription
         }
 
-        // computeState check
-        if funcDecl.name.text == "computeState"
-            && funcDecl.signature.parameterClause.parameters.isEmpty
-        {
-          if let returnType = funcDecl.signature.returnClause?.type.trimmedDescription {
-            computeStateReturnType = returnType
+        // perform detection
+        if funcDecl.name.text == "perform" {
+          let params = funcDecl.signature.parameterClause.parameters
+          if params.count == 1 {
+            hasPerformMethod = true
+            performIsAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
           }
         }
 
@@ -426,6 +429,49 @@ struct ClassAnalysis {
           parameterName: parameterName,
           observeExpression: "self." + components.joined(separator: "."),
           isAsync: isAsync))
+      }
+    }
+  }
+
+  /// Scans the nested `struct State` for @Bound attributes.
+  private mutating func scanStateStruct(_ structDecl: StructDeclSyntax) {
+    for member in structDecl.memberBlock.members {
+      guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
+        continue
+      }
+
+      guard let boundAttr = varDecl.attributes.lazy
+        .compactMap({ $0.as(AttributeSyntax.self) })
+        .first(where: { $0.attributeName.trimmedDescription == "Bound" })
+      else {
+        continue
+      }
+
+      guard
+        let binding = varDecl.bindings.first,
+        let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
+      else {
+        continue
+      }
+
+      let bindingKind = varDecl.bindingSpecifier.text
+      if bindingKind == "let" {
+        boundOnLetProperties.append(identifier.identifier.text)
+        continue
+      }
+
+      // Try to parse the key-path argument
+      if let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
+         let firstArg = arguments.first,
+         let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self),
+         let firstComponent = keyPathExpr.components.first,
+         case .property(let property) = firstComponent.component
+      {
+        stateBoundProperties.append(BoundPropertyInfo(
+          propertyName: identifier.identifier.text,
+          dependencyName: property.declName.baseName.text))
+      } else {
+        malformedStateBoundAttributes.append(identifier.identifier.text)
       }
     }
   }

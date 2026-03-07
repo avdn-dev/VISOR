@@ -16,27 +16,19 @@ import Observation
 /// `viewModel.startObserving()`. SwiftUI owns the task lifetime —
 /// cancellation happens automatically when the view disappears.
 ///
-/// **Mode A — `loadedView(state:)`:** Full loading/empty/loaded/error state switch.
-/// Conforms the view to `LazyViewModelView` (provides default loading/empty/error views).
+/// **Screen/Content pattern:**
 /// ```swift
-/// @LazyViewModel(MyViewModel.self)
-/// struct MyView: View {
-///   func loadedView(state: MyViewModel.State) -> some View { ... }
+/// @LazyViewModel(DashboardViewModel.self)
+/// struct DashboardScreen: View {
+///   var content: some View {
+///     DashboardContent(state: viewModel.state, onAction: viewModel.send)
+///   }
 /// }
 /// ```
 ///
-/// **Mode B — `content`:** Simplified body for VMs that are always `.loaded`.
-/// No state switch, no `makeViewModel()`, no `LazyViewModelView` conformance.
-/// ```swift
-/// @LazyViewModel(MyViewModel.self)
-/// struct MyView: View {
-///   var content: some View { ... }
-/// }
-/// ```
-///
-/// Provide exactly one of `loadedView(state:)` or `content` — not both.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(factory), named(makeViewModel), named(containerRouter))
-@attached(extension, conformances: LazyViewModelView)
+/// The Screen owns the VM. The Content view is a pure function of state + onAction,
+/// trivially previewable with static state and no factory.
+@attached(member, names: named(body), named(_viewModel), named(viewModel), named(factory), named(containerRouter))
 public macro LazyViewModel<VM: ViewModel>(_: VM.Type) = #externalMacro(
   module: "VISORMacros",
   type: "LazyViewModelMacro")

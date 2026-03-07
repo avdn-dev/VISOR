@@ -8,12 +8,14 @@ import Testing
 @Observable
 @MainActor
 private final class FactoryTestVM: ViewModel, PreviewProviding {
-  typealias State = Int
-  var state: ViewModelState<Int> = .loading
-  let value: Int
+  struct State: Equatable {
+    var value = 0
+  }
+  var state = State()
+  let initialValue: Int
 
   init(value: Int = 0) {
-    self.value = value
+    self.initialValue = value
   }
 
   static var preview: FactoryTestVM {
@@ -24,8 +26,8 @@ private final class FactoryTestVM: ViewModel, PreviewProviding {
 @Observable
 @MainActor
 private final class RoutedTestVM: ViewModel {
-  typealias State = Void
-  var state: ViewModelState<Void> = .loading
+  struct State: Equatable {}
+  var state = State()
   let routerID: ObjectIdentifier
 
   init(routerID: ObjectIdentifier) {
@@ -56,7 +58,7 @@ struct ViewModelFactoryTests {
   func `makeViewModel invokes closure and returns result`() {
     let factory = ViewModelFactory { FactoryTestVM(value: 99) }
     let result = factory.makeViewModel()
-    #expect(result.value == 99)
+    #expect(result.initialValue == 99)
   }
 
   @Test
@@ -71,7 +73,7 @@ struct ViewModelFactoryTests {
   func `preview works with PreviewProviding type`() {
     let factory = ViewModelFactory<FactoryTestVM>.preview
     let vm = factory.makeViewModel()
-    #expect(vm.value == 42)
+    #expect(vm.initialValue == 42)
   }
 
   // MARK: - Routed Factory Tests
@@ -80,14 +82,14 @@ struct ViewModelFactoryTests {
   func `non-routed factory ignores router context`() {
     let factory = ViewModelFactory { FactoryTestVM() }
     let result = factory.makeViewModel(router: NSObject())
-    #expect(result.value == 0)
+    #expect(result.initialValue == 0)
   }
 
   @Test
   func `non-routed factory works with nil router context`() {
     let factory = ViewModelFactory { FactoryTestVM() }
     let result = factory.makeViewModel(router: nil)
-    #expect(result.value == 0)
+    #expect(result.initialValue == 0)
   }
 
   @Test
@@ -131,8 +133,8 @@ struct ViewModelFactoryTests {
     }
     let first = factory.makeViewModel()
     let second = factory.makeViewModel()
-    #expect(first.value == 1)
-    #expect(second.value == 2)
+    #expect(first.initialValue == 1)
+    #expect(second.initialValue == 2)
   }
 
   // MARK: - Non-Routed with Multiple Router Contexts
@@ -142,8 +144,8 @@ struct ViewModelFactoryTests {
     let factory = ViewModelFactory { FactoryTestVM() }
     let a = factory.makeViewModel(router: NSObject())
     let b = factory.makeViewModel(router: nil)
-    #expect(a.value == 0)
-    #expect(b.value == 0)
+    #expect(a.initialValue == 0)
+    #expect(b.initialValue == 0)
   }
 
   // MARK: - Routed Convenience with Correct Typed Router
