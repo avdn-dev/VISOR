@@ -10,7 +10,7 @@ import SwiftDiagnostics
 // MARK: - VISORDiagnostic
 
 enum VISORDiagnostic: DiagnosticMessage {
-  case missingContent
+  case missingContent(macroName: String)
   case singleViewModelInLazyViewModels
   case notAClass
   case notAStruct(macroName: String)
@@ -30,8 +30,8 @@ enum VISORDiagnostic: DiagnosticMessage {
 
   var message: String {
     switch self {
-    case .missingContent:
-      "@LazyViewModels requires: var content: some View"
+    case .missingContent(let macroName):
+      "@\(macroName) requires: var content: some View"
     case .singleViewModelInLazyViewModels:
       "@LazyViewModels with a single ViewModel; use @LazyViewModel instead"
     case .notAClass:

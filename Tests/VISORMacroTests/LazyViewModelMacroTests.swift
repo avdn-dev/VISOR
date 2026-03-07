@@ -135,7 +135,7 @@ struct LazyViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModels requires: var content: some View", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@LazyViewModel requires: var content: some View", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }

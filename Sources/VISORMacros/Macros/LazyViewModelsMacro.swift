@@ -44,7 +44,7 @@ public struct LazyViewModelsMacro: MemberMacro {
       context.diagnose(
         Diagnostic(
           node: node,
-          message: VISORDiagnostic.missingContent))
+          message: VISORDiagnostic.missingContent(macroName: "LazyViewModels")))
     }
 
     var members: [DeclSyntax] = []
