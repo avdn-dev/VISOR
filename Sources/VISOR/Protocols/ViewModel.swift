@@ -29,6 +29,9 @@ public enum Loadable<Value> {
 nonisolated extension Loadable {
   public var value: Value? { if case .loaded(let v) = self { v } else { nil } }
   public var isLoading: Bool { if case .loading = self { true } else { false } }
+  public var isEmpty: Bool { if case .empty = self { true } else { false } }
+  public var isError: Bool { if case .error = self { true } else { false } }
+  public var error: String? { if case .error(let msg) = self { msg } else { nil } }
 
   public func map<U>(_ transform: (Value) -> U) -> Loadable<U> {
     switch self {

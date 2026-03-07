@@ -108,6 +108,84 @@ struct LoadableTests {
     #expect(!state.isLoading)
   }
 
+  // MARK: - isEmpty
+
+  @Test
+  func `isEmpty returns true when empty`() {
+    let state: Loadable<Int> = .empty
+    #expect(state.isEmpty)
+  }
+
+  @Test
+  func `isEmpty returns false when loading`() {
+    let state: Loadable<Int> = .loading
+    #expect(!state.isEmpty)
+  }
+
+  @Test
+  func `isEmpty returns false when loaded`() {
+    let state: Loadable<Int> = .loaded(42)
+    #expect(!state.isEmpty)
+  }
+
+  @Test
+  func `isEmpty returns false when error`() {
+    let state: Loadable<Int> = .error("fail")
+    #expect(!state.isEmpty)
+  }
+
+  // MARK: - isError
+
+  @Test
+  func `isError returns true when error`() {
+    let state: Loadable<Int> = .error("fail")
+    #expect(state.isError)
+  }
+
+  @Test
+  func `isError returns false when loading`() {
+    let state: Loadable<Int> = .loading
+    #expect(!state.isError)
+  }
+
+  @Test
+  func `isError returns false when loaded`() {
+    let state: Loadable<Int> = .loaded(42)
+    #expect(!state.isError)
+  }
+
+  @Test
+  func `isError returns false when empty`() {
+    let state: Loadable<Int> = .empty
+    #expect(!state.isError)
+  }
+
+  // MARK: - error
+
+  @Test
+  func `error returns message when error`() {
+    let state: Loadable<String> = .error("something went wrong")
+    #expect(state.error == "something went wrong")
+  }
+
+  @Test
+  func `error returns nil when loading`() {
+    let state: Loadable<String> = .loading
+    #expect(state.error == nil)
+  }
+
+  @Test
+  func `error returns nil when empty`() {
+    let state: Loadable<String> = .empty
+    #expect(state.error == nil)
+  }
+
+  @Test
+  func `error returns nil when loaded`() {
+    let state: Loadable<String> = .loaded("hello")
+    #expect(state.error == nil)
+  }
+
   // MARK: - map
 
   @Test
