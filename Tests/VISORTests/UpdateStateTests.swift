@@ -120,7 +120,7 @@ private final class CounterViewModel: ViewModel {
 
 @Suite("updateState / direct state mutation")
 @MainActor
-struct DeriveStateTests {
+struct UpdateStateTests {
 
     // MARK: - Initial State
 
