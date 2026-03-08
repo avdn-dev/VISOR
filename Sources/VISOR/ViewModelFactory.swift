@@ -45,7 +45,7 @@ public final class ViewModelFactory<VM: ViewModel> {
   }
 
   /// Create a ViewModel. The router parameter is for generated code only.
-  package func makeViewModel(router: AnyObject? = nil) -> VM {
+  public func makeViewModel(router: AnyObject? = nil) -> VM {
     _make(router)
   }
 }
