@@ -77,7 +77,7 @@ enum VISORDiagnostic: DiagnosticMessage {
 
   var severity: DiagnosticSeverity {
     switch self {
-    case .missingObservable, .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
+    case .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
          .singleViewModelInLazyViewModels, .manualStartObservingMissingMethod,
          .handleNotAsync, .boundOnClassVar, .boundOnLetProperty,
          .malformedReactionKeyPath:

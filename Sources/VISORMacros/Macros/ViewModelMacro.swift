@@ -27,7 +27,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       return []
     }
 
-    // Warn if @Observable is missing
+    // Error if @Observable is missing — observation code will silently fail without it
     let hasObservable = classDecl.attributes.contains { attr in
       attr.as(AttributeSyntax.self)?.attributeName.trimmedDescription == AttributeName.observable
     }
@@ -35,6 +35,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.missingObservable))
+      return []
     }
 
     let className = classDecl.name.trimmedDescription
@@ -218,6 +219,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     in _: some MacroExpansionContext)
     throws -> [ExtensionDeclSyntax]
   {
+    guard declaration.is(ClassDeclSyntax.self) else { return [] }
     let viewModelExt = makeProtocolExtension(for: type, conformingTo: "ViewModel")
 
     return [viewModelExt]
