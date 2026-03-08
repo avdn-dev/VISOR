@@ -70,9 +70,27 @@ enum VISORDiagnostic: DiagnosticMessage {
   }
 
   var diagnosticID: MessageID {
-    // Strips associated values from e.g. "notAStruct(macroName: \"Foo\")" -> "notAStruct"
-    let caseName = String(describing: self).prefix(while: { $0 != "(" })
-    return MessageID(domain: "VISOR", id: String(caseName))
+    let id: String
+    switch self {
+    case .missingContent: id = "missingContent"
+    case .singleViewModelInLazyViewModels: id = "singleViewModelInLazyViewModels"
+    case .notAClass: id = "notAClass"
+    case .notAStruct: id = "notAStruct"
+    case .missingArguments: id = "missingArguments"
+    case .missingSelfSuffix: id = "missingSelfSuffix"
+    case .missingObservable: id = "missingObservable"
+    case .invalidBoundDependency: id = "invalidBoundDependency"
+    case .malformedBoundKeyPath: id = "malformedBoundKeyPath"
+    case .invalidReactionParameter: id = "invalidReactionParameter"
+    case .malformedReactionKeyPath: id = "malformedReactionKeyPath"
+    case .malformedLazyViewModelsArgument: id = "malformedLazyViewModelsArgument"
+    case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
+    case .actionWithoutHandle: id = "actionWithoutHandle"
+    case .handleNotAsync: id = "handleNotAsync"
+    case .boundOnClassVar: id = "boundOnClassVar"
+    case .boundOnLetProperty: id = "boundOnLetProperty"
+    }
+    return MessageID(domain: "VISOR", id: id)
   }
 
   var severity: DiagnosticSeverity {

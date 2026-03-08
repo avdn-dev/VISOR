@@ -92,6 +92,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     }
 
     var allObserveMethodNames: [String] = []
+    allObserveMethodNames.reserveCapacity(analysis.stateBoundProperties.count + analysis.reactionMethods.count)
 
     // 6. Generate observe methods from @Bound properties inside State
     let boundProps = analysis.stateBoundProperties

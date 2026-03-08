@@ -5,7 +5,6 @@
 //  Extracted from SharedExtensions.swift
 //
 
-import Foundation
 import SwiftSyntax
 
 // MARK: - Attribute Name Constants
@@ -37,7 +36,7 @@ func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: 
 // MARK: - Default Value Helper
 
 func defaultValue(for type: String) -> String? {
-  let trimmed = type.trimmingCharacters(in: .whitespaces)
+  let trimmed = type.trimmingWhitespace
 
   // Optional
   if trimmed.hasSuffix("?") { return "nil" }
@@ -135,11 +134,10 @@ func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> 
   }.joined(separator: ", ")
 
   let prefix = access.isEmpty ? "" : "\(access) "
-  var sig = "\(prefix)func \(method.name)(\(params))"
-  if method.isAsync { sig += " async" }
-  if method.isThrowing { sig += " throws" }
-  if let ret = method.returnType { sig += " -> \(ret)" }
-  return sig
+  let asyncSuffix = method.isAsync ? " async" : ""
+  let throwsSuffix = method.isThrowing ? " throws" : ""
+  let returnSuffix = method.returnType.map { " -> \($0)" } ?? ""
+  return "\(prefix)func \(method.name)(\(params))\(asyncSuffix)\(throwsSuffix)\(returnSuffix)"
 }
 
 // MARK: - Protocol Extension Helper
@@ -166,5 +164,11 @@ extension String {
   var lowercasedFirst: String {
     guard let first else { return self }
     return first.lowercased() + dropFirst()
+  }
+
+  var trimmingWhitespace: String {
+    let start = firstIndex(where: { !$0.isWhitespace }) ?? startIndex
+    let end = lastIndex(where: { !$0.isWhitespace }).map(index(after:)) ?? endIndex
+    return String(self[start..<end])
   }
 }
