@@ -3,12 +3,12 @@ import VISOR
 
 // MARK: - Navigation Scene Types
 
-enum TestTab: Int, TabDestination {
+nonisolated enum TestTab: Int, TabDestination {
   case home = 0
   case settings = 1
 }
 
-enum TestPush: PushDestination {
+nonisolated enum TestPush: PushDestination {
   case detail(id: String)
   case nested
 
@@ -17,7 +17,7 @@ enum TestPush: PushDestination {
   }
 }
 
-enum TestSheet: String, SheetDestination {
+nonisolated enum TestSheet: String, SheetDestination {
   case preferences
   case profile
 
@@ -28,7 +28,7 @@ enum TestSheet: String, SheetDestination {
   }
 }
 
-enum TestFullScreen: String, FullScreenDestination {
+nonisolated enum TestFullScreen: String, FullScreenDestination {
   case onboarding
   case tutorial
 
@@ -39,7 +39,7 @@ enum TestFullScreen: String, FullScreenDestination {
   }
 }
 
-enum TestScene: NavigationScene {
+nonisolated enum TestScene: NavigationScene {
   typealias Push = TestPush
   typealias Sheet = TestSheet
   typealias FullScreen = TestFullScreen

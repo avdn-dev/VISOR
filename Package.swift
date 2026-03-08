@@ -30,7 +30,8 @@ let package = Package(
 
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR"]),
+      dependencies: ["VISOR"],
+      swiftSettings: [.defaultIsolation(MainActor.self)]),
 
     .testTarget(
       name: "VISORMacroTests",

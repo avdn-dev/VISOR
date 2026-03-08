@@ -109,6 +109,70 @@ private final class AsyncActionVM: ViewModel {
     }
 }
 
+// MARK: - @ViewModel macro with @Bound inside State
+
+/// Source dependency for @Bound tests.
+@Observable
+@MainActor
+final class BoundSource {
+    var count = 0
+    var label = "initial"
+    var isEnabled = false
+}
+
+/// Single @Bound property — macro generates init, observe method, startObserving.
+@Observable
+@ViewModel
+final class SingleBoundVM {
+    struct State: Equatable {
+        @Bound(\SingleBoundVM.source) var count = 0
+    }
+
+    var state = State()
+
+    let source: BoundSource
+}
+
+/// Multiple @Bound properties from the same dependency.
+@Observable
+@ViewModel
+final class MultiBoundVM {
+    struct State: Equatable {
+        @Bound(\MultiBoundVM.source) var count = 0
+        @Bound(\MultiBoundVM.source) var label = "initial"
+        @Bound(\MultiBoundVM.source) var isEnabled = false
+    }
+
+    var state = State()
+
+    let source: BoundSource
+}
+
+/// @Bound properties mixed with non-bound state and an Action enum.
+@Observable
+@ViewModel
+final class MixedBoundVM {
+    struct State: Equatable {
+        @Bound(\MixedBoundVM.source) var count = 0
+        var localFlag = false
+    }
+
+    enum Action {
+        case toggleFlag
+    }
+
+    var state = State()
+
+    func handle(_ action: Action) {
+        switch action {
+        case .toggleFlag:
+            updateState(\.localFlag, to: !state.localFlag)
+        }
+    }
+
+    let source: BoundSource
+}
+
 // MARK: - Integration Tests
 
 @Suite("Integration")
@@ -275,6 +339,102 @@ struct IntegrationTests {
         await vm.handle(.loadItems)
         #expect(vm.state.items == .loaded(["a", "b"]))
         #expect(vm.state.count == 1)
+    }
+
+    // MARK: - @Bound inside State (macro-generated observation)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `single @Bound propagates dependency changes to state`() async {
+        let source = BoundSource()
+        let vm = SingleBoundVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+
+            source.count = 5
+            await expect(\.state.count, equals: 5)
+
+            source.count = 42
+            await expect(\.state.count, equals: 42)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `multiple @Bound properties from same dependency`() async {
+        let source = BoundSource()
+        let vm = MultiBoundVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+            await expect(\.state.label, equals: "initial")
+            await expect(\.state.isEnabled, equals: false)
+
+            source.count = 10
+            await expect(\.state.count, equals: 10)
+
+            source.label = "updated"
+            await expect(\.state.label, equals: "updated")
+
+            source.isEnabled = true
+            await expect(\.state.isEnabled, equals: true)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Bound deduplicates equal values`() async throws {
+        let source = BoundSource()
+        let vm = SingleBoundVM(source: source)
+
+        var emissions = [Int]()
+        let trackingTask = Task {
+            for await count in valuesOf({ vm.state.count }) {
+                emissions.append(count)
+                if emissions.count >= 4 { break }
+            }
+        }
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+        try await yieldForTracking()
+
+        source.count = 5
+        try await yieldForTracking()
+
+        // Same value — should be deduplicated
+        source.count = 5
+        try await yieldForTracking()
+
+        source.count = 10
+        try await yieldForTracking()
+
+        trackingTask.cancel()
+        observeTask.cancel()
+
+        #expect(emissions == [0, 5, 10])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Bound coexists with local state and actions`() async {
+        let source = BoundSource()
+        let vm = MixedBoundVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+            #expect(vm.state.localFlag == false)
+
+            // @Bound updates from dependency
+            source.count = 7
+            await expect(\.state.count, equals: 7)
+
+            // Action updates local state
+            vm.handle(.toggleFlag)
+            #expect(vm.state.localFlag == true)
+
+            // Both coexist
+            source.count = 99
+            await expect(\.state.count, equals: 99)
+            #expect(vm.state.localFlag == true)
+        }
     }
 
     // MARK: - Sequential observing blocks
