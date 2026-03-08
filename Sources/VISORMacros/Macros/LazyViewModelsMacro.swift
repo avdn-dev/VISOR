@@ -30,8 +30,13 @@ public struct LazyViewModelsMacro: MemberMacro {
     }
 
     // Parse variadic tuple arguments: (ViewModel.self, Factory.self)
-    guard let viewModels = parseViewModelTuples(from: node, in: context) else {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModels")))
+    let viewModels = parseViewModelTuples(from: node, in: context)
+    if viewModels.isEmpty {
+      // Only emit missingArguments when no argument list exists at all;
+      // per-argument malformed diagnostics are already emitted by the parser.
+      if case .argumentList = node.arguments {} else {
+        context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModels")))
+      }
       return []
     }
 
@@ -45,6 +50,7 @@ public struct LazyViewModelsMacro: MemberMacro {
         Diagnostic(
           node: node,
           message: VISORDiagnostic.missingContent(macroName: "LazyViewModels")))
+      return []
     }
 
     var members: [DeclSyntax] = []
@@ -102,9 +108,9 @@ public struct LazyViewModelsMacro: MemberMacro {
   private static func parseViewModelTuples(
     from node: AttributeSyntax,
     in context: some MacroExpansionContext
-  ) -> [ViewModelPairInfo]? {
+  ) -> [ViewModelPairInfo] {
     guard case .argumentList(let arguments) = node.arguments else {
-      return nil
+      return []
     }
 
     var pairs: [ViewModelPairInfo] = []
@@ -134,8 +140,8 @@ public struct LazyViewModelsMacro: MemberMacro {
     }
 
     // Fail entirely if any argument was malformed — never generate partial code
-    guard !hasMalformed, !pairs.isEmpty else {
-      return nil
+    guard !hasMalformed else {
+      return []
     }
 
     return pairs

@@ -38,6 +38,7 @@ public struct LazyViewModelMacro: MemberMacro {
     // Validate: must have content
     if !hasContent {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingContent(macroName: "LazyViewModel")))
+      return []
     }
 
     // Content property — simplified body, no makeViewModel, no state switch
