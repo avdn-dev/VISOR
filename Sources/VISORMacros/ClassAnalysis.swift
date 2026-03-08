@@ -237,10 +237,11 @@ struct ClassAnalysis {
         continue
       }
 
-      // Try to parse the key-path argument
+      // Try to parse the key-path argument (must be single-level: \ClassName.dep)
       if let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
          let firstArg = arguments.first,
          let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self),
+         keyPathExpr.components.count == 1,
          let firstComponent = keyPathExpr.components.first,
          case .property(let property) = firstComponent.component
       {
