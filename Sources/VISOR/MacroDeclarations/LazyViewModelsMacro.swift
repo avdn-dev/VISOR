@@ -18,6 +18,10 @@
 ///   GalleryViewModel.self
 /// )
 /// ```
+///
+/// > Each generated accessor (e.g. `cameraViewModel`) force-unwraps the backing `@State`.
+/// > This is safe because the generated `body` guards with a nil check before rendering
+/// > `content`, and initialization is guaranteed by the `.task` modifier.
 @attached(member, names: arbitrary)
 public macro LazyViewModels(_ viewModels: Any...) = #externalMacro(
   module: "VISORMacros",

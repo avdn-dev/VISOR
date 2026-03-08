@@ -186,7 +186,7 @@ struct IntegrationTests {
         ])
 
         let child = root.childRouter(for: .home)
-        child.setActive()
+        child.activate()
 
         if let destination = child.deepLinkHandler?(URL(string: "test://settings/detail")!) {
             child.deepLinkOpen(to: destination)

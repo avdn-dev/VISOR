@@ -29,7 +29,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // Warn if @Observable is missing
     let hasObservable = classDecl.attributes.contains { attr in
-      attr.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "Observable"
+      attr.as(AttributeSyntax.self)?.attributeName.trimmedDescription == AttributeName.observable
     }
     if !hasObservable {
       context.diagnose(Diagnostic(
@@ -135,6 +135,13 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.invalidReactionParameter(methodName: methodName)))
+    }
+
+    // 6c. Diagnose malformed @Reaction key paths
+    for methodName in analysis.malformedReactionKeyPaths {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.malformedReactionKeyPath(methodName: methodName)))
     }
 
     // Generate observe wrappers for @Reaction methods

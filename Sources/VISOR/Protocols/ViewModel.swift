@@ -20,11 +20,17 @@
 ///
 /// - Note: Requires Swift 6.2+ with `MainActorByDefault` enabled in the consuming target.
 public protocol ViewModel: Observable, AnyObject {
+  /// The complete representation of all view state. Must be `Equatable` to enable deduplication.
   associatedtype State: Equatable
+  /// The enum of user-initiated mutations. Defaults to `Never` for read-only ViewModels.
   associatedtype Action = Never
 
+  /// The current view state. Mutate via `updateState(_:to:)` for deduplication.
   var state: State { get set }
+  /// Dispatch an action. Implement sync or async as needed; the protocol requires `async`.
   func handle(_ action: Action) async
+  /// Called by the `@LazyViewModel` macro's `.task` modifier to begin observation loops.
+  /// Override to run custom observation; the default implementation is a no-op.
   func startObserving() async
 }
 
@@ -39,7 +45,12 @@ extension ViewModel where Action == Never {
 // MARK: - updateState (keypath mutation with deduplication)
 
 extension ViewModel {
-  /// Equatable overload: skips write if value unchanged (prevents observation trigger).
+  /// Mutate a single state field by key path. Skips the write if the new value equals the
+  /// current one, preventing unnecessary observation triggers.
+  ///
+  /// - Parameters:
+  ///   - keyPath: A writable key path into `State`.
+  ///   - value: The new value to set.
   public func updateState<V: Equatable>(
     _ keyPath: WritableKeyPath<State, V>,
     to value: V
@@ -48,7 +59,7 @@ extension ViewModel {
     state[keyPath: keyPath] = value
   }
 
-  /// Non-Equatable fallback: always writes.
+  /// Non-Equatable fallback — always writes (no deduplication possible).
   public func updateState<V>(
     _ keyPath: WritableKeyPath<State, V>,
     to value: V

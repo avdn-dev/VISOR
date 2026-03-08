@@ -161,6 +161,26 @@ struct LazyViewModelMacroTests {
   }
 
   @Test
+  func `Error when argument missing .self suffix`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyViewModel)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel argument must use .self suffix (e.g., MyViewModel.self)", line: 1, column: 16, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Error when applied to enum`() {
     assertMacroExpansion(
       """

@@ -15,19 +15,18 @@ public protocol PushDestination: Hashable {
   @ViewBuilder var destinationView: Body { get }
 }
 
-/// A destination that can be presented as a sheet.
-/// Identifiable conformance is required by SwiftUI's `.sheet(item:)`.
-public protocol SheetDestination: Hashable, Identifiable {
+/// Shared requirements for modal destinations (sheets, full-screen covers).
+/// `Identifiable` is required by SwiftUI's `.sheet(item:)` and `.fullScreenCover(item:)`.
+public protocol PresentableDestination: Hashable, Identifiable {
   associatedtype Body: View
   @ViewBuilder var destinationView: Body { get }
 }
 
+/// A destination that can be presented as a sheet.
+public protocol SheetDestination: PresentableDestination {}
+
 /// A destination that can be presented as a full-screen cover.
-/// Identifiable conformance is required by SwiftUI's `.fullScreenCover(item:)`.
-public protocol FullScreenDestination: Hashable, Identifiable {
-  associatedtype Body: View
-  @ViewBuilder var destinationView: Body { get }
-}
+public protocol FullScreenDestination: PresentableDestination {}
 
 /// A tab identifier. Tabs define their views in the consumer's TabView, so no view is required here.
 public protocol TabDestination: Hashable {}

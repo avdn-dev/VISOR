@@ -731,6 +731,45 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Action enum with wrong handle parameter type emits diagnostic`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {}
+        enum Action { case refresh }
+        var state = State()
+        func handle(_ action: String) async {}
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {}
+        enum Action { case refresh }
+        var state = State()
+        func handle(_ action: String) async {}
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
   // MARK: - @Reaction Generation
 
   @Test

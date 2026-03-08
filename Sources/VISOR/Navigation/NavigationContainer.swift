@@ -48,8 +48,8 @@ public struct NavigationContainer<Scene: NavigationScene, Content: View>: View {
     InnerContainer(router: router, content: content)
       .environment(router)
       .environment(\.router, router)
-      .onAppear { router.setActive() }
-      .onDisappear { router.resignActive() }
+      .onAppear { router.activate() }
+      .onDisappear { router.deactivate() }
       .onOpenURL { url in
         if let destination = router.deepLinkHandler?(url) {
           router.deepLinkOpen(to: destination)

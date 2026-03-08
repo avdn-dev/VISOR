@@ -32,11 +32,11 @@ struct RouterTests {
   }
 
   @Test
-  func `Child setActive deactivates parent`() {
+  func `Child activate deactivates parent`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
 
-    child.setActive()
+    child.activate()
     #expect(child.isActive)
     #expect(!root.isActive)
   }
@@ -117,7 +117,7 @@ struct RouterTests {
   func `Deep link on inactive router ignores all destination types`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
-    child.setActive() // root becomes inactive
+    child.activate() // root becomes inactive
 
     root.deepLinkOpen(to: .push(.detail(id: "deep")))
     root.deepLinkOpen(to: .sheet(.preferences))
@@ -336,15 +336,15 @@ struct RouterTests {
     #expect(result == .tab(.home))
   }
 
-  // MARK: - setActive idempotent
+  // MARK: - activate idempotent
 
   @Test
-  func `setActive is idempotent`() {
+  func `activate is idempotent`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
 
-    child.setActive()
-    child.setActive()
+    child.activate()
+    child.activate()
     #expect(child.isActive)
     #expect(!root.isActive)
   }

@@ -108,6 +108,7 @@ public struct LazyViewModelsMacro: MemberMacro {
     }
 
     var pairs: [ViewModelPairInfo] = []
+    var hasMalformed = false
 
     for argument in arguments {
       guard
@@ -118,6 +119,7 @@ public struct LazyViewModelsMacro: MemberMacro {
         context.diagnose(Diagnostic(
           node: Syntax(argument),
           message: VISORDiagnostic.malformedLazyViewModelsArgument))
+        hasMalformed = true
         continue
       }
 
@@ -131,7 +133,8 @@ public struct LazyViewModelsMacro: MemberMacro {
         propertyName: propertyName))
     }
 
-    guard !pairs.isEmpty else {
+    // Fail entirely if any argument was malformed — never generate partial code
+    guard !hasMalformed, !pairs.isEmpty else {
       return nil
     }
 

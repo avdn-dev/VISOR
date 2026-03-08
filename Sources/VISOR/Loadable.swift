@@ -28,6 +28,7 @@ nonisolated extension Loadable {
   public var isError: Bool { if case .error = self { true } else { false } }
   public var error: String? { if case .error(let msg) = self { msg } else { nil } }
 
+  /// Transform the loaded value, preserving `loading`/`empty`/`error` states.
   public func map<U>(_ transform: (Value) -> U) -> Loadable<U> {
     switch self {
     case .loading: .loading
@@ -37,6 +38,7 @@ nonisolated extension Loadable {
     }
   }
 
+  /// Transform the loaded value into another `Loadable`, preserving `loading`/`empty`/`error` states.
   public func flatMap<U>(_ transform: (Value) -> Loadable<U>) -> Loadable<U> {
     switch self {
     case .loading: .loading

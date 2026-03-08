@@ -234,6 +234,27 @@ struct LazyViewModelsMacroTests {
   }
 
   @Test
+  func `Error when any argument is malformed (no partial expansion)`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModels(AViewModel.self, 42)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModels: unrecognized argument (expected ViewModel.self)", line: 1, column: 34, severity: .warning),
+        DiagnosticSpec(message: "@LazyViewModels requires (ViewModel.self) argument", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Error when no arguments provided`() {
     assertMacroExpansion(
       """

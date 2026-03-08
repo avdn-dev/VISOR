@@ -36,18 +36,18 @@ struct RouterEdgeCaseTests {
   }
 
   @Test
-  func `setActive then resignActive roundtrip`() {
+  func `activate then deactivate roundtrip`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
 
-    child.setActive()
+    child.activate()
     #expect(child.isActive)
     #expect(!root.isActive)
 
-    child.resignActive()
+    child.deactivate()
     #expect(!child.isActive)
 
-    root.setActive()
+    root.activate()
     #expect(root.isActive)
   }
 
@@ -94,34 +94,34 @@ struct RouterEdgeCaseTests {
     #expect(router.presentingFullScreen == .tutorial)
   }
 
-  // MARK: - Grandchild setActive
+  // MARK: - Grandchild activate
 
   @Test
-  func `Grandchild setActive deactivates direct parent`() {
+  func `Grandchild activate deactivates direct parent`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
     let grandchild = child.childRouter(for: .home)
 
-    // setActive only resignActive on direct parent, not grandparent
-    child.setActive()
-    grandchild.setActive()
+    // activate only deactivate on direct parent, not grandparent
+    child.activate()
+    grandchild.activate()
     #expect(grandchild.isActive)
     #expect(!child.isActive)
-    // root was already deactivated when child.setActive() was called
+    // root was already deactivated when child.activate() was called
     #expect(!root.isActive)
   }
 
-  // MARK: - resignActive on root then setActive restores
+  // MARK: - deactivate on root then activate restores
 
   @Test
-  func `resignActive on root then setActive restores`() {
+  func `deactivate on root then activate restores`() {
     let root = Router<TestScene>(level: 0)
     #expect(root.isActive)
 
-    root.resignActive()
+    root.deactivate()
     #expect(!root.isActive)
 
-    root.setActive()
+    root.activate()
     #expect(root.isActive)
   }
 
@@ -234,7 +234,7 @@ struct RouterEdgeCaseTests {
   func `navigate(to: .tab) on child propagates to root`() {
     let root = Router<TestScene>(level: 0)
     let child = root.childRouter(for: .home)
-    child.setActive()
+    child.activate()
 
     child.navigate(to: .tab(.settings))
     #expect(root.selectedTab == .settings)

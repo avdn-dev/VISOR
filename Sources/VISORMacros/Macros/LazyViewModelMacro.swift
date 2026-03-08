@@ -29,8 +29,7 @@ public struct LazyViewModelMacro: MemberMacro {
       return []
     }
 
-    guard let (viewModelType, factoryType) = parseArguments(from: node) else {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
+    guard let (viewModelType, factoryType) = parseArguments(from: node, in: context) else {
       return []
     }
 
@@ -72,14 +71,23 @@ public struct LazyViewModelMacro: MemberMacro {
 
   // MARK: Private
 
-  private static func parseArguments(from node: AttributeSyntax) -> (viewModelType: String, factoryType: String)? {
+  private static func parseArguments(
+    from node: AttributeSyntax,
+    in context: some MacroExpansionContext
+  ) -> (viewModelType: String, factoryType: String)? {
+    // Stage 1: Must have an argument list
+    guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
+      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
+      return nil
+    }
+
+    // Stage 2: Must be a member access expression with `.self`
     guard
-      case .argumentList(let arguments) = node.arguments,
-      let firstArg = arguments.first,
       let memberAccess = firstArg.expression.as(MemberAccessExprSyntax.self),
       memberAccess.declName.baseName.text == "self",
       let baseType = memberAccess.base?.as(DeclReferenceExprSyntax.self)
     else {
+      context.diagnose(Diagnostic(node: Syntax(firstArg), message: VISORDiagnostic.missingSelfSuffix(macroName: "LazyViewModel")))
       return nil
     }
 

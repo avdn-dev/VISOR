@@ -19,6 +19,13 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: Lifecycle
 
+  /// Creates a router node in the navigation hierarchy.
+  ///
+  /// - Parameters:
+  ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
+  ///   - identifierTab: The tab this router manages, or `nil` for root/modal routers.
+  ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
+  ///   - logger: Optional `os.Logger` for debug-level navigation logging.
   public init(
     level: Int = 0,
     identifierTab: Scene.Tab? = nil,
@@ -55,7 +62,7 @@ public final class Router<Scene: NavigationScene> {
   public let identifierTab: Scene.Tab?
 
   /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
-  public weak let parent: Router?
+  package weak let parent: Router?
 
   /// Whether this router is the currently active one for deep linking.
   public private(set) var isActive: Bool
@@ -132,15 +139,15 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Active State
 
   /// Mark this router as the active one. Deactivates the parent.
-  public func setActive() {
-    log("setActive (level \(level))")
+  public func activate() {
+    log("activate (level \(level))")
     isActive = true
-    parent?.resignActive()
+    parent?.deactivate()
   }
 
   /// Mark this router as inactive.
-  public func resignActive() {
-    log("resignActive (level \(level))")
+  public func deactivate() {
+    log("deactivate (level \(level))")
     isActive = false
   }
 
