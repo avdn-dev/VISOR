@@ -53,10 +53,11 @@ public struct StubbableMacro: PeerMacro {
     var members = generatePropertyDeclarations(properties, access: access)
 
     // Generate methods
-    for method in methods {
+    let prefixes = uniqueMethodPrefixes(for: methods)
+    for (method, methodPrefix) in zip(methods, prefixes) {
       if let returnType = method.returnType {
         let defaultVal = defaultValue(for: returnType)
-        let retVarName = "\(method.name)ReturnValue"
+        let retVarName = "\(methodPrefix)ReturnValue"
         if let defaultVal {
           members.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
         } else {

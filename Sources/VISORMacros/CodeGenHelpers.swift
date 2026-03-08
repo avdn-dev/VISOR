@@ -81,6 +81,46 @@ func defaultValue(for type: String) -> String? {
   return nil
 }
 
+// MARK: - Method Name Disambiguation
+
+/// Computes unique property-name prefixes for each method in the list.
+/// Methods with unique base names keep their original name as prefix.
+/// Methods that share a base name are disambiguated by appending camelCased parameter labels.
+///
+/// Example: `func load(byId:)` and `func load(matching:)` produce `loadById` and `loadMatching`.
+/// For unlabeled parameters (`_`), the parameter type name is used (stripped of punctuation)
+/// so generated names depend only on the public API surface.
+///
+/// If labels alone still collide (same name and labels, different return types),
+/// the return type is appended: `loadIdReturningItem` vs `loadIdReturningItems`.
+func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
+  var nameCounts: [String: Int] = [:]
+  for m in methods { nameCounts[m.name, default: 0] += 1 }
+
+  // Phase 1: disambiguate by parameter labels
+  var prefixes = methods.map { method -> String in
+    guard nameCounts[method.name, default: 0] > 1 else { return method.name }
+    let suffix = method.parameters.map { param in
+      if let label = param.externalLabel {
+        return label.capitalizedFirst
+      }
+      return param.type.filter(\.isLetter).capitalizedFirst
+    }.joined()
+    return suffix.isEmpty ? method.name : "\(method.name)\(suffix)"
+  }
+
+  // Phase 2: if prefixes still collide, append return type
+  var prefixCounts: [String: Int] = [:]
+  for p in prefixes { prefixCounts[p, default: 0] += 1 }
+
+  for (i, prefix) in prefixes.enumerated() where prefixCounts[prefix, default: 0] > 1 {
+    let retSuffix = methods[i].returnType?.filter(\.isLetter) ?? "Void"
+    prefixes[i] = "\(prefix)Returning\(retSuffix)"
+  }
+
+  return prefixes
+}
+
 // MARK: - Method Signature Helper
 
 func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> String {

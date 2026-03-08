@@ -414,6 +414,143 @@ struct StubbableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Overloaded Methods
+
+  @Test
+  func `Disambiguates methods with same name but different labels`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol LoadService {
+        func load(byId id: String) -> Item
+        func load(matching query: String) -> [Item]
+      }
+      """,
+      expandedSource: """
+      protocol LoadService {
+        func load(byId id: String) -> Item
+        func load(matching query: String) -> [Item]
+      }
+
+      @Observable
+      class StubLoadService: LoadService {
+        var loadByIdReturnValue: Item!
+        func load(byId id: String) -> Item { loadByIdReturnValue }
+        var loadMatchingReturnValue: [Item] = []
+        func load(matching query: String) -> [Item] { loadMatchingReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Disambiguates void overloads`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol EventService {
+        func send(event: String)
+        func send(error: Error)
+      }
+      """,
+      expandedSource: """
+      protocol EventService {
+        func send(event: String)
+        func send(error: Error)
+      }
+
+      @Observable
+      class StubEventService: EventService {
+        func send(event: String) { }
+        func send(error: Error) { }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Disambiguates overload with underscore label using type name`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol Finder {
+        func find(_ expected: Item) -> Bool
+        func find(byID id: String) -> Bool
+      }
+      """,
+      expandedSource: """
+      protocol Finder {
+        func find(_ expected: Item) -> Bool
+        func find(byID id: String) -> Bool
+      }
+
+      @Observable
+      class StubFinder: Finder {
+        var findItemReturnValue: Bool = false
+        func find(_ expected: Item) -> Bool { findItemReturnValue }
+        var findByIDReturnValue: Bool = false
+        func find(byID id: String) -> Bool { findByIDReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Disambiguates overloads with same labels but different return types`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol Converter {
+        func convert(from value: String) -> Int
+        func convert(from value: String) -> Double
+      }
+      """,
+      expandedSource: """
+      protocol Converter {
+        func convert(from value: String) -> Int
+        func convert(from value: String) -> Double
+      }
+
+      @Observable
+      class StubConverter: Converter {
+        var convertFromReturningIntReturnValue: Int = 0
+        func convert(from value: String) -> Int { convertFromReturningIntReturnValue }
+        var convertFromReturningDoubleReturnValue: Double = 0.0
+        func convert(from value: String) -> Double { convertFromReturningDoubleReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Non-colliding methods keep simple names`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol MixedService {
+        func fetch() -> [Item]
+        func save(_ item: Item)
+        func delete(byId id: String)
+      }
+      """,
+      expandedSource: """
+      protocol MixedService {
+        func fetch() -> [Item]
+        func save(_ item: Item)
+        func delete(byId id: String)
+      }
+
+      @Observable
+      class StubMixedService: MixedService {
+        var fetchReturnValue: [Item] = []
+        func fetch() -> [Item] { fetchReturnValue }
+        func save(_ item: Item) { }
+        func delete(byId id: String) { }
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test

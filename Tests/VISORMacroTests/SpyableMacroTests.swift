@@ -263,6 +263,119 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Overloaded Methods
+
+  @Test
+  func `Disambiguates methods with same name but different labels`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      protocol LoadService {
+        func load(byId id: String) -> Item
+        func load(matching query: String) -> [Item]
+      }
+      """,
+      expandedSource: """
+      protocol LoadService {
+        func load(byId id: String) -> Item
+        func load(matching query: String) -> [Item]
+      }
+
+      @Observable
+      class SpyLoadService: LoadService {
+        // -- loadById --
+        var loadByIdCallCount = 0
+        var loadByIdReceivedId: String?
+        var loadByIdReceivedInvocations: [String] = []
+        var loadByIdReturnValue: Item!
+        func load(byId id: String) -> Item {
+          loadByIdCallCount += 1
+          loadByIdReceivedId = id
+          loadByIdReceivedInvocations.append(id)
+          calls.append(.load(id: id))
+          return loadByIdReturnValue
+        }
+        // -- loadMatching --
+        var loadMatchingCallCount = 0
+        var loadMatchingReceivedQuery: String?
+        var loadMatchingReceivedInvocations: [String] = []
+        var loadMatchingReturnValue: [Item] = []
+        func load(matching query: String) -> [Item] {
+          loadMatchingCallCount += 1
+          loadMatchingReceivedQuery = query
+          loadMatchingReceivedInvocations.append(query)
+          calls.append(.load(query: query))
+          return loadMatchingReturnValue
+        }
+        enum Call {
+          case load(id: String)
+          case load(query: String)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Non-colliding methods keep simple names alongside overloads`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      protocol MixedService {
+        func fetch() -> [Item]
+        func send(event: String)
+        func send(error: Error)
+      }
+      """,
+      expandedSource: """
+      protocol MixedService {
+        func fetch() -> [Item]
+        func send(event: String)
+        func send(error: Error)
+      }
+
+      @Observable
+      class SpyMixedService: MixedService {
+        // -- fetch --
+        var fetchCallCount = 0
+        var fetchReturnValue: [Item] = []
+        func fetch() -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return fetchReturnValue
+        }
+        // -- sendEvent --
+        var sendEventCallCount = 0
+        var sendEventReceivedEvent: String?
+        var sendEventReceivedInvocations: [String] = []
+        func send(event: String) {
+          sendEventCallCount += 1
+          sendEventReceivedEvent = event
+          sendEventReceivedInvocations.append(event)
+          calls.append(.send(event: event))
+        }
+        // -- sendError --
+        var sendErrorCallCount = 0
+        var sendErrorReceivedError: Error?
+        var sendErrorReceivedInvocations: [Error] = []
+        func send(error: Error) {
+          sendErrorCallCount += 1
+          sendErrorReceivedError = error
+          sendErrorReceivedInvocations.append(error)
+          calls.append(.send(error: error))
+        }
+        enum Call {
+          case fetch
+          case send(event: String)
+          case send(error: Error)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Access Level Propagation
 
   @Test
