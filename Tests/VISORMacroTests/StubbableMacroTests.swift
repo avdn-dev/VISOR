@@ -700,6 +700,33 @@ struct StubbableMacroTests {
   }
 
   @Test
+  func `Warning on protocol with static members`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol HasStatic {
+        static var shared: String { get }
+        func doWork()
+      }
+      """,
+      expandedSource: """
+      protocol HasStatic {
+        static var shared: String { get }
+        func doWork()
+      }
+
+      @Observable
+      class StubHasStatic: HasStatic {
+        func doWork() { }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@Stubbable skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Warning on protocol with subscripts`() {
     assertMacroExpansion(
       """

@@ -65,7 +65,7 @@ final class AutoObserveSingleVM {
     let source: RuntimeSource
 }
 
-// MARK: 5. Multiple @Bound from same dep (task group startObserving)
+// MARK: 4. Multiple @Bound from same dep (task group startObserving)
 
 @Observable
 @ViewModel
@@ -290,6 +290,7 @@ final class LoadableStatesVM {
 
 struct NonEquatableWrapper { let value: Int }
 
+/// Tests updateState overload resolution directly, independent of macro generation.
 @Observable
 @MainActor
 final class NonEquatableVM: ViewModel {
@@ -298,6 +299,7 @@ final class NonEquatableVM: ViewModel {
         var wrapper = NonEquatableWrapper(value: 0)
         var label = ""
 
+        // Intentionally compares only `label` to test the non-Equatable updateState overload on `wrapper`
         static func == (lhs: State, rhs: State) -> Bool {
             lhs.label == rhs.label
         }

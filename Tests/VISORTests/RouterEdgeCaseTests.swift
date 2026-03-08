@@ -16,7 +16,7 @@ import Foundation
 struct RouterEdgeCaseTests {
 
   @Test
-  func `weak parent does not crash when parent deallocated`() {
+  func `select tab falls back to self when parent deallocated`() {
     var parent: Router<TestScene>? = Router<TestScene>(level: 0)
     let child = Router<TestScene>(level: 1, parent: parent)
     parent = nil
@@ -260,6 +260,31 @@ struct RouterEdgeCaseTests {
 
     let settingsResult = root.deepLinkHandler?(URL(string: "test://settings")!)
     #expect(settingsResult == .tab(.settings))
+  }
+
+  // MARK: - selectAndPush from deep hierarchy
+
+  // MARK: - No-op safety
+
+  @Test
+  func `popToRoot on empty path is no-op`() {
+    let router = Router<TestScene>(level: 0)
+    router.popToRoot()
+    #expect(router.navigationPath.isEmpty)
+  }
+
+  @Test
+  func `dismissSheet when no sheet presented is no-op`() {
+    let router = Router<TestScene>(level: 0)
+    router.dismissSheet()
+    #expect(router.presentingSheet == nil)
+  }
+
+  @Test
+  func `dismissFullScreen when no fullScreen presented is no-op`() {
+    let router = Router<TestScene>(level: 0)
+    router.dismissFullScreen()
+    #expect(router.presentingFullScreen == nil)
   }
 
   // MARK: - selectAndPush from deep hierarchy

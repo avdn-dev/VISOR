@@ -957,6 +957,45 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - @Reaction with malformed key path
+
+  @Test
+  func `@Reaction with non-key-path argument emits diagnostic`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        @Reaction("bogus")
+        func handleChange(value: String) { }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        func handleChange(value: String) { }
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        observableWarning,
+        DiagnosticSpec(message: #"@Reaction on 'handleChange': expected key path argument like \.dependency.property"#, line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
   // MARK: - Router Type Detection
 
   @Test

@@ -260,6 +260,7 @@ struct MemoryLeakTests {
         try await yieldForTracking()
 
         source.destination = "test"
+        // Two yields needed: first for observation re-registration, second for the async handler task to complete
         try await yieldForTracking()
         try await yieldForTracking()
 
@@ -444,6 +445,25 @@ struct MemoryLeakTests {
         try await yieldForTracking()
 
         #expect(weakVM2 == nil, "Second VM should be deallocated independently")
+    }
+
+    // MARK: - Immediate cancellation before first yield
+
+    @Test(.timeLimit(.minutes(1)))
+    func `VM is released when observation cancelled before first yield`() async throws {
+        let source = LeakSource()
+        var vm: ManualLeakVM? = ManualLeakVM(source: source)
+        weak let weakVM = vm
+
+        let task = Task { await vm!.startObserving() }
+        // Cancel immediately — no yieldForTracking() first
+        task.cancel()
+        _ = await task.value
+
+        vm = nil
+        try await yieldForTracking()
+
+        #expect(weakVM == nil, "VM should be deallocated even when cancelled before first observation fires")
     }
 
     // MARK: - Router parent-child does not leak

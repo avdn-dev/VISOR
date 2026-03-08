@@ -80,15 +80,10 @@ private final class AsyncActionVM: ViewModel {
     enum Action {
         case increment
         case loadItems
+        case failItems
     }
 
     var state = State()
-
-    private let source: TestSource
-
-    init(source: TestSource) {
-        self.source = source
-    }
 
     func handle(_ action: Action) async {
         switch action {
@@ -96,9 +91,10 @@ private final class AsyncActionVM: ViewModel {
             updateState(\.count, to: state.count + 1)
         case .loadItems:
             updateState(\.items, to: .loading)
-            // Simulate async work
             try? await Task.sleep(for: .milliseconds(10))
             updateState(\.items, to: .loaded(["a", "b"]))
+        case .failItems:
+            updateState(\.items, to: .error("network"))
         }
     }
 }
@@ -128,29 +124,23 @@ struct IntegrationTests {
     // MARK: - Two VMs sharing same service
 
     @Test(.timeLimit(.minutes(1)))
-    func `Two VMs sharing same service both reflect changes`() async throws {
+    func `Two VMs sharing same service both reflect changes`() async {
         let source = TestSource()
         let vm1 = IntegrationVM(source: source)
         let vm2 = IntegrationVM(source: source)
 
-        let task1 = Task { await vm1.startObserving() }
         let task2 = Task { await vm2.startObserving() }
+        defer { task2.cancel() }
 
-        defer {
-            task1.cancel()
-            task2.cancel()
+        await observing(vm1) { expect in
+            source.count = 7
+            await expect(\.state.count, equals: 7)
+
+            // Wait for vm2 to also converge
+            for await count in valuesOf({ vm2.state.count }) {
+                if count == 7 { break }
+            }
         }
-
-        // Wait for observation to set up
-        try await yieldForTracking()
-        try await yieldForTracking()
-
-        source.count = 7
-        try await yieldForTracking()
-        try await yieldForTracking()
-
-        #expect(vm1.state.count == 7)
-        #expect(vm2.state.count == 7)
     }
 
     // MARK: - Router navigation does not interfere with VM observation
@@ -228,8 +218,7 @@ struct IntegrationTests {
 
     @Test
     func `Async handle performs async work`() async {
-        let source = TestSource()
-        let vm = AsyncActionVM(source: source)
+        let vm = AsyncActionVM()
 
         await vm.handle(.loadItems)
         #expect(vm.state.items == .loaded(["a", "b"]))
@@ -237,8 +226,7 @@ struct IntegrationTests {
 
     @Test
     func `Async handle mixes sync and async cases`() async {
-        let source = TestSource()
-        let vm = AsyncActionVM(source: source)
+        let vm = AsyncActionVM()
 
         await vm.handle(.increment)
         #expect(vm.state.count == 1)
@@ -246,6 +234,41 @@ struct IntegrationTests {
         await vm.handle(.loadItems)
         #expect(vm.state.items == .loaded(["a", "b"]))
         #expect(vm.state.count == 1)
+    }
+
+    // MARK: - Error path via Loadable
+
+    @Test
+    func `Async handle transitions to error state`() async {
+        let vm = AsyncActionVM()
+
+        await vm.handle(.failItems)
+        #expect(vm.state.items.isError)
+        #expect(vm.state.items.error == "network")
+    }
+
+    // MARK: - Post-cancel observation stops
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Observation stops propagating after cancellation`() async throws {
+        let source = TestSource()
+        let vm = IntegrationVM(source: source)
+
+        let task = Task { await vm.startObserving() }
+        try await yieldForTracking()
+        try await yieldForTracking()
+
+        source.count = 5
+        try await yieldForTracking()
+        #expect(vm.state.count == 5)
+
+        task.cancel()
+        try await Task.sleep(for: .milliseconds(100))
+
+        let countAfterCancel = vm.state.count
+        source.count = 999
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(vm.state.count == countAfterCancel, "Changes should not propagate after cancellation")
     }
 
 }

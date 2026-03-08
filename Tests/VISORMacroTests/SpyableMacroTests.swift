@@ -554,6 +554,24 @@ struct SpyableMacroTests {
   // MARK: - Diagnostics
 
   @Test
+  func `Error when applied to struct`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      struct NotAProtocol {
+      }
+      """,
+      expandedSource: """
+      struct NotAProtocol {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@Spyable can only be applied to protocols", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Error when applied to class`() {
     assertMacroExpansion(
       """

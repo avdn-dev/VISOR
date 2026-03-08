@@ -10,6 +10,23 @@ import Testing
 @MainActor
 struct ViewModelMacroRuntimeTests {
 
+    // MARK: - Minimal VMs
+
+    @Test
+    func `Minimal VM with no deps can be constructed and mutated`() {
+        let vm = MinimalVM()
+        #expect(vm.state.value == 0)
+        vm.updateState(\.value, to: 42)
+        #expect(vm.state.value == 42)
+    }
+
+    @Test
+    func `NoDeps VM handles action without dependencies`() {
+        let vm = NoDepsVM()
+        vm.handle(.setText("hello"))
+        #expect(vm.state.text == "hello")
+    }
+
     // MARK: - Memberwise init generation
 
     @Test
@@ -300,7 +317,7 @@ struct ViewModelMacroRuntimeTests {
 
     // MARK: - Loadable state transitions
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func `Loadable state transitions through all cases`() async {
         let vm = LoadableStatesVM()
 
@@ -496,7 +513,7 @@ struct SpyableMacroRuntimeTests {
     }
 
     @Test
-    func `Spy Call enum records all calls in order`() {
+    func `Spy Call enum records all calls in order with correct values`() {
         let spy = SpyAnalyticsService()
 
         spy.trackEvent("launch")
@@ -504,6 +521,10 @@ struct SpyableMacroRuntimeTests {
         spy.trackEvent("tap")
 
         #expect(spy.calls.count == 3)
+        // Verify order and content via call counts and received values
+        #expect(spy.trackEventReceivedInvocations == ["launch", "tap"])
+        #expect(spy.trackScreenReceivedInvocations.count == 1)
+        #expect(spy.trackScreenReceivedInvocations[0].name == "Home")
     }
 
 }

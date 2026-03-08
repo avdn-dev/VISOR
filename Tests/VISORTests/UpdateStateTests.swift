@@ -220,6 +220,27 @@ struct UpdateStateTests {
         }
     }
 
+    // MARK: - Optional Field Round-Trip
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Optional field round-trip through nil`() async {
+        let source = TestSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.errorMessage, equals: nil)
+
+            vm.setError("something broke")
+            await expect(\.state.errorMessage, equals: "something broke")
+
+            vm.clearError()
+            await expect(\.state.errorMessage, equals: nil)
+
+            vm.setError("again")
+            await expect(\.state.errorMessage, equals: "again")
+        }
+    }
+
     // MARK: - State Stable After Cancellation
 
     @Test(.timeLimit(.minutes(1)))

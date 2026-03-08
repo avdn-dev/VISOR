@@ -158,6 +158,7 @@ struct ObserveTests {
     observeTask.cancel()
 
     #expect(received.count >= 2, "Expected at least 2 emissions but got \(received.count): \(received)")
+    #expect(received.last == "5-true", "Final emission should reflect both properties")
   }
 
   // MARK: - Computed property depending on two observables
@@ -320,7 +321,7 @@ struct ObserveLatestTests {
     _ = await task.value
 
     #expect(received.first == 0)
-    #expect(received.contains(3))
+    #expect(received.last == 3)
   }
 }
 

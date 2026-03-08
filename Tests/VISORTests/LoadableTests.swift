@@ -120,6 +120,33 @@ struct LoadableTests {
     #expect(set.count == 4)
   }
 
+  // MARK: - map edge cases
+
+  @Test
+  func `map transforms value type`() {
+    let state: Loadable<Int> = .loaded(42)
+    let mapped: Loadable<String> = state.map { "\($0)" }
+    #expect(mapped == .loaded("42"))
+  }
+
+  @Test
+  func `map does not invoke closure for non-loaded cases`() {
+    var callCount = 0
+    _ = Loadable<Int>.loading.map { callCount += 1; return $0 }
+    _ = Loadable<Int>.empty.map { callCount += 1; return $0 }
+    _ = Loadable<Int>.error("e").map { callCount += 1; return $0 }
+    #expect(callCount == 0)
+  }
+
+  // MARK: - flatMap edge cases
+
+  @Test
+  func `flatMap flattens nested Loadable`() {
+    let nested: Loadable<Loadable<Int>> = .loaded(.loaded(42))
+    let flat = nested.flatMap { $0 }
+    #expect(flat == .loaded(42))
+  }
+
   // MARK: - Void Value
 
   @Test

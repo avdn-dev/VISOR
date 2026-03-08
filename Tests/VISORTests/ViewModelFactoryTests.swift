@@ -72,6 +72,22 @@ struct ViewModelFactoryTests {
   }
 
   @Test
+  func `Factory closure is not invoked at construction time`() {
+    var callCount = 0
+    let factory = ViewModelFactory {
+      callCount += 1
+      return FactoryTestVM()
+    }
+    #expect(callCount == 0, "Closure should not run at factory init")
+
+    _ = factory.makeViewModel()
+    #expect(callCount == 1, "Closure should run on first makeViewModel()")
+
+    _ = factory.makeViewModel()
+    #expect(callCount == 2, "Closure should run each time makeViewModel() is called")
+  }
+
+  @Test
   func `Routed factory with typed convenience receives router`() {
     let router = Router<TestScene>()
     let factory: ViewModelFactory<RoutedTestVM> = .routed { (r: Router<TestScene>) in

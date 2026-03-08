@@ -101,7 +101,27 @@ struct ObservationSequenceTests {
     #expect(countEmissions == 2)
   }
 
-  // MARK: - Deduplicating init with string type
+  // MARK: - Deduplicating init
+
+  @Test(.timeLimit(.minutes(1)))
+  func `Deduplicating init skips re-emission of same initial value`() async throws {
+    let service = TestSource()
+    var received = [Int]()
+    let task = Task {
+      for await value in ObservationSequence(deduplicating: { service.count }).stream {
+        received.append(value)
+        if received.count >= 2 { break }
+      }
+    }
+    try await yieldForTracking()
+    // Same as initial (0) — should be skipped
+    service.count = 0
+    try await yieldForTracking()
+    // Different — should be second emission
+    service.count = 1
+    _ = await task.value
+    #expect(received == [0, 1])
+  }
 
   @Test(.timeLimit(.minutes(1)))
   func `Deduplicating init with string type`() async throws {
