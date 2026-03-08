@@ -5,8 +5,6 @@
 //  Created by Anh Nguyen on 18/2/2026.
 //
 
-#if DEBUG
-
 /// Test scope bound to a ViewModel, providing observation assertions via `callAsFunction`.
 ///
 /// Used inside ``observing(_:body:)`` to await property changes on a ViewModel:
@@ -69,5 +67,3 @@ public func observing<VM: ViewModel>(
   defer { task.cancel() }
   try await body(Expectation(viewModel: viewModel))
 }
-
-#endif
