@@ -481,6 +481,76 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Generic Types
+
+  @Test
+  func `Generates spy with generic return type`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      protocol ResultService {
+        func execute() -> Result<String, Error>
+      }
+      """,
+      expandedSource: """
+      protocol ResultService {
+        func execute() -> Result<String, Error>
+      }
+
+      @Observable
+      class SpyResultService: ResultService {
+        // -- execute --
+        var executeCallCount = 0
+        var executeReturnValue: Result<String, Error>!
+        func execute() -> Result<String, Error> {
+          executeCallCount += 1
+          calls.append(.execute)
+          return executeReturnValue
+        }
+        enum Call {
+          case execute
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy with generic parameter type`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      protocol BatchService {
+        func process(_ batch: Set<String>)
+      }
+      """,
+      expandedSource: """
+      protocol BatchService {
+        func process(_ batch: Set<String>)
+      }
+
+      @Observable
+      class SpyBatchService: BatchService {
+        // -- process --
+        var processCallCount = 0
+        var processReceivedBatch: Set<String>?
+        var processReceivedInvocations: [Set<String>] = []
+        func process(_ batch: Set<String>) {
+          processCallCount += 1
+          processReceivedBatch = batch
+          processReceivedInvocations.append(batch)
+          calls.append(.process(batch: batch))
+        }
+        enum Call {
+          case process(batch: Set<String>)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test

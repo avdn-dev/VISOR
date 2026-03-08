@@ -551,6 +551,112 @@ struct StubbableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Generic Types
+
+  @Test
+  func `Generates stub with generic return type`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol ResultService {
+        func execute() -> Result<String, Error>
+      }
+      """,
+      expandedSource: """
+      protocol ResultService {
+        func execute() -> Result<String, Error>
+      }
+
+      @Observable
+      class StubResultService: ResultService {
+        var executeReturnValue: Result<String, Error>!
+        func execute() -> Result<String, Error> { executeReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates stub with generic parameter type`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol StorageService {
+        func store(_ value: Set<String>)
+        func retrieve() -> [String: [Int]]
+      }
+      """,
+      expandedSource: """
+      protocol StorageService {
+        func store(_ value: Set<String>)
+        func retrieve() -> [String: [Int]]
+      }
+
+      @Observable
+      class StubStorageService: StorageService {
+        func store(_ value: Set<String>) { }
+        var retrieveReturnValue: [String: [Int]] = [:]
+        func retrieve() -> [String: [Int]] { retrieveReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Disambiguates overloads with generic underscore parameter types`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol Processor {
+        func process(_ items: Set<String>) -> Int
+        func process(_ items: Array<Int>) -> Int
+      }
+      """,
+      expandedSource: """
+      protocol Processor {
+        func process(_ items: Set<String>) -> Int
+        func process(_ items: Array<Int>) -> Int
+      }
+
+      @Observable
+      class StubProcessor: Processor {
+        var processSetStringReturnValue: Int = 0
+        func process(_ items: Set<String>) -> Int { processSetStringReturnValue }
+        var processArrayIntReturnValue: Int = 0
+        func process(_ items: Array<Int>) -> Int { processArrayIntReturnValue }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generic property types use correct defaults`() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol CacheService {
+        var entries: Dictionary<String, Int> { get }
+        var pending: Set<String> { get }
+        var result: Result<String, Error> { get }
+      }
+      """,
+      expandedSource: """
+      protocol CacheService {
+        var entries: Dictionary<String, Int> { get }
+        var pending: Set<String> { get }
+        var result: Result<String, Error> { get }
+      }
+
+      @Observable
+      class StubCacheService: CacheService {
+        var entries: Dictionary<String, Int> = [:]
+        var pending: Set<String> = []
+        var result: Result<String, Error>! = nil
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test
