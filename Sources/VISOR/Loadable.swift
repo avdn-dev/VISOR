@@ -22,10 +22,15 @@ public enum Loadable<Value> {
 }
 
 nonisolated extension Loadable {
+  /// The loaded value, or `nil` if not in the `.loaded` state.
   public var value: Value? { if case .loaded(let v) = self { v } else { nil } }
+  /// Whether the state is `.loading`.
   public var isLoading: Bool { if case .loading = self { true } else { false } }
+  /// Whether the state is `.empty` (distinct from `.loaded` with an empty collection).
   public var isEmpty: Bool { if case .empty = self { true } else { false } }
+  /// Whether the state is `.error`.
   public var isError: Bool { if case .error = self { true } else { false } }
+  /// The error message, or `nil` if not in the `.error` state.
   public var error: String? { if case .error(let msg) = self { msg } else { nil } }
 
   /// Transform the loaded value, preserving `loading`/`empty`/`error` states.
