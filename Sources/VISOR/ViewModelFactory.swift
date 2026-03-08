@@ -34,7 +34,7 @@ public final class ViewModelFactory<VM: ViewModel> {
 
   /// Create a factory that receives a type-erased router at creation time.
   /// Use the typed `ViewModelFactory.routed { }` convenience instead.
-  public init(routed make: @escaping (AnyObject) -> VM) {
+  package init(routed make: @escaping (AnyObject) -> VM) {
     _make = { router in
       guard let router else {
         preconditionFailure(
@@ -44,8 +44,8 @@ public final class ViewModelFactory<VM: ViewModel> {
     }
   }
 
-  /// Create a ViewModel, optionally passing a router for routed factories.
-  public func makeViewModel(router: AnyObject? = nil) -> VM {
+  /// Create a ViewModel. The router parameter is for generated code only.
+  package func makeViewModel(router: AnyObject? = nil) -> VM {
     _make(router)
   }
 }

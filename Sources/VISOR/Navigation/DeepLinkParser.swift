@@ -69,7 +69,7 @@ extension URL {
   /// - `myapp://valentine/accept` → `["valentine", "accept"]`
   /// - `myapp:///settings` → `["settings"]`
   /// - `myapp://home` → `["home"]`
-  nonisolated public var deepLinkComponents: [String] {
+  nonisolated package var deepLinkComponents: [String] {
     // host + path covers both "scheme://host/path" and "scheme:///path" forms.
     let pathSegments = path().split(separator: "/")
     var parts: [String] = []

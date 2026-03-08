@@ -9,5 +9,5 @@ import SwiftUI
 
 extension EnvironmentValues {
   /// Type-erased router, automatically set by NavigationContainer.
-  @Entry public var router: AnyObject?
+  @Entry package var router: AnyObject?
 }

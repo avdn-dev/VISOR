@@ -139,14 +139,14 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Active State
 
   /// Mark this router as the active one. Deactivates the parent.
-  public func activate() {
+  package func activate() {
     log("activate (level \(level))")
     isActive = true
     parent?.deactivate()
   }
 
   /// Mark this router as inactive.
-  public func deactivate() {
+  package func deactivate() {
     log("deactivate (level \(level))")
     isActive = false
   }
@@ -154,7 +154,7 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Deep Linking
 
   /// Open a deep link destination. Only navigates if this router is active.
-  public func deepLinkOpen(to destination: Destination<Scene>) {
+  package func deepLinkOpen(to destination: Destination<Scene>) {
     guard isActive else {
       log("deepLinkOpen ignored (inactive, level \(level))")
       return
@@ -182,7 +182,7 @@ public final class Router<Scene: NavigationScene> {
   }
 
   /// Create a child router for a modal's NavigationContainer.
-  public func childRouter() -> Router {
+  package func childRouter() -> Router {
     let child = Router(
       level: level + 1,
       identifierTab: nil,
@@ -209,7 +209,7 @@ public final class Router<Scene: NavigationScene> {
   /// This closure is retained for the router's lifetime (often app lifetime) and propagated
   /// to all child routers. Prefer `configureDeepLinks(scheme:parsers:)` which captures only
   /// value types. If setting directly, use `[weak self]` to avoid retain cycles.
-  @ObservationIgnored public var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
+  @ObservationIgnored public package(set) var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
 
   /// Configure deep link handling with a URL scheme and an ordered list of parsers.
   ///
