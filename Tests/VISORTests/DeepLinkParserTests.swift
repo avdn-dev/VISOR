@@ -85,7 +85,7 @@ struct DeepLinkParserTests {
   // MARK: - Custom parser
 
   @Test
-  func `custom parser extracts dynamic values`() {
+  func `Custom parser extracts dynamic values`() {
     let parser = DeepLinkParser<TestScene> { url in
       let parts = url.deepLinkComponents
       guard parts.first == "detail", parts.count == 2 else { return nil }
@@ -98,7 +98,7 @@ struct DeepLinkParserTests {
   }
 
   @Test
-  func `custom parser returns nil for non-matching URL`() {
+  func `Custom parser returns nil for non-matching URL`() {
     let parser = DeepLinkParser<TestScene> { url in
       let parts = url.deepLinkComponents
       guard parts.first == "detail", parts.count == 2 else { return nil }
@@ -147,27 +147,35 @@ struct DeepLinkParserTests {
     #expect(result == .tab(.home))
   }
 
-  // MARK: - Multiple Parsers First Nil Second Matches
-
-  @Test
-  func `multiple parsers first nil second matches`() {
-    let nilParser = DeepLinkParser<TestScene> { _ in nil }
-    let matchParser = DeepLinkParser<TestScene>.equal(
-      to: ["settings"],
-      destination: .tab(.settings))
-
-    let root = Router<TestScene>(level: 0)
-    root.configureDeepLinks(scheme: "test", parsers: [nilParser, matchParser])
-
-    let result = root.deepLinkHandler?(URL(string: "test://settings")!)
-    #expect(result == .tab(.settings))
-  }
-
   // MARK: - Query and Fragment Combined
 
   @Test
   func `deepLinkComponents with query and fragment combined`() {
     let url = URL(string: "myapp://item/42?a=1#top")!
     #expect(url.deepLinkComponents == ["item", "42"])
+  }
+
+  // MARK: - Percent-Encoded Components
+
+  @Test
+  func `deepLinkComponents preserves percent-encoded characters`() {
+    let url = URL(string: "myapp://item/hello%20world")!
+    // Custom scheme URLs preserve percent-encoding in path components
+    #expect(url.deepLinkComponents == ["item", "hello%20world"])
+  }
+
+  // MARK: - Case-Sensitive Path Components
+
+  @Test
+  func `equal parser is case-sensitive for path components`() {
+    let parser = DeepLinkParser<TestScene>.equal(
+      to: ["settings"],
+      destination: .tab(.settings))
+
+    let lowercase = URL(string: "myapp://settings")!
+    #expect(parser.parse(lowercase) == .tab(.settings))
+
+    let uppercase = URL(string: "myapp://Settings")!
+    #expect(parser.parse(uppercase) == nil, "Path matching should be case-sensitive")
   }
 }

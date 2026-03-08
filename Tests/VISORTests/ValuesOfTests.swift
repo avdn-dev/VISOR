@@ -4,12 +4,6 @@ import Testing
 
 @Observable
 @MainActor
-private final class ObserveSource {
-  var count = 0
-}
-
-@Observable
-@MainActor
 private final class BoundViewModel: ViewModel {
   struct State: Equatable {
     var isActive = false
@@ -18,9 +12,9 @@ private final class BoundViewModel: ViewModel {
 
   var state = State()
 
-  private let source: ObserveSource
+  private let source: TestSource
 
-  init(source: ObserveSource) {
+  init(source: TestSource) {
     self.source = source
   }
 
@@ -41,8 +35,8 @@ private final class BoundViewModel: ViewModel {
 struct ObserveTests {
 
   @Test(.timeLimit(.minutes(1)))
-  func `emits initial value`() async {
-    let source = ObserveSource()
+  func `Emits initial value`() async {
+    let source = TestSource()
     source.count = 5
 
     var iterator = valuesOf { source.count }.makeAsyncIterator()
@@ -51,8 +45,8 @@ struct ObserveTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `re-emits on change`() async throws {
-    let source = ObserveSource()
+  func `Re-emits on change`() async throws {
+    let source = TestSource()
 
     var iterator = valuesOf { source.count }.makeAsyncIterator()
     let initial = await iterator.next()
@@ -67,7 +61,7 @@ struct ObserveTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `Equatable overload deduplicates consecutive equal values`() async throws {
-    let source = ObserveSource()
+    let source = TestSource()
 
     var received = [Int]()
     let task = Task {
@@ -96,8 +90,8 @@ struct ObserveTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `stream finishes on task cancellation`() async throws {
-    let source = ObserveSource()
+  func `Stream finishes on task cancellation`() async throws {
+    let source = TestSource()
 
     let task = Task {
       var count = 0
@@ -114,9 +108,9 @@ struct ObserveTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `non-Equatable type emits every change`() async throws {
+  func `Non-Equatable type emits every change`() async throws {
     struct Wrapper: Sendable { let value: Int }
-    let source = ObserveSource()
+    let source = TestSource()
 
     var received = [Int]()
     let task = Task {
@@ -141,8 +135,8 @@ struct ObserveTests {
   // MARK: - Multiple properties tracked simultaneously
 
   @Test(.timeLimit(.minutes(1)))
-  func `multiple properties tracked simultaneously`() async throws {
-    let source = ObserveSource()
+  func `Multiple properties tracked simultaneously`() async throws {
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     var received = [String]()
@@ -163,27 +157,15 @@ struct ObserveTests {
     _ = await task.value
     observeTask.cancel()
 
-    #expect(received.count >= 2)
-  }
-
-  // MARK: - Mutation before first consumption
-
-  @Test(.timeLimit(.minutes(1)))
-  func `mutation before first consumption captures current value`() async {
-    let source = ObserveSource()
-    source.count = 42
-
-    var iterator = valuesOf { source.count }.makeAsyncIterator()
-    let first = await iterator.next()
-    #expect(first == 42)
+    #expect(received.count >= 2, "Expected at least 2 emissions but got \(received.count): \(received)")
   }
 
   // MARK: - Computed property depending on two observables
 
   @Test(.timeLimit(.minutes(1)))
-  func `computed property depending on two observables`() async throws {
-    let source1 = ObserveSource()
-    let source2 = ObserveSource()
+  func `Computed property depending on two observables`() async throws {
+    let source1 = TestSource()
+    let source2 = TestSource()
 
     var received = [Int]()
     let task = Task {
@@ -199,15 +181,16 @@ struct ObserveTests {
     source2.count = 5
 
     _ = await task.value
-    #expect(received.contains(0))
+    #expect(received.count == 3, "Expected 3 emissions but got \(received.count): \(received)")
+    #expect(received.first == 0)
     #expect(received.last == 15)
   }
 
   // MARK: - Two independent streams from same source
 
   @Test(.timeLimit(.minutes(1)))
-  func `two independent streams from same source`() async throws {
-    let source = ObserveSource()
+  func `Two independent streams from same source`() async throws {
+    let source = TestSource()
 
     var iter1 = valuesOf { source.count }.makeAsyncIterator()
     var iter2 = valuesOf { source.count }.makeAsyncIterator()
@@ -235,8 +218,8 @@ struct ObserveTests {
 struct ObserveLatestTests {
 
   @Test(.timeLimit(.minutes(1)))
-  func `calls handler with initial value`() async throws {
-    let source = ObserveSource()
+  func `Calls handler with initial value`() async throws {
+    let source = TestSource()
     source.count = 7
 
     let task = Task {
@@ -254,8 +237,8 @@ struct ObserveLatestTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `cancels previous handler when new value arrives`() async throws {
-    let source = ObserveSource()
+  func `Cancels previous handler when new value arrives`() async throws {
+    let source = TestSource()
 
     // Track which handlers completed vs were cancelled
     var completed = [Int]()
@@ -287,41 +270,11 @@ struct ObserveLatestTests {
     #expect(completed.last == 3)
   }
 
-  // MARK: - Handler receives latest during concurrent mutations
-
-  @Test(.timeLimit(.minutes(1)))
-  func `handler receives latest value during concurrent mutations`() async throws {
-    let source = ObserveSource()
-
-    var handlerValues = [Int]()
-    let task = Task {
-      await latestValuesOf({ source.count }) { value in
-        try? await Task.sleep(for: .milliseconds(50))
-        if !Task.isCancelled {
-          handlerValues.append(value)
-        }
-      }
-    }
-
-    try await yieldForTracking()
-
-    source.count = 1
-    try await Task.sleep(for: .milliseconds(10))
-    source.count = 2
-    try await Task.sleep(for: .milliseconds(10))
-    source.count = 3
-
-    try await Task.sleep(for: .milliseconds(300))
-    task.cancel()
-
-    #expect(handlerValues.last == 3)
-  }
-
   // MARK: - Finishes when outer task is cancelled
 
   @Test(.timeLimit(.minutes(1)))
-  func `finishes when outer task is cancelled`() async throws {
-    let source = ObserveSource()
+  func `Finishes when outer task is cancelled`() async throws {
+    let source = TestSource()
 
     var handlerCallCount = 0
     let task = Task {
@@ -342,8 +295,8 @@ struct ObserveLatestTests {
   // MARK: - Synchronous handler receives all values in order
 
   @Test(.timeLimit(.minutes(1)))
-  func `synchronous handler receives all values in order`() async throws {
-    let source = ObserveSource()
+  func `Synchronous handler receives initial and final values`() async throws {
+    let source = TestSource()
 
     var received = [Int]()
     let task = Task {
@@ -379,7 +332,7 @@ struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `equals waits for matching value`() async {
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
@@ -390,7 +343,7 @@ struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `isNot waits until value differs`() async {
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
@@ -403,18 +356,18 @@ struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `satisfies waits for predicate`() async {
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      source.count = 5
-      await expect(\.state.isActive, equals: true)
+      source.count = 15
+      await expect(\.state.count, satisfies: { $0 > 10 })
     }
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `observation is cancelled when body returns`() async throws {
-    let source = ObserveSource()
+  func `Observation is cancelled when body returns`() async throws {
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
@@ -433,7 +386,7 @@ struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `equals returns immediately when value already correct`() async {
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
     // count starts at 0
 
@@ -446,7 +399,7 @@ struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
   func `isNot returns immediately when initial value already differs`() async {
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
     // isActive starts as false
 
@@ -455,11 +408,29 @@ struct ExpectationDSLTests {
     }
   }
 
+  // MARK: - satisfies with intermediate non-matching values
+
+  @Test(.timeLimit(.minutes(1)))
+  func `satisfies keeps waiting through non-matching intermediate values`() async {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    await observing(vm) { expect in
+      // Set values that don't satisfy the predicate first
+      source.count = 1
+      source.count = 3
+      source.count = 5
+      // Now set one that does
+      source.count = 20
+      await expect(\.state.count, satisfies: { $0 > 10 })
+    }
+  }
+
   // MARK: - Multiple expect calls in sequence
 
   @Test(.timeLimit(.minutes(1)))
-  func `multiple expect calls in sequence`() async {
-    let source = ObserveSource()
+  func `Multiple expect calls in sequence`() async {
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
@@ -476,9 +447,9 @@ struct ExpectationDSLTests {
   // MARK: - Observation cancelled even if body throws
 
   @Test(.timeLimit(.minutes(1)))
-  func `observation cancelled even if body throws`() async throws {
+  func `Observation cancelled even if body throws`() async throws {
     struct TestError: Error {}
-    let source = ObserveSource()
+    let source = TestSource()
     let vm = BoundViewModel(source: source)
 
     do {

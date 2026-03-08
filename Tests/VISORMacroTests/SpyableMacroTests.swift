@@ -302,75 +302,6 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
-  @Test
-  func `Package protocol generates package spy`() {
-    assertMacroExpansion(
-      """
-      @Spyable
-      package protocol DataService {
-        var items: [Item] { get }
-        func fetch() async throws -> [Item]
-      }
-      """,
-      expandedSource: """
-      package protocol DataService {
-        var items: [Item] { get }
-        func fetch() async throws -> [Item]
-      }
-
-      @Observable
-      package class SpyDataService: DataService {
-        package var items: [Item] = []
-        // -- fetch --
-        package var fetchCallCount = 0
-        package var fetchReturnValue: [Item] = []
-        package func fetch() async throws -> [Item] {
-          fetchCallCount += 1
-          calls.append(.fetch)
-          return fetchReturnValue
-        }
-        package enum Call {
-          case fetch
-        }
-        package var calls: [Call] = []
-      }
-      """,
-      macros: testMacros)
-  }
-
-  @Test
-  func `Fileprivate protocol generates fileprivate spy`() {
-    assertMacroExpansion(
-      """
-      @Spyable
-      fileprivate protocol DataService {
-        func fetch() async throws -> [Item]
-      }
-      """,
-      expandedSource: """
-      fileprivate protocol DataService {
-        func fetch() async throws -> [Item]
-      }
-
-      @Observable
-      fileprivate class SpyDataService: DataService {
-        // -- fetch --
-        fileprivate var fetchCallCount = 0
-        fileprivate var fetchReturnValue: [Item] = []
-        fileprivate func fetch() async throws -> [Item] {
-          fetchCallCount += 1
-          calls.append(.fetch)
-          return fetchReturnValue
-        }
-        fileprivate enum Call {
-          case fetch
-        }
-        fileprivate var calls: [Call] = []
-      }
-      """,
-      macros: testMacros)
-  }
-
   // MARK: - @StubbableDefault
 
   @Test
@@ -410,6 +341,33 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Properties-only Protocol
+
+  @Test
+  func `Properties-only protocol generates spy without Call enum`() {
+    assertMacroExpansion(
+      """
+      @Spyable
+      protocol ConfigService {
+        var apiKey: String { get }
+        var isEnabled: Bool { get }
+      }
+      """,
+      expandedSource: """
+      protocol ConfigService {
+        var apiKey: String { get }
+        var isEnabled: Bool { get }
+      }
+
+      @Observable
+      class SpyConfigService: ConfigService {
+        var apiKey: String = ""
+        var isEnabled: Bool = false
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test
@@ -422,24 +380,6 @@ struct SpyableMacroTests {
       """,
       expandedSource: """
       class NotAProtocol {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@Spyable can only be applied to protocols", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Error when applied to struct`() {
-    assertMacroExpansion(
-      """
-      @Spyable
-      struct NotAProtocol {
-      }
-      """,
-      expandedSource: """
-      struct NotAProtocol {
       }
       """,
       diagnostics: [

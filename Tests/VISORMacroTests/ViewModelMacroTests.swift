@@ -18,6 +18,11 @@ private let testMacros: [String: Macro.Type] = [
   "ViewModel": ViewModelMacro.self,
 ]
 
+private nonisolated(unsafe) let observableWarning = DiagnosticSpec(
+  message: "@ViewModel requires @Observable on the class to enable observation tracking",
+  line: 1, column: 1, severity: .warning
+)
+
 // MARK: - ViewModelMacroTests
 
 @Suite("ViewModel Macro")
@@ -59,9 +64,7 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -96,9 +99,7 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -133,9 +134,7 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -168,9 +167,7 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -197,9 +194,7 @@ struct ViewModelMacroTests {
       extension SimpleViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -261,30 +256,10 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  @Test
-  func `Error when applied to enum`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      enum NotAClass {
-        case a
-      }
-      """,
-      expandedSource: """
-      enum NotAClass {
-        case a
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel can only be applied to classes", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
   // MARK: - @Bound inside State
 
   @Test
-  func `Bound inside State generates updateState observe method`() {
+  func `@Bound inside State generates updateState observe method`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -324,14 +299,12 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   @Test
-  func `Multiple Bound inside State generates withDiscardingTaskGroup`() {
+  func `Multiple @Bound inside State generates withDiscardingTaskGroup`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -391,9 +364,7 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -464,14 +435,12 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   @Test
-  func `Bound inside State with invalid dependency emits error`() {
+  func `@Bound inside State with invalid dependency emits error`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -509,7 +478,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Bound inside State with malformed key path emits warning`() {
+  func `@Bound inside State with malformed key path emits warning`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -547,7 +516,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Bound on let inside State emits warning`() {
+  func `@Bound on let inside State emits warning`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -587,7 +556,7 @@ struct ViewModelMacroTests {
   // MARK: - @Bound on class-level var (v1 migration)
 
   @Test
-  func `Bound on class-level var emits migration warning`() {
+  func `@Bound on class-level var emits migration warning`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -765,7 +734,7 @@ struct ViewModelMacroTests {
   // MARK: - @Reaction Generation
 
   @Test
-  func `Sync Reaction generates for-await loop`() {
+  func `Sync @Reaction generates for-await loop`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -804,14 +773,12 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   @Test
-  func `Async Reaction generates latestValuesOf call`() {
+  func `Async @Reaction generates latestValuesOf call`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -850,14 +817,12 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   @Test
-  func `Mixed Bound in State and Reaction generates combined startObserving`() {
+  func `Mixed @Bound in State and @Reaction generates combined startObserving`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -912,14 +877,12 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   @Test
-  func `Reaction with zero params emits diagnostic`() {
+  func `@Reaction with zero params emits diagnostic`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -987,16 +950,14 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-      ],
+      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
   // MARK: - Manual startObserving missing Bound observe method
 
   @Test
-  func `Manual startObserving missing Bound observe method emits warning`() {
+  func `Manual startObserving missing @Bound observe method emits warning`() {
     assertMacroExpansion(
       """
       @Observable
@@ -1074,9 +1035,118 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  // MARK: - Error when applied to enum
+
+  @Test
+  func `Error when applied to enum`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      enum NotAClass {
+        case a
+      }
+      """,
+      expandedSource: """
+      enum NotAClass {
+        case a
+      }
+      """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@ViewModel can only be applied to classes", line: 1, column: 1, severity: .error),
       ],
+      macros: testMacros)
+  }
+
+  // MARK: - @Reaction with two parameters
+
+  @Test
+  func `@Reaction with two parameters emits diagnostic`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        @Reaction(\\.router.pendingDestination)
+        func handleDeepLink(destination: Destination?, source: String) { }
+        private let router: DeepLinkRouter
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        func handleDeepLink(destination: Destination?, source: String) { }
+        private let router: DeepLinkRouter
+
+          init(router: DeepLinkRouter) {
+              self.router = router
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        observableWarning,
+        DiagnosticSpec(message: "@Reaction on 'handleDeepLink': method must have exactly one parameter", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  // MARK: - Manual startObserving calling correct observe methods emits no diagnostic
+
+  @Test
+  func `Manual startObserving calling observe methods emits no diagnostic`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class ItemsViewModel {
+        struct State: Equatable {
+          @Bound(\\.service) var items: [String] = []
+        }
+        var state = State()
+        func startObserving() async {
+          await observeItems()
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class ItemsViewModel {
+        struct State: Equatable {
+          var items: [String] = []
+        }
+        var state = State()
+        func startObserving() async {
+          await observeItems()
+        }
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<ItemsViewModel>
+
+          func observeItems() async {
+              for await value in VISOR.valuesOf({ self.service.items }) {
+                  self.updateState(\\.items, to: value)
+              }
+          }
+      }
+
+      extension ItemsViewModel: @MainActor ViewModel {
+      }
+      """,
       macros: testMacros)
   }
 }

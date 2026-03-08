@@ -1,5 +1,18 @@
 import SwiftUI
+import Observation
 import VISOR
+
+// MARK: - Shared Observable Source
+
+/// Shared observable test dependency used across observation test suites.
+/// Replaces per-file duplicates (CounterSource, FlagSource, ObserveSource, etc.)
+@Observable
+@MainActor
+final class TestSource {
+  var count = 0
+  var isEnabled = false
+  var name = "initial"
+}
 
 // MARK: - Navigation Scene Types
 

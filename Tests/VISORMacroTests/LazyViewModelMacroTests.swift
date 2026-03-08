@@ -141,10 +141,10 @@ struct LazyViewModelMacroTests {
   }
 
   @Test
-  func `Short VM name derives correct factory`() {
+  func `Error when no argument provided`() {
     assertMacroExpansion(
       """
-      @LazyViewModel(MyVM.self)
+      @LazyViewModel
       struct MyView: View {
         var content: some View { Text("") }
       }
@@ -152,39 +152,29 @@ struct LazyViewModelMacroTests {
       expandedSource: """
       struct MyView: View {
         var content: some View { Text("") }
-
-          @Environment(\\.router) private var containerRouter
-
-          @Environment(MyVM.Factory.self) private var factory
-
-          @State private var _viewModel: MyVM?
-
-          var viewModel: MyVM {
-              _viewModel!
-          }
-
-          var body: some View {
-              Group {
-                  if _viewModel != nil {
-                      content
-                  } else {
-                      Color.clear
-                  }
-              }
-              .task {
-                  if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
-                  }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
-              }
-          }
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel requires (ViewModel.self) argument", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Error when applied to enum`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyViewModel.self)
+      enum NotAStruct {
+      }
+      """,
+      expandedSource: """
+      enum NotAStruct {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel can only be applied to structs", line: 1, column: 1, severity: .error),
+      ],
       macros: testMacros)
   }
 }

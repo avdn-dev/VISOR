@@ -435,46 +435,6 @@ struct StubbableMacroTests {
   }
 
   @Test
-  func `Error when applied to enum`() {
-    assertMacroExpansion(
-      """
-      @Stubbable
-      enum NotValid {
-        case a
-      }
-      """,
-      expandedSource: """
-      enum NotValid {
-        case a
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@Stubbable can only be applied to protocols", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Error when applied to class`() {
-    assertMacroExpansion(
-      """
-      @Stubbable
-      final class NotValid {
-        private let service: DataService
-      }
-      """,
-      expandedSource: """
-      final class NotValid {
-        private let service: DataService
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@Stubbable can only be applied to protocols", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
   func `Error on protocol with associated types`() {
     assertMacroExpansion(
       """

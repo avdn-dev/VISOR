@@ -182,10 +182,8 @@ struct LazyViewModelsMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - Expansion Variants
-
   @Test
-  func `Single ViewModel expansion`() {
+  func `Single ViewModel with content emits warning but expands correctly`() {
     assertMacroExpansion(
       """
       @LazyViewModels(AViewModel.self)
@@ -234,6 +232,46 @@ struct LazyViewModelsMacroTests {
       ],
       macros: testMacros)
   }
+
+  @Test
+  func `Error when no arguments provided`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModels()
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModels requires (ViewModel.self) argument", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Error when applied to enum`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModels(AViewModel.self)
+      enum NotAStruct {
+      }
+      """,
+      expandedSource: """
+      enum NotAStruct {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModels can only be applied to structs", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  // MARK: - Expansion Variants
 
   @Test
   func `Three ViewModels expansion`() {
