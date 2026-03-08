@@ -63,8 +63,8 @@ import VISOR
 @ViewModel
 final class ProfileViewModel {
   struct State: Equatable {
-    @Bound(\.profileService) var name = ""
-    @Bound(\.profileService) var email = ""
+    @Bound(\ProfileViewModel.profileService) var name = ""
+    @Bound(\ProfileViewModel.profileService) var email = ""
   }
 
   enum Action {
@@ -140,7 +140,7 @@ Apply to a ViewModel class to auto-generate:
 @ViewModel
 final class CounterViewModel {
   struct State: Equatable {
-    @Bound(\.counterService) var count = 0
+    @Bound(\CounterViewModel.counterService) var count = 0
   }
 
   var state = State()
@@ -158,8 +158,8 @@ Marks a `var` property **inside `struct State`** for automatic observation bindi
 @ViewModel
 final class ProfileViewModel {
   struct State: Equatable {
-    @Bound(\.profileService) var isLoggedIn = false
-    @Bound(\.profileService) var recentItems: [String] = []
+    @Bound(\ProfileViewModel.profileService) var isLoggedIn = false
+    @Bound(\ProfileViewModel.profileService) var recentItems: [String] = []
   }
 
   var state = State()
@@ -170,7 +170,7 @@ final class ProfileViewModel {
 // and profileService.recentItems, calling updateState for each change.
 ```
 
-The key path argument (`\.profileService`) identifies which dependency owns the source property. The generated code uses `valuesOf()` with the Equatable-constrained overload for automatic deduplication.
+The key path argument (`\ProfileViewModel.profileService`) identifies which dependency owns the source property. Use the full root type — `\.dep` can't infer the root inside a struct. The generated code uses `valuesOf()` with the Equatable-constrained overload for automatic deduplication.
 
 ### `@Reaction`
 

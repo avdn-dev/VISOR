@@ -541,7 +541,7 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound on 'value': expected key path argument like \Self.dependencyName"#, line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Bound on 'value': expected key path argument like \ClassName.dependencyName"#, line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }

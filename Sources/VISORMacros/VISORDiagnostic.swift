@@ -45,7 +45,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .invalidBoundDependency(let name, let propertyName):
       "@Bound(\\.\(name)) on '\(propertyName)': no stored 'let \(name)' found on this class"
     case .malformedBoundKeyPath(let propertyName):
-      "@Bound on '\(propertyName)': expected key path argument like \\Self.dependencyName"
+      "@Bound on '\(propertyName)': expected key path argument like \\ClassName.dependencyName"
     case .invalidReactionParameter(let methodName):
       "@Reaction on '\(methodName)': method must have exactly one parameter"
     case .malformedLazyViewModelsArgument:
