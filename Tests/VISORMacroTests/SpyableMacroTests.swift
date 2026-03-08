@@ -43,7 +43,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyDataService: DataService {
+      final class SpyDataService: DataService {
         var items: [Item] = []
         // -- fetch --
         var fetchCallCount = 0
@@ -90,7 +90,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyLogService: LogService {
+      final class SpyLogService: LogService {
         // -- log --
         var logCallCount = 0
         var logReceivedMessage: String?
@@ -132,7 +132,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpySearchService: SearchService {
+      final class SpySearchService: SearchService {
         // -- search --
         var searchCallCount = 0
         var searchReceivedArguments: (query: String, limit: Int)?
@@ -169,7 +169,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyThemeService: ThemeService {
+      final class SpyThemeService: ThemeService {
         // -- currentTheme --
         var currentThemeCallCount = 0
         var currentThemeReturnValue: Theme!
@@ -200,7 +200,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyEmptyService: EmptyService {
+      final class SpyEmptyService: EmptyService {
       }
       """,
       macros: testMacros)
@@ -221,7 +221,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyThemeService: ThemeService {
+      final class SpyThemeService: ThemeService {
         var currentTheme: Theme! = nil
       }
       """,
@@ -243,7 +243,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyItemService: ItemService {
+      final class SpyItemService: ItemService {
         // -- perform --
         var performCallCount = 0
         var performReceivedItem: Item?
@@ -282,7 +282,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyLoadService: LoadService {
+      final class SpyLoadService: LoadService {
         // -- loadById --
         var loadByIdCallCount = 0
         var loadByIdReceivedId: String?
@@ -336,7 +336,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyMixedService: MixedService {
+      final class SpyMixedService: MixedService {
         // -- fetch --
         var fetchCallCount = 0
         var fetchReturnValue: [Item] = []
@@ -395,7 +395,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      public class SpyDataService: DataService {
+      public final class SpyDataService: DataService {
         public var items: [Item] = []
         // -- fetch --
         public var fetchCallCount = 0
@@ -436,7 +436,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyExtractionService: ExtractionService {
+      final class SpyExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
         var count: Int = 0
         // -- reset --
@@ -473,7 +473,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyConfigService: ConfigService {
+      final class SpyConfigService: ConfigService {
         var apiKey: String = ""
         var isEnabled: Bool = false
       }
@@ -498,7 +498,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyResultService: ResultService {
+      final class SpyResultService: ResultService {
         // -- execute --
         var executeCallCount = 0
         var executeReturnValue: Result<String, Error>!
@@ -531,7 +531,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyBatchService: BatchService {
+      final class SpyBatchService: BatchService {
         // -- process --
         var processCallCount = 0
         var processReceivedBatch: Set<String>?
@@ -628,7 +628,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyHasStatic: HasStatic {
+      final class SpyHasStatic: HasStatic {
         // -- doWork --
         var doWorkCallCount = 0
         func doWork() {
@@ -664,7 +664,7 @@ struct SpyableMacroTests {
       }
 
       @Observable
-      class SpyHasSubscript: HasSubscript {
+      final class SpyHasSubscript: HasSubscript {
         var name: String = ""
       }
       """,

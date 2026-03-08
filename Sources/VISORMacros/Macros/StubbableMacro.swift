@@ -81,7 +81,7 @@ public struct StubbableMacro: PeerMacro {
 
     let result: DeclSyntax = """
       @Observable
-      \(raw: prefix)class \(raw: stubName): \(raw: protocolName) {
+      \(raw: prefix)final class \(raw: stubName): \(raw: protocolName) {
       \(raw: body)
       }
       """

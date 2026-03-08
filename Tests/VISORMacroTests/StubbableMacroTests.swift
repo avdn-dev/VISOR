@@ -45,7 +45,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubDataService: DataService {
+      final class StubDataService: DataService {
         var items: [Item] = []
         var isLoading: Bool = false
         var fetchReturnValue: [Item] = []
@@ -85,7 +85,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubConfigService: ConfigService {
+      final class StubConfigService: ConfigService {
         var name: String = ""
         var count: Int = 0
         var rate: Double = 0.0
@@ -114,7 +114,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubThemeService: ThemeService {
+      final class StubThemeService: ThemeService {
         var currentThemeReturnValue: Theme!
         func currentTheme() -> Theme { currentThemeReturnValue }
       }
@@ -135,7 +135,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubEmptyService: EmptyService {
+      final class StubEmptyService: EmptyService {
       }
       """,
       macros: testMacros)
@@ -156,7 +156,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubSearchService: SearchService {
+      final class StubSearchService: SearchService {
         var searchReturnValue: [Result] = []
         func search(query: String, limit: Int) async throws -> [Result] { searchReturnValue }
       }
@@ -179,7 +179,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubCacheService: CacheService {
+      final class StubCacheService: CacheService {
         var getReturnValue: Data? = nil
         func get(key: String) -> Data? { getReturnValue }
       }
@@ -208,7 +208,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      public class StubDataService: DataService {
+      public final class StubDataService: DataService {
         public var items: [Item] = []
         public var fetchReturnValue: [Item] = []
         public func fetch() async throws -> [Item] { fetchReturnValue }
@@ -236,7 +236,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      package class StubDataService: DataService {
+      package final class StubDataService: DataService {
         package var items: [Item] = []
         package var fetchReturnValue: [Item] = []
         package func fetch() async throws -> [Item] { fetchReturnValue }
@@ -262,7 +262,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      fileprivate class StubDataService: DataService {
+      fileprivate final class StubDataService: DataService {
         fileprivate var items: [Item] = []
         fileprivate var fetchReturnValue: [Item] = []
         fileprivate func fetch() async throws -> [Item] { fetchReturnValue }
@@ -288,7 +288,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubExtractionService: ExtractionService {
+      final class StubExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
       }
       """,
@@ -312,7 +312,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubExtractionService: ExtractionService {
+      final class StubExtractionService: ExtractionService {
         var count: Int = 0
         var theme: Theme! = nil
       }
@@ -339,7 +339,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubExtractionService: ExtractionService {
+      final class StubExtractionService: ExtractionService {
         var status: ExtractionStatus = ExtractionStatus.idle
         var count: Int = 0
         var name: String = ""
@@ -363,7 +363,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubStreamService: StreamService {
+      final class StubStreamService: StreamService {
         var updates: AsyncStream<Int> = AsyncStream { $0.finish() }
       }
       """,
@@ -385,7 +385,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubTagService: TagService {
+      final class StubTagService: TagService {
         var tags: Set<String> = []
       }
       """,
@@ -407,7 +407,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubItemService: ItemService {
+      final class StubItemService: ItemService {
         func perform(with item: Item) async throws { }
       }
       """,
@@ -433,7 +433,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubLoadService: LoadService {
+      final class StubLoadService: LoadService {
         var loadByIdReturnValue: Item!
         func load(byId id: String) -> Item { loadByIdReturnValue }
         var loadMatchingReturnValue: [Item] = []
@@ -460,7 +460,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubEventService: EventService {
+      final class StubEventService: EventService {
         func send(event: String) { }
         func send(error: Error) { }
       }
@@ -485,7 +485,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubFinder: Finder {
+      final class StubFinder: Finder {
         var findItemReturnValue: Bool = false
         func find(_ expected: Item) -> Bool { findItemReturnValue }
         var findByIDReturnValue: Bool = false
@@ -512,7 +512,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubConverter: Converter {
+      final class StubConverter: Converter {
         var convertFromReturningIntReturnValue: Int = 0
         func convert(from value: String) -> Int { convertFromReturningIntReturnValue }
         var convertFromReturningDoubleReturnValue: Double = 0.0
@@ -541,7 +541,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubMixedService: MixedService {
+      final class StubMixedService: MixedService {
         var fetchReturnValue: [Item] = []
         func fetch() -> [Item] { fetchReturnValue }
         func save(_ item: Item) { }
@@ -568,7 +568,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubResultService: ResultService {
+      final class StubResultService: ResultService {
         var executeReturnValue: Result<String, Error>!
         func execute() -> Result<String, Error> { executeReturnValue }
       }
@@ -593,7 +593,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubStorageService: StorageService {
+      final class StubStorageService: StorageService {
         func store(_ value: Set<String>) { }
         var retrieveReturnValue: [String: [Int]] = [:]
         func retrieve() -> [String: [Int]] { retrieveReturnValue }
@@ -619,7 +619,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubProcessor: Processor {
+      final class StubProcessor: Processor {
         var processSetStringReturnValue: Int = 0
         func process(_ items: Set<String>) -> Int { processSetStringReturnValue }
         var processArrayIntReturnValue: Int = 0
@@ -648,7 +648,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubCacheService: CacheService {
+      final class StubCacheService: CacheService {
         var entries: Dictionary<String, Int> = [:]
         var pending: Set<String> = []
         var result: Result<String, Error>! = nil
@@ -716,7 +716,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubHasStatic: HasStatic {
+      final class StubHasStatic: HasStatic {
         func doWork() { }
       }
       """,
@@ -743,7 +743,7 @@ struct StubbableMacroTests {
       }
 
       @Observable
-      class StubHasSubscript: HasSubscript {
+      final class StubHasSubscript: HasSubscript {
         var name: String = ""
       }
       """,

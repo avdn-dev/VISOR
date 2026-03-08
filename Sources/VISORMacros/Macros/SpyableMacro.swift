@@ -129,7 +129,7 @@ public struct SpyableMacro: PeerMacro {
 
     let result: DeclSyntax = """
       @Observable
-      \(raw: prefix)class \(raw: spyName): \(raw: protocolName) {
+      \(raw: prefix)final class \(raw: spyName): \(raw: protocolName) {
       \(raw: bodyStr)
       }
       """
