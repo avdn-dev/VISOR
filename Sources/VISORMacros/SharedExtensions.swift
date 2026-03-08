@@ -290,10 +290,10 @@ struct ClassAnalysis {
   var hasStartObserving = false
   var startObservingBodyText: String?
   var hasInitializer = false
-  // v2: Action/perform detection
+  // v2: Action/handle detection
   var hasActionEnum = false
-  var hasPerformMethod = false
-  var performIsAsync = false
+  var hasHandleMethod = false
+  var handleIsAsync = false
 
   // v2: @Bound inside State struct
   var stateBoundProperties: [BoundPropertyInfo] = []
@@ -372,12 +372,12 @@ struct ClassAnalysis {
           startObservingBodyText = funcDecl.body?.statements.trimmedDescription
         }
 
-        // perform detection
-        if funcDecl.name.text == "perform" {
+        // handle detection
+        if funcDecl.name.text == "handle" {
           let params = funcDecl.signature.parameterClause.parameters
           if params.count == 1 {
-            hasPerformMethod = true
-            performIsAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+            hasHandleMethod = true
+            handleIsAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
           }
         }
 

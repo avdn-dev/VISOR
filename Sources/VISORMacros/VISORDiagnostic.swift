@@ -21,8 +21,8 @@ enum VISORDiagnostic: DiagnosticMessage {
   case invalidReactionParameter(methodName: String)
   case malformedLazyViewModelsArgument
   case manualStartObservingMissingMethod(methodName: String)
-  case actionWithoutPerform
-  case performNotAsync
+  case actionWithoutHandle
+  case handleNotAsync
   case boundOnClassVar(propertyName: String)
   case boundOnLetProperty(propertyName: String)
 
@@ -52,10 +52,10 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@LazyViewModels: unrecognized argument (expected ViewModel.self)"
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
-    case .actionWithoutPerform:
-      "@ViewModel: 'Action' enum declared but no 'perform(_ action: Action) async' method found"
-    case .performNotAsync:
-      "@ViewModel: 'perform(_:)' should be 'async' for structured concurrency"
+    case .actionWithoutHandle:
+      "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found"
+    case .handleNotAsync:
+      "@ViewModel: 'handle(_:)' should be 'async' for structured concurrency"
     case .boundOnClassVar(let name):
       "@Bound on '\(name)': move @Bound to the State struct property instead"
     case .boundOnLetProperty(let name):
@@ -73,9 +73,9 @@ enum VISORDiagnostic: DiagnosticMessage {
     switch self {
     case .missingObservable, .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
          .singleViewModelInLazyViewModels, .manualStartObservingMissingMethod,
-         .performNotAsync, .boundOnClassVar, .boundOnLetProperty:
+         .handleNotAsync, .boundOnClassVar, .boundOnLetProperty:
       .warning
-    case .actionWithoutPerform, .invalidBoundDependency:
+    case .actionWithoutHandle, .invalidBoundDependency:
       .error
     default:
       .error

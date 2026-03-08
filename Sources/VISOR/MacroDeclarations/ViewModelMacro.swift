@@ -16,7 +16,7 @@
 /// ## State + Action pattern
 ///
 /// Define a nested `struct State: Equatable` with all view state, and an optional
-/// `enum Action` with a `perform(_ action: Action) async` method:
+/// `enum Action` with a `handle(_ action: Action) async` method:
 ///
 /// ```swift
 /// @Observable
@@ -34,7 +34,7 @@
 ///
 ///   var state = State()
 ///
-///   func perform(_ action: Action) async {
+///   func handle(_ action: Action) async {
 ///     switch action {
 ///     case .refresh:
 ///       updateState(\.items, to: .loading)

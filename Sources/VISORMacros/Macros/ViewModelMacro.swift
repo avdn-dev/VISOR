@@ -63,17 +63,17 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       """
     members.append(typealiasDecl)
 
-    // 3. Action/perform diagnostics
-    if analysis.hasActionEnum && !analysis.hasPerformMethod {
+    // 3. Action/handle diagnostics
+    if analysis.hasActionEnum && !analysis.hasHandleMethod {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.actionWithoutPerform))
+        message: VISORDiagnostic.actionWithoutHandle))
     }
 
-    if analysis.hasPerformMethod && !analysis.performIsAsync {
+    if analysis.hasHandleMethod && !analysis.handleIsAsync {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.performNotAsync))
+        message: VISORDiagnostic.handleNotAsync))
     }
 
     // 4. v1 @Bound on class var (migration aid)

@@ -48,6 +48,67 @@ private final class RoutedIntegrationVM: ViewModel {
     }
 }
 
+// MARK: - Action VMs (sync and async handle)
+
+@Observable
+@MainActor
+private final class SyncActionVM: ViewModel {
+    struct State: Equatable {
+        var count = 0
+        var label = ""
+    }
+
+    enum Action {
+        case increment
+        case setLabel(String)
+    }
+
+    var state = State()
+
+    func handle(_ action: Action) {
+        switch action {
+        case .increment:
+            updateState(\.count, to: state.count + 1)
+        case .setLabel(let text):
+            updateState(\.label, to: text)
+        }
+    }
+}
+
+@Observable
+@MainActor
+private final class AsyncActionVM: ViewModel {
+    struct State: Equatable {
+        var items: Loadable<[String]> = .loading
+        var count = 0
+    }
+
+    enum Action {
+        case increment
+        case loadItems
+    }
+
+    var state = State()
+
+    private let source: IntegrationSource
+
+    init(source: IntegrationSource) {
+        self.source = source
+    }
+
+    func handle(_ action: Action) async {
+        switch action {
+        case .increment:
+            updateState(\.count, to: state.count + 1)
+        case .loadItems:
+            updateState(\.items, to: .loading)
+            // Simulate async work
+            try? await Task.sleep(for: .milliseconds(10))
+            updateState(\.items, to: .loaded(["a", "b"]))
+        }
+    }
+}
+
 // MARK: - Integration Tests
 
 @Suite("Integration")
@@ -151,6 +212,69 @@ struct IntegrationTests {
 
         let vm = factory.makeViewModel(router: router)
         #expect(vm.routerID == ObjectIdentifier(router))
+    }
+
+    // MARK: - Sync handle
+
+    @Test
+    func `sync handle mutates state without await`() {
+        let vm = SyncActionVM()
+
+        vm.handle(.increment)
+        #expect(vm.state.count == 1)
+
+        vm.handle(.increment)
+        #expect(vm.state.count == 2)
+
+        vm.handle(.setLabel("hello"))
+        #expect(vm.state.label == "hello")
+    }
+
+    @Test
+    func `sync handle called from async context`() async {
+        let vm = SyncActionVM()
+
+        await vm.handle(.increment)
+        #expect(vm.state.count == 1)
+
+        await vm.handle(.setLabel("async caller"))
+        #expect(vm.state.label == "async caller")
+    }
+
+    // MARK: - Async handle
+
+    @Test
+    func `async handle performs async work`() async {
+        let source = IntegrationSource()
+        let vm = AsyncActionVM(source: source)
+
+        await vm.handle(.loadItems)
+        #expect(vm.state.items == .loaded(["a", "b"]))
+    }
+
+    @Test
+    func `async handle with sync action case`() async {
+        let source = IntegrationSource()
+        let vm = AsyncActionVM(source: source)
+
+        await vm.handle(.increment)
+        #expect(vm.state.count == 1)
+
+        await vm.handle(.increment)
+        #expect(vm.state.count == 2)
+    }
+
+    @Test
+    func `async handle mixes sync and async cases`() async {
+        let source = IntegrationSource()
+        let vm = AsyncActionVM(source: source)
+
+        await vm.handle(.increment)
+        #expect(vm.state.count == 1)
+
+        await vm.handle(.loadItems)
+        #expect(vm.state.items == .loaded(["a", "b"]))
+        #expect(vm.state.count == 1)
     }
 
     // MARK: - Sequential observing blocks

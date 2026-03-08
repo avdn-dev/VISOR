@@ -622,10 +622,10 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - Action/perform diagnostics
+  // MARK: - Action/handle diagnostics
 
   @Test
-  func `Action enum without perform emits error`() {
+  func `Action enum without handle emits error`() {
     assertMacroExpansion(
       """
       @Observable
@@ -656,13 +656,13 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'perform(_ action: Action) async' method found", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `Action enum with async perform emits no diagnostic`() {
+  func `Action enum with async handle emits no diagnostic`() {
     assertMacroExpansion(
       """
       @Observable
@@ -671,7 +671,7 @@ struct ViewModelMacroTests {
         struct State: Equatable {}
         enum Action { case refresh }
         var state = State()
-        func perform(_ action: Action) async {}
+        func handle(_ action: Action) async {}
         private let service: MyService
       }
       """,
@@ -681,7 +681,7 @@ struct ViewModelMacroTests {
         struct State: Equatable {}
         enum Action { case refresh }
         var state = State()
-        func perform(_ action: Action) async {}
+        func handle(_ action: Action) async {}
         private let service: MyService
 
           init(service: MyService) {
@@ -698,7 +698,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Action enum with non-async perform emits warning`() {
+  func `Action enum with non-async handle emits warning`() {
     assertMacroExpansion(
       """
       @Observable
@@ -707,7 +707,7 @@ struct ViewModelMacroTests {
         struct State: Equatable {}
         enum Action { case refresh }
         var state = State()
-        func perform(_ action: Action) {}
+        func handle(_ action: Action) {}
         private let service: MyService
       }
       """,
@@ -717,7 +717,7 @@ struct ViewModelMacroTests {
         struct State: Equatable {}
         enum Action { case refresh }
         var state = State()
-        func perform(_ action: Action) {}
+        func handle(_ action: Action) {}
         private let service: MyService
 
           init(service: MyService) {
@@ -731,13 +731,13 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'perform(_:)' should be 'async' for structured concurrency", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@ViewModel: 'handle(_:)' should be 'async' for structured concurrency", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `No Action no perform emits no diagnostic`() {
+  func `No Action no handle emits no diagnostic`() {
     assertMacroExpansion(
       """
       @Observable

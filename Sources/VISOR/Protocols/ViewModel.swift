@@ -62,7 +62,7 @@ nonisolated extension Loadable: Sendable where Value: Sendable {}
 /// and an optional `Action` enum for user-initiated mutations.
 ///
 /// - State is the complete representation of all view state.
-/// - Actions are dispatched via `send(_:)` (sync) or `perform(_:)` (async).
+/// - Actions are dispatched via `handle(_:)`. Implement sync or async as needed.
 /// - Use `updateState(_:to:)` for keypath-based mutation with deduplication.
 ///
 /// - Note: Requires Swift 6.2+ with `MainActorByDefault` enabled in the consuming target.
@@ -71,7 +71,7 @@ public protocol ViewModel: Observable, AnyObject {
   associatedtype Action = Never
 
   var state: State { get set }
-  func perform(_ action: Action) async
+  func handle(_ action: Action) async
   func startObserving() async
 }
 
@@ -80,7 +80,7 @@ extension ViewModel {
 }
 
 extension ViewModel where Action == Never {
-  public func perform(_ action: Never) async {}
+  public func handle(_ action: Never) async {}
 }
 
 // MARK: - updateState (keypath mutation with deduplication)
@@ -104,13 +104,4 @@ extension ViewModel {
   }
 }
 
-// MARK: - send (sync convenience for views)
-
-extension ViewModel {
-  /// Sync dispatch for use in button closures and other synchronous view contexts.
-  /// For async contexts (`.task`, `.refreshable`), call `await perform(_:)` directly.
-  public func send(_ action: Action) {
-    Task { await perform(action) }
-  }
-}
 
