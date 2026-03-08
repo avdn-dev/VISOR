@@ -30,9 +30,9 @@ Importing `VISOR` re-exports `Observation`, so a single import is sufficient.
 ```
 View  -->  ViewModel  -->  Interactor  -->  Service
  |            |                |              |
-(UI only) (owns view state) (coordinates  (platform/domain,
- |            |              services,     may depend on
- |            |              use-case      other services)
+(UI only) (owns State,    (coordinates  (platform/domain,
+ |         dispatches      services,     may depend on
+ |         Actions)        use-case      other services)
 Factory ------+              logic)
 (creates VM   |
  with deps)   |
@@ -45,9 +45,9 @@ Factory ------+              logic)
 
 Dependencies may only point downward: **View → ViewModel / Router → Interactor → Service**. The only exception is services, which may depend on other services.
 
-- **View**: Responsible for UI only. Contains no business logic; as dumb as possible. Binds to ViewModels for all data and interactions. Uses `@LazyViewModel` or `@LazyViewModels` macro.
-- **ViewModel**: The "brain" of the view. Transforms domain models and state into display models (performing all formatting necessary). Forwards actions to interactors. The intermediary between views and the rest of the app. `@Observable` class, owns view state via `ViewModelState<State>`.
-- **Router**: Provides uncoupled navigation to any presentation within the app
+- **View**: Responsible for UI only. Contains no business logic; as dumb as possible. The `@LazyViewModel` view owns the ViewModel; child views receive state and actions as plain parameters.
+- **ViewModel**: The "brain" of the view. Owns a `struct State: Equatable` that is directly mutated. Dispatches user intent via an `Action` enum. Forwards side effects to interactors/services.
+- **Router**: Provides uncoupled navigation to any presentation within the app.
 - **Factory**: `ViewModelFactory<VM>` injected via `@Environment`, creates ViewModel instances with their dependencies.
 - **Interactor (optional)**: Coordinates multiple services and executes business logic for a use case.
 - **Service**: Specialized components handling feature state or lower-level concerns (e.g., networking, caching). Platform or domain services providing shared `@Observable` state.
@@ -62,34 +62,47 @@ import VISOR
 @Observable
 @ViewModel
 final class ProfileViewModel {
-  struct State {
-    let name: String
-    let email: String
+  struct State: Equatable {
+    @Bound(\.profileService) var name = ""
+    @Bound(\.profileService) var email = ""
   }
 
-  var state: ViewModelState<State> {
-    .loaded(state: State(name: profileService.name, email: profileService.email))
+  enum Action {
+    case refresh
+  }
+
+  var state = State()
+
+  func handle(_ action: Action) async {
+    switch action {
+    case .refresh:
+      await profileService.refresh()
+    }
   }
 
   private let profileService: ProfileService
 }
 // @ViewModel auto-generates:
 // - init(profileService:)
-// - typealias Factory = ViewModelFactory<ProfileViewModel>
 // - ViewModel protocol conformance
-// - static var preview (using Stub types)
-// - PreviewProviding conformance
+// - typealias Factory = ViewModelFactory<ProfileViewModel>
+// - startObserving() from @Bound annotations
 ```
 
 ### 2. Create the View
 
+The `@LazyViewModel` view owns the ViewModel. Pass state and actions to child views as plain parameters for easy previewing and testability:
+
 ```swift
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileView: View {
-  func loadedView(state: ProfileViewModel.State) -> some View {
+  var content: some View {
     VStack {
-      Text(state.name)
-      Text(state.email)
+      Text(viewModel.state.name)
+      Text(viewModel.state.email)
+      Button("Refresh") {
+        Task { await viewModel.handle(.refresh) }
+      }
     }
   }
 }
@@ -98,7 +111,7 @@ struct ProfileView: View {
 ### 3. Inject the Factory
 
 ```swift
-ProfileView()
+ProfileScreen()
   .environment(ProfileViewModel.Factory { ProfileViewModel(profileService: profileService) })
 ```
 
@@ -120,39 +133,44 @@ Apply to a ViewModel class to auto-generate:
 1. **Memberwise `init`** from stored `let` properties (skipped if an init already exists)
 2. **`ViewModel` protocol conformance** via extension
 3. **`typealias Factory = ViewModelFactory<ClassName>`**
-4. **`static var preview`** using `Stub*` types for dependencies (DEBUG only)
-5. **`PreviewProviding` conformance**
-6. **`startObserving()`** from `@Bound` and `@Reaction` annotations (see below)
+4. **`startObserving()`** from `@Bound` and `@Reaction` annotations (see below)
 
 ```swift
 @Observable
 @ViewModel
 final class CounterViewModel {
-  struct State { let count: Int }
-  var state: ViewModelState<State> { .loaded(state: State(count: counterService.count)) }
+  struct State: Equatable {
+    @Bound(\.counterService) var count = 0
+  }
+
+  var state = State()
+
   private let counterService: CounterService
 }
 ```
 
 ### `@Bound`
 
-Marks a `var` property for automatic observation binding. The `@ViewModel` macro reads `@Bound` annotations and generates a `startObserving()` method that binds each property to the corresponding dependency.
+Marks a `var` property **inside `struct State`** for automatic observation binding. The `@ViewModel` macro reads `@Bound` annotations and generates a `startObserving()` method that observes the dependency and assigns changes via `updateState`.
 
 ```swift
 @Observable
 @ViewModel
 final class ProfileViewModel {
-  @Bound(\Self.profileService) var isLoggedIn = false
-  @Bound(\Self.profileService) var recentItems: [String] = []
+  struct State: Equatable {
+    @Bound(\.profileService) var isLoggedIn = false
+    @Bound(\.profileService) var recentItems: [String] = []
+  }
+
+  var state = State()
+
   private let profileService: ProfileService
 }
-// Generates startObserving() that observes profileService.isLoggedIn
-// and profileService.recentItems, assigning changes to self.
+// Generates observe methods that watch profileService.isLoggedIn
+// and profileService.recentItems, calling updateState for each change.
 ```
 
-The key path argument (`\Self.profileService`) identifies which dependency owns the source property. The generated code uses `valuesOf()` with the Equatable-constrained overload for automatic deduplication.
-
-> **Note**: Use `\Self.dep` (explicit root), not `\.dep` — implicit root doesn't work in attribute arguments.
+The key path argument (`\.profileService`) identifies which dependency owns the source property. The generated code uses `valuesOf()` with the Equatable-constrained overload for automatic deduplication.
 
 ### `@Reaction`
 
@@ -180,43 +198,6 @@ final class HomeViewModel {
 
 The method must take exactly one parameter whose type matches the observed property. When multiple `@Bound` or `@Reaction` annotations exist, `startObserving()` runs them concurrently in a `withDiscardingTaskGroup`.
 
-### `computeState()` / `deriveState()`
-
-When a ViewModel's state depends on multiple internal properties (loading flags, error messages, fetched data), define a `computeState()` method and the `@ViewModel` macro generates the state-derivation wiring automatically:
-
-```swift
-@Observable
-@ViewModel
-final class ItemsViewModel {
-  private var isLoading = false
-  private var items: [Item] = []
-  private var errorMessage: String?
-
-  func computeState() -> ViewModelState<ItemsState> {
-    if isLoading { return .loading }
-    if let errorMessage { return .error(errorMessage) }
-    if items.isEmpty { return .empty }
-    return .loaded(state: ItemsState(items: items))
-  }
-
-  private let itemsService: ItemsService
-}
-```
-
-The macro detects `computeState()` and generates:
-
-1. **`private(set) var state: ViewModelState<...> = .loading`** — the stored state property, starting in `.loading`
-2. **`func deriveState() async`** — observes `computeState()` via `valuesOf()` and assigns back to `state`, with automatic deduplication of consecutive equal values
-3. **`startObserving()`** — includes `deriveState()` alongside any `@Bound`/`@Reaction` observers
-
-This pattern is useful when state is a pure function of multiple internal properties rather than a single observed dependency. The `computeState()` function acts as a reducer — you mutate internal properties and state automatically recomputes.
-
-**Requirements:**
-- Must return `ViewModelState<...>` (compile-time error otherwise)
-- Must take no parameters (methods with parameters are not detected)
-- Cannot coexist with a user-declared `state` property (compile-time error)
-- If you provide a manual `startObserving()`, include `deriveState()` in it (warning if missing)
-
 ### `@LazyViewModel`
 
 Apply to a View struct for single-ViewModel lazy initialization:
@@ -224,22 +205,24 @@ Apply to a View struct for single-ViewModel lazy initialization:
 ```swift
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileView: View {
-  func loadedView(state: ProfileViewModel.State) -> some View { ... }
+  var content: some View {
+    Text(viewModel.state.name)
+  }
 }
 ```
 
-Generates: `@Environment` factory, `@State` backing, `viewModel` accessor, `makeViewModel()`, and full `body` with state-driven rendering.
+Generates: `@Environment` factory, `@State` backing, `viewModel` accessor, and full `body` with lazy initialization and observation lifecycle.
 
-Default implementations are provided for `loadingView`, `emptyView`, and `errorView(message:)`. Override any of them to customize:
+For previewing, extract a child view that takes state as a parameter:
 
 ```swift
-@LazyViewModel(ProfileViewModel.self)
-struct ProfileView: View {
-  func loadedView(state: ProfileViewModel.State) -> some View { ... }
+struct ProfileContent: View {
+  let state: ProfileViewModel.State
+  var body: some View { Text(state.name) }
+}
 
-  var loadingView: some View {
-    ProgressView("Loading profile...")
-  }
+#Preview {
+  ProfileContent(state: .init(name: "Alice", email: "alice@example.com"))
 }
 ```
 
@@ -349,6 +332,89 @@ protocol ContentLoading: AnyObject {
 
 > **Important**: The expression must be fully qualified — `.idle` alone can't infer the type in attribute context. Use `LoadStatus.idle`, not `.idle`.
 
+## Loadable
+
+`Loadable<Value>` is a standalone enum for per-field loading semantics within `State` structs:
+
+```swift
+public enum Loadable<Value> {
+  case loading
+  case empty
+  case loaded(Value)
+  case error(String)
+}
+```
+
+Use it for any field that has independent loading/empty/error states:
+
+```swift
+struct State: Equatable {
+  var items: Loadable<[Item]> = .loading
+  var profile: Loadable<Profile> = .loading
+  var filter: Filter = .all  // non-loadable fields coexist naturally
+}
+```
+
+### Accessors
+
+| Accessor | Type | Description |
+|----------|------|-------------|
+| `value` | `Value?` | Unwraps `.loaded`, `nil` otherwise |
+| `isLoading` | `Bool` | `true` iff `.loading` |
+| `isEmpty` | `Bool` | `true` iff `.empty` |
+| `isError` | `Bool` | `true` iff `.error` |
+| `error` | `String?` | Unwraps error message, `nil` otherwise |
+| `map(_:)` | `Loadable<U>` | Transforms the loaded value |
+| `flatMap(_:)` | `Loadable<U>` | Transforms the loaded value, returning a new `Loadable` |
+
+`Loadable` conforms to `Equatable`, `Hashable`, and `Sendable` when `Value` does.
+
+## State Management
+
+### `updateState(_:to:)`
+
+Keypath-based mutation with automatic Equatable deduplication. Skips the write (and avoids triggering observation) when the new value equals the current value:
+
+```swift
+// Only triggers observation if count actually changed
+updateState(\.count, to: newCount)
+```
+
+A non-Equatable fallback always writes. The compiler selects the correct overload automatically.
+
+### `handle(_:)`
+
+Define a `handle` method to process actions. The protocol requirement is async, but a sync implementation also satisfies it — implement whichever you need:
+
+```swift
+enum Action {
+  case refresh
+  case delete(Item)
+}
+
+// Async — for actions that need side effects
+func handle(_ action: Action) async {
+  switch action {
+  case .refresh:
+    updateState(\.items, to: .loading)
+    let result = await service.fetchItems()
+    updateState(\.items, to: .loaded(result))
+  case .delete(let item):
+    await service.delete(item)
+  }
+}
+
+// Or sync — when all actions are pure state mutations
+func handle(_ action: Action) {
+  switch action {
+  case .increment:
+    updateState(\.count, to: state.count + 1)
+  }
+}
+```
+
+On concrete types (not existentials), the compiler uses the concrete signature — sync implementations can be called without `await`.
+
 ## Observation Utilities
 
 ### `valuesOf()`
@@ -394,10 +460,7 @@ func updatesOnServiceChange() async {
 
   await observing(vm) { expect in
     spy.name = "Alice"
-    await expect(\.state, satisfies: {
-      if case .loaded(let state) = $0 { return state.name == "Alice" }
-      return false
-    })
+    await expect(\.state.name, equals: "Alice")
   }
 }
 ```
@@ -543,36 +606,11 @@ typealias AppNavigationButton<Label: View> = NavigationButton<AppScene, Label>
 // Then: AppNavigationButton(push: .detail(id: "1")) { Text("Go") }
 ```
 
-## Preview Support
-
-### `previewFactory(for:configure:)`
-
-A View extension for injecting preview factories (DEBUG only):
-
-```swift
-#Preview {
-  ProfileView()
-    .previewFactory(for: ProfileViewModel.self)
-}
-```
-
-Optionally configure the preview instance:
-
-```swift
-.previewFactory(for: ProfileViewModel.self) { vm in
-  vm.someProperty = customValue
-}
-```
-
-> **Note**: `#Preview` macros cannot see macro-generated symbols from other declarations. If you need to reference `static var preview` or `typealias Factory` inside `#Preview`, create a hand-written helper file (e.g. `PreviewFactories.swift`) — regular code can resolve macro expansions fine.
-
 ## Protocols
 
 | Protocol | Purpose |
 |----------|---------|
-| `ViewModel` | `@Observable`, requires `State` type + `state` property + optional `startObserving()` |
-| `LazyViewModelView` | View with single lazy ViewModel (default loading/empty/error views) |
-| `PreviewProviding` | Marker for `ViewModelFactory<VM>.preview` support |
+| `ViewModel` | `@Observable`, requires `State: Equatable` + `state` property + optional `Action`/`handle` + optional `startObserving()` |
 | `PushDestination` | Hashable destination with `destinationView` for NavigationStack |
 | `SheetDestination` | Hashable & Identifiable destination for `.sheet(item:)` |
 | `FullScreenDestination` | Hashable & Identifiable destination for `.fullScreenCover(item:)` |
