@@ -48,9 +48,10 @@ struct StubbableMacroTests {
       final class StubDataService: DataService {
         var items: [Item] = []
         var isLoading: Bool = false
-        var fetchReturnValue: [Item] = []
-        func fetch() async throws -> [Item] { fetchReturnValue }
-        func save(_ item: Item) async throws { }
+        var fetchResult: Result<[Item], Error> = .success([])
+        func fetch() async throws -> [Item] { try fetchResult.get() }
+        var saveResult: Result<Void, Error> = .success(())
+        func save(_ item: Item) async throws { try saveResult.get() }
       }
       """,
       macros: testMacros)
@@ -157,8 +158,8 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubSearchService: SearchService {
-        var searchReturnValue: [Result] = []
-        func search(query: String, limit: Int) async throws -> [Result] { searchReturnValue }
+        var searchResult: Result<[Result], Error> = .success([])
+        func search(query: String, limit: Int) async throws -> [Result] { try searchResult.get() }
       }
       """,
       macros: testMacros)
@@ -210,9 +211,10 @@ struct StubbableMacroTests {
       @Observable
       public final class StubDataService: DataService {
         public var items: [Item] = []
-        public var fetchReturnValue: [Item] = []
-        public func fetch() async throws -> [Item] { fetchReturnValue }
-        public func save(_ item: Item) async throws { }
+        public var fetchResult: Result<[Item], Error> = .success([])
+        public func fetch() async throws -> [Item] { try fetchResult.get() }
+        public var saveResult: Result<Void, Error> = .success(())
+        public func save(_ item: Item) async throws { try saveResult.get() }
         public init() {}
       }
       """,
@@ -238,8 +240,8 @@ struct StubbableMacroTests {
       @Observable
       package final class StubDataService: DataService {
         package var items: [Item] = []
-        package var fetchReturnValue: [Item] = []
-        package func fetch() async throws -> [Item] { fetchReturnValue }
+        package var fetchResult: Result<[Item], Error> = .success([])
+        package func fetch() async throws -> [Item] { try fetchResult.get() }
       }
       """,
       macros: testMacros)
@@ -264,8 +266,8 @@ struct StubbableMacroTests {
       @Observable
       fileprivate final class StubDataService: DataService {
         fileprivate var items: [Item] = []
-        fileprivate var fetchReturnValue: [Item] = []
-        fileprivate func fetch() async throws -> [Item] { fetchReturnValue }
+        fileprivate var fetchResult: Result<[Item], Error> = .success([])
+        fileprivate func fetch() async throws -> [Item] { try fetchResult.get() }
       }
       """,
       macros: testMacros)
@@ -408,7 +410,8 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubItemService: ItemService {
-        func perform(with item: Item) async throws { }
+        var performResult: Result<Void, Error> = .success(())
+        func perform(with item: Item) async throws { try performResult.get() }
       }
       """,
       macros: testMacros)

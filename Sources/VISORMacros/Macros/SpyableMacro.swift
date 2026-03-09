@@ -62,8 +62,20 @@ public struct SpyableMacro: PeerMacro {
         members.append("  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(tupleType)] = []")
       }
 
-      // Return value storage
-      if let returnType = method.returnType {
+      // Return value / Result storage
+      if method.isThrowing {
+        let resultVarName = "\(methodPrefix)Result"
+        if let returnType = method.returnType {
+          let innerDefault = defaultValue(for: returnType)
+          if let innerDefault {
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error> = .success(\(innerDefault))")
+          } else {
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error>!")
+          }
+        } else {
+          members.append("  \(prefix)var \(resultVarName): Result<Void, Error> = .success(())")
+        }
+      } else if let returnType = method.returnType {
         let defaultVal = defaultValue(for: returnType)
         if let defaultVal {
           members.append("  \(prefix)var \(methodPrefix)ReturnValue: \(returnType) = \(defaultVal)")
@@ -99,7 +111,13 @@ public struct SpyableMacro: PeerMacro {
         bodyLines.append("    calls.append(.\(method.name)(\(callArgs)))")
       }
 
-      if method.returnType != nil {
+      if method.isThrowing {
+        if method.returnType != nil {
+          bodyLines.append("    return try \(methodPrefix)Result.get()")
+        } else {
+          bodyLines.append("    try \(methodPrefix)Result.get()")
+        }
+      } else if method.returnType != nil {
         bodyLines.append("    return \(methodPrefix)ReturnValue")
       }
 

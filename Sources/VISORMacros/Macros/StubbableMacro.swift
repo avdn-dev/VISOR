@@ -55,7 +55,21 @@ public struct StubbableMacro: PeerMacro {
     // Generate methods
     let prefixes = uniqueMethodPrefixes(for: methods)
     for (method, methodPrefix) in zip(methods, prefixes) {
-      if let returnType = method.returnType {
+      let sig = buildMethodSignature(method, access: access)
+      if method.isThrowing {
+        let resultVarName = "\(methodPrefix)Result"
+        if let returnType = method.returnType {
+          let innerDefault = defaultValue(for: returnType)
+          if let innerDefault {
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error> = .success(\(innerDefault))")
+          } else {
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error>!")
+          }
+        } else {
+          members.append("  \(prefix)var \(resultVarName): Result<Void, Error> = .success(())")
+        }
+        members.append("  \(sig) { try \(resultVarName).get() }")
+      } else if let returnType = method.returnType {
         let defaultVal = defaultValue(for: returnType)
         let retVarName = "\(methodPrefix)ReturnValue"
         if let defaultVal {
@@ -63,10 +77,8 @@ public struct StubbableMacro: PeerMacro {
         } else {
           members.append("  \(prefix)var \(retVarName): \(returnType)!")
         }
-        let sig = buildMethodSignature(method, access: access)
         members.append("  \(sig) { \(retVarName) }")
       } else {
-        let sig = buildMethodSignature(method, access: access)
         members.append("  \(sig) { }")
       }
     }

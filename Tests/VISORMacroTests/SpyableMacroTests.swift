@@ -47,21 +47,23 @@ struct SpyableMacroTests {
         var items: [Item] = []
         // -- fetch --
         var fetchCallCount = 0
-        var fetchReturnValue: [Item] = []
+        var fetchResult: Result<[Item], Error> = .success([])
         func fetch() async throws -> [Item] {
           fetchCallCount += 1
           calls.append(.fetch)
-          return fetchReturnValue
+          return try fetchResult.get()
         }
         // -- save --
         var saveCallCount = 0
         var saveReceivedItem: Item?
         var saveReceivedInvocations: [Item] = []
+        var saveResult: Result<Void, Error> = .success(())
         func save(_ item: Item) async throws {
           saveCallCount += 1
           saveReceivedItem = item
           saveReceivedInvocations.append(item)
           calls.append(.save(item: item))
+          try saveResult.get()
         }
         enum Call {
           case fetch
@@ -137,13 +139,13 @@ struct SpyableMacroTests {
         var searchCallCount = 0
         var searchReceivedArguments: (query: String, limit: Int)?
         var searchReceivedInvocations: [(query: String, limit: Int)] = []
-        var searchReturnValue: [String] = []
+        var searchResult: Result<[String], Error> = .success([])
         func search(query: String, limit: Int) async throws -> [String] {
           searchCallCount += 1
           searchReceivedArguments = (query, limit)
           searchReceivedInvocations.append((query, limit))
           calls.append(.search(query: query, limit: limit))
-          return searchReturnValue
+          return try searchResult.get()
         }
         enum Call {
           case search(query: String, limit: Int)
@@ -248,11 +250,13 @@ struct SpyableMacroTests {
         var performCallCount = 0
         var performReceivedItem: Item?
         var performReceivedInvocations: [Item] = []
+        var performResult: Result<Void, Error> = .success(())
         func perform(with item: Item) async throws {
           performCallCount += 1
           performReceivedItem = item
           performReceivedInvocations.append(item)
           calls.append(.perform(item: item))
+          try performResult.get()
         }
         enum Call {
           case perform(item: Item)
@@ -399,11 +403,11 @@ struct SpyableMacroTests {
         public var items: [Item] = []
         // -- fetch --
         public var fetchCallCount = 0
-        public var fetchReturnValue: [Item] = []
+        public var fetchResult: Result<[Item], Error> = .success([])
         public func fetch() async throws -> [Item] {
           fetchCallCount += 1
           calls.append(.fetch)
-          return fetchReturnValue
+          return try fetchResult.get()
         }
         public enum Call {
           case fetch
