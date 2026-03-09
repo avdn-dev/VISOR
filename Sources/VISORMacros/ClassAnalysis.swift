@@ -71,7 +71,7 @@ struct ClassAnalysis {
   // v2: Action/handle detection
   var hasActionEnum = false
   var hasHandleMethod = false
-  var handleIsAsync = false
+  var handleHasWrongLabel = false
 
   // v2: @Bound inside State struct
   var stateBoundProperties: [BoundPropertyInfo] = []
@@ -157,8 +157,11 @@ struct ClassAnalysis {
              let param = params.first,
              param.type.trimmedDescription == "Action"
           {
-            hasHandleMethod = true
-            handleIsAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+            if param.firstName.text == "_" {
+              hasHandleMethod = true
+            } else {
+              handleHasWrongLabel = true
+            }
           }
         }
 

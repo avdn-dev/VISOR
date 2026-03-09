@@ -24,7 +24,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case malformedLazyViewModelsArgument
   case manualStartObservingMissingMethod(methodName: String)
   case actionWithoutHandle
-  case handleNotAsync
+  case handleWrongLabel
   case boundOnClassVar(propertyName: String)
   case boundOnLetProperty(propertyName: String)
 
@@ -59,9 +59,9 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
     case .actionWithoutHandle:
-      "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found"
-    case .handleNotAsync:
-      "@ViewModel: 'handle(_:)' should be 'async' for structured concurrency"
+      "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
+    case .handleWrongLabel:
+      "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'"
     case .boundOnClassVar(let name):
       "@Bound on '\(name)': move @Bound to the State struct property instead"
     case .boundOnLetProperty(let name):
@@ -86,7 +86,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .malformedLazyViewModelsArgument: id = "malformedLazyViewModelsArgument"
     case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
     case .actionWithoutHandle: id = "actionWithoutHandle"
-    case .handleNotAsync: id = "handleNotAsync"
+    case .handleWrongLabel: id = "handleWrongLabel"
     case .boundOnClassVar: id = "boundOnClassVar"
     case .boundOnLetProperty: id = "boundOnLetProperty"
     }
@@ -97,10 +97,10 @@ enum VISORDiagnostic: DiagnosticMessage {
     switch self {
     case .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
          .singleViewModelInLazyViewModels, .manualStartObservingMissingMethod,
-         .handleNotAsync, .boundOnClassVar, .boundOnLetProperty,
+         .boundOnClassVar, .boundOnLetProperty,
          .malformedReactionKeyPath:
       .warning
-    case .actionWithoutHandle, .invalidBoundDependency:
+    case .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
       .error
     default:
       .error

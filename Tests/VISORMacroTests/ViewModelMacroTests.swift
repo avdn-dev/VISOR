@@ -625,7 +625,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
@@ -667,7 +667,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Action enum with non-async handle emits warning`() {
+  func `Action enum with non-async handle emits no warning`() {
     assertMacroExpansion(
       """
       @Observable
@@ -699,9 +699,6 @@ struct ViewModelMacroTests {
       extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'handle(_:)' should be 'async' for structured concurrency", line: 1, column: 1, severity: .warning),
-      ],
       macros: testMacros)
   }
 
@@ -765,7 +762,46 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action) async' method found", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Action enum with wrong handle label emits error`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {}
+        enum Action { case refresh }
+        var state = State()
+        func handle(action: Action) async {}
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {}
+        enum Action { case refresh }
+        var state = State()
+        func handle(action: Action) async {}
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }

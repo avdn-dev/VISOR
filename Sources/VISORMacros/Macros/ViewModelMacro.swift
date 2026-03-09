@@ -71,10 +71,10 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.actionWithoutHandle))
     }
 
-    if analysis.hasHandleMethod && !analysis.handleIsAsync {
+    if analysis.handleHasWrongLabel {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.handleNotAsync))
+        message: VISORDiagnostic.handleWrongLabel))
     }
 
     // 4. v1 @Bound on class var (migration aid)
