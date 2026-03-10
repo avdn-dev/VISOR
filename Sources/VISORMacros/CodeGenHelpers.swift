@@ -140,6 +140,22 @@ func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> 
   return "\(prefix)func \(method.name)(\(params))\(asyncSuffix)\(throwsSuffix)\(returnSuffix)"
 }
 
+// MARK: - Access Level Helper
+
+/// Returns the access-level keyword for any declaration group (class, struct, enum, etc.)
+/// or empty string for `internal` (Swift's default, omitted to reduce noise).
+func accessLevel(of declaration: some DeclGroupSyntax) -> String {
+  for modifier in declaration.modifiers {
+    switch modifier.name.text {
+    case "open", "public", "package", "fileprivate", "private":
+      return modifier.name.text
+    default:
+      continue
+    }
+  }
+  return ""
+}
+
 // MARK: - Protocol Extension Helper
 
 func makeProtocolExtension(

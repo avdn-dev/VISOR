@@ -39,6 +39,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     }
 
     let className = classDecl.name.trimmedDescription
+    let access = accessLevel(of: classDecl)
+    let prefix = access.isEmpty ? "" : "\(access) "
     let analysis = ClassAnalysis(classDecl)
     let properties = analysis.storedLetProperties
     var members: [DeclSyntax] = []
@@ -50,7 +52,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         let assignments = properties.map { "self.\($0.name) = \($0.name)" }.joined(separator: "\n    ")
 
         let initDecl: DeclSyntax = """
-          init(\(raw: params)) {
+          \(raw: prefix)init(\(raw: params)) {
               \(raw: assignments)
           }
           """
@@ -60,7 +62,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // 2. Generate Factory typealias
     let typealiasDecl: DeclSyntax = """
-      typealias Factory = ViewModelFactory<\(raw: className)>
+      \(raw: prefix)typealias Factory = ViewModelFactory<\(raw: className)>
       """
     members.append(typealiasDecl)
 

@@ -53,6 +53,9 @@ public struct LazyViewModelsMacro: MemberMacro {
       return []
     }
 
+    let access = accessLevel(of: structDecl)
+    let prefix = access.isEmpty ? "" : "\(access) "
+
     var members: [DeclSyntax] = []
 
     // Router context for auto-bridging (non-routed factories ignore it)
@@ -85,7 +88,7 @@ public struct LazyViewModelsMacro: MemberMacro {
     }.joined(separator: "\n")
 
     members.append("""
-      var body: some View {
+      \(raw: prefix)var body: some View {
           Group {
               if \(raw: nilChecks) {
                   content

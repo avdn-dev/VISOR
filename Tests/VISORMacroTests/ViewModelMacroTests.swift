@@ -232,6 +232,118 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Access Modifier Propagation
+
+  @Test
+  func `Public class propagates access to init and Factory`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      public final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      public final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let service: MyService
+
+          public init(service: MyService) {
+              self.service = service
+          }
+
+          public typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Package class propagates access to init and Factory`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      package final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      package final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let service: MyService
+
+          package init(service: MyService) {
+              self.service = service
+          }
+
+          package typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Public class with @Bound does not propagate access to observe methods`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      public final class MyViewModel {
+        struct State: Equatable {
+          @Bound(\\.service) var isLoading = false
+        }
+        var state = State()
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      public final class MyViewModel {
+        struct State: Equatable {
+          var isLoading = false
+        }
+        var state = State()
+        private let service: MyService
+
+          public init(service: MyService) {
+              self.service = service
+          }
+
+          public typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeIsLoading() async {
+              for await value in VISOR.valuesOf({ self.service.isLoading }) {
+                  self.updateState(\\.isLoading, to: value)
+              }
+          }
+
+          func startObserving() async {
+              await observeIsLoading()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Error Diagnostics
 
   @Test

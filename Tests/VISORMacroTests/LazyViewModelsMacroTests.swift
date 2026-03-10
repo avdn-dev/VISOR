@@ -89,6 +89,73 @@ struct LazyViewModelsMacroTests {
     assertMacroExpansion(input, expandedSource: expanded, macros: testMacros)
   }
 
+  // MARK: - Access Modifier Propagation
+
+  @Test
+  func `Public struct propagates access to body only`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModels(
+        AViewModel.self,
+        BViewModel.self)
+      public struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      public struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(AViewModel.Factory.self) private var aViewModelFactory
+
+          @State private var _aViewModel: AViewModel?
+
+          var aViewModel: AViewModel {
+              _aViewModel!
+          }
+
+          @Environment(BViewModel.Factory.self) private var bViewModelFactory
+
+          @State private var _bViewModel: BViewModel?
+
+          var bViewModel: BViewModel {
+              _bViewModel!
+          }
+
+          public var body: some View {
+              Group {
+                  if _aViewModel != nil && _bViewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _aViewModel == nil || _bViewModel == nil {
+              _aViewModel = aViewModelFactory.makeViewModel(router: containerRouter)
+              _bViewModel = bViewModelFactory.makeViewModel(router: containerRouter)
+                  }
+              }
+                  .task(id: _aViewModel != nil) {
+                      guard let vm = _aViewModel else {
+                          return
+                      }
+                      await vm.startObserving()
+                  }
+                  .task(id: _bViewModel != nil) {
+                      guard let vm = _bViewModel else {
+                          return
+                      }
+                      await vm.startObserving()
+                  }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Error Diagnostics
 
   @Test

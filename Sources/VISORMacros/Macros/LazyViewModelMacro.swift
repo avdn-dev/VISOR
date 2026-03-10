@@ -41,6 +41,9 @@ public struct LazyViewModelMacro: MemberMacro {
       return []
     }
 
+    let access = accessLevel(of: structDecl)
+    let prefix = access.isEmpty ? "" : "\(access) "
+
     // Content property — simplified body, no makeViewModel, no state switch
     return [
       "@Environment(\\.router) private var containerRouter",
@@ -48,7 +51,7 @@ public struct LazyViewModelMacro: MemberMacro {
       "@State private var _viewModel: \(raw: viewModelType)?",
       "var viewModel: \(raw: viewModelType) { _viewModel! }",
       """
-      var body: some View {
+      \(raw: prefix)var body: some View {
           Group {
               if _viewModel != nil {
                   content
