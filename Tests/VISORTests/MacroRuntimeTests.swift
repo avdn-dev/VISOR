@@ -418,7 +418,7 @@ struct StubbableMacroRuntimeTests {
     @Test
     func `Stub method returns configured return value`() async throws {
         let stub = StubItemService()
-        stub.fetchItemsReturnValue = ["x", "y"]
+        stub.fetchItemsResult = .success(["x", "y"])
         let result = try await stub.fetchItems()
         #expect(result == ["x", "y"])
     }
@@ -433,7 +433,7 @@ struct StubbableMacroRuntimeTests {
     @Test
     func `Stub used as protocol-typed dependency`() async throws {
         let stub = StubItemService()
-        stub.fetchItemsReturnValue = ["stubbed"]
+        stub.fetchItemsResult = .success(["stubbed"])
 
         let service: any ItemService = stub
         let result = try await service.fetchItems()
@@ -505,7 +505,7 @@ struct SpyableMacroRuntimeTests {
     @Test
     func `Spy returns configured return value`() async throws {
         let spy = SpyAnalyticsService()
-        spy.fetchReportReturnValue = "report data"
+        spy.fetchReportResult = .success("report data")
 
         let result = try await spy.fetchReport()
         #expect(result == "report data")
