@@ -11,7 +11,6 @@ import SwiftDiagnostics
 
 enum VISORDiagnostic: DiagnosticMessage {
   case missingContent(macroName: String)
-  case singleViewModelInLazyViewModels
   case notAClass
   case notAStruct(macroName: String)
   case missingArguments(macroName: String)
@@ -21,7 +20,6 @@ enum VISORDiagnostic: DiagnosticMessage {
   case malformedBoundKeyPath(propertyName: String)
   case invalidReactionParameter(methodName: String)
   case malformedReactionKeyPath(methodName: String)
-  case malformedLazyViewModelsArgument
   case manualStartObservingMissingMethod(methodName: String)
   case actionWithoutHandle
   case handleWrongLabel
@@ -34,8 +32,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     switch self {
     case .missingContent(let macroName):
       "@\(macroName) requires: var content: some View"
-    case .singleViewModelInLazyViewModels:
-      "@LazyViewModels with a single ViewModel; use @LazyViewModel instead"
     case .notAClass:
       "@ViewModel can only be applied to classes"
     case .notAStruct(let macroName):
@@ -54,8 +50,6 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Reaction on '\(methodName)': method must have exactly one parameter"
     case .malformedReactionKeyPath(let methodName):
       "@Reaction on '\(methodName)': expected key path argument like \\.dependency.property"
-    case .malformedLazyViewModelsArgument:
-      "@LazyViewModels: unrecognized argument (expected ViewModel.self)"
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
     case .actionWithoutHandle:
@@ -73,7 +67,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     let id: String
     switch self {
     case .missingContent: id = "missingContent"
-    case .singleViewModelInLazyViewModels: id = "singleViewModelInLazyViewModels"
     case .notAClass: id = "notAClass"
     case .notAStruct: id = "notAStruct"
     case .missingArguments: id = "missingArguments"
@@ -83,7 +76,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .malformedBoundKeyPath: id = "malformedBoundKeyPath"
     case .invalidReactionParameter: id = "invalidReactionParameter"
     case .malformedReactionKeyPath: id = "malformedReactionKeyPath"
-    case .malformedLazyViewModelsArgument: id = "malformedLazyViewModelsArgument"
     case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
     case .actionWithoutHandle: id = "actionWithoutHandle"
     case .handleWrongLabel: id = "handleWrongLabel"
@@ -95,8 +87,7 @@ enum VISORDiagnostic: DiagnosticMessage {
 
   var severity: DiagnosticSeverity {
     switch self {
-    case .malformedBoundKeyPath, .malformedLazyViewModelsArgument,
-         .singleViewModelInLazyViewModels, .manualStartObservingMissingMethod,
+    case .malformedBoundKeyPath, .manualStartObservingMissingMethod,
          .boundOnClassVar, .boundOnLetProperty,
          .malformedReactionKeyPath:
       .warning

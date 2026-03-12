@@ -7,14 +7,6 @@
 
 import SwiftSyntax
 
-// MARK: - ViewModelPairInfo
-
-struct ViewModelPairInfo {
-  let viewModelType: String
-  let factoryType: String
-  let propertyName: String // e.g., "cameraViewModel" derived from "CameraViewModel"
-}
-
 // MARK: - StructDeclSyntax Extensions
 
 extension StructDeclSyntax {

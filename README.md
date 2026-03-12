@@ -226,25 +226,6 @@ struct ProfileContent: View {
 }
 ```
 
-### `@LazyViewModels`
-
-For views needing multiple ViewModels:
-
-```swift
-@LazyViewModels(
-  ProfileViewModel.self,
-  SettingsViewModel.self)
-struct DashboardView: View {
-  var content: some View {
-    TabView {
-      // Access via profileViewModel, settingsViewModel
-    }
-  }
-}
-```
-
-Property names are derived from ViewModel type names (e.g., `SettingsViewModel` becomes `settingsViewModel`).
-
 ### `@Stubbable`
 
 Apply to a protocol to auto-generate a `Stub<Name>` class for previews and tests:
