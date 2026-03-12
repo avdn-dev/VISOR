@@ -25,6 +25,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case handleWrongLabel
   case boundOnClassVar(propertyName: String)
   case boundOnLetProperty(propertyName: String)
+  case invalidObservationPolicy
 
   // MARK: Internal
 
@@ -60,6 +61,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Bound on '\(name)': move @Bound to the State struct property instead"
     case .boundOnLetProperty(let name):
       "@Bound on '\(name)': use 'var' instead of 'let' — bound properties must be mutable"
+    case .invalidObservationPolicy:
+      "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     }
   }
 
@@ -81,6 +84,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .handleWrongLabel: id = "handleWrongLabel"
     case .boundOnClassVar: id = "boundOnClassVar"
     case .boundOnLetProperty: id = "boundOnLetProperty"
+    case .invalidObservationPolicy: id = "invalidObservationPolicy"
     }
     return MessageID(domain: "VISOR", id: id)
   }

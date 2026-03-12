@@ -247,5 +247,273 @@ struct LazyViewModelMacroTests {
       ],
       macros: testMacros)
   }
+
+  // MARK: - ObservationPolicy
+
+  @Test
+  func `Explicit alwaysObserving produces same expansion as default`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .alwaysObserving)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              _viewModel!
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `pauseInBackground generates scenePhase environment and modified task`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @Environment(\\.scenePhase) private var scenePhase
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              _viewModel!
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: scenePhase != .background && _viewModel != nil) {
+                  guard let vm = _viewModel, scenePhase != .background else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `pauseWhenInactive generates scenePhase environment and modified task`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .pauseWhenInactive)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @Environment(\\.scenePhase) private var scenePhase
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              _viewModel!
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: scenePhase == .active && _viewModel != nil) {
+                  guard let vm = _viewModel, scenePhase == .active else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Public struct with pauseInBackground propagates access`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
+      public struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      public struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @Environment(\\.scenePhase) private var scenePhase
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              _viewModel!
+          }
+
+          public var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: scenePhase != .background && _viewModel != nil) {
+                  guard let vm = _viewModel, scenePhase != .background else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Invalid observation policy emits diagnostic`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .never)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive", line: 1, column: 27, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Default expansion does not contain scenePhase`() {
+    assertMacroExpansion(
+      """
+      @LazyViewModel(MyVM.self)
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              _viewModel!
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
 }
 #endif

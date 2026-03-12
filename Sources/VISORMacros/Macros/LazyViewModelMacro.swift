@@ -29,7 +29,7 @@ public struct LazyViewModelMacro: MemberMacro {
       return []
     }
 
-    guard let (viewModelType, factoryType) = parseArguments(from: node, in: context) else {
+    guard let (viewModelType, factoryType, observationPolicy) = parseArguments(from: node, in: context) else {
       return []
     }
 
@@ -44,10 +44,31 @@ public struct LazyViewModelMacro: MemberMacro {
     let access = accessLevel(of: structDecl)
     let prefix = access.isEmpty ? "" : "\(access) "
 
-    // Content property — simplified body, no makeViewModel, no state switch
-    return [
+    let taskIdExpression: String
+    let guardCondition: String
+
+    switch observationPolicy {
+    case "pauseInBackground":
+      taskIdExpression = "scenePhase != .background && _viewModel != nil"
+      guardCondition = "guard let vm = _viewModel, scenePhase != .background else { return }"
+    case "pauseWhenInactive":
+      taskIdExpression = "scenePhase == .active && _viewModel != nil"
+      guardCondition = "guard let vm = _viewModel, scenePhase == .active else { return }"
+    default:
+      taskIdExpression = "_viewModel != nil"
+      guardCondition = "guard let vm = _viewModel else { return }"
+    }
+
+    var members: [DeclSyntax] = [
       "@Environment(\\.router) private var containerRouter",
       "@Environment(\(raw: factoryType).self) private var factory",
+    ]
+
+    if observationPolicy != "alwaysObserving" {
+      members.append("@Environment(\\.scenePhase) private var scenePhase")
+    }
+
+    members.append(contentsOf: [
       "@State private var _viewModel: \(raw: viewModelType)?",
       "var viewModel: \(raw: viewModelType) { _viewModel! }",
       """
@@ -64,28 +85,34 @@ public struct LazyViewModelMacro: MemberMacro {
                   _viewModel = factory.makeViewModel(router: containerRouter)
               }
           }
-          .task(id: _viewModel != nil) {
-              guard let vm = _viewModel else { return }
+          .task(id: \(raw: taskIdExpression)) {
+              \(raw: guardCondition)
               await vm.startObserving()
           }
       }
       """,
-    ]
+    ])
+
+    return members
   }
 
   // MARK: Private
 
+  private static let validPolicies: Set<String> = [
+    "alwaysObserving", "pauseInBackground", "pauseWhenInactive",
+  ]
+
   private static func parseArguments(
     from node: AttributeSyntax,
     in context: some MacroExpansionContext
-  ) -> (viewModelType: String, factoryType: String)? {
+  ) -> (viewModelType: String, factoryType: String, observationPolicy: String)? {
     // Stage 1: Must have an argument list
     guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
       return nil
     }
 
-    // Stage 2: Must be a member access expression with `.self`
+    // Stage 2: First arg must be a member access expression with `.self`
     guard
       let memberAccess = firstArg.expression.as(MemberAccessExprSyntax.self),
       memberAccess.declName.baseName.text == "self",
@@ -96,6 +123,24 @@ public struct LazyViewModelMacro: MemberMacro {
     }
 
     let vm = baseType.baseName.text
-    return (vm, "\(vm).Factory")
+
+    // Stage 3: Optional observationPolicy parameter
+    var policy = "alwaysObserving"
+    let secondIndex = arguments.index(after: arguments.startIndex)
+    if secondIndex != arguments.endIndex {
+      let secondArg = arguments[secondIndex]
+      if secondArg.label?.text == "observationPolicy",
+         let policyAccess = secondArg.expression.as(MemberAccessExprSyntax.self)
+      {
+        let value = policyAccess.declName.baseName.text
+        guard validPolicies.contains(value) else {
+          context.diagnose(Diagnostic(node: Syntax(secondArg), message: VISORDiagnostic.invalidObservationPolicy))
+          return nil
+        }
+        policy = value
+      }
+    }
+
+    return (vm, "\(vm).Factory", policy)
   }
 }
