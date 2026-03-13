@@ -48,9 +48,9 @@ struct StubbableMacroTests {
       final class StubDataService: DataService {
         var items: [Item] = []
         var isLoading: Bool = false
-        var fetchResult: Result<[Item], Error> = .success([])
+        var fetchResult: Result<[Item], any Error> = .success([])
         func fetch() async throws -> [Item] { try fetchResult.get() }
-        var saveResult: Result<Void, Error> = .success(())
+        var saveResult: Result<Void, any Error> = .success(())
         func save(_ item: Item) async throws { try saveResult.get() }
       }
       """,
@@ -158,7 +158,7 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubSearchService: SearchService {
-        var searchResult: Result<[Result], Error> = .success([])
+        var searchResult: Result<[Result], any Error> = .success([])
         func search(query: String, limit: Int) async throws -> [Result] { try searchResult.get() }
       }
       """,
@@ -211,9 +211,9 @@ struct StubbableMacroTests {
       @Observable
       public final class StubDataService: DataService {
         public var items: [Item] = []
-        public var fetchResult: Result<[Item], Error> = .success([])
+        public var fetchResult: Result<[Item], any Error> = .success([])
         public func fetch() async throws -> [Item] { try fetchResult.get() }
-        public var saveResult: Result<Void, Error> = .success(())
+        public var saveResult: Result<Void, any Error> = .success(())
         public func save(_ item: Item) async throws { try saveResult.get() }
         public init() {}
       }
@@ -240,7 +240,7 @@ struct StubbableMacroTests {
       @Observable
       package final class StubDataService: DataService {
         package var items: [Item] = []
-        package var fetchResult: Result<[Item], Error> = .success([])
+        package var fetchResult: Result<[Item], any Error> = .success([])
         package func fetch() async throws -> [Item] { try fetchResult.get() }
       }
       """,
@@ -266,7 +266,7 @@ struct StubbableMacroTests {
       @Observable
       fileprivate final class StubDataService: DataService {
         fileprivate var items: [Item] = []
-        fileprivate var fetchResult: Result<[Item], Error> = .success([])
+        fileprivate var fetchResult: Result<[Item], any Error> = .success([])
         fileprivate func fetch() async throws -> [Item] { try fetchResult.get() }
       }
       """,
@@ -410,7 +410,7 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubItemService: ItemService {
-        var performResult: Result<Void, Error> = .success(())
+        var performResult: Result<Void, any Error> = .success(())
         func perform(with item: Item) async throws { try performResult.get() }
       }
       """,
@@ -453,19 +453,19 @@ struct StubbableMacroTests {
       @Stubbable
       protocol EventService {
         func send(event: String)
-        func send(error: Error)
+        func send(error: any Error)
       }
       """,
       expandedSource: """
       protocol EventService {
         func send(event: String)
-        func send(error: Error)
+        func send(error: any Error)
       }
 
       @Observable
       final class StubEventService: EventService {
         func send(event: String) { }
-        func send(error: Error) { }
+        func send(error: any Error) { }
       }
       """,
       macros: testMacros)
@@ -562,18 +562,18 @@ struct StubbableMacroTests {
       """
       @Stubbable
       protocol ResultService {
-        func execute() -> Result<String, Error>
+        func execute() -> Result<String, any Error>
       }
       """,
       expandedSource: """
       protocol ResultService {
-        func execute() -> Result<String, Error>
+        func execute() -> Result<String, any Error>
       }
 
       @Observable
       final class StubResultService: ResultService {
-        var executeReturnValue: Result<String, Error>!
-        func execute() -> Result<String, Error> { executeReturnValue }
+        var executeReturnValue: Result<String, any Error>!
+        func execute() -> Result<String, any Error> { executeReturnValue }
       }
       """,
       macros: testMacros)
@@ -640,21 +640,21 @@ struct StubbableMacroTests {
       protocol CacheService {
         var entries: Dictionary<String, Int> { get }
         var pending: Set<String> { get }
-        var result: Result<String, Error> { get }
+        var result: Result<String, any Error> { get }
       }
       """,
       expandedSource: """
       protocol CacheService {
         var entries: Dictionary<String, Int> { get }
         var pending: Set<String> { get }
-        var result: Result<String, Error> { get }
+        var result: Result<String, any Error> { get }
       }
 
       @Observable
       final class StubCacheService: CacheService {
         var entries: Dictionary<String, Int> = [:]
         var pending: Set<String> = []
-        var result: Result<String, Error>! = nil
+        var result: Result<String, any Error>! = nil
       }
       """,
       macros: testMacros)

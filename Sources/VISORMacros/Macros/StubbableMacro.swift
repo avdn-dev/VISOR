@@ -61,12 +61,12 @@ public struct StubbableMacro: PeerMacro {
         if let returnType = method.returnType {
           let innerDefault = defaultValue(for: returnType)
           if let innerDefault {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error> = .success(\(innerDefault))")
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
           } else {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), Error>!")
+            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>!")
           }
         } else {
-          members.append("  \(prefix)var \(resultVarName): Result<Void, Error> = .success(())")
+          members.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
         }
         members.append("  \(sig) { try \(resultVarName).get() }")
       } else if let returnType = method.returnType {

@@ -47,7 +47,7 @@ struct SpyableMacroTests {
         var items: [Item] = []
         // -- fetch --
         var fetchCallCount = 0
-        var fetchResult: Result<[Item], Error> = .success([])
+        var fetchResult: Result<[Item], any Error> = .success([])
         func fetch() async throws -> [Item] {
           fetchCallCount += 1
           calls.append(.fetch)
@@ -57,7 +57,7 @@ struct SpyableMacroTests {
         var saveCallCount = 0
         var saveReceivedItem: Item?
         var saveReceivedInvocations: [Item] = []
-        var saveResult: Result<Void, Error> = .success(())
+        var saveResult: Result<Void, any Error> = .success(())
         func save(_ item: Item) async throws {
           saveCallCount += 1
           saveReceivedItem = item
@@ -139,7 +139,7 @@ struct SpyableMacroTests {
         var searchCallCount = 0
         var searchReceivedArguments: (query: String, limit: Int)?
         var searchReceivedInvocations: [(query: String, limit: Int)] = []
-        var searchResult: Result<[String], Error> = .success([])
+        var searchResult: Result<[String], any Error> = .success([])
         func search(query: String, limit: Int) async throws -> [String] {
           searchCallCount += 1
           searchReceivedArguments = (query, limit)
@@ -250,7 +250,7 @@ struct SpyableMacroTests {
         var performCallCount = 0
         var performReceivedItem: Item?
         var performReceivedInvocations: [Item] = []
-        var performResult: Result<Void, Error> = .success(())
+        var performResult: Result<Void, any Error> = .success(())
         func perform(with item: Item) async throws {
           performCallCount += 1
           performReceivedItem = item
@@ -329,14 +329,14 @@ struct SpyableMacroTests {
       protocol MixedService {
         func fetch() -> [Item]
         func send(event: String)
-        func send(error: Error)
+        func send(error: any Error)
       }
       """,
       expandedSource: """
       protocol MixedService {
         func fetch() -> [Item]
         func send(event: String)
-        func send(error: Error)
+        func send(error: any Error)
       }
 
       @Observable
@@ -361,9 +361,9 @@ struct SpyableMacroTests {
         }
         // -- sendError --
         var sendErrorCallCount = 0
-        var sendErrorReceivedError: Error?
-        var sendErrorReceivedInvocations: [Error] = []
-        func send(error: Error) {
+        var sendErrorReceivedError: (any Error)?
+        var sendErrorReceivedInvocations: [any Error] = []
+        func send(error: any Error) {
           sendErrorCallCount += 1
           sendErrorReceivedError = error
           sendErrorReceivedInvocations.append(error)
@@ -372,7 +372,7 @@ struct SpyableMacroTests {
         enum Call {
           case fetch
           case send(event: String)
-          case send(error: Error)
+          case send(error: any Error)
         }
         var calls: [Call] = []
       }
@@ -403,7 +403,7 @@ struct SpyableMacroTests {
         public var items: [Item] = []
         // -- fetch --
         public var fetchCallCount = 0
-        public var fetchResult: Result<[Item], Error> = .success([])
+        public var fetchResult: Result<[Item], any Error> = .success([])
         public func fetch() async throws -> [Item] {
           fetchCallCount += 1
           calls.append(.fetch)
@@ -493,20 +493,20 @@ struct SpyableMacroTests {
       """
       @Spyable
       protocol ResultService {
-        func execute() -> Result<String, Error>
+        func execute() -> Result<String, any Error>
       }
       """,
       expandedSource: """
       protocol ResultService {
-        func execute() -> Result<String, Error>
+        func execute() -> Result<String, any Error>
       }
 
       @Observable
       final class SpyResultService: ResultService {
         // -- execute --
         var executeCallCount = 0
-        var executeReturnValue: Result<String, Error>!
-        func execute() -> Result<String, Error> {
+        var executeReturnValue: Result<String, any Error>!
+        func execute() -> Result<String, any Error> {
           executeCallCount += 1
           calls.append(.execute)
           return executeReturnValue
