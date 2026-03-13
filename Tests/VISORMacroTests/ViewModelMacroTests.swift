@@ -1180,6 +1180,46 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Existential `any` Protocol Types
+
+  @Test
+  func `Existential any types preserved in init`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let router: Router<AppScene>
+        private let sessionInteractor: any SessionInteractor
+        private let distractionInteractor: any DistractionInteractor
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {}
+        var state = State()
+        private let router: Router<AppScene>
+        private let sessionInteractor: any SessionInteractor
+        private let distractionInteractor: any DistractionInteractor
+
+          init(router: Router<AppScene>, sessionInteractor: any SessionInteractor, distractionInteractor: any DistractionInteractor) {
+              self.router = router
+              self.sessionInteractor = sessionInteractor
+              self.distractionInteractor = distractionInteractor
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Manual startObserving missing Bound observe method
 
   @Test
