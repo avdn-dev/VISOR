@@ -358,24 +358,6 @@ struct ViewModelMacroRuntimeTests {
         #expect(vm.state.profile.isEmpty)
     }
 
-    // MARK: - Non-Equatable updateState always writes
-
-    @Test
-    func `Non-Equatable updateState writes even when Equatable value unchanged`() {
-        let vm = NonEquatableVM()
-        vm.updateState(\NonEquatableVM.State.wrapper, to: NonEquatableWrapper(value: 1))
-        #expect(vm.state.wrapper.value == 1)
-
-        // Equatable field: same value should be deduplicated (guard prevents write)
-        vm.updateState(\NonEquatableVM.State.label, to: "a")
-        vm.updateState(\NonEquatableVM.State.label, to: "a")
-        #expect(vm.state.label == "a")
-
-        // Non-Equatable field: verify the overload is selected by testing type change
-        vm.updateState(\NonEquatableVM.State.wrapper, to: NonEquatableWrapper(value: 2))
-        #expect(vm.state.wrapper.value == 2)
-    }
-
     // MARK: - @Reaction deduplication behavior
 
     @Test(.timeLimit(.minutes(1)))

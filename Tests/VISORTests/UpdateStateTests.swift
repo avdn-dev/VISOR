@@ -290,4 +290,73 @@ struct UpdateStateTests {
             await expect(\.state.count, equals: 10)
         }
     }
+
+    // MARK: - High-Throughput Stress
+
+    @Test(.timeLimit(.minutes(1)))
+    func `High-throughput mutations converge to final value`() async {
+        let source = TestSource()
+        let vm = CounterViewModel(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+
+            for i in 1...500 {
+                source.count = i
+            }
+
+            await expect(\.state.count, equals: 500)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Deduplication prevents spurious emissions under load`() async throws {
+        let source = TestSource()
+        let vm = CounterViewModel(source: source)
+
+        var emissions = [Int]()
+        let trackingTask = Task {
+            for await count in valuesOf({ vm.state.count }) {
+                emissions.append(count)
+                if count == 100 { break }
+            }
+        }
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+        try await yieldForTracking()
+
+        // Alternate between 50 and 100, with repeated values that must be deduped
+        for _ in 1...20 { source.count = 50 }
+        try await yieldForTracking()
+        for _ in 1...20 { source.count = 100 }
+
+        await trackingTask.value
+        observeTask.cancel()
+
+        // Verify no consecutive duplicates in the emission log
+        for i in 1..<emissions.count {
+            #expect(emissions[i] != emissions[i - 1],
+                    "Consecutive duplicate at index \(i): \(emissions[i])")
+        }
+    }
+
+    // MARK: - Non-Equatable updateState
+
+    @Test
+    func `Non-Equatable field always writes via updateState`() {
+        let vm = NonEquatableVM()
+
+        vm.updateState(\.wrapper, to: NonEquatableWrapper(value: 1))
+        #expect(vm.state.wrapper.value == 1)
+
+        // Same logical value — non-Equatable overload writes unconditionally
+        vm.updateState(\.wrapper, to: NonEquatableWrapper(value: 1))
+        #expect(vm.state.wrapper.value == 1)
+
+        // Equatable field deduplicates
+        vm.updateState(\.label, to: "hello")
+        vm.updateState(\.label, to: "hello") // no-op
+        #expect(vm.state.label == "hello")
+    }
 }

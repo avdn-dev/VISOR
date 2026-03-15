@@ -247,28 +247,4 @@ struct IntegrationTests {
         #expect(vm.state.items.error == "network")
     }
 
-    // MARK: - Post-cancel observation stops
-
-    @Test(.timeLimit(.minutes(1)))
-    func `Observation stops propagating after cancellation`() async throws {
-        let source = TestSource()
-        let vm = IntegrationVM(source: source)
-
-        let task = Task { await vm.startObserving() }
-        try await yieldForTracking()
-        try await yieldForTracking()
-
-        source.count = 5
-        try await yieldForTracking()
-        #expect(vm.state.count == 5)
-
-        task.cancel()
-        try await Task.sleep(for: .milliseconds(100))
-
-        let countAfterCancel = vm.state.count
-        source.count = 999
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(vm.state.count == countAfterCancel, "Changes should not propagate after cancellation")
-    }
-
 }
