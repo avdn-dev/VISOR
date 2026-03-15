@@ -82,6 +82,12 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     }
 
     if !analysis.hasStateProperty {
+      if !analysis.stateHasDefaultInit {
+        context.diagnose(Diagnostic(
+          node: Syntax(declaration),
+          message: VISORDiagnostic.stateNotDefaultInitializable))
+        return []
+      }
       let stateDecl: DeclSyntax = """
         var state = State()
         """

@@ -23,6 +23,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case manualStartObservingMissingMethod(methodName: String)
   case missingState
   case statePropertyMissingInitializer
+  case stateNotDefaultInitializable
   case actionWithoutHandle
   case handleWrongLabel
   case boundOnClassVar(propertyName: String)
@@ -59,6 +60,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel requires a nested 'struct State: Equatable { }'"
     case .statePropertyMissingInitializer:
       "@ViewModel: 'var state' must have a default value (e.g., 'var state = State()')"
+    case .stateNotDefaultInitializable:
+      "@ViewModel: all State properties must have default values when 'var state' is not declared (auto-generates 'var state = State()')"
     case .actionWithoutHandle:
       "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
     case .handleWrongLabel:
@@ -88,6 +91,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
     case .missingState: id = "missingState"
     case .statePropertyMissingInitializer: id = "statePropertyMissingInitializer"
+    case .stateNotDefaultInitializable: id = "stateNotDefaultInitializable"
     case .actionWithoutHandle: id = "actionWithoutHandle"
     case .handleWrongLabel: id = "handleWrongLabel"
     case .boundOnClassVar: id = "boundOnClassVar"
@@ -103,7 +107,8 @@ enum VISORDiagnostic: DiagnosticMessage {
          .boundOnClassVar, .boundOnLetProperty,
          .malformedReactionKeyPath:
       .warning
-    case .missingState, .statePropertyMissingInitializer, .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
+    case .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
+         .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
       .error
     default:
       .error

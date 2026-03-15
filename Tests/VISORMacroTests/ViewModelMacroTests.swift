@@ -836,6 +836,34 @@ struct ViewModelMacroTests {
   }
 
   @Test
+  func `State without defaults and no var state emits error`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          var name: String
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {
+          var name: String
+        }
+        private let service: MyService
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel: all State properties must have default values when 'var state' is not declared (auto-generates 'var state = State()')", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Action enum without handle emits error`() {
     assertMacroExpansion(
       """

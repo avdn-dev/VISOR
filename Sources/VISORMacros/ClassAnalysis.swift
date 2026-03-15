@@ -62,6 +62,7 @@ struct ClassAnalysis {
   var hasInitializer = false
   // v2: State/Action detection
   var hasStateStruct = false
+  var stateHasDefaultInit = true
   var hasStateProperty = false
   var statePropertyMissingInitializer = false
   var hasActionEnum = false
@@ -223,11 +224,20 @@ struct ClassAnalysis {
     }
   }
 
-  /// Scans the nested `struct State` for @Bound attributes.
+  /// Scans the nested `struct State` for @Bound attributes and default-init eligibility.
   private mutating func scanStateStruct(_ structDecl: StructDeclSyntax) {
     for member in structDecl.memberBlock.members {
       guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
         continue
+      }
+
+      // Check if any stored property lacks a default value (affects auto-generated State())
+      if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
+        for binding in varDecl.bindings where binding.accessorBlock == nil {
+          if binding.initializer == nil {
+            stateHasDefaultInit = false
+          }
+        }
       }
 
       guard let boundAttr = varDecl.attributes.lazy
