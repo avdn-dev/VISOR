@@ -60,7 +60,9 @@ struct ClassAnalysis {
   var hasStartObserving = false
   var startObservingBodyText: String?
   var hasInitializer = false
-  // v2: Action/handle detection
+  // v2: State/Action detection
+  var hasStateStruct = false
+  var hasStateProperty = false
   var hasActionEnum = false
   var hasHandleMethod = false
   var handleHasWrongLabel = false
@@ -84,6 +86,7 @@ struct ClassAnalysis {
       // Nested struct/enum declarations
       if let structDecl = member.decl.as(StructDeclSyntax.self) {
         if structDecl.name.text == "State" {
+          hasStateStruct = true
           scanStateStruct(structDecl)
         }
         continue
@@ -121,6 +124,17 @@ struct ClassAnalysis {
             let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
           else {
             continue
+          }
+
+          // Detect `var state: State` property (type must be State if annotated)
+          if identifier.identifier.text == "state" {
+            if let typeAnnotation = binding.typeAnnotation {
+              if typeAnnotation.type.trimmedDescription == "State" {
+                hasStateProperty = true
+              }
+            } else {
+              hasStateProperty = true
+            }
           }
 
           // Detect v1 @Bound on class-level var (migration warning)

@@ -703,7 +703,107 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - Action/handle diagnostics
+  // MARK: - State/Action diagnostics
+
+  @Test
+  func `Missing State struct emits error`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        private let service: MyService
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires a nested 'struct State: Equatable { }'", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `State struct without state property generates it`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          var count = 0
+        }
+        enum Action { case refresh }
+        func handle(_ action: Action) async {}
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {
+          var count = 0
+        }
+        enum Action { case refresh }
+        func handle(_ action: Action) async {}
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          var state = State()
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `var state with non-State type still generates state property`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          var count = 0
+        }
+        var state: Int = 0
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        struct State: Equatable {
+          var count = 0
+        }
+        var state: Int = 0
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          var state = State()
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
 
   @Test
   func `Action enum without handle emits error`() {
