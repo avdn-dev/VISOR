@@ -63,6 +63,7 @@ struct ClassAnalysis {
   // v2: State/Action detection
   var hasStateStruct = false
   var hasStateProperty = false
+  var statePropertyMissingInitializer = false
   var hasActionEnum = false
   var hasHandleMethod = false
   var handleHasWrongLabel = false
@@ -131,6 +132,9 @@ struct ClassAnalysis {
             if let typeAnnotation = binding.typeAnnotation {
               if typeAnnotation.type.trimmedDescription == "State" {
                 hasStateProperty = true
+                if binding.initializer == nil {
+                  statePropertyMissingInitializer = true
+                }
               }
             } else {
               hasStateProperty = true

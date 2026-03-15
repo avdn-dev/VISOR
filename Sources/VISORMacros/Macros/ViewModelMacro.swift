@@ -66,7 +66,28 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       """
     members.append(typealiasDecl)
 
-    // 3. Action/handle diagnostics
+    // 3. State/Action diagnostics
+    if !analysis.hasStateStruct {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.missingState))
+      return []
+    }
+
+    if analysis.statePropertyMissingInitializer {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.statePropertyMissingInitializer))
+      return []
+    }
+
+    if !analysis.hasStateProperty {
+      let stateDecl: DeclSyntax = """
+        var state = State()
+        """
+      members.append(stateDecl)
+    }
+
     if analysis.hasActionEnum && !analysis.hasHandleMethod {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),

@@ -21,6 +21,8 @@ enum VISORDiagnostic: DiagnosticMessage {
   case invalidReactionParameter(methodName: String)
   case malformedReactionKeyPath(methodName: String)
   case manualStartObservingMissingMethod(methodName: String)
+  case missingState
+  case statePropertyMissingInitializer
   case actionWithoutHandle
   case handleWrongLabel
   case boundOnClassVar(propertyName: String)
@@ -53,6 +55,10 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Reaction on '\(methodName)': expected key path argument like \\.dependency.property"
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
+    case .missingState:
+      "@ViewModel requires a nested 'struct State: Equatable { }'"
+    case .statePropertyMissingInitializer:
+      "@ViewModel: 'var state' must have a default value (e.g., 'var state = State()')"
     case .actionWithoutHandle:
       "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
     case .handleWrongLabel:
@@ -80,6 +86,8 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .invalidReactionParameter: id = "invalidReactionParameter"
     case .malformedReactionKeyPath: id = "malformedReactionKeyPath"
     case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
+    case .missingState: id = "missingState"
+    case .statePropertyMissingInitializer: id = "statePropertyMissingInitializer"
     case .actionWithoutHandle: id = "actionWithoutHandle"
     case .handleWrongLabel: id = "handleWrongLabel"
     case .boundOnClassVar: id = "boundOnClassVar"
@@ -95,7 +103,7 @@ enum VISORDiagnostic: DiagnosticMessage {
          .boundOnClassVar, .boundOnLetProperty,
          .malformedReactionKeyPath:
       .warning
-    case .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
+    case .missingState, .statePropertyMissingInitializer, .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
       .error
     default:
       .error
