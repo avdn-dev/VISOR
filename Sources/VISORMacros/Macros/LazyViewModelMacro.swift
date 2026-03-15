@@ -44,19 +44,15 @@ public struct LazyViewModelMacro: MemberMacro {
     let access = accessLevel(of: structDecl)
     let prefix = access.isEmpty ? "" : "\(access) "
 
-    let taskIdExpression: String
-    let guardCondition: String
-
-    switch observationPolicy {
+    let (taskIdExpression, guardCondition) = switch observationPolicy {
     case "pauseInBackground":
-      taskIdExpression = "scenePhase != .background && _viewModel != nil"
-      guardCondition = "guard let vm = _viewModel, scenePhase != .background else { return }"
+      ("scenePhase != .background && _viewModel != nil",
+       "guard let vm = _viewModel, scenePhase != .background else { return }")
     case "pauseWhenInactive":
-      taskIdExpression = "scenePhase == .active && _viewModel != nil"
-      guardCondition = "guard let vm = _viewModel, scenePhase == .active else { return }"
+      ("scenePhase == .active && _viewModel != nil",
+       "guard let vm = _viewModel, scenePhase == .active else { return }")
     default:
-      taskIdExpression = "_viewModel != nil"
-      guardCondition = "guard let vm = _viewModel else { return }"
+      ("_viewModel != nil", "guard let vm = _viewModel else { return }")
     }
 
     var members: [DeclSyntax] = [

@@ -82,29 +82,28 @@ enum VISORDiagnostic: DiagnosticMessage {
   }
 
   var diagnosticID: MessageID {
-    let id: String
-    switch self {
-    case .missingContent: id = "missingContent"
-    case .notAClass: id = "notAClass"
-    case .notAStruct: id = "notAStruct"
-    case .missingArguments: id = "missingArguments"
-    case .missingSelfSuffix: id = "missingSelfSuffix"
-    case .missingObservable: id = "missingObservable"
-    case .invalidBoundDependency: id = "invalidBoundDependency"
-    case .malformedBoundKeyPath: id = "malformedBoundKeyPath"
-    case .boundOutsideState: id = "boundOutsideState"
-    case .invalidReactionParameter: id = "invalidReactionParameter"
-    case .malformedReactionKeyPath: id = "malformedReactionKeyPath"
-    case .reactionNotOnMethod: id = "reactionNotOnMethod"
-    case .reactionInsideNestedType: id = "reactionInsideNestedType"
-    case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
-    case .missingState: id = "missingState"
-    case .statePropertyMissingInitializer: id = "statePropertyMissingInitializer"
-    case .stateNotDefaultInitializable: id = "stateNotDefaultInitializable"
-    case .actionWithoutHandle: id = "actionWithoutHandle"
-    case .handleWrongLabel: id = "handleWrongLabel"
-    case .boundOnLetProperty: id = "boundOnLetProperty"
-    case .invalidObservationPolicy: id = "invalidObservationPolicy"
+    let id = switch self {
+    case .missingContent: "missingContent"
+    case .notAClass: "notAClass"
+    case .notAStruct: "notAStruct"
+    case .missingArguments: "missingArguments"
+    case .missingSelfSuffix: "missingSelfSuffix"
+    case .missingObservable: "missingObservable"
+    case .invalidBoundDependency: "invalidBoundDependency"
+    case .malformedBoundKeyPath: "malformedBoundKeyPath"
+    case .boundOutsideState: "boundOutsideState"
+    case .invalidReactionParameter: "invalidReactionParameter"
+    case .malformedReactionKeyPath: "malformedReactionKeyPath"
+    case .reactionNotOnMethod: "reactionNotOnMethod"
+    case .reactionInsideNestedType: "reactionInsideNestedType"
+    case .manualStartObservingMissingMethod: "manualStartObservingMissingMethod"
+    case .missingState: "missingState"
+    case .statePropertyMissingInitializer: "statePropertyMissingInitializer"
+    case .stateNotDefaultInitializable: "stateNotDefaultInitializable"
+    case .actionWithoutHandle: "actionWithoutHandle"
+    case .handleWrongLabel: "handleWrongLabel"
+    case .boundOnLetProperty: "boundOnLetProperty"
+    case .invalidObservationPolicy: "invalidObservationPolicy"
     }
     return MessageID(domain: "VISOR", id: id)
   }
