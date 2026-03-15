@@ -55,29 +55,12 @@ public struct StubbableMacro: PeerMacro {
     // Generate methods
     let prefixes = uniqueMethodPrefixes(for: methods)
     for (method, methodPrefix) in zip(methods, prefixes) {
+      members.append(contentsOf: generateReturnStorage(method: method, methodPrefix: methodPrefix, access: access))
       let sig = buildMethodSignature(method, access: access)
       if method.isThrowing {
-        let resultVarName = "\(methodPrefix)Result"
-        if let returnType = method.returnType {
-          let innerDefault = defaultValue(for: returnType)
-          if let innerDefault {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
-          } else {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>!")
-          }
-        } else {
-          members.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
-        }
-        members.append("  \(sig) { try \(resultVarName).get() }")
-      } else if let returnType = method.returnType {
-        let defaultVal = defaultValue(for: returnType)
-        let retVarName = "\(methodPrefix)ReturnValue"
-        if let defaultVal {
-          members.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
-        } else {
-          members.append("  \(prefix)var \(retVarName): \(returnType)!")
-        }
-        members.append("  \(sig) { \(retVarName) }")
+        members.append("  \(sig) { try \(methodPrefix)Result.get() }")
+      } else if method.returnType != nil {
+        members.append("  \(sig) { \(methodPrefix)ReturnValue }")
       } else {
         members.append("  \(sig) { }")
       }

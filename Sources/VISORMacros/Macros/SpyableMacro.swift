@@ -63,26 +63,7 @@ public struct SpyableMacro: PeerMacro {
       }
 
       // Return value / Result storage
-      if method.isThrowing {
-        let resultVarName = "\(methodPrefix)Result"
-        if let returnType = method.returnType {
-          let innerDefault = defaultValue(for: returnType)
-          if let innerDefault {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
-          } else {
-            members.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>!")
-          }
-        } else {
-          members.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
-        }
-      } else if let returnType = method.returnType {
-        let defaultVal = defaultValue(for: returnType)
-        if let defaultVal {
-          members.append("  \(prefix)var \(methodPrefix)ReturnValue: \(returnType) = \(defaultVal)")
-        } else {
-          members.append("  \(prefix)var \(methodPrefix)ReturnValue: \(returnType)!")
-        }
-      }
+      members.append(contentsOf: generateReturnStorage(method: method, methodPrefix: methodPrefix, access: access))
 
       // Method implementation
       let sig = buildMethodSignature(method, access: access)

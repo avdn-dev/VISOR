@@ -106,14 +106,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.handleWrongLabel))
     }
 
-    // 4. v1 @Bound on class var (migration aid)
-    for name in analysis.classLevelBoundProperties {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.boundOnClassVar(propertyName: name)))
-    }
-
-    // 5. @Bound on let inside State
+    // 4. @Bound on let inside State
     for name in analysis.boundOnLetProperties {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
@@ -143,7 +136,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     for propertyName in analysis.malformedStateBoundAttributes {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName)))
+        message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName, className: className)))
     }
 
     // Generate observe methods for each @Bound property (using updateState)

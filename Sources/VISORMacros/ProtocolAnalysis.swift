@@ -177,17 +177,5 @@ func validateProtocolForTestDouble(
   return true
 }
 
-/// Returns the access-level keyword for a protocol (e.g. "public") or empty string.
-/// `internal` is omitted (returns "") because it's Swift's default access level —
-/// emitting it explicitly would just add noise to the generated code.
-func accessLevel(of protocolDecl: ProtocolDeclSyntax) -> String {
-  for modifier in protocolDecl.modifiers {
-    switch modifier.name.text {
-    case "open", "public", "package", "fileprivate", "private":
-      return modifier.name.text
-    default:
-      continue
-    }
-  }
-  return ""
-}
+// accessLevel(of:) — use the generic version from CodeGenHelpers.swift.
+// ProtocolDeclSyntax conforms to DeclGroupSyntax, so it matches directly.

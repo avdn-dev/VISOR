@@ -18,6 +18,8 @@ enum AttributeName {
 
 // MARK: - Property Declaration Helper
 
+/// Generates `var` declarations for each protocol property with appropriate defaults.
+/// Unknown custom types use implicitly unwrapped optionals (IUO) as a placeholder.
 func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: String = "") -> [String] {
   let prefix = access.isEmpty ? "" : "\(access) "
   return properties.map { prop in
@@ -35,6 +37,8 @@ func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: 
 
 // MARK: - Default Value Helper
 
+/// Returns a sensible default literal for known Swift types, or `nil` for custom types.
+/// Used by `@Stubbable` and `@Spyable` to initialize generated stub/spy properties.
 func defaultValue(for type: String) -> String? {
   let trimmed = type.trimmingWhitespace
 
@@ -118,6 +122,46 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   }
 
   return prefixes
+}
+
+// MARK: - Return Storage Helper
+
+/// Generates `var` declarations for a method's return value or `Result` storage.
+///
+/// - Throwing methods get a `Result<ReturnType, any Error>` variable.
+/// - Non-throwing methods with a return type get a `ReturnValue` variable.
+/// - Void non-throwing methods produce no declarations.
+///
+/// Used by both `@Stubbable` and `@Spyable` to avoid duplicated codegen logic.
+func generateReturnStorage(
+  method: ProtocolMethodInfo,
+  methodPrefix: String,
+  access: String
+) -> [String] {
+  let prefix = access.isEmpty ? "" : "\(access) "
+  var lines: [String] = []
+
+  if method.isThrowing {
+    let resultVarName = "\(methodPrefix)Result"
+    if let returnType = method.returnType {
+      if let innerDefault = defaultValue(for: returnType) {
+        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
+      } else {
+        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>!")
+      }
+    } else {
+      lines.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
+    }
+  } else if let returnType = method.returnType {
+    let retVarName = "\(methodPrefix)ReturnValue"
+    if let defaultVal = defaultValue(for: returnType) {
+      lines.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
+    } else {
+      lines.append("  \(prefix)var \(retVarName): \(returnType)!")
+    }
+  }
+
+  return lines
 }
 
 // MARK: - Method Signature Helper

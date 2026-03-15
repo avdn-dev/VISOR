@@ -74,9 +74,6 @@ struct ClassAnalysis {
   var malformedStateBoundAttributes: [String] = []
   var boundOnLetProperties: [String] = []
 
-  // v2: @Bound on class-level var (migration warning)
-  var classLevelBoundProperties: [String] = []
-
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
       // Initializer check
@@ -142,13 +139,6 @@ struct ClassAnalysis {
             }
           }
 
-          // Detect v1 @Bound on class-level var (migration warning)
-          if let _ = varDecl.attributes.lazy
-            .compactMap({ $0.as(AttributeSyntax.self) })
-            .first(where: { $0.attributeName.trimmedDescription == AttributeName.bound })
-          {
-            classLevelBoundProperties.append(identifier.identifier.text)
-          }
         }
         continue
       }

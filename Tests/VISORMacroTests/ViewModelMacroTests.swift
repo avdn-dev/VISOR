@@ -622,7 +622,7 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound on 'value': expected key path argument like \ClassName.dependencyName"#, line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Bound on 'value': expected key path argument like \MyViewModel.dependencyName"#, line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -665,10 +665,10 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - @Bound on class-level var (v1 migration)
+  // MARK: - @Bound on class-level var (caught by BoundMacro)
 
   @Test
-  func `@Bound on class-level var emits migration warning`() {
+  func `@Bound on class-level var emits error`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -697,8 +697,8 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Bound on 'value': move @Bound to the State struct property instead", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@Bound must be inside 'struct State' — move to the corresponding State property", line: 5, column: 3, severity: .error),
       ],
       macros: testMacros)
   }

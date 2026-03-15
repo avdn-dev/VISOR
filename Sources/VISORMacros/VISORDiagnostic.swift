@@ -17,16 +17,18 @@ enum VISORDiagnostic: DiagnosticMessage {
   case missingSelfSuffix(macroName: String)
   case missingObservable
   case invalidBoundDependency(name: String, propertyName: String)
-  case malformedBoundKeyPath(propertyName: String)
+  case malformedBoundKeyPath(propertyName: String, className: String)
+  case boundOutsideState
   case invalidReactionParameter(methodName: String)
   case malformedReactionKeyPath(methodName: String)
+  case reactionNotOnMethod
+  case reactionInsideNestedType
   case manualStartObservingMissingMethod(methodName: String)
   case missingState
   case statePropertyMissingInitializer
   case stateNotDefaultInitializable
   case actionWithoutHandle
   case handleWrongLabel
-  case boundOnClassVar(propertyName: String)
   case boundOnLetProperty(propertyName: String)
   case invalidObservationPolicy
 
@@ -48,12 +50,18 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel requires @Observable on the class to enable observation tracking"
     case .invalidBoundDependency(let name, let propertyName):
       "@Bound(\\.\(name)) on '\(propertyName)': no stored 'let \(name)' found on this class"
-    case .malformedBoundKeyPath(let propertyName):
-      "@Bound on '\(propertyName)': expected single-level key path like \\ClassName.dependencyName (nested paths are not supported)"
+    case .malformedBoundKeyPath(let propertyName, let className):
+      "@Bound on '\(propertyName)': expected key path argument like \\\(className).dependencyName"
+    case .boundOutsideState:
+      "@Bound must be inside 'struct State' — move to the corresponding State property"
     case .invalidReactionParameter(let methodName):
       "@Reaction on '\(methodName)': method must have exactly one parameter"
     case .malformedReactionKeyPath(let methodName):
       "@Reaction on '\(methodName)': expected key path argument like \\.dependency.property"
+    case .reactionNotOnMethod:
+      "@Reaction can only annotate methods"
+    case .reactionInsideNestedType:
+      "@Reaction must be at the class level, not inside a nested type"
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
     case .missingState:
@@ -66,8 +74,6 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
     case .handleWrongLabel:
       "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'"
-    case .boundOnClassVar(let name):
-      "@Bound on '\(name)': move @Bound to the State struct property instead"
     case .boundOnLetProperty(let name):
       "@Bound on '\(name)': use 'var' instead of 'let' — bound properties must be mutable"
     case .invalidObservationPolicy:
@@ -86,15 +92,17 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .missingObservable: id = "missingObservable"
     case .invalidBoundDependency: id = "invalidBoundDependency"
     case .malformedBoundKeyPath: id = "malformedBoundKeyPath"
+    case .boundOutsideState: id = "boundOutsideState"
     case .invalidReactionParameter: id = "invalidReactionParameter"
     case .malformedReactionKeyPath: id = "malformedReactionKeyPath"
+    case .reactionNotOnMethod: id = "reactionNotOnMethod"
+    case .reactionInsideNestedType: id = "reactionInsideNestedType"
     case .manualStartObservingMissingMethod: id = "manualStartObservingMissingMethod"
     case .missingState: id = "missingState"
     case .statePropertyMissingInitializer: id = "statePropertyMissingInitializer"
     case .stateNotDefaultInitializable: id = "stateNotDefaultInitializable"
     case .actionWithoutHandle: id = "actionWithoutHandle"
     case .handleWrongLabel: id = "handleWrongLabel"
-    case .boundOnClassVar: id = "boundOnClassVar"
     case .boundOnLetProperty: id = "boundOnLetProperty"
     case .invalidObservationPolicy: id = "invalidObservationPolicy"
     }
@@ -104,13 +112,13 @@ enum VISORDiagnostic: DiagnosticMessage {
   var severity: DiagnosticSeverity {
     switch self {
     case .malformedBoundKeyPath, .manualStartObservingMissingMethod,
-         .boundOnClassVar, .boundOnLetProperty,
-         .malformedReactionKeyPath:
+         .boundOnLetProperty, .malformedReactionKeyPath:
       .warning
-    case .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
-         .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency:
-      .error
-    default:
+    case .missingObservable, .boundOutsideState, .reactionNotOnMethod, .reactionInsideNestedType,
+         .missingContent, .notAClass, .notAStruct, .missingArguments, .missingSelfSuffix,
+         .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
+         .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
+         .invalidReactionParameter, .invalidObservationPolicy:
       .error
     }
   }
