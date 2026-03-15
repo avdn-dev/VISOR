@@ -39,6 +39,16 @@ final class MinimalVM {
     var state = State()
 }
 
+// MARK: 1b. Minimal VM with auto-generated state property
+
+@Observable
+@ViewModel
+final class AutoStateVM {
+    struct State: Equatable {
+        var value = 0
+    }
+}
+
 // MARK: 2. Multiple dependencies (was MARK 2)
 
 @Observable

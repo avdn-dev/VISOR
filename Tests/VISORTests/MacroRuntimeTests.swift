@@ -20,6 +20,20 @@ struct ViewModelMacroRuntimeTests {
         #expect(vm.state.value == 42)
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func `Auto-generated state property is observation-tracked`() async {
+        let vm = AutoStateVM()
+        #expect(vm.state.value == 0)
+
+        await observing(vm) { expect in
+            vm.updateState(\.value, to: 1)
+            await expect(\.state.value, equals: 1)
+
+            vm.updateState(\.value, to: 2)
+            await expect(\.state.value, equals: 2)
+        }
+    }
+
     @Test
     func `NoDeps VM handles action without dependencies`() {
         let vm = NoDepsVM()
