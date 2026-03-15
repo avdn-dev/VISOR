@@ -29,6 +29,12 @@ import Observation
 /// The Screen owns the VM. The Content view is a pure function of state + onAction,
 /// trivially previewable with static state and no factory.
 ///
+/// **Bindings:** Use the generated `stateBinding` property for SwiftUI controls:
+/// ```swift
+/// Toggle("Enabled", isOn: stateBinding.isEnabled)
+/// TextField("Name", text: stateBinding.name)
+/// ```
+///
 /// - Parameter observationPolicy: Controls whether observation pauses based on scene phase.
 ///   Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
 ///   view models driving high-frequency work that wastes resources when the UI is not visible.
@@ -36,7 +42,7 @@ import Observation
 /// > The generated `viewModel` property force-unwraps the backing `@State`. This is safe
 /// > because the generated `body` guards with `if _viewModel != nil` before rendering
 /// > `content`, and initialization is guaranteed by the `.task` modifier.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(factory), named(containerRouter), named(scenePhase))
+@attached(member, names: named(body), named(_viewModel), named(viewModel), named(stateBinding), named(factory), named(containerRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
   _: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving

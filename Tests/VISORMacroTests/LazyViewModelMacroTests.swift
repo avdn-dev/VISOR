@@ -44,6 +44,10 @@ struct LazyViewModelMacroTests {
               _viewModel!
           }
 
+          var stateBinding: Binding<MyVM.State> {
+              Bindable(viewModel).state
+          }
+
           var body: some View {
               Group {
                   if _viewModel != nil {
@@ -162,6 +166,10 @@ struct LazyViewModelMacroTests {
               _viewModel!
           }
 
+          var stateBinding: Binding<MyViewModel.State> {
+              Bindable(viewModel).state
+          }
+
           var body: some View {
               Group {
                   if _viewModel != nil {
@@ -273,6 +281,10 @@ struct LazyViewModelMacroTests {
               _viewModel!
           }
 
+          var stateBinding: Binding<MyVM.State> {
+              Bindable(viewModel).state
+          }
+
           var body: some View {
               Group {
                   if _viewModel != nil {
@@ -323,6 +335,10 @@ struct LazyViewModelMacroTests {
               _viewModel!
           }
 
+          var stateBinding: Binding<MyVM.State> {
+              Bindable(viewModel).state
+          }
+
           var body: some View {
               Group {
                   if _viewModel != nil {
@@ -371,6 +387,10 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               _viewModel!
+          }
+
+          var stateBinding: Binding<MyVM.State> {
+              Bindable(viewModel).state
           }
 
           var body: some View {
@@ -489,6 +509,10 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               _viewModel!
+          }
+
+          var stateBinding: Binding<MyVM.State> {
+              Bindable(viewModel).state
           }
 
           var body: some View {
