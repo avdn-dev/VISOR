@@ -15,9 +15,9 @@
 /// - Then sleeps for `interval` between reads.
 /// - Cancellation breaks the loop cooperatively.
 /// - Uses `.bufferingNewest(1)` policy.
-public func polledValues<T: Sendable>(
-  every interval: Duration,
-  _ read: @MainActor @Sendable @escaping () -> T
+public func polledValuesOf<T: Sendable>(
+  _ read: @MainActor @Sendable @escaping () -> T,
+  every interval: Duration
 ) -> AsyncStream<T> {
   AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
     let task = Task { @MainActor in
@@ -38,9 +38,9 @@ public func polledValues<T: Sendable>(
 }
 
 /// Equatable-constrained overload that deduplicates consecutive equal values.
-public func polledValues<T: Sendable & Equatable>(
-  every interval: Duration,
-  _ read: @MainActor @Sendable @escaping () -> T
+public func polledValuesOf<T: Sendable & Equatable>(
+  _ read: @MainActor @Sendable @escaping () -> T,
+  every interval: Duration
 ) -> AsyncStream<T> {
   AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
     let task = Task { @MainActor in

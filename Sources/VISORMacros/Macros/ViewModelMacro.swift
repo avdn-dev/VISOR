@@ -236,7 +236,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // 8b. Generate observe methods from @Polled properties inside State
     //
-    // Inlines the poll loop directly instead of going through `polledValues` AsyncStream.
+    // Inlines the poll loop directly instead of going through `polledValuesOf` AsyncStream.
     // This avoids: heap-allocated stream buffer, extra producer Task, continuation overhead,
     // and redundant deduplication (updateState already deduplicates Equatable values).
     for prop in validPolled {

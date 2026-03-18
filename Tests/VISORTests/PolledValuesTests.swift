@@ -9,7 +9,7 @@ import Foundation
 import Testing
 @testable import VISOR
 
-@Suite("polledValues")
+@Suite("polledValuesOf")
 @MainActor
 struct PolledValuesTests {
 
@@ -19,7 +19,7 @@ struct PolledValuesTests {
     var emissions: [Int] = []
 
     let task = Task {
-      for await v in polledValues(every: .seconds(60), { value }) {
+      for await v in polledValuesOf({ value }, every: .seconds(60)) {
         emissions.append(v)
         if emissions.count >= 1 { break }
       }
@@ -35,7 +35,7 @@ struct PolledValuesTests {
     var emissions: [Int] = []
 
     let task = Task {
-      for await v in polledValues(every: .milliseconds(50), { counter }) {
+      for await v in polledValuesOf({ counter }, every: .milliseconds(50)) {
         emissions.append(v)
         if emissions.count >= 3 { break }
       }
@@ -58,7 +58,7 @@ struct PolledValuesTests {
     var emissions: [Int] = []
 
     let task = Task {
-      for await v in polledValues(every: .milliseconds(20), { 1 }) {
+      for await v in polledValuesOf({ 1 }, every: .milliseconds(20)) {
         emissions.append(v)
       }
     }
@@ -79,7 +79,7 @@ struct PolledValuesTests {
     var emissions: [Int] = []
 
     let task = Task {
-      for await v in polledValues(every: .milliseconds(30), { value }) {
+      for await v in polledValuesOf({ value }, every: .milliseconds(30)) {
         emissions.append(v)
         if emissions.count >= 3 { break }
       }
