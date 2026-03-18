@@ -300,7 +300,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Public class with @Bound does not propagate access to observe methods`() {
+  func `Public class with @Bound propagates access to protocol requirements`() {
     assertMacroExpansion(
       """
       @Observable
@@ -322,7 +322,7 @@ struct ViewModelMacroTests {
 
           private var _state: State
 
-          var state: State {
+          public var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
           }
@@ -340,7 +340,7 @@ struct ViewModelMacroTests {
               }
           }
 
-          func startObserving() async {
+          public func startObserving() async {
               await observeIsLoading()
           }
       }

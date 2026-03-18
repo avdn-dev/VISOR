@@ -151,7 +151,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         // observation accessors that call access/withMutation (provided by @Observable).
         let backingDecl: DeclSyntax = "private var _state: State"
         let computedDecl: DeclSyntax = """
-          var state: State {
+          \(raw: prefix)var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
           }
@@ -165,7 +165,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         return []
       } else {
         let stateDecl: DeclSyntax = """
-          var state = State()
+          \(raw: prefix)var state = State()
           """
         members.append(stateDecl)
       }
@@ -308,7 +308,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         }
       } else if allObserveMethodNames.count == 1 {
         let observingDecl: DeclSyntax = """
-          func startObserving() async {
+          \(raw: prefix)func startObserving() async {
               await \(raw: allObserveMethodNames[0])()
           }
           """
@@ -320,7 +320,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
           """
         }.joined(separator: "\n")
         let observingDecl: DeclSyntax = """
-          func startObserving() async {
+          \(raw: prefix)func startObserving() async {
               await withDiscardingTaskGroup { group in
           \(raw: tasks)
               }
