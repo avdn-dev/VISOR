@@ -30,6 +30,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case actionWithoutHandle
   case handleWrongLabel
   case boundOnLetProperty(propertyName: String)
+  case boundPropertyHasDefault(propertyName: String)
   case invalidObservationPolicy
 
   // MARK: Internal
@@ -51,7 +52,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .invalidBoundDependency(let name, let propertyName):
       "@Bound(\\.\(name)) on '\(propertyName)': no stored 'let \(name)' found on this class"
     case .malformedBoundKeyPath(let propertyName, let className):
-      "@Bound on '\(propertyName)': expected key path argument like \\\(className).dependencyName"
+      "@Bound on '\(propertyName)': expected key path like \\\(className).dependency.property"
     case .boundOutsideState:
       "@Bound must be inside 'struct State' — move to the corresponding State property"
     case .invalidReactionParameter(let methodName):
@@ -76,6 +77,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'"
     case .boundOnLetProperty(let name):
       "@Bound on '\(name)': use 'var' instead of 'let' — bound properties must be mutable"
+    case .boundPropertyHasDefault(let propertyName):
+      "@Bound on '\(propertyName)': remove the default value — state is initialized from the service"
     case .invalidObservationPolicy:
       "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     }
@@ -103,6 +106,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .actionWithoutHandle: "actionWithoutHandle"
     case .handleWrongLabel: "handleWrongLabel"
     case .boundOnLetProperty: "boundOnLetProperty"
+    case .boundPropertyHasDefault: "boundPropertyHasDefault"
     case .invalidObservationPolicy: "invalidObservationPolicy"
     }
     return MessageID(domain: "VISOR", id: id)
@@ -117,7 +121,8 @@ enum VISORDiagnostic: DiagnosticMessage {
          .missingContent, .notAClass, .notAStruct, .missingArguments, .missingSelfSuffix,
          .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
          .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
-         .invalidReactionParameter, .invalidObservationPolicy:
+         .invalidReactionParameter, .boundPropertyHasDefault,
+         .invalidObservationPolicy:
       .error
     }
   }

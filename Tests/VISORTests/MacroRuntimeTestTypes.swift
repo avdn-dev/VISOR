@@ -55,10 +55,9 @@ final class AutoStateVM {
 @ViewModel
 final class MultiDepVM {
     struct State: Equatable {
-        @Bound(\MultiDepVM.source) var count = 0
-        @Bound(\MultiDepVM.second) var name = ""
+        @Bound(\MultiDepVM.source.count) var count: Int
+        @Bound(\MultiDepVM.second.name) var name: String
     }
-    var state = State()
     let source: RuntimeSource
     let second: SecondSource
 }
@@ -69,9 +68,8 @@ final class MultiDepVM {
 @ViewModel
 final class AutoObserveSingleVM {
     struct State: Equatable {
-        @Bound(\AutoObserveSingleVM.source) var count = 0
+        @Bound(\AutoObserveSingleVM.source.count) var count: Int
     }
-    var state = State()
     let source: RuntimeSource
 }
 
@@ -81,11 +79,10 @@ final class AutoObserveSingleVM {
 @ViewModel
 final class AutoObserveMultiVM {
     struct State: Equatable {
-        @Bound(\AutoObserveMultiVM.source) var count = 0
-        @Bound(\AutoObserveMultiVM.source) var label = "initial"
-        @Bound(\AutoObserveMultiVM.source) var isEnabled = false
+        @Bound(\AutoObserveMultiVM.source.count) var count: Int
+        @Bound(\AutoObserveMultiVM.source.label) var label: String
+        @Bound(\AutoObserveMultiVM.source.isEnabled) var isEnabled: Bool
     }
-    var state = State()
     let source: RuntimeSource
 }
 
@@ -95,7 +92,7 @@ final class AutoObserveMultiVM {
 @ViewModel
 final class BoundWithSyncActionVM {
     struct State: Equatable {
-        @Bound(\BoundWithSyncActionVM.source) var count = 0
+        @Bound(\BoundWithSyncActionVM.source.count) var count: Int
         var selectedIndex = 0
     }
 
@@ -103,8 +100,6 @@ final class BoundWithSyncActionVM {
         case selectIndex(Int)
         case reset
     }
-
-    var state = State()
 
     func handle(_ action: Action) {
         switch action {
@@ -124,7 +119,7 @@ final class BoundWithSyncActionVM {
 @ViewModel
 final class BoundWithAsyncActionVM {
     struct State: Equatable {
-        @Bound(\BoundWithAsyncActionVM.source) var count = 0
+        @Bound(\BoundWithAsyncActionVM.source.count) var count: Int
         var detail: Loadable<String> = .loading
     }
 
@@ -132,8 +127,6 @@ final class BoundWithAsyncActionVM {
         case loadDetail
         case clearDetail
     }
-
-    var state = State()
 
     func handle(_ action: Action) async {
         switch action {
@@ -194,10 +187,9 @@ final class AsyncReactionVM {
 @ViewModel
 final class BoundAndReactionVM {
     struct State: Equatable {
-        @Bound(\BoundAndReactionVM.source) var count = 0
+        @Bound(\BoundAndReactionVM.source.count) var count: Int
         var lastNav: String? = nil
     }
-    var state = State()
     let source: RuntimeSource
     let nav: ReactionSource
 
@@ -213,13 +205,14 @@ final class BoundAndReactionVM {
 @ViewModel
 final class CustomInitVM {
     struct State: Equatable {
-        @Bound(\CustomInitVM.source) var count = 0
+        @Bound(\CustomInitVM.source.count) var count: Int
     }
-    var state = State()
+    var state: State
     let source: RuntimeSource
 
     init(customSource: RuntimeSource) {
         self.source = customSource
+        self.state = State(count: customSource.count)
     }
 }
 
@@ -252,9 +245,8 @@ final class NoDepsVM {
 @ViewModel
 final class NoActionVM {
     struct State: Equatable {
-        @Bound(\NoActionVM.source) var count = 0
+        @Bound(\NoActionVM.source.count) var count: Int
     }
-    var state = State()
     let source: RuntimeSource
 }
 

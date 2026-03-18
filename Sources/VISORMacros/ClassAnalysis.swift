@@ -36,8 +36,10 @@ struct StoredProperty {
 // MARK: - BoundPropertyInfo
 
 struct BoundPropertyInfo {
-  let propertyName: String
-  let dependencyName: String
+  let propertyName: String       // State var name
+  let dependencyName: String     // First keypath component (for dependency validation)
+  let sourceExpression: String   // Full dot-path for observation (e.g. "profileService.isLoggedIn")
+  let hasDefault: Bool           // Whether the State property has a default value
 }
 
 // MARK: - ReactionMethodInfo
@@ -62,7 +64,7 @@ struct ClassAnalysis {
   var hasInitializer = false
   // v2: State/Action detection
   var hasStateStruct = false
-  var stateHasDefaultInit = true
+  var nonBoundPropertiesLackDefaults = false
   var hasStateProperty = false
   var statePropertyMissingInitializer = false
   var hasActionEnum = false
@@ -221,19 +223,19 @@ struct ClassAnalysis {
         continue
       }
 
-      // Check if any stored property lacks a default value (affects auto-generated State())
-      if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
-        for binding in varDecl.bindings where binding.accessorBlock == nil {
-          if binding.initializer == nil {
-            stateHasDefaultInit = false
+      let hasBoundAttr = varDecl.attributes.lazy
+        .compactMap({ $0.as(AttributeSyntax.self) })
+        .contains(where: { $0.attributeName.trimmedDescription == AttributeName.bound })
+
+      // Non-bound stored properties without defaults prevent State() auto-init
+      if !hasBoundAttr {
+        if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
+          for binding in varDecl.bindings where binding.accessorBlock == nil {
+            if binding.initializer == nil {
+              nonBoundPropertiesLackDefaults = true
+            }
           }
         }
-      }
-
-      guard let boundAttr = varDecl.attributes.lazy
-        .compactMap({ $0.as(AttributeSyntax.self) })
-        .first(where: { $0.attributeName.trimmedDescription == AttributeName.bound })
-      else {
         continue
       }
 
@@ -250,17 +252,34 @@ struct ClassAnalysis {
         continue
       }
 
-      // Try to parse the key-path argument (must be single-level: \ClassName.dep)
-      if let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
-         let firstArg = arguments.first,
-         let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self),
-         keyPathExpr.components.count == 1,
-         let firstComponent = keyPathExpr.components.first,
-         case .property(let property) = firstComponent.component
-      {
+      let hasDefault = binding.initializer != nil
+
+      // Parse the key-path argument (must be multi-level: \ClassName.dep.property[.nested...])
+      guard
+        let boundAttr = varDecl.attributes.lazy
+          .compactMap({ $0.as(AttributeSyntax.self) })
+          .first(where: { $0.attributeName.trimmedDescription == AttributeName.bound }),
+        let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
+        let firstArg = arguments.first,
+        let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self)
+      else {
+        malformedStateBoundAttributes.append(identifier.identifier.text)
+        continue
+      }
+
+      let components = keyPathExpr.components.compactMap { component -> String? in
+        if case .property(let property) = component.component {
+          return property.declName.baseName.text
+        }
+        return nil
+      }
+
+      if components.count >= 2 {
         stateBoundProperties.append(BoundPropertyInfo(
           propertyName: identifier.identifier.text,
-          dependencyName: property.declName.baseName.text))
+          dependencyName: components[0],
+          sourceExpression: components.joined(separator: "."),
+          hasDefault: hasDefault))
       } else {
         malformedStateBoundAttributes.append(identifier.identifier.text)
       }

@@ -45,53 +45,12 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     let properties = analysis.storedLetProperties
     var members: [DeclSyntax] = []
 
-    // 1. Generate memberwise init (if none exists)
-    if !analysis.hasInitializer {
-      if !properties.isEmpty {
-        let params = properties.map { "\($0.name): \($0.type)" }.joined(separator: ", ")
-        let assignments = properties.map { "self.\($0.name) = \($0.name)" }.joined(separator: "\n    ")
-
-        let initDecl: DeclSyntax = """
-          \(raw: prefix)init(\(raw: params)) {
-              \(raw: assignments)
-          }
-          """
-        members.append(initDecl)
-      }
-    }
-
-    // 2. Generate Factory typealias
-    let typealiasDecl: DeclSyntax = """
-      \(raw: prefix)typealias Factory = ViewModelFactory<\(raw: className)>
-      """
-    members.append(typealiasDecl)
-
-    // 3. State/Action diagnostics
+    // 1. State/Action diagnostics (early — before init generation)
     if !analysis.hasStateStruct {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.missingState))
       return []
-    }
-
-    if analysis.statePropertyMissingInitializer {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.statePropertyMissingInitializer))
-      return []
-    }
-
-    if !analysis.hasStateProperty {
-      if !analysis.stateHasDefaultInit {
-        context.diagnose(Diagnostic(
-          node: Syntax(declaration),
-          message: VISORDiagnostic.stateNotDefaultInitializable))
-        return []
-      }
-      let stateDecl: DeclSyntax = """
-        var state = State()
-        """
-      members.append(stateDecl)
     }
 
     if analysis.hasActionEnum && !analysis.hasHandleMethod {
@@ -106,17 +65,14 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.handleWrongLabel))
     }
 
-    // 4. @Bound on let inside State
+    // 2. @Bound on let inside State
     for name in analysis.boundOnLetProperties {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.boundOnLetProperty(propertyName: name)))
     }
 
-    var allObserveMethodNames: [String] = []
-    allObserveMethodNames.reserveCapacity(analysis.stateBoundProperties.count + analysis.reactionMethods.count)
-
-    // 6. Generate observe methods from @Bound properties inside State
+    // 3. Validate @Bound properties
     let boundProps = analysis.stateBoundProperties
     let storedLetNames = Set(properties.map(\.name))
     var validBounds: [BoundPropertyInfo] = []
@@ -132,21 +88,93 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 6a. Diagnose malformed @Bound key paths inside State
     for propertyName in analysis.malformedStateBoundAttributes {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName, className: className)))
     }
 
-    // Generate observe methods for each @Bound property (using updateState)
+    // 4. Error if any @Bound property has a default value
+    for prop in validBounds where prop.hasDefault {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.boundPropertyHasDefault(propertyName: prop.propertyName)))
+    }
+
+    // 5. Generate `var state` if not declared by user
+    if !analysis.hasStateProperty {
+      if !validBounds.isEmpty {
+        // @Observable won't track macro-generated stored vars. Generate manual
+        // observation accessors that call access/withMutation (provided by @Observable).
+        let backingDecl: DeclSyntax = "private var _state: State"
+        let computedDecl: DeclSyntax = """
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+          """
+        members.append(backingDecl)
+        members.append(computedDecl)
+      } else if analysis.nonBoundPropertiesLackDefaults {
+        context.diagnose(Diagnostic(
+          node: Syntax(declaration),
+          message: VISORDiagnostic.stateNotDefaultInitializable))
+        return []
+      } else {
+        let stateDecl: DeclSyntax = """
+          var state = State()
+          """
+        members.append(stateDecl)
+      }
+    } else if analysis.statePropertyMissingInitializer && validBounds.isEmpty {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.statePropertyMissingInitializer))
+      return []
+    }
+
+    // 6. Generate memberwise init (if none exists)
+    if !analysis.hasInitializer {
+      if !properties.isEmpty || !validBounds.isEmpty {
+        let params = properties.map { "\($0.name): \($0.type)" }.joined(separator: ", ")
+        var assignments = properties.map { "self.\($0.name) = \($0.name)" }
+
+        if !validBounds.isEmpty {
+          let stateArgs = validBounds.map { prop in
+            "\(prop.propertyName): \(prop.sourceExpression)"
+          }.joined(separator: ", ")
+          // Use _state directly to avoid triggering observation during init
+          let stateTarget = analysis.hasStateProperty ? "self.state" : "self._state"
+          assignments.append("\(stateTarget) = State(\(stateArgs))")
+        }
+
+        let body = assignments.joined(separator: "\n        ")
+        let initDecl: DeclSyntax = """
+          \(raw: prefix)init(\(raw: params)) {
+              \(raw: body)
+          }
+          """
+        members.append(initDecl)
+      }
+    }
+
+    // 6. Generate Factory typealias
+    let typealiasDecl: DeclSyntax = """
+      \(raw: prefix)typealias Factory = ViewModelFactory<\(raw: className)>
+      """
+    members.append(typealiasDecl)
+
+    // 7. Generate observe methods from @Bound properties inside State
+    var allObserveMethodNames: [String] = []
+    allObserveMethodNames.reserveCapacity(validBounds.count + analysis.reactionMethods.count)
+
     for prop in validBounds {
       let methodName = "observe\(prop.propertyName.capitalizedFirst)"
       allObserveMethodNames.append(methodName)
       let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax = """
         func \(raw: methodName)() async {
-            for await value in VISOR.valuesOf({ self.\(raw: prop.dependencyName).\(raw: prop.propertyName) }) {
+            for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
                 self.updateState(\(raw: keyPath), to: value)
             }
         }
@@ -154,14 +182,13 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       members.append(observeMethod)
     }
 
-    // 6b. Diagnose invalid @Reaction methods
+    // 8. Diagnose invalid @Reaction methods
     for methodName in analysis.invalidReactionMethods {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.invalidReactionParameter(methodName: methodName)))
     }
 
-    // 6c. Diagnose malformed @Reaction key paths
     for methodName in analysis.malformedReactionKeyPaths {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
@@ -193,10 +220,9 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 7. Generate startObserving() or warn about missing calls in manual implementation
+    // 9. Generate startObserving() or warn about missing calls in manual implementation
     if !allObserveMethodNames.isEmpty {
       if analysis.hasStartObserving {
-        // Warn for each generated method not referenced in the manual body
         let body = analysis.startObservingBodyText ?? ""
         for methodName in allObserveMethodNames {
           if !body.contains(methodName) {

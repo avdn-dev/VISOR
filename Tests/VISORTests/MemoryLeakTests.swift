@@ -39,9 +39,8 @@ final class ManualLeakVM: ViewModel {
 @ViewModel
 final class LeakSingleBoundVM {
     struct State: Equatable {
-        @Bound(\LeakSingleBoundVM.source) var count = 0
+        @Bound(\LeakSingleBoundVM.source.count) var count: Int
     }
-    var state = State()
     let source: LeakSource
 }
 
@@ -50,10 +49,9 @@ final class LeakSingleBoundVM {
 @ViewModel
 final class LeakMultiBoundVM {
     struct State: Equatable {
-        @Bound(\LeakMultiBoundVM.source) var count = 0
-        @Bound(\LeakMultiBoundVM.source) var label = ""
+        @Bound(\LeakMultiBoundVM.source.count) var count: Int
+        @Bound(\LeakMultiBoundVM.source.label) var label: String
     }
-    var state = State()
     let source: LeakSource
 }
 
@@ -96,10 +94,9 @@ final class LeakAsyncReactionVM {
 @ViewModel
 final class LeakCombinedVM {
     struct State: Equatable {
-        @Bound(\LeakCombinedVM.source) var count = 0
+        @Bound(\LeakCombinedVM.source.count) var count: Int
         var lastNav: String? = nil
     }
-    var state = State()
     let source: LeakSource
 
     @Reaction(\LeakCombinedVM.source.destination)

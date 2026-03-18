@@ -306,9 +306,8 @@ struct ViewModelMacroTests {
       @ViewModel
       public final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service) var isLoading = false
+          @Bound(\\.service.isLoading) var isLoading: Bool
         }
-        var state = State()
         private let service: MyService
       }
       """,
@@ -316,13 +315,20 @@ struct ViewModelMacroTests {
       @Observable
       public final class MyViewModel {
         struct State: Equatable {
-          var isLoading = false
+          var isLoading: Bool
         }
-        var state = State()
         private let service: MyService
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
 
           public init(service: MyService) {
               self.service = service
+              self._state = State(isLoading: service.isLoading)
           }
 
           public typealias Factory = ViewModelFactory<MyViewModel>
@@ -377,22 +383,28 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.permissionService) var isCameraDenied = false
+          @Bound(\\.permissionService.isCameraDenied) var isCameraDenied: Bool
         }
-        var state = State()
         private let permissionService: PermissionService
       }
       """,
       expandedSource: """
       final class MyViewModel {
         struct State: Equatable {
-          var isCameraDenied = false
+          var isCameraDenied: Bool
         }
-        var state = State()
         private let permissionService: PermissionService
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
 
           init(permissionService: PermissionService) {
               self.permissionService = permissionService
+              self._state = State(isCameraDenied: permissionService.isCameraDenied)
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
@@ -422,26 +434,32 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.connectionService) var isAuthenticated = false
-          @Bound(\\.connectionService) var isLoading = false
-          @Bound(\\.connectionService) var connections: [Connection] = []
+          @Bound(\\.connectionService.isAuthenticated) var isAuthenticated: Bool
+          @Bound(\\.connectionService.isLoading) var isLoading: Bool
+          @Bound(\\.connectionService.connections) var connections: [Connection]
         }
-        var state = State()
         private let connectionService: ConnectionService
       }
       """,
       expandedSource: """
       final class MyViewModel {
         struct State: Equatable {
-          var isAuthenticated = false
-          var isLoading = false
-          var connections: [Connection] = []
+          var isAuthenticated: Bool
+          var isLoading: Bool
+          var connections: [Connection]
         }
-        var state = State()
         private let connectionService: ConnectionService
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
 
           init(connectionService: ConnectionService) {
               self.connectionService = connectionService
+              self._state = State(isAuthenticated: connectionService.isAuthenticated, isLoading: connectionService.isLoading, connections: connectionService.connections)
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
@@ -487,11 +505,10 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.widgetService) var selectedId = ""
-          @Bound(\\.connectionService) var connections: [Connection] = []
-          @Bound(\\.sharingService) var isSending = false
+          @Bound(\\.widgetService.selectedId) var selectedId: String
+          @Bound(\\.connectionService.connections) var connections: [Connection]
+          @Bound(\\.sharingService.isSending) var isSending: Bool
         }
-        var state = State()
         private let widgetService: WidgetService
         private let connectionService: ConnectionService
         private let sharingService: SharingService
@@ -500,19 +517,26 @@ struct ViewModelMacroTests {
       expandedSource: """
       final class MyViewModel {
         struct State: Equatable {
-          var selectedId = ""
-          var connections: [Connection] = []
-          var isSending = false
+          var selectedId: String
+          var connections: [Connection]
+          var isSending: Bool
         }
-        var state = State()
         private let widgetService: WidgetService
         private let connectionService: ConnectionService
         private let sharingService: SharingService
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
 
           init(widgetService: WidgetService, connectionService: ConnectionService, sharingService: SharingService) {
               self.widgetService = widgetService
               self.connectionService = connectionService
               self.sharingService = sharingService
+              self._state = State(selectedId: widgetService.selectedId, connections: connectionService.connections, isSending: sharingService.isSending)
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
@@ -558,7 +582,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.typoService) var value = false
+          @Bound(\\.typoService.value) var value = false
         }
         var state = State()
         private let service: MyService
@@ -622,7 +646,45 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound on 'value': expected key path argument like \MyViewModel.dependencyName"#, line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Bound on 'value': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Bound with single-component key path emits warning`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Bound(\\.service) var value = false
+        }
+        var state = State()
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var value = false
+        }
+        var state = State()
+        private let service: MyService
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Bound on 'value': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -634,7 +696,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service) let value = false
+          @Bound(\\.service.value) let value = false
         }
         var state = State()
         private let service: MyService
@@ -665,17 +727,17 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - @Bound on class-level var (caught by BoundMacro)
+  // MARK: - @Bound on class-level var (BoundMacro is a no-op; @ViewModel ignores it)
 
   @Test
-  func `@Bound on class-level var emits error`() {
+  func `@Bound on class-level var is ignored`() {
     assertMacroExpansion(
       """
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Bound(\\.service) var value = false
+        @Bound(\\.service.value) var value = false
         private let service: MyService
       }
       """,
@@ -698,7 +760,6 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .error),
-        DiagnosticSpec(message: "@Bound must be inside 'struct State' — move to the corresponding State property", line: 5, column: 3, severity: .error),
       ],
       macros: testMacros)
   }
@@ -1173,9 +1234,8 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service) var isLoading = false
+          @Bound(\\.service.isLoading) var isLoading: Bool
         }
-        var state = State()
         @Reaction(\\.router.pendingDestination)
         func handleDeepLink(destination: Destination?) { }
         private let service: MyService
@@ -1185,16 +1245,23 @@ struct ViewModelMacroTests {
       expandedSource: """
       final class MyViewModel {
         struct State: Equatable {
-          var isLoading = false
+          var isLoading: Bool
         }
-        var state = State()
         func handleDeepLink(destination: Destination?) { }
         private let service: MyService
         private let router: DeepLinkRouter
 
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
           init(service: MyService, router: DeepLinkRouter) {
               self.service = service
               self.router = router
+              self._state = State(isLoading: service.isLoading)
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
@@ -1388,9 +1455,8 @@ struct ViewModelMacroTests {
       @ViewModel
       final class ItemsViewModel {
         struct State: Equatable {
-          @Bound(\\.service) var items: [String] = []
+          @Bound(\\.service.items) var items: [String]
         }
-        var state = State()
         func startObserving() async {
           // forgot to call observeItems
         }
@@ -1401,16 +1467,23 @@ struct ViewModelMacroTests {
       @Observable
       final class ItemsViewModel {
         struct State: Equatable {
-          var items: [String] = []
+          var items: [String]
         }
-        var state = State()
         func startObserving() async {
           // forgot to call observeItems
         }
         private let service: MyService
 
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
           init(service: MyService) {
               self.service = service
+              self._state = State(items: service.items)
           }
 
           typealias Factory = ViewModelFactory<ItemsViewModel>
@@ -1534,9 +1607,8 @@ struct ViewModelMacroTests {
       @ViewModel
       final class ItemsViewModel {
         struct State: Equatable {
-          @Bound(\\.service) var items: [String] = []
+          @Bound(\\.service.items) var items: [String]
         }
-        var state = State()
         func startObserving() async {
           await observeItems()
         }
@@ -1547,16 +1619,23 @@ struct ViewModelMacroTests {
       @Observable
       final class ItemsViewModel {
         struct State: Equatable {
-          var items: [String] = []
+          var items: [String]
         }
-        var state = State()
         func startObserving() async {
           await observeItems()
         }
         private let service: MyService
 
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
           init(service: MyService) {
               self.service = service
+              self._state = State(items: service.items)
           }
 
           typealias Factory = ViewModelFactory<ItemsViewModel>
