@@ -307,7 +307,7 @@ struct ViewModelMacroTests {
       @ViewModel
       public final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service.isLoading) var isLoading: Bool
+          @Bound(\\MyViewModel.service.isLoading) var isLoading: Bool
         }
         private let service: MyService
       }
@@ -384,7 +384,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.permissionService.isCameraDenied) var isCameraDenied: Bool
+          @Bound(\\MyViewModel.permissionService.isCameraDenied) var isCameraDenied: Bool
         }
         private let permissionService: PermissionService
       }
@@ -435,9 +435,9 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.connectionService.isAuthenticated) var isAuthenticated: Bool
-          @Bound(\\.connectionService.isLoading) var isLoading: Bool
-          @Bound(\\.connectionService.connections) var connections: [Connection]
+          @Bound(\\MyViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
+          @Bound(\\MyViewModel.connectionService.isLoading) var isLoading: Bool
+          @Bound(\\MyViewModel.connectionService.connections) var connections: [Connection]
         }
         private let connectionService: ConnectionService
       }
@@ -506,9 +506,9 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.widgetService.selectedId) var selectedId: String
-          @Bound(\\.connectionService.connections) var connections: [Connection]
-          @Bound(\\.sharingService.isSending) var isSending: Bool
+          @Bound(\\MyViewModel.widgetService.selectedId) var selectedId: String
+          @Bound(\\MyViewModel.connectionService.connections) var connections: [Connection]
+          @Bound(\\MyViewModel.sharingService.isSending) var isSending: Bool
         }
         private let widgetService: WidgetService
         private let connectionService: ConnectionService
@@ -583,7 +583,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.typoService.value) var value = false
+          @Bound(\\MyViewModel.typoService.value) var value = false
         }
         var state = State()
         private let service: MyService
@@ -659,7 +659,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service) var value = false
+          @Bound(\\MyViewModel.service) var value = false
         }
         var state = State()
         private let service: MyService
@@ -697,7 +697,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service.value) let value = false
+          @Bound(\\MyViewModel.service.value) let value = false
         }
         var state = State()
         private let service: MyService
@@ -738,7 +738,7 @@ struct ViewModelMacroTests {
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Bound(\\.service.value) var value = false
+        @Bound(\\MyViewModel.service.value) var value = false
         private let service: MyService
       }
       """,
@@ -1235,7 +1235,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Bound(\\.service.isLoading) var isLoading: Bool
+          @Bound(\\MyViewModel.service.isLoading) var isLoading: Bool
         }
         @Reaction(\\.router.pendingDestination)
         func handleDeepLink(destination: Destination?) { }
@@ -1456,7 +1456,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class ItemsViewModel {
         struct State: Equatable {
-          @Bound(\\.service.items) var items: [String]
+          @Bound(\\ItemsViewModel.service.items) var items: [String]
         }
         func startObserving() async {
           // forgot to call observeItems
@@ -1608,7 +1608,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class ItemsViewModel {
         struct State: Equatable {
-          @Bound(\\.service.items) var items: [String]
+          @Bound(\\ItemsViewModel.service.items) var items: [String]
         }
         func startObserving() async {
           await observeItems()
@@ -1663,7 +1663,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class DashboardVM {
         struct State: Equatable {
-          @Polled(\\.monitor.level, every: .seconds(30)) var level: Float
+          @Polled(\\DashboardVM.monitor.level, every: .seconds(30)) var level: Float
         }
         private let monitor: BatteryMonitor
       }
@@ -1719,8 +1719,8 @@ struct ViewModelMacroTests {
       @ViewModel
       final class SensorVM {
         struct State: Equatable {
-          @Polled(\\.monitor.level, every: .seconds(30)) var level: Float
-          @Polled(\\.monitor.temperature, every: .seconds(10)) var temperature: Double
+          @Polled(\\SensorVM.monitor.level, every: .seconds(30)) var level: Float
+          @Polled(\\SensorVM.monitor.temperature, every: .seconds(10)) var temperature: Double
         }
         private let monitor: SensorMonitor
       }
@@ -1791,9 +1791,9 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MixedVM {
         struct State: Equatable {
-          @Bound(\\.service.name) var name: String
-          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float
-          @Bound(\\.service.count) var count: Int
+          @Bound(\\MixedVM.service.name) var name: String
+          @Polled(\\MixedVM.monitor.level, every: .seconds(5)) var level: Float
+          @Bound(\\MixedVM.service.count) var count: Int
         }
         private let service: MyService
         private let monitor: BatteryMonitor
@@ -1870,7 +1870,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Polled(\\.typoMonitor.level, every: .seconds(5)) var level = 0.0
+          @Polled(\\MyViewModel.typoMonitor.level, every: .seconds(5)) var level = 0.0
         }
         var state = State()
         private let monitor: BatteryMonitor
@@ -1946,7 +1946,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Polled(\\.monitor.level, every: .seconds(5)) let level = 0.0
+          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) let level = 0.0
         }
         var state = State()
         private let monitor: BatteryMonitor
@@ -1984,7 +1984,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float = 0.5
+          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) var level: Float = 0.5
         }
         private let monitor: BatteryMonitor
       }
@@ -2043,7 +2043,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Polled(\\.monitor.level) var level = 0.0
+          @Polled(\\MyViewModel.monitor.level) var level = 0.0
         }
         var state = State()
         private let monitor: BatteryMonitor
@@ -2081,7 +2081,7 @@ struct ViewModelMacroTests {
       @ViewModel
       final class MyViewModel {
         struct State: Equatable {
-          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float
+          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) var level: Float
         }
         private let monitor: BatteryMonitor
 
@@ -2136,5 +2136,6 @@ struct ViewModelMacroTests {
       ],
       macros: testMacros)
   }
+
 }
 #endif
