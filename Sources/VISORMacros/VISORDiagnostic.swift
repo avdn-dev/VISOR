@@ -31,6 +31,11 @@ enum VISORDiagnostic: DiagnosticMessage {
   case handleWrongLabel
   case boundOnLetProperty(propertyName: String)
   case boundPropertyHasDefault(propertyName: String)
+  case invalidPolledDependency(name: String, propertyName: String)
+  case malformedPolledKeyPath(propertyName: String, className: String)
+  case polledOnLetProperty(propertyName: String)
+  case polledPropertyHasDefault(propertyName: String)
+  case polledMissingInterval(propertyName: String)
   case invalidObservationPolicy
 
   // MARK: Internal
@@ -79,6 +84,16 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Bound on '\(name)': use 'var' instead of 'let' — bound properties must be mutable"
     case .boundPropertyHasDefault(let propertyName):
       "@Bound on '\(propertyName)': remove the default value — state is initialized from the service"
+    case .invalidPolledDependency(let name, let propertyName):
+      "@Polled(\\.\(name)) on '\(propertyName)': no stored 'let \(name)' found on this class"
+    case .malformedPolledKeyPath(let propertyName, let className):
+      "@Polled on '\(propertyName)': expected key path like \\\(className).dependency.property"
+    case .polledOnLetProperty(let name):
+      "@Polled on '\(name)': use 'var' instead of 'let' — polled properties must be mutable"
+    case .polledPropertyHasDefault(let propertyName):
+      "@Polled on '\(propertyName)': remove the default value — state is initialized from the service"
+    case .polledMissingInterval(let propertyName):
+      "@Polled on '\(propertyName)': missing 'every:' interval parameter"
     case .invalidObservationPolicy:
       "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     }
@@ -107,6 +122,11 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .handleWrongLabel: "handleWrongLabel"
     case .boundOnLetProperty: "boundOnLetProperty"
     case .boundPropertyHasDefault: "boundPropertyHasDefault"
+    case .invalidPolledDependency: "invalidPolledDependency"
+    case .malformedPolledKeyPath: "malformedPolledKeyPath"
+    case .polledOnLetProperty: "polledOnLetProperty"
+    case .polledPropertyHasDefault: "polledPropertyHasDefault"
+    case .polledMissingInterval: "polledMissingInterval"
     case .invalidObservationPolicy: "invalidObservationPolicy"
     }
     return MessageID(domain: "VISOR", id: id)
@@ -115,13 +135,15 @@ enum VISORDiagnostic: DiagnosticMessage {
   var severity: DiagnosticSeverity {
     switch self {
     case .malformedBoundKeyPath, .manualStartObservingMissingMethod,
-         .boundOnLetProperty, .malformedReactionKeyPath:
+         .boundOnLetProperty, .malformedReactionKeyPath,
+         .malformedPolledKeyPath, .polledOnLetProperty:
       .warning
     case .missingObservable, .boundOutsideState, .reactionNotOnMethod, .reactionInsideNestedType,
          .missingContent, .notAClass, .notAStruct, .missingArguments, .missingSelfSuffix,
          .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
          .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
          .invalidReactionParameter, .boundPropertyHasDefault,
+         .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
          .invalidObservationPolicy:
       .error
     }

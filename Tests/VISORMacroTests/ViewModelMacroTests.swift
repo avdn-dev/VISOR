@@ -14,6 +14,7 @@ import VISORMacros
 
 private let testMacros: [String: Macro.Type] = [
   "Bound": BoundMacro.self,
+  "Polled": PolledMacro.self,
   "Reaction": ReactionMacro.self,
   "ViewModel": ViewModelMacro.self,
 ]
@@ -1650,6 +1651,489 @@ struct ViewModelMacroTests {
       extension ItemsViewModel: @MainActor ViewModel {
       }
       """,
+      macros: testMacros)
+  }
+
+  // MARK: - @Polled inside State
+
+  @Test
+  func `Single @Polled generates inlined poll loop`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class DashboardVM {
+        struct State: Equatable {
+          @Polled(\\.monitor.level, every: .seconds(30)) var level: Float
+        }
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class DashboardVM {
+        struct State: Equatable {
+          var level: Float
+        }
+        private let monitor: BatteryMonitor
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+              self._state = State(level: monitor.level)
+          }
+
+          typealias Factory = ViewModelFactory<DashboardVM>
+
+          func observeLevel() async {
+              self.updateState(\\.level, to: self.monitor.level)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(30))
+                      self.updateState(\\.level, to: self.monitor.level)
+                  }
+              } catch {
+              }
+          }
+
+          func startObserving() async {
+              await observeLevel()
+          }
+      }
+
+      extension DashboardVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Multiple @Polled generates task group startObserving`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class SensorVM {
+        struct State: Equatable {
+          @Polled(\\.monitor.level, every: .seconds(30)) var level: Float
+          @Polled(\\.monitor.temperature, every: .seconds(10)) var temperature: Double
+        }
+        private let monitor: SensorMonitor
+      }
+      """,
+      expandedSource: """
+      final class SensorVM {
+        struct State: Equatable {
+          var level: Float
+          var temperature: Double
+        }
+        private let monitor: SensorMonitor
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(monitor: SensorMonitor) {
+              self.monitor = monitor
+              self._state = State(level: monitor.level, temperature: monitor.temperature)
+          }
+
+          typealias Factory = ViewModelFactory<SensorVM>
+
+          func observeLevel() async {
+              self.updateState(\\.level, to: self.monitor.level)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(30))
+                      self.updateState(\\.level, to: self.monitor.level)
+                  }
+              } catch {
+              }
+          }
+
+          func observeTemperature() async {
+              self.updateState(\\.temperature, to: self.monitor.temperature)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(10))
+                      self.updateState(\\.temperature, to: self.monitor.temperature)
+                  }
+              } catch {
+              }
+          }
+
+          func startObserving() async {
+              await withDiscardingTaskGroup { group in
+                  group.addTask { await self.observeLevel() }
+                  group.addTask { await self.observeTemperature() }
+              }
+          }
+      }
+
+      extension SensorVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Mixed @Bound and @Polled preserves declaration order in init`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MixedVM {
+        struct State: Equatable {
+          @Bound(\\.service.name) var name: String
+          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float
+          @Bound(\\.service.count) var count: Int
+        }
+        private let service: MyService
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MixedVM {
+        struct State: Equatable {
+          var name: String
+          var level: Float
+          var count: Int
+        }
+        private let service: MyService
+        private let monitor: BatteryMonitor
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(service: MyService, monitor: BatteryMonitor) {
+              self.service = service
+              self.monitor = monitor
+              self._state = State(name: service.name, level: monitor.level, count: service.count)
+          }
+
+          typealias Factory = ViewModelFactory<MixedVM>
+
+          func observeName() async {
+              for await value in VISOR.valuesOf({ self.service.name }) {
+                  self.updateState(\\.name, to: value)
+              }
+          }
+
+          func observeCount() async {
+              for await value in VISOR.valuesOf({ self.service.count }) {
+                  self.updateState(\\.count, to: value)
+              }
+          }
+
+          func observeLevel() async {
+              self.updateState(\\.level, to: self.monitor.level)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(5))
+                      self.updateState(\\.level, to: self.monitor.level)
+                  }
+              } catch {
+              }
+          }
+
+          func startObserving() async {
+              await withDiscardingTaskGroup { group in
+                  group.addTask { await self.observeName() }
+                  group.addTask { await self.observeCount() }
+                  group.addTask { await self.observeLevel() }
+              }
+          }
+      }
+
+      extension MixedVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Polled with invalid dependency emits error`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled(\\.typoMonitor.level, every: .seconds(5)) var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Polled(\.typoMonitor) on 'level': no stored 'let typoMonitor' found on this class"#, line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Polled with malformed key path emits warning`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled("invalid", every: .seconds(5)) var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: #"@Polled on 'level': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Polled on let emits warning`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled(\\.monitor.level, every: .seconds(5)) let level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          let level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@Polled on 'level': use 'var' instead of 'let' — polled properties must be mutable", line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Polled with default value emits error`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float = 0.5
+        }
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var level: Float = 0.5
+        }
+        private let monitor: BatteryMonitor
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+              self._state = State(level: monitor.level)
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeLevel() async {
+              self.updateState(\\.level, to: self.monitor.level)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(5))
+                      self.updateState(\\.level, to: self.monitor.level)
+                  }
+              } catch {
+              }
+          }
+
+          func startObserving() async {
+              await observeLevel()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@Polled on 'level': remove the default value — state is initialized from the service", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `@Polled missing interval emits error`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled(\\.monitor.level) var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var level = 0.0
+        }
+        var state = State()
+        private let monitor: BatteryMonitor
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@Polled on 'level': missing 'every:' interval parameter", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Manual startObserving warns for missing @Polled observe call`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        struct State: Equatable {
+          @Polled(\\.monitor.level, every: .seconds(5)) var level: Float
+        }
+        private let monitor: BatteryMonitor
+
+        func startObserving() async {
+          // Forgot to call observeLevel()
+        }
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        struct State: Equatable {
+          var level: Float
+        }
+        private let monitor: BatteryMonitor
+
+        func startObserving() async {
+          // Forgot to call observeLevel()
+        }
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(monitor: BatteryMonitor) {
+              self.monitor = monitor
+              self._state = State(level: monitor.level)
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeLevel() async {
+              self.updateState(\\.level, to: self.monitor.level)
+              do {
+                  while !Task.isCancelled {
+                      try await Task.sleep(for: .seconds(5))
+                      self.updateState(\\.level, to: self.monitor.level)
+                  }
+              } catch {
+              }
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "startObserving() does not call observeLevel(); state derivation will not run", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 }

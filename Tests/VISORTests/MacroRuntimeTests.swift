@@ -329,6 +329,128 @@ struct ViewModelMacroRuntimeTests {
         }
     }
 
+    // MARK: - @Polled
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Single @Polled seeds initial value at init`() {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+        let vm = PolledSingleVM(monitor: monitor)
+        #expect(vm.state.level == 0.5)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Polled updates state after poll interval`() async {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+        let vm = PolledSingleVM(monitor: monitor)
+
+        await observing(vm) { expect in
+            monitor.level = 0.8
+            await expect(\.state.level, equals: 0.8)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Polled catches value changed between init and startObserving`() async throws {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+        let vm = PolledSingleVM(monitor: monitor)
+        #expect(vm.state.level == 0.5)
+
+        // Value changes AFTER init but BEFORE startObserving
+        monitor.level = 0.9
+
+        await observing(vm) { expect in
+            // The initial updateState in the generated observe method should catch this
+            await expect(\.state.level, equals: 0.9)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Polled stops updating after cancellation`() async throws {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+        let vm = PolledSingleVM(monitor: monitor)
+
+        let task = Task { await vm.startObserving() }
+        // Wait for initial updateState + at least one poll cycle
+        monitor.level = 0.8
+        // Use valuesOf on the state to wait for the update
+        for await level in valuesOf({ vm.state.level }) {
+            if level == 0.8 { break }
+        }
+
+        task.cancel()
+        try await yieldForTracking()
+
+        // After cancellation, further changes should NOT propagate
+        monitor.level = 1.0
+        // Wait longer than the poll interval (50ms)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(vm.state.level == 0.8)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Polled deduplicates equal values via updateState`() async throws {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+        let vm = PolledSingleVM(monitor: monitor)
+
+        var emissions: [Float] = []
+        let trackingTask = Task {
+            for await level in valuesOf({ vm.state.level }) {
+                emissions.append(level)
+                if emissions.count >= 3 { break }
+            }
+        }
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+
+        // Value stays 0.5 across multiple polls — no duplicate emissions
+        try await Task.sleep(for: .milliseconds(120))
+        let countBeforeChange = emissions.count
+        #expect(countBeforeChange == 1, "Only initial emission, no duplicates")
+
+        // Two distinct changes to collect remaining 2 emissions
+        monitor.level = 0.9
+        try await Task.sleep(for: .milliseconds(120))
+        monitor.level = 1.0
+
+        _ = await trackingTask.value
+        observeTask.cancel()
+
+        #expect(emissions == [0.5, 0.9, 1.0])
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Mixed @Bound and @Polled coexist`() async {
+        let source = RuntimeSource()
+        let monitor = BatteryMonitor()
+        monitor.level = 0.3
+        let vm = BoundAndPolledVM(source: source, monitor: monitor)
+
+        // Init seeds both @Bound and @Polled values
+        #expect(vm.state.count == 0)
+        #expect(vm.state.level == 0.3)
+        #expect(vm.state.label == "initial")
+
+        await observing(vm) { expect in
+            // @Bound update (push-based — immediate)
+            source.count = 10
+            await expect(\.state.count, equals: 10)
+
+            // @Polled update (pull-based — next poll cycle)
+            monitor.level = 0.9
+            await expect(\.state.level, equals: 0.9)
+
+            // @Bound still works after @Polled update
+            source.label = "changed"
+            await expect(\.state.label, equals: "changed")
+        }
+    }
+
     // MARK: - Loadable state transitions
 
     @Test(.timeLimit(.minutes(1)))

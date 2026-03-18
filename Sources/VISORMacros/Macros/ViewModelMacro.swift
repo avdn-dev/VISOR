@@ -72,6 +72,13 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.boundOnLetProperty(propertyName: name)))
     }
 
+    // 2b. @Polled on let inside State
+    for name in analysis.polledOnLetProperties {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.polledOnLetProperty(propertyName: name)))
+    }
+
     // 3. Validate @Bound properties
     let boundProps = analysis.stateBoundProperties
     let storedLetNames = Set(properties.map(\.name))
@@ -94,6 +101,33 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName, className: className)))
     }
 
+    // 3b. Validate @Polled properties
+    let polledProps = analysis.statePolledProperties
+    var validPolled: [PolledPropertyInfo] = []
+    for prop in polledProps {
+      if storedLetNames.contains(prop.dependencyName) {
+        validPolled.append(prop)
+      } else {
+        context.diagnose(Diagnostic(
+          node: Syntax(declaration),
+          message: VISORDiagnostic.invalidPolledDependency(
+            name: prop.dependencyName,
+            propertyName: prop.propertyName)))
+      }
+    }
+
+    for propertyName in analysis.malformedStatePolledAttributes {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.malformedPolledKeyPath(propertyName: propertyName, className: className)))
+    }
+
+    for propertyName in analysis.polledMissingInterval {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.polledMissingInterval(propertyName: propertyName)))
+    }
+
     // 4. Error if any @Bound property has a default value
     for prop in validBounds where prop.hasDefault {
       context.diagnose(Diagnostic(
@@ -101,9 +135,18 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.boundPropertyHasDefault(propertyName: prop.propertyName)))
     }
 
+    // 4b. Error if any @Polled property has a default value
+    for prop in validPolled where prop.hasDefault {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.polledPropertyHasDefault(propertyName: prop.propertyName)))
+    }
+
+    let hasServiceInitProps = !validBounds.isEmpty || !validPolled.isEmpty
+
     // 5. Generate `var state` if not declared by user
     if !analysis.hasStateProperty {
-      if !validBounds.isEmpty {
+      if hasServiceInitProps {
         // @Observable won't track macro-generated stored vars. Generate manual
         // observation accessors that call access/withMutation (provided by @Observable).
         let backingDecl: DeclSyntax = "private var _state: State"
@@ -126,7 +169,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
           """
         members.append(stateDecl)
       }
-    } else if analysis.statePropertyMissingInitializer && validBounds.isEmpty {
+    } else if analysis.statePropertyMissingInitializer && !hasServiceInitProps {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.statePropertyMissingInitializer))
@@ -135,17 +178,26 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // 6. Generate memberwise init (if none exists)
     if !analysis.hasInitializer {
-      if !properties.isEmpty || !validBounds.isEmpty {
+      if !properties.isEmpty || hasServiceInitProps {
         let params = properties.map { "\($0.name): \($0.type)" }.joined(separator: ", ")
         var assignments = properties.map { "self.\($0.name) = \($0.name)" }
 
-        if !validBounds.isEmpty {
-          let stateArgs = validBounds.map { prop in
-            "\(prop.propertyName): \(prop.sourceExpression)"
-          }.joined(separator: ", ")
+        if hasServiceInitProps {
+          // Merge @Bound and @Polled args, sorted by declaration order
+          let boundArgs: [(order: Int, arg: String)] = validBounds.map { prop in
+            (prop.declarationOrder, "\(prop.propertyName): \(prop.sourceExpression)")
+          }
+          let polledArgs: [(order: Int, arg: String)] = validPolled.map { prop in
+            (prop.declarationOrder, "\(prop.propertyName): \(prop.sourceExpression)")
+          }
+          let combinedArgs = (boundArgs + polledArgs)
+            .sorted(by: { $0.order < $1.order })
+            .map(\.arg)
+            .joined(separator: ", ")
+
           // Use _state directly to avoid triggering observation during init
           let stateTarget = analysis.hasStateProperty ? "self.state" : "self._state"
-          assignments.append("\(stateTarget) = State(\(stateArgs))")
+          assignments.append("\(stateTarget) = State(\(combinedArgs))")
         }
 
         let body = assignments.joined(separator: "\n        ")
@@ -158,15 +210,15 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    // 6. Generate Factory typealias
+    // 7. Generate Factory typealias
     let typealiasDecl: DeclSyntax = """
       \(raw: prefix)typealias Factory = ViewModelFactory<\(raw: className)>
       """
     members.append(typealiasDecl)
 
-    // 7. Generate observe methods from @Bound properties inside State
+    // 8. Generate observe methods from @Bound properties inside State
     var allObserveMethodNames: [String] = []
-    allObserveMethodNames.reserveCapacity(validBounds.count + analysis.reactionMethods.count)
+    allObserveMethodNames.reserveCapacity(validBounds.count + validPolled.count + analysis.reactionMethods.count)
 
     for prop in validBounds {
       let methodName = "observe\(prop.propertyName.capitalizedFirst)"
@@ -177,6 +229,29 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
             for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
                 self.updateState(\(raw: keyPath), to: value)
             }
+        }
+        """
+      members.append(observeMethod)
+    }
+
+    // 8b. Generate observe methods from @Polled properties inside State
+    //
+    // Inlines the poll loop directly instead of going through `polledValues` AsyncStream.
+    // This avoids: heap-allocated stream buffer, extra producer Task, continuation overhead,
+    // and redundant deduplication (updateState already deduplicates Equatable values).
+    for prop in validPolled {
+      let methodName = "observe\(prop.propertyName.capitalizedFirst)"
+      allObserveMethodNames.append(methodName)
+      let keyPath = "\\." + prop.propertyName
+      let observeMethod: DeclSyntax = """
+        func \(raw: methodName)() async {
+            self.updateState(\(raw: keyPath), to: self.\(raw: prop.sourceExpression))
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: \(raw: prop.intervalExpression))
+                    self.updateState(\(raw: keyPath), to: self.\(raw: prop.sourceExpression))
+                }
+            } catch {}
         }
         """
       members.append(observeMethod)

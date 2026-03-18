@@ -287,6 +287,39 @@ final class LoadableStatesVM {
     }
 }
 
+// MARK: - Non-observable polling source
+
+@MainActor
+final class BatteryMonitor {
+    var level: Float = 0.75
+    var isCharging: Bool = false
+}
+
+// MARK: 15. Single @Polled
+
+@Observable
+@ViewModel
+final class PolledSingleVM {
+    struct State: Equatable {
+        @Polled(\PolledSingleVM.monitor.level, every: .milliseconds(50)) var level: Float
+    }
+    let monitor: BatteryMonitor
+}
+
+// MARK: 16. Mixed @Bound + @Polled (interleaved declaration order)
+
+@Observable
+@ViewModel
+final class BoundAndPolledVM {
+    struct State: Equatable {
+        @Bound(\BoundAndPolledVM.source.count) var count: Int
+        @Polled(\BoundAndPolledVM.monitor.level, every: .milliseconds(50)) var level: Float
+        @Bound(\BoundAndPolledVM.source.label) var label: String
+    }
+    let source: RuntimeSource
+    let monitor: BatteryMonitor
+}
+
 // MARK: - Non-Equatable State VM
 
 

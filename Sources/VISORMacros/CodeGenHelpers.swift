@@ -11,6 +11,7 @@ import SwiftSyntax
 
 enum AttributeName {
   static let bound = "Bound"
+  static let polled = "Polled"
   static let reaction = "Reaction"
   static let stubbableDefault = "StubbableDefault"
   static let observable = "Observable"

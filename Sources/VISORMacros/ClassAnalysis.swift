@@ -40,6 +40,18 @@ struct BoundPropertyInfo {
   let dependencyName: String     // First keypath component (for dependency validation)
   let sourceExpression: String   // Full dot-path for observation (e.g. "profileService.isLoggedIn")
   let hasDefault: Bool           // Whether the State property has a default value
+  let declarationOrder: Int      // Position among @Bound/@Polled properties (for init arg ordering)
+}
+
+// MARK: - PolledPropertyInfo
+
+struct PolledPropertyInfo {
+  let propertyName: String       // State var name
+  let dependencyName: String     // First keypath component (for dependency validation)
+  let sourceExpression: String   // Full dot-path for reading (e.g. "batteryMonitor.level")
+  let intervalExpression: String // Duration expression (e.g. ".seconds(30)")
+  let hasDefault: Bool           // Whether the State property has a default value
+  let declarationOrder: Int      // Position among @Bound/@Polled properties (for init arg ordering)
 }
 
 // MARK: - ReactionMethodInfo
@@ -75,6 +87,12 @@ struct ClassAnalysis {
   var stateBoundProperties: [BoundPropertyInfo] = []
   var malformedStateBoundAttributes: [String] = []
   var boundOnLetProperties: [String] = []
+
+  // v2: @Polled inside State struct
+  var statePolledProperties: [PolledPropertyInfo] = []
+  var malformedStatePolledAttributes: [String] = []
+  var polledOnLetProperties: [String] = []
+  var polledMissingInterval: [String] = []
 
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
@@ -216,19 +234,27 @@ struct ClassAnalysis {
     }
   }
 
-  /// Scans the nested `struct State` for @Bound attributes and default-init eligibility.
+  /// Scans the nested `struct State` for @Bound/@Polled attributes and default-init eligibility.
   private mutating func scanStateStruct(_ structDecl: StructDeclSyntax) {
+    var declarationOrder = 0
+
     for member in structDecl.memberBlock.members {
       guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
         continue
       }
 
-      let hasBoundAttr = varDecl.attributes.lazy
-        .compactMap({ $0.as(AttributeSyntax.self) })
-        .contains(where: { $0.attributeName.trimmedDescription == AttributeName.bound })
+      // Single-pass attribute scan — find @Bound or @Polled in one iteration
+      var boundAttr: AttributeSyntax?
+      var polledAttr: AttributeSyntax?
+      for attr in varDecl.attributes {
+        guard let attrSyntax = attr.as(AttributeSyntax.self) else { continue }
+        let name = attrSyntax.attributeName.trimmedDescription
+        if name == AttributeName.bound { boundAttr = attrSyntax }
+        else if name == AttributeName.polled { polledAttr = attrSyntax }
+      }
 
-      // Non-bound stored properties without defaults prevent State() auto-init
-      if !hasBoundAttr {
+      // Non-bound/non-polled stored properties without defaults prevent State() auto-init
+      if boundAttr == nil && polledAttr == nil {
         if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
           for binding in varDecl.bindings where binding.accessorBlock == nil {
             if binding.initializer == nil {
@@ -247,41 +273,101 @@ struct ClassAnalysis {
       }
 
       let bindingKind = varDecl.bindingSpecifier.text
-      if bindingKind == "let" {
-        boundOnLetProperties.append(identifier.identifier.text)
-        continue
-      }
-
       let hasDefault = binding.initializer != nil
 
-      // Parse the key-path argument (must be multi-level: \ClassName.dep.property[.nested...])
-      guard
-        let boundAttr = varDecl.attributes.lazy
-          .compactMap({ $0.as(AttributeSyntax.self) })
-          .first(where: { $0.attributeName.trimmedDescription == AttributeName.bound }),
-        let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
-        let firstArg = arguments.first,
-        let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self)
-      else {
-        malformedStateBoundAttributes.append(identifier.identifier.text)
+      // Handle @Bound
+      if let boundAttr {
+        if bindingKind == "let" {
+          boundOnLetProperties.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+
+        guard
+          let arguments = boundAttr.arguments?.as(LabeledExprListSyntax.self),
+          let firstArg = arguments.first,
+          let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self)
+        else {
+          malformedStateBoundAttributes.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+
+        let components = keyPathExpr.components.compactMap { component -> String? in
+          if case .property(let property) = component.component {
+            return property.declName.baseName.text
+          }
+          return nil
+        }
+
+        if components.count >= 2 {
+          stateBoundProperties.append(BoundPropertyInfo(
+            propertyName: identifier.identifier.text,
+            dependencyName: components[0],
+            sourceExpression: components.joined(separator: "."),
+            hasDefault: hasDefault,
+            declarationOrder: declarationOrder))
+        } else {
+          malformedStateBoundAttributes.append(identifier.identifier.text)
+        }
+        declarationOrder += 1
         continue
       }
 
-      let components = keyPathExpr.components.compactMap { component -> String? in
-        if case .property(let property) = component.component {
-          return property.declName.baseName.text
+      // Handle @Polled
+      if let polledAttr {
+        if bindingKind == "let" {
+          polledOnLetProperties.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
         }
-        return nil
-      }
 
-      if components.count >= 2 {
-        stateBoundProperties.append(BoundPropertyInfo(
+        guard
+          let arguments = polledAttr.arguments?.as(LabeledExprListSyntax.self),
+          let firstArg = arguments.first,
+          let keyPathExpr = firstArg.expression.as(KeyPathExprSyntax.self)
+        else {
+          malformedStatePolledAttributes.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+
+        let components = keyPathExpr.components.compactMap { component -> String? in
+          if case .property(let property) = component.component {
+            return property.declName.baseName.text
+          }
+          return nil
+        }
+
+        guard components.count >= 2 else {
+          malformedStatePolledAttributes.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+
+        // Extract `every:` second argument
+        let secondIndex = arguments.index(after: arguments.startIndex)
+        guard secondIndex != arguments.endIndex else {
+          polledMissingInterval.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+        let secondArg = arguments[secondIndex]
+        guard secondArg.label?.text == "every" else {
+          polledMissingInterval.append(identifier.identifier.text)
+          declarationOrder += 1
+          continue
+        }
+        let intervalExpr = secondArg.expression.trimmedDescription
+
+        statePolledProperties.append(PolledPropertyInfo(
           propertyName: identifier.identifier.text,
           dependencyName: components[0],
           sourceExpression: components.joined(separator: "."),
-          hasDefault: hasDefault))
-      } else {
-        malformedStateBoundAttributes.append(identifier.identifier.text)
+          intervalExpression: intervalExpr,
+          hasDefault: hasDefault,
+          declarationOrder: declarationOrder))
+        declarationOrder += 1
       }
     }
   }

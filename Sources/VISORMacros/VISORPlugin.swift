@@ -15,6 +15,7 @@ struct VISORPlugin: CompilerPlugin {
   let providingMacros: [Macro.Type] = [
     BoundMacro.self,
     LazyViewModelMacro.self,
+    PolledMacro.self,
     ReactionMacro.self,
     ViewModelMacro.self,
     StubbableDefaultMacro.self,
