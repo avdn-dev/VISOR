@@ -23,8 +23,12 @@ import Observation
 ///
 /// - Note: `@Observable` is required for `@Environment` injection even though
 ///   stored properties are `@ObservationIgnored`.
-@Observable
+@MainActor @Observable
 public final class ViewModelFactory<VM: ViewModel> {
+  // Workaround: Swift 6.2 SIL EarlyPerfInliner crash with -default-isolation MainActor + -O.
+  // See Router.swift for details.
+  nonisolated deinit { }
+
   @ObservationIgnored private let _make: (AnyObject?) -> VM
 
   /// Create a factory that does not need a router.

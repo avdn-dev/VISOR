@@ -14,10 +14,16 @@ import SwiftUI
 ///
 /// Each NavigationContainer creates a child Router. The root Router is created
 /// at the app level and passed to the first NavigationContainer.
-@Observable
+@MainActor @Observable
 public final class Router<Scene: NavigationScene> {
 
   // MARK: Lifecycle
+
+  // Workaround: Swift 6.2 compiler crash in the SIL EarlyPerfInliner on Router.deinit
+  // when compiled with -default-isolation MainActor + -O. The inliner's layout constraint
+  // check enters infinite recursion on the generic type. Explicit @MainActor on the class
+  // with nonisolated deinit produces different SIL that avoids the crash.
+  nonisolated deinit { }
 
   /// Creates a router node in the navigation hierarchy.
   ///
