@@ -451,6 +451,133 @@ struct ViewModelMacroRuntimeTests {
         }
     }
 
+    // MARK: - Throttled @Bound
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Throttled @Bound drops intermediate rapid-fire values`() async throws {
+        let source = RuntimeSource()
+        let vm = ThrottledBoundVM(source: source)
+
+        var emissions: [Int] = []
+        let trackingTask = Task {
+            for await count in valuesOf({ vm.state.count }) {
+                emissions.append(count)
+                if emissions.count >= 3 { break }
+            }
+        }
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+
+        // Rapid-fire 5 changes within buffer window (100ms)
+        for i in 1...5 {
+            source.count = i
+        }
+
+        // Wait for buffer to expire + next iteration to process
+        try await Task.sleep(for: .milliseconds(200))
+
+        // One more distinct change for the third emission
+        source.count = 99
+
+        _ = await trackingTask.value
+        observeTask.cancel()
+
+        // First = initial (0), second = latest from burst (5), third = 99
+        #expect(emissions.count == 3)
+        #expect(emissions[0] == 0)
+        #expect(emissions[1] == 5, "Should pick up only the latest from rapid-fire burst")
+        #expect(emissions[2] == 99)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Throttled @Bound eventually delivers single change`() async {
+        let source = RuntimeSource()
+        let vm = ThrottledBoundVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+
+            source.count = 42
+            await expect(\.state.count, equals: 42)
+        }
+    }
+
+    // MARK: - Throttled @Reaction (sync)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Throttled sync @Reaction throttles rapid-fire changes`() async throws {
+        let source = RuntimeSource()
+        let vm = ThrottledSyncReactionVM(source: source)
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+
+        let baseline = vm.state.reactionCount
+
+        // Rapid-fire 10 changes within buffer window
+        for i in 1...10 {
+            source.count = i
+        }
+
+        // Wait for buffer(100ms) + processing margin
+        try await Task.sleep(for: .milliseconds(400))
+
+        let totalReactions = vm.state.reactionCount - baseline
+        #expect(totalReactions < 10,
+                "Throttled reaction should throttle: fired \(totalReactions) times for 10 changes")
+        #expect(vm.state.latestCount == 10, "Should have the latest value")
+
+        observeTask.cancel()
+    }
+
+    // MARK: - Throttled @Reaction (async)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Throttled async @Reaction throttles and completes handlers`() async throws {
+        let source = RuntimeSource()
+        let vm = ThrottledAsyncReactionVM(source: source)
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+
+        // Rapid-fire 10 changes
+        for i in 1...10 {
+            source.count = i
+        }
+
+        // Wait for processing: buffer(100ms) + work(10ms) + extra margin
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(vm.state.processedCount == 10, "Should have the latest value")
+        #expect(vm.state.completedHandlers < 10,
+                "Throttled async reaction should throttle: completed \(vm.state.completedHandlers) for 10 changes")
+        #expect(vm.state.completedHandlers >= 1, "At least one handler should complete")
+
+        observeTask.cancel()
+    }
+
+    // MARK: - Mixed throttled + unthrottled @Bound
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Mixed throttled and unthrottled @Bound in same VM`() async {
+        let source = RuntimeSource()
+        let vm = MixedThrottledVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.label, equals: "initial")
+            await expect(\.state.count, equals: 0)
+
+            // Unthrottled @Bound updates promptly
+            source.label = "changed"
+            await expect(\.state.label, equals: "changed")
+
+            // Throttled @Bound also delivers (after buffer)
+            source.count = 42
+            await expect(\.state.count, equals: 42)
+        }
+    }
+
     // MARK: - Loadable state transitions
 
     @Test(.timeLimit(.minutes(1)))

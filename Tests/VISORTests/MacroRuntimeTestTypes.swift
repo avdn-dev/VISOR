@@ -320,6 +320,69 @@ final class BoundAndPolledVM {
     let monitor: BatteryMonitor
 }
 
+// MARK: 17. Throttled @Bound
+
+@Observable
+@ViewModel
+final class ThrottledBoundVM {
+    struct State: Equatable {
+        @Bound(\ThrottledBoundVM.source.count, throttled: .milliseconds(100)) var count: Int
+    }
+    let source: RuntimeSource
+}
+
+// MARK: 18. Throttled sync @Reaction
+
+@Observable
+@ViewModel
+final class ThrottledSyncReactionVM {
+    struct State: Equatable {
+        var latestCount = 0
+        var reactionCount = 0
+    }
+    var state = State()
+    let source: RuntimeSource
+
+    @Reaction(\ThrottledSyncReactionVM.source.count, throttled: .milliseconds(100))
+    func handleCount(count: Int) {
+        updateState(\.latestCount, to: count)
+        updateState(\.reactionCount, to: state.reactionCount + 1)
+    }
+}
+
+// MARK: 19. Throttled async @Reaction
+
+@Observable
+@ViewModel
+final class ThrottledAsyncReactionVM {
+    struct State: Equatable {
+        var processedCount = 0
+        var completedHandlers = 0
+    }
+    var state = State()
+    let source: RuntimeSource
+
+    @Reaction(\ThrottledAsyncReactionVM.source.count, throttled: .milliseconds(100))
+    func handleCount(count: Int) async {
+        try? await Task.sleep(for: .milliseconds(10))
+        guard !Task.isCancelled else { return }
+        updateState(\.processedCount, to: count)
+        updateState(\.completedHandlers, to: state.completedHandlers + 1)
+    }
+}
+
+// MARK: 20. Mixed throttled + unthrottled @Bound
+
+@Observable
+@ViewModel
+final class MixedThrottledVM {
+    struct State: Equatable {
+        @Bound(\MixedThrottledVM.source.label) var label: String
+        @Bound(\MixedThrottledVM.source.count, throttled: .milliseconds(100)) var count: Int
+    }
+    let source: RuntimeSource
+}
+
 // MARK: - Non-Equatable State VM
 
 

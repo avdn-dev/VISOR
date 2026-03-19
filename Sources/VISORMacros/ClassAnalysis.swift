@@ -41,6 +41,7 @@ struct BoundPropertyInfo {
   let sourceExpression: String   // Full dot-path for observation (e.g. "profileService.isLoggedIn")
   let hasDefault: Bool           // Whether the State property has a default value
   let declarationOrder: Int      // Position among @Bound/@Polled properties (for init arg ordering)
+  let throttleExpression: String?  // Optional Duration expression for throttling (e.g. ".seconds(0.5)")
 }
 
 // MARK: - PolledPropertyInfo
@@ -61,6 +62,7 @@ struct ReactionMethodInfo {
   let parameterName: String     // "destination"
   let observeExpression: String // "self.deepLinkRouter.pendingDestination"
   let isAsync: Bool
+  let throttleExpression: String? // Optional Duration expression for throttling
 }
 
 // MARK: - ClassAnalysis
@@ -225,11 +227,21 @@ struct ClassAnalysis {
         let parameterName = param.secondName?.text ?? param.firstName.text
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
 
+        var throttleExpr: String? = nil
+        let secondIndex = arguments.index(after: arguments.startIndex)
+        if secondIndex != arguments.endIndex {
+          let secondArg = arguments[secondIndex]
+          if secondArg.label?.text == "throttled" {
+            throttleExpr = secondArg.expression.trimmedDescription
+          }
+        }
+
         reactionMethods.append(ReactionMethodInfo(
           methodName: funcDecl.name.text,
           parameterName: parameterName,
           observeExpression: "self." + components.joined(separator: "."),
-          isAsync: isAsync))
+          isAsync: isAsync,
+          throttleExpression: throttleExpr))
       }
     }
   }
@@ -300,13 +312,23 @@ struct ClassAnalysis {
           return nil
         }
 
+        var throttleExpr: String? = nil
+        let secondIndex = arguments.index(after: arguments.startIndex)
+        if secondIndex != arguments.endIndex {
+          let secondArg = arguments[secondIndex]
+          if secondArg.label?.text == "throttled" {
+            throttleExpr = secondArg.expression.trimmedDescription
+          }
+        }
+
         if components.count >= 2 {
           stateBoundProperties.append(BoundPropertyInfo(
             propertyName: identifier.identifier.text,
             dependencyName: components[0],
             sourceExpression: components.joined(separator: "."),
             hasDefault: hasDefault,
-            declarationOrder: declarationOrder))
+            declarationOrder: declarationOrder,
+            throttleExpression: throttleExpr))
         } else {
           malformedStateBoundAttributes.append(identifier.identifier.text)
         }

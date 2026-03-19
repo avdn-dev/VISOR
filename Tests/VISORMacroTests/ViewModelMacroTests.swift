@@ -2137,5 +2137,227 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - @Bound with throttled:
+
+  @Test
+  func `@Bound with throttled generates sleep after updateState`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class HeadVM {
+        struct State: Equatable {
+          @Bound(\\HeadVM.tracker.posture, throttled: .seconds(0.125)) var posture: Posture
+        }
+        private let tracker: HeadTracker
+      }
+      """,
+      expandedSource: """
+      final class HeadVM {
+        struct State: Equatable {
+          var posture: Posture
+        }
+        private let tracker: HeadTracker
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(tracker: HeadTracker) {
+              self.tracker = tracker
+              self._state = State(posture: tracker.posture)
+          }
+
+          typealias Factory = ViewModelFactory<HeadVM>
+
+          func observePosture() async {
+              for await value in VISOR.valuesOf({ self.tracker.posture }) {
+                  self.updateState(\\.posture, to: value)
+                  do {
+                      try await Task.sleep(for: .seconds(0.125))
+                  } catch {
+                  }
+              }
+          }
+
+          func startObserving() async {
+              await observePosture()
+          }
+      }
+
+      extension HeadVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sync @Reaction with throttled generates sleep after method call`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class AudioVM {
+        struct State: Equatable {}
+        var state = State()
+        @Reaction(\\.recorder.audioLevel, throttled: .seconds(0.1))
+        func handleLevel(level: Float) { }
+        private let recorder: AudioRecorder
+      }
+      """,
+      expandedSource: """
+      final class AudioVM {
+        struct State: Equatable {}
+        var state = State()
+        func handleLevel(level: Float) { }
+        private let recorder: AudioRecorder
+
+          init(recorder: AudioRecorder) {
+              self.recorder = recorder
+          }
+
+          typealias Factory = ViewModelFactory<AudioVM>
+
+          func observeHandleLevel() async {
+              for await level in VISOR.valuesOf({ self.recorder.audioLevel }) {
+                  self.handleLevel(level: level)
+                  do {
+                      try await Task.sleep(for: .seconds(0.1))
+                  } catch {
+                  }
+              }
+          }
+
+          func startObserving() async {
+              await observeHandleLevel()
+          }
+      }
+
+      extension AudioVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Async @Reaction with throttled generates for-await with sleep instead of latestValuesOf`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class UploadVM {
+        struct State: Equatable {}
+        var state = State()
+        @Reaction(\\.uploadService.uploadState, throttled: .seconds(1))
+        func handleUploadState(state: UploadState) async { }
+        private let uploadService: UploadService
+      }
+      """,
+      expandedSource: """
+      final class UploadVM {
+        struct State: Equatable {}
+        var state = State()
+        func handleUploadState(state: UploadState) async { }
+        private let uploadService: UploadService
+
+          init(uploadService: UploadService) {
+              self.uploadService = uploadService
+          }
+
+          typealias Factory = ViewModelFactory<UploadVM>
+
+          func observeHandleUploadState() async {
+              for await state in VISOR.valuesOf({ self.uploadService.uploadState }) {
+                  await self.handleUploadState(state: state)
+                  do {
+                      try await Task.sleep(for: .seconds(1))
+                  } catch {
+                  }
+              }
+          }
+
+          func startObserving() async {
+              await observeHandleUploadState()
+          }
+      }
+
+      extension UploadVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Mixed throttled and unthrottled @Bound in same State`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MixedThrottleVM {
+        struct State: Equatable {
+          @Bound(\\MixedThrottleVM.service.name) var name: String
+          @Bound(\\MixedThrottleVM.tracker.posture, throttled: .seconds(0.125)) var posture: Posture
+        }
+        private let service: MyService
+        private let tracker: HeadTracker
+      }
+      """,
+      expandedSource: """
+      final class MixedThrottleVM {
+        struct State: Equatable {
+          var name: String
+          var posture: Posture
+        }
+        private let service: MyService
+        private let tracker: HeadTracker
+
+          private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          init(service: MyService, tracker: HeadTracker) {
+              self.service = service
+              self.tracker = tracker
+              self._state = State(name: service.name, posture: tracker.posture)
+          }
+
+          typealias Factory = ViewModelFactory<MixedThrottleVM>
+
+          func observeName() async {
+              for await value in VISOR.valuesOf({ self.service.name }) {
+                  self.updateState(\\.name, to: value)
+              }
+          }
+
+          func observePosture() async {
+              for await value in VISOR.valuesOf({ self.tracker.posture }) {
+                  self.updateState(\\.posture, to: value)
+                  do {
+                      try await Task.sleep(for: .seconds(0.125))
+                  } catch {
+                  }
+              }
+          }
+
+          func startObserving() async {
+              await withDiscardingTaskGroup { group in
+                  group.addTask { await self.observeName() }
+                  group.addTask { await self.observePosture() }
+              }
+          }
+      }
+
+      extension MixedThrottleVM: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
 }
 #endif

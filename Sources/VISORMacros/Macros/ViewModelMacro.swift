@@ -224,13 +224,27 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       let methodName = "observe\(prop.propertyName.capitalizedFirst)"
       allObserveMethodNames.append(methodName)
       let keyPath = "\\." + prop.propertyName
-      let observeMethod: DeclSyntax = """
-        func \(raw: methodName)() async {
-            for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
-                self.updateState(\(raw: keyPath), to: value)
-            }
-        }
-        """
+      let observeMethod: DeclSyntax
+      if let throttleExpr = prop.throttleExpression {
+        observeMethod = """
+          func \(raw: methodName)() async {
+              for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
+                  self.updateState(\(raw: keyPath), to: value)
+                  do {
+                      try await Task.sleep(for: \(raw: throttleExpr))
+                  } catch {}
+              }
+          }
+          """
+      } else {
+        observeMethod = """
+          func \(raw: methodName)() async {
+              for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
+                  self.updateState(\(raw: keyPath), to: value)
+              }
+          }
+          """
+      }
       members.append(observeMethod)
     }
 
@@ -275,22 +289,51 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       let methodName = "observe\(reaction.methodName.capitalizedFirst)"
       allObserveMethodNames.append(methodName)
       if reaction.isAsync {
-        let observeMethod: DeclSyntax = """
-          func \(raw: methodName)() async {
-              await VISOR.latestValuesOf({ \(raw: reaction.observeExpression) }) { \(raw: reaction.parameterName) in
-                  await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
-              }
-          }
-          """
+        let observeMethod: DeclSyntax
+        if let throttleExpr = reaction.throttleExpression {
+          // Throttled async: switch from latestValuesOf (cancel-previous) to for-await + sleep (throttle)
+          observeMethod = """
+            func \(raw: methodName)() async {
+                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                    do {
+                        try await Task.sleep(for: \(raw: throttleExpr))
+                    } catch {}
+                }
+            }
+            """
+        } else {
+          observeMethod = """
+            func \(raw: methodName)() async {
+                await VISOR.latestValuesOf({ \(raw: reaction.observeExpression) }) { \(raw: reaction.parameterName) in
+                    await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                }
+            }
+            """
+        }
         members.append(observeMethod)
       } else {
-        let observeMethod: DeclSyntax = """
-          func \(raw: methodName)() async {
-              for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
-                  self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
-              }
-          }
-          """
+        let observeMethod: DeclSyntax
+        if let throttleExpr = reaction.throttleExpression {
+          observeMethod = """
+            func \(raw: methodName)() async {
+                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                    do {
+                        try await Task.sleep(for: \(raw: throttleExpr))
+                    } catch {}
+                }
+            }
+            """
+        } else {
+          observeMethod = """
+            func \(raw: methodName)() async {
+                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                }
+            }
+            """
+        }
         members.append(observeMethod)
       }
     }

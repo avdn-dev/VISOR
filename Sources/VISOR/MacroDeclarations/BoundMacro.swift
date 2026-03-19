@@ -15,16 +15,27 @@
 /// Bound properties without default values are initialized from the service
 /// at init time — no stale defaults.
 ///
+/// Use the `throttled:` variant to limit rapid-fire updates to a maximum
+/// frequency. The observation loop pauses after each update, dropping
+/// intermediate values. Zero CPU cost when the source is quiet.
+///
 /// ```swift
 /// @ViewModel
 /// final class ConnectionsViewModel {
 ///   struct State: Equatable {
 ///     @Bound(\ConnectionsViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
-///     @Bound(\ConnectionsViewModel.connectionService.connections) var connections: [Connection]
+///     @Bound(\ConnectionsViewModel.headTracker.posture, throttled: .seconds(0.125)) var posture: Posture
 ///   }
 ///   private let connectionService: ConnectionService
+///   private let headTracker: HeadTracker
 /// }
 /// ```
 @attached(peer)
 public macro Bound<Root, Value>(_ keyPath: KeyPath<Root, Value>) = #externalMacro(
   module: "VISORMacros", type: "BoundMacro")
+
+@attached(peer)
+public macro Bound<Root, Value>(
+  _ keyPath: KeyPath<Root, Value>,
+  throttled interval: Duration
+) = #externalMacro(module: "VISORMacros", type: "BoundMacro")
