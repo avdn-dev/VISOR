@@ -117,7 +117,7 @@ All observation macros support `throttledBy:` for rate-limiting rapid-fire updat
 
 ## Documentation
 
-Full API documentation is available via DocC. Open the package in Xcode and select **Product > Build Documentation** to browse:
+Full API documentation is available at [**avdn-dev.github.io/VISOR**](https://avdn-dev.github.io/VISOR/documentation/visor/), or locally via Xcode (**Product > Build Documentation**):
 
 - **Architecture** — VISOR layers, View/Content pattern, Factory injection
 - **Observation** — `@Bound`, `@Polled`, `@Reaction`, rate limiting, `valuesOf()`
