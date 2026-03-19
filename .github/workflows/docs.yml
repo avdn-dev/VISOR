@@ -28,6 +28,9 @@ jobs:
             --transform-for-static-hosting \
             --hosting-base-path VISOR
 
+      - name: Fix GitHub Pages SPA routing
+        run: cp docs/index.html docs/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
