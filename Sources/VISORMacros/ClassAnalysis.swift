@@ -29,8 +29,6 @@ extension StructDeclSyntax {
 struct StoredProperty {
   let name: String
   let type: String
-  /// Whether this property's type is `Router<...>` (not a protocol, so no Stub prefix).
-  var isRouterType: Bool { type.hasPrefix("Router<") }
 }
 
 // MARK: - BoundPropertyInfo
