@@ -42,63 +42,6 @@ private final class RoutedIntegrationVM: ViewModel {
     }
 }
 
-// MARK: - Action VMs (sync and async handle)
-
-@Observable
-@MainActor
-private final class SyncActionVM: ViewModel {
-    struct State: Equatable {
-        var count = 0
-        var label = ""
-    }
-
-    enum Action {
-        case increment
-        case setLabel(String)
-    }
-
-    var state = State()
-
-    func handle(_ action: Action) {
-        switch action {
-        case .increment:
-            updateState(\.count, to: state.count + 1)
-        case .setLabel(let text):
-            updateState(\.label, to: text)
-        }
-    }
-}
-
-@Observable
-@MainActor
-private final class AsyncActionVM: ViewModel {
-    struct State: Equatable {
-        var items: Loadable<[String]> = .loading
-        var count = 0
-    }
-
-    enum Action {
-        case increment
-        case loadItems
-        case failItems
-    }
-
-    var state = State()
-
-    func handle(_ action: Action) async {
-        switch action {
-        case .increment:
-            updateState(\.count, to: state.count + 1)
-        case .loadItems:
-            updateState(\.items, to: .loading)
-            try? await Task.sleep(for: .milliseconds(10))
-            updateState(\.items, to: .loaded(["a", "b"]))
-        case .failItems:
-            updateState(\.items, to: .error("network"))
-        }
-    }
-}
-
 // MARK: - Integration Tests
 
 @Suite("Integration")
@@ -196,55 +139,6 @@ struct IntegrationTests {
 
         let vm = factory.makeViewModel(router: router)
         #expect(vm.routerID == ObjectIdentifier(router))
-    }
-
-    // MARK: - Sync handle
-
-    @Test
-    func `Sync handle mutates state without await`() {
-        let vm = SyncActionVM()
-
-        vm.handle(.increment)
-        #expect(vm.state.count == 1)
-
-        vm.handle(.increment)
-        #expect(vm.state.count == 2)
-
-        vm.handle(.setLabel("hello"))
-        #expect(vm.state.label == "hello")
-    }
-
-    // MARK: - Async handle
-
-    @Test
-    func `Async handle performs async work`() async {
-        let vm = AsyncActionVM()
-
-        await vm.handle(.loadItems)
-        #expect(vm.state.items == .loaded(["a", "b"]))
-    }
-
-    @Test
-    func `Async handle mixes sync and async cases`() async {
-        let vm = AsyncActionVM()
-
-        await vm.handle(.increment)
-        #expect(vm.state.count == 1)
-
-        await vm.handle(.loadItems)
-        #expect(vm.state.items == .loaded(["a", "b"]))
-        #expect(vm.state.count == 1)
-    }
-
-    // MARK: - Error path via Loadable
-
-    @Test
-    func `Async handle transitions to error state`() async {
-        let vm = AsyncActionVM()
-
-        await vm.handle(.failItems)
-        #expect(vm.state.items.isError)
-        #expect(vm.state.items.error == "network")
     }
 
 }

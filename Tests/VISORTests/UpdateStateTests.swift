@@ -97,7 +97,7 @@ struct UpdateStateTests {
     // MARK: - Basic Observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `Observes state from service dependency`() async {
+    func `updateState propagates source changes via valuesOf`() async {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 
@@ -112,7 +112,7 @@ struct UpdateStateTests {
     // MARK: - Rapid Mutations
 
     @Test(.timeLimit(.minutes(1)))
-    func `Rapid mutations settle to correct final state`() async {
+    func `Rapid source mutations converge to final value`() async {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 

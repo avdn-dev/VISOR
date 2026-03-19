@@ -135,7 +135,7 @@ struct ObserveTests {
   // MARK: - Multiple properties tracked simultaneously
 
   @Test(.timeLimit(.minutes(1)))
-  func `Multiple properties tracked simultaneously`() async throws {
+  func `valuesOf tracks composite expression across fields`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
@@ -164,7 +164,7 @@ struct ObserveTests {
   // MARK: - Computed property depending on two observables
 
   @Test(.timeLimit(.minutes(1)))
-  func `Computed property depending on two observables`() async throws {
+  func `valuesOf re-emits when either source changes`() async throws {
     let source1 = TestSource()
     let source2 = TestSource()
 
@@ -219,7 +219,7 @@ struct ObserveTests {
 struct ObserveLatestTests {
 
   @Test(.timeLimit(.minutes(1)))
-  func `Calls handler with initial value`() async throws {
+  func `latestValuesOf invokes handler with current value on first emission`() async throws {
     let source = TestSource()
     source.count = 7
 
@@ -406,6 +406,19 @@ struct ExpectationDSLTests {
 
     await observing(vm) { expect in
       await expect(\.state.isActive, isNot: true)
+    }
+  }
+
+  // MARK: - satisfies returns immediately when already matching
+
+  @Test(.timeLimit(.minutes(1)))
+  func `satisfies returns immediately when predicate already matches`() async {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+    // count starts at 0
+
+    await observing(vm) { expect in
+      await expect(\.state.count, satisfies: { $0 >= 0 })
     }
   }
 

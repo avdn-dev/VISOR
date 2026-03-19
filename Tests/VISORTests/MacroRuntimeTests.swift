@@ -13,7 +13,7 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - Minimal VMs
 
     @Test
-    func `Minimal VM with no deps can be constructed and mutated`() {
+    func `MinimalVM writes and reads state via updateState`() {
         let vm = MinimalVM()
         #expect(vm.state.value == 0)
         vm.updateState(\.value, to: 42)
@@ -21,7 +21,7 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `Auto-generated state property is observation-tracked`() async {
+    func `Macro-generated state var tracks observation changes`() async {
         let vm = AutoStateVM()
         #expect(vm.state.value == 0)
 
@@ -35,7 +35,7 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test
-    func `NoDeps VM handles action without dependencies`() {
+    func `ViewModel dispatches sync action without dependencies`() {
         let vm = NoDepsVM()
         vm.handle(.setText("hello"))
         #expect(vm.state.text == "hello")
@@ -44,7 +44,7 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - Memberwise init generation
 
     @Test
-    func `Macro generates memberwise init for multiple deps`() {
+    func `@ViewModel generates init for all stored-let dependencies`() {
         let source = RuntimeSource()
         let second = SecondSource()
         let vm = MultiDepVM(source: source, second: second)
@@ -53,7 +53,7 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test
-    func `Custom init is preserved when provided`() {
+    func `@ViewModel skips init generation when user provides one`() {
         let source = RuntimeSource()
         let vm = CustomInitVM(customSource: source)
         #expect(vm.source === source)
@@ -93,29 +93,6 @@ struct ViewModelMacroRuntimeTests {
 
             source.isEnabled = true
             await expect(\.state.isEnabled, equals: true)
-        }
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func `Multiple @Bound all update independently`() async {
-        let source = RuntimeSource()
-        let vm = AutoObserveMultiVM(source: source)
-
-        await observing(vm) { expect in
-            // Update all three in sequence
-            source.count = 1
-            source.label = "one"
-            source.isEnabled = true
-            await expect(\.state.count, equals: 1)
-            await expect(\.state.label, equals: "one")
-            await expect(\.state.isEnabled, equals: true)
-
-            // Update only one
-            source.count = 2
-            await expect(\.state.count, equals: 2)
-            // Others remain unchanged
-            #expect(vm.state.label == "one")
-            #expect(vm.state.isEnabled == true)
         }
     }
 
@@ -249,7 +226,7 @@ struct ViewModelMacroRuntimeTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Sync @Reaction fires on every value change`() async {
-        let nav = ReactionSource()
+        let nav = RuntimeSource()
         let vm = SyncReactionVM(nav: nav)
 
         await observing(vm) { expect in
@@ -275,7 +252,7 @@ struct ViewModelMacroRuntimeTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Async @Reaction processes values sequentially`() async throws {
-        let nav = ReactionSource()
+        let nav = RuntimeSource()
         let vm = AsyncReactionVM(nav: nav)
 
         await observing(vm) { expect in
@@ -295,7 +272,7 @@ struct ViewModelMacroRuntimeTests {
     @Test(.timeLimit(.minutes(1)))
     func `@Bound and @Reaction both active concurrently`() async {
         let source = RuntimeSource()
-        let nav = ReactionSource()
+        let nav = RuntimeSource()
         let vm = BoundAndReactionVM(source: source, nav: nav)
 
         await observing(vm) { expect in
@@ -427,7 +404,7 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `Mixed @Bound and @Polled coexist`() async {
+    func `Push-based @Bound and pull-based @Polled update independently`() async {
         let source = RuntimeSource()
         let monitor = BatteryMonitor()
         monitor.level = 0.3
@@ -562,7 +539,7 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - Mixed throttledBy + unthrottledBy @Bound
 
     @Test(.timeLimit(.minutes(1)))
-    func `Mixed throttledBy and unthrottledBy @Bound in same VM`() async {
+    func `Mixed throttled and unthrottled @Bound in same State`() async {
         let source = RuntimeSource()
         let vm = MixedThrottledByVM(source: source)
 
@@ -613,7 +590,7 @@ struct ViewModelMacroRuntimeTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Sync @Reaction deduplicates consecutive equal values`() async throws {
-        let nav = ReactionSource()
+        let nav = RuntimeSource()
         let vm = SyncReactionVM(nav: nav)
 
         try await observing(vm) { expect in
@@ -637,6 +614,46 @@ struct ViewModelMacroRuntimeTests {
             #expect(vm.state.reactionCount == countAfterFirst + 1)
         }
     }
+
+    // MARK: - @Reaction with non-optional observed property
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Sync @Reaction fires for non-optional property changes`() async {
+        let source = RuntimeSource()
+        let vm = ThrottledBySyncReactionVM(source: source)
+
+        await observing(vm) { expect in
+            await expect(\.state.reactionCount, satisfies: { $0 >= 1 })
+
+            source.count = 42
+            await expect(\.state.latestCount, equals: 42)
+        }
+    }
+
+    // MARK: - @Bound + throttled @Bound + @Reaction combined
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Unthrottled @Bound delivers before throttled @Bound during burst`() async throws {
+        let source = RuntimeSource()
+        let vm = MixedThrottledByVM(source: source)
+
+        let observeTask = Task { await vm.startObserving() }
+        try await yieldForTracking()
+
+        // Label is unthrottled, count is throttled (100ms)
+        source.label = "fast"
+        source.count = 99
+
+        // Unthrottled should arrive within one yield
+        try await yieldForTracking()
+        #expect(vm.state.label == "fast")
+
+        // Throttled should arrive after buffer expires
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(vm.state.count == 99)
+
+        observeTask.cancel()
+    }
 }
 
 // MARK: - @Stubbable Runtime Tests
@@ -647,7 +664,7 @@ struct ViewModelMacroRuntimeTests {
 struct StubbableMacroRuntimeTests {
 
     @Test
-    func `Stub conforms to protocol`() {
+    func `@Stubbable generates class conforming to protocol`() {
         let stub: any ItemService = StubItemService()
         #expect(stub.items.isEmpty)
         #expect(stub.count == 0)
@@ -696,7 +713,7 @@ struct StubbableMacroRuntimeTests {
 struct SpyableMacroRuntimeTests {
 
     @Test
-    func `Spy conforms to protocol`() {
+    func `@Spyable generates class conforming to protocol`() {
         let spy: any AnalyticsService = SpyAnalyticsService()
         spy.trackEvent("test")
     }

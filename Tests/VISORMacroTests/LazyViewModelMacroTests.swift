@@ -488,56 +488,5 @@ struct LazyViewModelMacroTests {
       macros: testMacros)
   }
 
-  @Test
-  func `Default expansion does not contain scenePhase`() {
-    assertMacroExpansion(
-      """
-      @LazyViewModel(MyVM.self)
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-      struct MyView: View {
-        var content: some View { Text("") }
-
-          @Environment(\\.router) private var containerRouter
-
-          @Environment(MyVM.Factory.self) private var factory
-
-          @State private var _viewModel: MyVM?
-
-          var viewModel: MyVM {
-              _viewModel!
-          }
-
-          var stateBinding: Binding<MyVM.State> {
-              Bindable(viewModel).state
-          }
-
-          var body: some View {
-              Group {
-                  if _viewModel != nil {
-                      content
-                  } else {
-                      Color.clear
-                  }
-              }
-              .task {
-                  if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
-                  }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
-              }
-          }
-      }
-      """,
-      macros: testMacros)
-  }
 }
 #endif

@@ -11,18 +11,13 @@ final class RuntimeSource {
     var count = 0
     var label = "initial"
     var isEnabled = false
+    var destination: String? = nil
 }
 
 @Observable
 @MainActor
 final class SecondSource {
     var name = ""
-}
-
-@Observable
-@MainActor
-final class ReactionSource {
-    var destination: String? = nil
 }
 
 // MARK: - @ViewModel Macro Test VMs
@@ -152,7 +147,7 @@ final class SyncReactionVM {
         var reactionCount = 0
     }
     var state = State()
-    let nav: ReactionSource
+    let nav: RuntimeSource
 
     @Reaction(\SyncReactionVM.nav.destination)
     func handleDestination(destination: String?) {
@@ -170,7 +165,7 @@ final class AsyncReactionVM {
         var processedValue: String? = nil
     }
     var state = State()
-    let nav: ReactionSource
+    let nav: RuntimeSource
 
     @Reaction(\AsyncReactionVM.nav.destination)
     func processDestination(destination: String?) async {
@@ -190,7 +185,7 @@ final class BoundAndReactionVM {
         var lastNav: String? = nil
     }
     let source: RuntimeSource
-    let nav: ReactionSource
+    let nav: RuntimeSource
 
     @Reaction(\BoundAndReactionVM.nav.destination)
     func handleNav(destination: String?) {

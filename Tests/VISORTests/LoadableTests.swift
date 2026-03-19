@@ -147,10 +147,24 @@ struct LoadableTests {
     #expect(flat == .loaded(42))
   }
 
+  // MARK: - Loaded empty collection vs empty case
+
+  @Test
+  func `Loaded empty collection is distinct from empty case`() {
+    let loaded: Loadable<[String]> = .loaded([])
+    let empty: Loadable<[String]> = .empty
+
+    #expect(loaded != empty)
+    #expect(loaded.value == [])
+    #expect(loaded.isEmpty == false)
+    #expect(empty.value == nil)
+    #expect(empty.isEmpty == true)
+  }
+
   // MARK: - Void Value
 
   @Test
-  func `Works with Void value type`() {
+  func `Loadable supports Void as Value type`() {
     let loaded: Loadable<Void> = .loaded(())
     #expect(loaded.value != nil)
 

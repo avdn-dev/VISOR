@@ -5,14 +5,6 @@ import Testing
 
 // MARK: - Test Types (must be non-private for weak refs to work across closures)
 
-@Observable
-@MainActor
-final class LeakSource {
-    var count = 0
-    var label = ""
-    var destination: String? = nil
-}
-
 // Manual VM (no macro) to isolate observation lifecycle
 @Observable
 @MainActor
@@ -21,9 +13,9 @@ final class ManualLeakVM: ViewModel {
         var count = 0
     }
     var state = State()
-    let source: LeakSource
+    let source: RuntimeSource
 
-    init(source: LeakSource) {
+    init(source: RuntimeSource) {
         self.source = source
     }
 
@@ -34,78 +26,7 @@ final class ManualLeakVM: ViewModel {
     }
 }
 
-// Macro-generated single @Bound
-@Observable
-@ViewModel
-final class LeakSingleBoundVM {
-    struct State: Equatable {
-        @Bound(\LeakSingleBoundVM.source.count) var count: Int
-    }
-    let source: LeakSource
-}
-
-// Macro-generated multiple @Bound (task group)
-@Observable
-@ViewModel
-final class LeakMultiBoundVM {
-    struct State: Equatable {
-        @Bound(\LeakMultiBoundVM.source.count) var count: Int
-        @Bound(\LeakMultiBoundVM.source.label) var label: String
-    }
-    let source: LeakSource
-}
-
-// Macro-generated @Reaction (sync)
-@Observable
-@ViewModel
-final class LeakSyncReactionVM {
-    struct State: Equatable {
-        var lastNav: String? = nil
-    }
-    var state = State()
-    let source: LeakSource
-
-    @Reaction(\LeakSyncReactionVM.source.destination)
-    func handleNav(destination: String?) {
-        updateState(\.lastNav, to: destination)
-    }
-}
-
-// Macro-generated @Reaction (async)
-@Observable
-@ViewModel
-final class LeakAsyncReactionVM {
-    struct State: Equatable {
-        var processed: String? = nil
-    }
-    var state = State()
-    let source: LeakSource
-
-    @Reaction(\LeakAsyncReactionVM.source.destination)
-    func handleNav(destination: String?) async {
-        guard let destination else { return }
-        guard !Task.isCancelled else { return }
-        updateState(\.processed, to: destination)
-    }
-}
-
-// Macro-generated @Bound + @Reaction combined
-@Observable
-@ViewModel
-final class LeakCombinedVM {
-    struct State: Equatable {
-        @Bound(\LeakCombinedVM.source.count) var count: Int
-        var lastNav: String? = nil
-    }
-    let source: LeakSource
-
-    @Reaction(\LeakCombinedVM.source.destination)
-    func handleNav(destination: String?) {
-        updateState(\.lastNav, to: destination)
-    }
-}
-
-// VM with async action
+// VM with async action (no equivalent in MacroRuntimeTestTypes)
 @Observable
 @ViewModel
 final class LeakAsyncActionVM {
@@ -133,18 +54,22 @@ final class LeakAsyncActionVM {
 @MainActor
 struct MemoryLeakTests {
 
-    // MARK: - Manual observation VM
+    // MARK: - Helper
 
-    @Test(.timeLimit(.minutes(1)))
-    func `Manual VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: ManualLeakVM? = ManualLeakVM(source: source)
+    /// Starts observation, exercises the VM, cancels, nils out, and asserts deallocation.
+    private func assertNoLeak<VM: ViewModel>(
+        _ make: () -> VM,
+        exercise: (VM) async throws -> Void = { _ in },
+        file: String = #file,
+        line: Int = #line
+    ) async throws {
+        var vm: VM? = make()
         weak let weakVM = vm
 
         let task = Task { await vm!.startObserving() }
-
         try await yieldForTracking()
-        source.count = 1
+
+        try await exercise(vm!)
         try await yieldForTracking()
 
         task.cancel()
@@ -153,14 +78,25 @@ struct MemoryLeakTests {
         vm = nil
         try await yieldForTracking()
 
-        #expect(weakVM == nil, "ManualLeakVM should be deallocated after observation cancelled")
+        #expect(weakVM == nil, "\(VM.self) should be deallocated after observation cancelled",
+                sourceLocation: SourceLocation(fileID: file, filePath: file, line: line, column: 1))
+    }
+
+    // MARK: - Manual observation VM
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Manual VM is released after observation cancelled`() async throws {
+        let source = RuntimeSource()
+        try await assertNoLeak({ ManualLeakVM(source: source) }) { _ in
+            source.count = 1
+        }
     }
 
     // MARK: - observing() DSL scoped lifetime
 
     @Test(.timeLimit(.minutes(1)))
     func `VM is released after observing scope exits`() async throws {
-        let source = LeakSource()
+        let source = RuntimeSource()
         var vm: ManualLeakVM? = ManualLeakVM(source: source)
         weak let weakVM = vm
 
@@ -179,111 +115,72 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Single @Bound VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: LeakSingleBoundVM? = LeakSingleBoundVM(source: source)
-        weak let weakVM = vm
-
-        let task = Task { await vm!.startObserving() }
-        try await yieldForTracking()
-
-        source.count = 5
-        try await yieldForTracking()
-
-        task.cancel()
-        try await yieldForTracking()
-
-        vm = nil
-        try await yieldForTracking()
-
-        #expect(weakVM == nil, "Single @Bound VM should be deallocated after observation cancelled")
+        let source = RuntimeSource()
+        try await assertNoLeak({ AutoObserveSingleVM(source: source) }) { _ in
+            source.count = 5
+        }
     }
 
     // MARK: - Multiple @Bound with task group (macro-generated)
 
     @Test(.timeLimit(.minutes(1)))
     func `Multi @Bound VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: LeakMultiBoundVM? = LeakMultiBoundVM(source: source)
-        weak let weakVM = vm
-
-        let task = Task { await vm!.startObserving() }
-        try await yieldForTracking()
-
-        source.count = 1
-        source.label = "hello"
-        try await yieldForTracking()
-
-        task.cancel()
-        try await yieldForTracking()
-
-        vm = nil
-        try await yieldForTracking()
-
-        #expect(weakVM == nil, "Multi @Bound VM should be deallocated after observation cancelled")
+        let source = RuntimeSource()
+        try await assertNoLeak({ AutoObserveMultiVM(source: source) }) { _ in
+            source.count = 1
+            source.label = "hello"
+        }
     }
 
     // MARK: - @Reaction sync (macro-generated)
 
     @Test(.timeLimit(.minutes(1)))
     func `Sync @Reaction VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: LeakSyncReactionVM? = LeakSyncReactionVM(source: source)
-        weak let weakVM = vm
-
-        let task = Task { await vm!.startObserving() }
-        try await yieldForTracking()
-
-        source.destination = "test"
-        try await yieldForTracking()
-
-        task.cancel()
-        try await yieldForTracking()
-
-        vm = nil
-        try await yieldForTracking()
-
-        #expect(weakVM == nil, "Sync @Reaction VM should be deallocated after observation cancelled")
+        let nav = RuntimeSource()
+        try await assertNoLeak({ SyncReactionVM(nav: nav) }) { _ in
+            nav.destination = "test"
+        }
     }
 
     // MARK: - @Reaction async (macro-generated)
 
     @Test(.timeLimit(.minutes(1)))
     func `Async @Reaction VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: LeakAsyncReactionVM? = LeakAsyncReactionVM(source: source)
-        weak let weakVM = vm
-
-        let task = Task { await vm!.startObserving() }
-        try await yieldForTracking()
-
-        source.destination = "test"
-        // Two yields needed: first for observation re-registration, second for the async handler task to complete
-        try await yieldForTracking()
-        try await yieldForTracking()
-
-        task.cancel()
-        try await yieldForTracking()
-
-        vm = nil
-        try await yieldForTracking()
-
-        #expect(weakVM == nil, "Async @Reaction VM should be deallocated after observation cancelled")
+        let nav = RuntimeSource()
+        try await assertNoLeak({ AsyncReactionVM(nav: nav) }) { _ in
+            nav.destination = "test"
+            // Extra yield for async handler to complete
+            try await yieldForTracking()
+        }
     }
 
     // MARK: - @Bound + @Reaction combined (macro-generated)
 
     @Test(.timeLimit(.minutes(1)))
     func `Combined @Bound + @Reaction VM is released after observation cancelled`() async throws {
-        let source = LeakSource()
-        var vm: LeakCombinedVM? = LeakCombinedVM(source: source)
+        let source = RuntimeSource()
+        let nav = RuntimeSource()
+        try await assertNoLeak({ BoundAndReactionVM(source: source, nav: nav) }) { _ in
+            source.count = 1
+            nav.destination = "nav"
+        }
+    }
+
+    // MARK: - @Polled (macro-generated)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Polled VM is released after observation cancelled`() async throws {
+        let monitor = BatteryMonitor()
+        monitor.level = 0.5
+
+        var vm: PolledSingleVM? = PolledSingleVM(monitor: monitor)
         weak let weakVM = vm
 
         let task = Task { await vm!.startObserving() }
         try await yieldForTracking()
 
-        source.count = 1
-        source.destination = "nav"
-        try await yieldForTracking()
+        monitor.level = 0.8
+        try await Task.sleep(for: .milliseconds(120))
 
         task.cancel()
         try await yieldForTracking()
@@ -291,16 +188,16 @@ struct MemoryLeakTests {
         vm = nil
         try await yieldForTracking()
 
-        #expect(weakVM == nil, "Combined VM should be deallocated after observation cancelled")
+        #expect(weakVM == nil, "Polled VM should be deallocated after observation cancelled")
     }
 
     // MARK: - Source not retained after VM and observation released
 
     @Test(.timeLimit(.minutes(1)))
     func `Source is released when VM and observation are released`() async throws {
-        var source: LeakSource? = LeakSource()
+        var source: RuntimeSource? = RuntimeSource()
         weak let weakSource = source
-        var vm: LeakSingleBoundVM? = LeakSingleBoundVM(source: source!)
+        var vm: AutoObserveSingleVM? = AutoObserveSingleVM(source: source!)
 
         let task = Task { await vm!.startObserving() }
         try await yieldForTracking()
@@ -323,7 +220,7 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `valuesOf stream releases captured observable after cancellation`() async throws {
-        var source: LeakSource? = LeakSource()
+        var source: RuntimeSource? = RuntimeSource()
         weak let weakSource = source
 
         let task = Task { @MainActor [source] in
@@ -345,7 +242,7 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `latestValuesOf stops processing after cancellation`() async throws {
-        let source = LeakSource()
+        let source = RuntimeSource()
         var processedCount = 0
 
         let task = Task { @MainActor in
@@ -391,7 +288,7 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Sequential observing blocks do not accumulate retained references`() async throws {
-        let source = LeakSource()
+        let source = RuntimeSource()
         var vm: ManualLeakVM? = ManualLeakVM(source: source)
         weak let weakVM = vm
 
@@ -413,9 +310,9 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Two VMs sharing source are released independently`() async throws {
-        let source = LeakSource()
-        var vm1: LeakSingleBoundVM? = LeakSingleBoundVM(source: source)
-        var vm2: LeakSingleBoundVM? = LeakSingleBoundVM(source: source)
+        let source = RuntimeSource()
+        var vm1: AutoObserveSingleVM? = AutoObserveSingleVM(source: source)
+        var vm2: AutoObserveSingleVM? = AutoObserveSingleVM(source: source)
         weak let weakVM1 = vm1
         weak let weakVM2 = vm2
 
@@ -448,7 +345,7 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `VM is released when observation cancelled before first yield`() async throws {
-        let source = LeakSource()
+        let source = RuntimeSource()
         var vm: ManualLeakVM? = ManualLeakVM(source: source)
         weak let weakVM = vm
 

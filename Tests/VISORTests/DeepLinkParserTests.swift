@@ -166,6 +166,28 @@ struct DeepLinkParserTests {
 
   // MARK: - Case-Sensitive Path Components
 
+  // MARK: - Component Count Mismatches
+
+  @Test
+  func `equal parser rejects URL with fewer components than expected`() {
+    let parser = DeepLinkParser<TestScene>.equal(
+      to: ["settings", "detail"],
+      destination: .tab(.settings))
+
+    let url = URL(string: "myapp://settings")!
+    #expect(parser.parse(url) == nil)
+  }
+
+  @Test
+  func `equal parser rejects URL with more components than expected`() {
+    let parser = DeepLinkParser<TestScene>.equal(
+      to: ["settings"],
+      destination: .tab(.settings))
+
+    let url = URL(string: "myapp://settings/extra")!
+    #expect(parser.parse(url) == nil)
+  }
+
   @Test
   func `equal parser is case-sensitive for path components`() {
     let parser = DeepLinkParser<TestScene>.equal(

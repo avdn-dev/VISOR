@@ -7,7 +7,7 @@
 
 import Foundation
 import Testing
-@testable import VISOR
+import VISOR
 
 @Suite("polledValuesOf")
 @MainActor
@@ -71,6 +71,25 @@ struct PolledValuesTests {
     try await Task.sleep(for: .milliseconds(80))
     // No more emissions after cancel
     #expect(emissions.count == countAtCancel)
+  }
+
+  @Test(.timeLimit(.minutes(1)))
+  func `Non-Equatable overload emits on every poll`() async throws {
+    struct Wrapper: Sendable { let value: Int }
+    var counter = 10
+    var emissions: [Int] = []
+
+    let task = Task {
+      for await w in polledValuesOf({ Wrapper(value: counter) }, every: .milliseconds(30)) {
+        emissions.append(w.value)
+        if emissions.count >= 3 { break }
+      }
+    }
+
+    // Value stays the same but non-Equatable, so every poll should emit
+    _ = await task.value
+    #expect(emissions.count == 3)
+    #expect(emissions[0] == 10)
   }
 
   @Test(.timeLimit(.minutes(1)))
