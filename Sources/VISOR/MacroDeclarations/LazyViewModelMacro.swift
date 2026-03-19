@@ -16,18 +16,18 @@ import Observation
 /// `viewModel.startObserving()`. SwiftUI owns the task lifetime —
 /// cancellation happens automatically when the view disappears.
 ///
-/// **Screen/Content pattern:**
+/// **View/Content pattern:**
 /// ```swift
 /// @LazyViewModel(DashboardViewModel.self)
-/// struct DashboardScreen: View {
+/// struct DashboardView: View {
 ///   var content: some View {
 ///     DashboardContent(state: viewModel.state, onAction: viewModel.handle)
 ///   }
 /// }
 /// ```
 ///
-/// The Screen owns the VM. The Content view is a pure function of state + onAction,
-/// trivially previewable with static state and no factory.
+/// The `@LazyViewModel` view owns the VM. The Content view is a pure function of
+/// state + onAction, trivially previewable with static state and no factory.
 ///
 /// **Bindings:** Use the generated `stateBinding` property for SwiftUI controls:
 /// ```swift
