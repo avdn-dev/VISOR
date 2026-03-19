@@ -161,7 +161,7 @@ final class SyncReactionVM {
     }
 }
 
-// MARK: 9. @Reaction (async) — only latest value matters
+// MARK: 9. @Reaction (async) — sequential delivery
 
 @Observable
 @ViewModel
@@ -176,7 +176,6 @@ final class AsyncReactionVM {
     func processDestination(destination: String?) async {
         guard let destination else { return }
         try? await Task.sleep(for: .milliseconds(20))
-        guard !Task.isCancelled else { return }
         updateState(\.processedValue, to: destination)
     }
 }

@@ -274,16 +274,18 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - @Reaction (async)
 
     @Test(.timeLimit(.minutes(1)))
-    func `Async @Reaction cancels previous handler for latest value`() async throws {
+    func `Async @Reaction processes values sequentially`() async throws {
         let nav = ReactionSource()
         let vm = AsyncReactionVM(nav: nav)
 
         await observing(vm) { expect in
-            // Rapid-fire: only the last should survive
             nav.destination = "first"
-            nav.destination = "second"
-            nav.destination = "final"
+            await expect(\.state.processedValue, equals: "first")
 
+            nav.destination = "second"
+            await expect(\.state.processedValue, equals: "second")
+
+            nav.destination = "final"
             await expect(\.state.processedValue, equals: "final")
         }
     }

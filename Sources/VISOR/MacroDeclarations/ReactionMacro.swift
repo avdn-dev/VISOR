@@ -11,12 +11,11 @@
 /// observation wrapper that calls the annotated method whenever the observed
 /// expression changes.
 ///
-/// - Sync methods: `for await value in VISOR.valuesOf({ ... }) { self.method(value) }`
-/// - Async methods: `await VISOR.latestValuesOf({ ... }) { value in await self.method(value) }`
+/// Both sync and async methods use `for await value in VISOR.valuesOf({ ... })` for
+/// sequential delivery — each handler completes before the next value is processed.
 ///
-/// Use `throttledBy:` to limit rapid-fire changes. On async methods, this switches
-/// from cancel-previous (`latestValuesOf`) to throttle semantics (`for await` + sleep),
-/// meaning each call runs to completion before the pause.
+/// Use `throttledBy:` to limit rapid-fire changes. The observation loop pauses after
+/// each handler completes, dropping intermediate values.
 ///
 /// ```swift
 /// @ViewModel

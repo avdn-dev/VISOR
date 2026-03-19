@@ -305,7 +305,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else {
           observeMethod = """
             func \(raw: methodName)() async {
-                await VISOR.latestValuesOf({ \(raw: reaction.observeExpression) }) { \(raw: reaction.parameterName) in
+                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
                     await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
                 }
             }

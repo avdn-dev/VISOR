@@ -1185,7 +1185,7 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Async @Reaction generates latestValuesOf call`() {
+  func `Async @Reaction generates for-await loop`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -1211,7 +1211,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
 
           func observeHandleUploadState() async {
-              await VISOR.latestValuesOf({ self.uploadService.uploadState }) { state in
+              for await state in VISOR.valuesOf({ self.uploadService.uploadState }) {
                   await self.handleUploadState(state: state)
               }
           }
