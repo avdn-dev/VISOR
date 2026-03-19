@@ -13,7 +13,7 @@
 /// Use ``pauseInBackground`` or ``pauseWhenInactive`` only when the observation loop
 /// drives high-frequency work (polling, real-time rendering) that wastes resources
 /// when the UI is not visible.
-public enum ObservationPolicy {
+public enum ObservationPolicy: Sendable {
   /// Observation runs continuously regardless of scene phase.
   case alwaysObserving
   /// Cancels observation when the scene enters background; restarts on foreground.

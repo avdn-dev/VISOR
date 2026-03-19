@@ -10,14 +10,14 @@ import SwiftUI
 // MARK: - Destination Protocols
 
 /// A destination that can be pushed onto a NavigationStack.
-public protocol PushDestination: Hashable {
+public protocol PushDestination: Hashable, Sendable {
   associatedtype Body: View
   @ViewBuilder var destinationView: Body { get }
 }
 
 /// Shared requirements for modal destinations (sheets, full-screen covers).
 /// `Identifiable` is required by SwiftUI's `.sheet(item:)` and `.fullScreenCover(item:)`.
-public protocol PresentableDestination: Hashable, Identifiable {
+public protocol PresentableDestination: Hashable, Identifiable, Sendable {
   associatedtype Body: View
   @ViewBuilder var destinationView: Body { get }
 }
@@ -29,7 +29,7 @@ public protocol SheetDestination: PresentableDestination {}
 public protocol FullScreenDestination: PresentableDestination {}
 
 /// A tab identifier. Tabs define their views in the consumer's TabView, so no view is required here.
-public protocol TabDestination: Hashable {}
+public protocol TabDestination: Hashable, Sendable {}
 
 // MARK: - NavigationScene
 
