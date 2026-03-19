@@ -231,7 +231,7 @@ struct ClassAnalysis {
         let secondIndex = arguments.index(after: arguments.startIndex)
         if secondIndex != arguments.endIndex {
           let secondArg = arguments[secondIndex]
-          if secondArg.label?.text == "throttled" {
+          if secondArg.label?.text == "throttledBy" {
             throttleExpr = secondArg.expression.trimmedDescription
           }
         }
@@ -316,7 +316,7 @@ struct ClassAnalysis {
         let secondIndex = arguments.index(after: arguments.startIndex)
         if secondIndex != arguments.endIndex {
           let secondArg = arguments[secondIndex]
-          if secondArg.label?.text == "throttled" {
+          if secondArg.label?.text == "throttledBy" {
             throttleExpr = secondArg.expression.trimmedDescription
           }
         }

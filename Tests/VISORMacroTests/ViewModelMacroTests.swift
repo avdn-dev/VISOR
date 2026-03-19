@@ -2137,16 +2137,16 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - @Bound with throttled:
+  // MARK: - @Bound with throttledBy:
 
   @Test
-  func `@Bound with throttled generates sleep after updateState`() {
+  func `@Bound with throttledBy generates sleep after updateState`() {
     assertMacroExpansion(
       """
       @ViewModel
       final class HeadVM {
         struct State: Equatable {
-          @Bound(\\HeadVM.tracker.posture, throttled: .seconds(0.125)) var posture: Posture
+          @Bound(\\HeadVM.tracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
         }
         private let tracker: HeadTracker
       }
@@ -2195,14 +2195,14 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Sync @Reaction with throttled generates sleep after method call`() {
+  func `Sync @Reaction with throttledBy generates sleep after method call`() {
     assertMacroExpansion(
       """
       @ViewModel
       final class AudioVM {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.recorder.audioLevel, throttled: .seconds(0.1))
+        @Reaction(\\.recorder.audioLevel, throttledBy: .seconds(0.1))
         func handleLevel(level: Float) { }
         private let recorder: AudioRecorder
       }
@@ -2243,14 +2243,14 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Async @Reaction with throttled generates for-await with sleep instead of latestValuesOf`() {
+  func `Async @Reaction with throttledBy generates for-await with sleep instead of latestValuesOf`() {
     assertMacroExpansion(
       """
       @ViewModel
       final class UploadVM {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.uploadService.uploadState, throttled: .seconds(1))
+        @Reaction(\\.uploadService.uploadState, throttledBy: .seconds(1))
         func handleUploadState(state: UploadState) async { }
         private let uploadService: UploadService
       }
@@ -2291,21 +2291,21 @@ struct ViewModelMacroTests {
   }
 
   @Test
-  func `Mixed throttled and unthrottled @Bound in same State`() {
+  func `Mixed throttledBy and unthrottledBy @Bound in same State`() {
     assertMacroExpansion(
       """
       @ViewModel
-      final class MixedThrottleVM {
+      final class MixedThrottledByVM {
         struct State: Equatable {
-          @Bound(\\MixedThrottleVM.service.name) var name: String
-          @Bound(\\MixedThrottleVM.tracker.posture, throttled: .seconds(0.125)) var posture: Posture
+          @Bound(\\MixedThrottledByVM.service.name) var name: String
+          @Bound(\\MixedThrottledByVM.tracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
         }
         private let service: MyService
         private let tracker: HeadTracker
       }
       """,
       expandedSource: """
-      final class MixedThrottleVM {
+      final class MixedThrottledByVM {
         struct State: Equatable {
           var name: String
           var posture: Posture
@@ -2326,7 +2326,7 @@ struct ViewModelMacroTests {
               self._state = State(name: service.name, posture: tracker.posture)
           }
 
-          typealias Factory = ViewModelFactory<MixedThrottleVM>
+          typealias Factory = ViewModelFactory<MixedThrottledByVM>
 
           func observeName() async {
               for await value in VISOR.valuesOf({ self.service.name }) {
@@ -2352,7 +2352,7 @@ struct ViewModelMacroTests {
           }
       }
 
-      extension MixedThrottleVM: @MainActor ViewModel {
+      extension MixedThrottledByVM: @MainActor ViewModel {
       }
       """,
       diagnostics: [observableWarning],

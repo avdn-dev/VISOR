@@ -451,12 +451,12 @@ struct ViewModelMacroRuntimeTests {
         }
     }
 
-    // MARK: - Throttled @Bound
+    // MARK: - ThrottledBy @Bound
 
     @Test(.timeLimit(.minutes(1)))
-    func `Throttled @Bound drops intermediate rapid-fire values`() async throws {
+    func `ThrottledBy @Bound drops intermediate rapid-fire values`() async throws {
         let source = RuntimeSource()
-        let vm = ThrottledBoundVM(source: source)
+        let vm = ThrottledByBoundVM(source: source)
 
         var emissions: [Int] = []
         let trackingTask = Task {
@@ -491,9 +491,9 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `Throttled @Bound eventually delivers single change`() async {
+    func `ThrottledBy @Bound eventually delivers single change`() async {
         let source = RuntimeSource()
-        let vm = ThrottledBoundVM(source: source)
+        let vm = ThrottledByBoundVM(source: source)
 
         await observing(vm) { expect in
             await expect(\.state.count, equals: 0)
@@ -503,12 +503,12 @@ struct ViewModelMacroRuntimeTests {
         }
     }
 
-    // MARK: - Throttled @Reaction (sync)
+    // MARK: - ThrottledBy @Reaction (sync)
 
     @Test(.timeLimit(.minutes(1)))
-    func `Throttled sync @Reaction throttles rapid-fire changes`() async throws {
+    func `ThrottledBy sync @Reaction throttles rapid-fire changes`() async throws {
         let source = RuntimeSource()
-        let vm = ThrottledSyncReactionVM(source: source)
+        let vm = ThrottledBySyncReactionVM(source: source)
 
         let observeTask = Task { await vm.startObserving() }
         try await yieldForTracking()
@@ -525,18 +525,18 @@ struct ViewModelMacroRuntimeTests {
 
         let totalReactions = vm.state.reactionCount - baseline
         #expect(totalReactions < 10,
-                "Throttled reaction should throttle: fired \(totalReactions) times for 10 changes")
+                "ThrottledBy reaction should throttle: fired \(totalReactions) times for 10 changes")
         #expect(vm.state.latestCount == 10, "Should have the latest value")
 
         observeTask.cancel()
     }
 
-    // MARK: - Throttled @Reaction (async)
+    // MARK: - ThrottledBy @Reaction (async)
 
     @Test(.timeLimit(.minutes(1)))
-    func `Throttled async @Reaction throttles and completes handlers`() async throws {
+    func `ThrottledBy async @Reaction throttles and completes handlers`() async throws {
         let source = RuntimeSource()
-        let vm = ThrottledAsyncReactionVM(source: source)
+        let vm = ThrottledByAsyncReactionVM(source: source)
 
         let observeTask = Task { await vm.startObserving() }
         try await yieldForTracking()
@@ -551,28 +551,28 @@ struct ViewModelMacroRuntimeTests {
 
         #expect(vm.state.processedCount == 10, "Should have the latest value")
         #expect(vm.state.completedHandlers < 10,
-                "Throttled async reaction should throttle: completed \(vm.state.completedHandlers) for 10 changes")
+                "ThrottledBy async reaction should throttle: completed \(vm.state.completedHandlers) for 10 changes")
         #expect(vm.state.completedHandlers >= 1, "At least one handler should complete")
 
         observeTask.cancel()
     }
 
-    // MARK: - Mixed throttled + unthrottled @Bound
+    // MARK: - Mixed throttledBy + unthrottledBy @Bound
 
     @Test(.timeLimit(.minutes(1)))
-    func `Mixed throttled and unthrottled @Bound in same VM`() async {
+    func `Mixed throttledBy and unthrottledBy @Bound in same VM`() async {
         let source = RuntimeSource()
-        let vm = MixedThrottledVM(source: source)
+        let vm = MixedThrottledByVM(source: source)
 
         await observing(vm) { expect in
             await expect(\.state.label, equals: "initial")
             await expect(\.state.count, equals: 0)
 
-            // Unthrottled @Bound updates promptly
+            // UnthrottledBy @Bound updates promptly
             source.label = "changed"
             await expect(\.state.label, equals: "changed")
 
-            // Throttled @Bound also delivers (after buffer)
+            // ThrottledBy @Bound also delivers (after buffer)
             source.count = 42
             await expect(\.state.count, equals: 42)
         }

@@ -320,22 +320,22 @@ final class BoundAndPolledVM {
     let monitor: BatteryMonitor
 }
 
-// MARK: 17. Throttled @Bound
+// MARK: 17. ThrottledBy @Bound
 
 @Observable
 @ViewModel
-final class ThrottledBoundVM {
+final class ThrottledByBoundVM {
     struct State: Equatable {
-        @Bound(\ThrottledBoundVM.source.count, throttled: .milliseconds(100)) var count: Int
+        @Bound(\ThrottledByBoundVM.source.count, throttledBy: .milliseconds(100)) var count: Int
     }
     let source: RuntimeSource
 }
 
-// MARK: 18. Throttled sync @Reaction
+// MARK: 18. ThrottledBy sync @Reaction
 
 @Observable
 @ViewModel
-final class ThrottledSyncReactionVM {
+final class ThrottledBySyncReactionVM {
     struct State: Equatable {
         var latestCount = 0
         var reactionCount = 0
@@ -343,18 +343,18 @@ final class ThrottledSyncReactionVM {
     var state = State()
     let source: RuntimeSource
 
-    @Reaction(\ThrottledSyncReactionVM.source.count, throttled: .milliseconds(100))
+    @Reaction(\ThrottledBySyncReactionVM.source.count, throttledBy: .milliseconds(100))
     func handleCount(count: Int) {
         updateState(\.latestCount, to: count)
         updateState(\.reactionCount, to: state.reactionCount + 1)
     }
 }
 
-// MARK: 19. Throttled async @Reaction
+// MARK: 19. ThrottledBy async @Reaction
 
 @Observable
 @ViewModel
-final class ThrottledAsyncReactionVM {
+final class ThrottledByAsyncReactionVM {
     struct State: Equatable {
         var processedCount = 0
         var completedHandlers = 0
@@ -362,7 +362,7 @@ final class ThrottledAsyncReactionVM {
     var state = State()
     let source: RuntimeSource
 
-    @Reaction(\ThrottledAsyncReactionVM.source.count, throttled: .milliseconds(100))
+    @Reaction(\ThrottledByAsyncReactionVM.source.count, throttledBy: .milliseconds(100))
     func handleCount(count: Int) async {
         try? await Task.sleep(for: .milliseconds(10))
         guard !Task.isCancelled else { return }
@@ -371,14 +371,14 @@ final class ThrottledAsyncReactionVM {
     }
 }
 
-// MARK: 20. Mixed throttled + unthrottled @Bound
+// MARK: 20. Mixed throttledBy + non-throttled @Bound
 
 @Observable
 @ViewModel
-final class MixedThrottledVM {
+final class MixedThrottledByVM {
     struct State: Equatable {
-        @Bound(\MixedThrottledVM.source.label) var label: String
-        @Bound(\MixedThrottledVM.source.count, throttled: .milliseconds(100)) var count: Int
+        @Bound(\MixedThrottledByVM.source.label) var label: String
+        @Bound(\MixedThrottledByVM.source.count, throttledBy: .milliseconds(100)) var count: Int
     }
     let source: RuntimeSource
 }
