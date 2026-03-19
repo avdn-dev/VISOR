@@ -237,13 +237,17 @@ func makeProtocolExtension(
 
 extension String {
   var capitalizedFirst: String {
-    guard let first else { return self }
-    return first.uppercased() + dropFirst()
+    guard !isEmpty else { return self }
+    var result = self
+    result.replaceSubrange(startIndex...startIndex, with: self[startIndex].uppercased())
+    return result
   }
 
   var lowercasedFirst: String {
-    guard let first else { return self }
-    return first.lowercased() + dropFirst()
+    guard !isEmpty else { return self }
+    var result = self
+    result.replaceSubrange(startIndex...startIndex, with: self[startIndex].lowercased())
+    return result
   }
 
   var trimmingWhitespace: String {

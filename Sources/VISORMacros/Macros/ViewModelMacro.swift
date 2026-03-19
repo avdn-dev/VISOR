@@ -29,7 +29,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // Error if @Observable is missing — observation code will silently fail without it
     let hasObservable = classDecl.attributes.contains { attr in
-      attr.as(AttributeSyntax.self)?.attributeName.trimmedDescription == AttributeName.observable
+      attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.observable
     }
     if !hasObservable {
       context.diagnose(Diagnostic(
@@ -342,8 +342,9 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     if !allObserveMethodNames.isEmpty {
       if analysis.hasStartObserving {
         let body = analysis.startObservingBodyText ?? ""
+        let bodyTokens = Set(body.split(whereSeparator: { !$0.isLetter && $0 != "_" && !$0.isNumber }).map(String.init))
         for methodName in allObserveMethodNames {
-          if !body.contains(methodName) {
+          if !bodyTokens.contains(methodName) {
             context.diagnose(Diagnostic(
               node: Syntax(declaration),
               message: VISORDiagnostic.manualStartObservingMissingMethod(methodName: methodName)))

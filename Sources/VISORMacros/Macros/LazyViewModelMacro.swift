@@ -95,6 +95,8 @@ public struct LazyViewModelMacro: MemberMacro {
 
   // MARK: Private
 
+  // Must stay in sync with ObservationPolicy cases in Sources/VISOR/ObservationPolicy.swift.
+  // The macro target cannot import the VISOR runtime, so valid values are duplicated here.
   private static let validPolicies: Set<String> = [
     "alwaysObserving", "pauseInBackground", "pauseWhenInactive",
   ]

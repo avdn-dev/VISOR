@@ -189,7 +189,7 @@ struct ClassAnalysis {
         // @Reaction methods
         guard let reactionAttr = funcDecl.attributes.lazy
           .compactMap({ $0.as(AttributeSyntax.self) })
-          .first(where: { $0.attributeName.trimmedDescription == AttributeName.reaction })
+          .first(where: { $0.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.reaction })
         else {
           continue
         }
@@ -258,7 +258,7 @@ struct ClassAnalysis {
       var polledAttr: AttributeSyntax?
       for attr in varDecl.attributes {
         guard let attrSyntax = attr.as(AttributeSyntax.self) else { continue }
-        let name = attrSyntax.attributeName.trimmedDescription
+        guard let name = attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text else { continue }
         if name == AttributeName.bound { boundAttr = attrSyntax }
         else if name == AttributeName.polled { polledAttr = attrSyntax }
       }

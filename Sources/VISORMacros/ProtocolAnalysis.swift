@@ -94,7 +94,7 @@ struct ProtocolAnalysis {
           for attr in varDecl.attributes {
             guard
               let attrSyntax = attr.as(AttributeSyntax.self),
-              attrSyntax.attributeName.trimmedDescription == AttributeName.stubbableDefault,
+              attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.stubbableDefault,
               let arguments = attrSyntax.arguments?.as(LabeledExprListSyntax.self),
               let firstArg = arguments.first
             else {
