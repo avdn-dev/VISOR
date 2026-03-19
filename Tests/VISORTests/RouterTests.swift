@@ -17,13 +17,13 @@ struct RouterTests {
 
   @Test
   func `Root router is active by default`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     #expect(router.isActive)
   }
 
   @Test
   func `Child router creation sets level and tab`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
     #expect(child.level == 1)
@@ -33,7 +33,7 @@ struct RouterTests {
 
   @Test
   func `Child activate deactivates parent`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
     child.activate()
@@ -43,7 +43,7 @@ struct RouterTests {
 
   @Test
   func `push appends to navigation path`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.push(.detail(id: "1"))
     router.push(.nested)
 
@@ -54,7 +54,7 @@ struct RouterTests {
 
   @Test
   func `present sheet sets presentingSheet`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.present(sheet: .preferences)
 
     #expect(router.presentingSheet == .preferences)
@@ -62,7 +62,7 @@ struct RouterTests {
 
   @Test
   func `present fullScreen sets presentingFullScreen`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.present(fullScreen: .onboarding)
 
     #expect(router.presentingFullScreen == .onboarding)
@@ -70,7 +70,7 @@ struct RouterTests {
 
   @Test
   func `popToRoot clears navigation path`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.push(.detail(id: "1"))
     router.push(.nested)
     router.popToRoot()
@@ -80,7 +80,7 @@ struct RouterTests {
 
   @Test
   func `dismissSheet clears presentingSheet`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.present(sheet: .preferences)
     router.dismissSheet()
 
@@ -89,7 +89,7 @@ struct RouterTests {
 
   @Test
   func `dismissFullScreen clears presentingFullScreen`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
     router.present(fullScreen: .onboarding)
     router.dismissFullScreen()
 
@@ -98,14 +98,14 @@ struct RouterTests {
 
   @Test
   func `select tab on root sets selectedTab directly`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.select(tab: .settings)
     #expect(root.selectedTab == .settings)
   }
 
   @Test
   func `select tab from child propagates to root`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.selectedTab = .home
     let child = root.childRouter(for: .home)
 
@@ -115,7 +115,7 @@ struct RouterTests {
 
   @Test
   func `Deep link on inactive router ignores all destination types`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     child.activate() // root becomes inactive
 
@@ -139,7 +139,7 @@ struct RouterTests {
 
   @Test
   func `Modal child router has no tab`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let modal = root.childRouter()
 
     #expect(modal.identifierTab == nil)
@@ -151,7 +151,7 @@ struct RouterTests {
 
   @Test
   func `selectAndPush pushes to child router not self`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.selectAndPush(tab: .settings, destination: .detail(id: "42"))
 
     #expect(root.navigationPath.isEmpty)
@@ -162,7 +162,7 @@ struct RouterTests {
 
   @Test
   func `selectAndPush from child propagates tab to root`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
     child.selectAndPush(tab: .settings, destination: .nested)
@@ -174,7 +174,7 @@ struct RouterTests {
 
   @Test
   func `childRouter for tab returns cached instance`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let first = root.childRouter(for: .home)
     let second = root.childRouter(for: .home)
 
@@ -183,7 +183,7 @@ struct RouterTests {
 
   @Test
   func `childRouter for modal returns new instance each call`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let first = root.childRouter()
     let second = root.childRouter()
 
@@ -194,7 +194,7 @@ struct RouterTests {
 
   @Test
   func `Deep link on active root handles all destination types`() {
-    let router = Router<TestScene>(level: 0)
+    let router = Router<TestScene>()
 
     router.deepLinkOpen(to: .push(.detail(id: "deep")))
     #expect(router.navigationPath == [.detail(id: "deep")])
@@ -213,7 +213,7 @@ struct RouterTests {
 
   @Test
   func `init with parent sets child inactive`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = Router<TestScene>(level: 1, parent: root)
 
     #expect(!child.isActive)
@@ -223,7 +223,7 @@ struct RouterTests {
 
   @Test
   func `configureDeepLinks sets handler that scheme-gates`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
@@ -239,7 +239,7 @@ struct RouterTests {
 
   @Test
   func `configureDeepLinks tries parsers in order`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
       .equal(to: ["settings"], destination: .tab(.home)), // second parser for same path
@@ -251,7 +251,7 @@ struct RouterTests {
 
   @Test
   func `deepLinkHandler propagates to tab children`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .tab(.home)),
     ])
@@ -265,7 +265,7 @@ struct RouterTests {
 
   @Test
   func `deepLinkHandler propagates to modal children`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .tab(.home)),
     ])
@@ -276,7 +276,7 @@ struct RouterTests {
 
   @Test
   func `Active router processes deep link URL end-to-end`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
@@ -292,7 +292,7 @@ struct RouterTests {
 
   @Test
   func `configureDeepLinks is case-insensitive for scheme`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
@@ -305,7 +305,7 @@ struct RouterTests {
 
   @Test
   func `configureDeepLinks with empty parsers returns nil`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [])
 
     let result = root.deepLinkHandler?(URL(string: "test://settings")!)
@@ -316,7 +316,7 @@ struct RouterTests {
 
   @Test
   func `configureDeepLinks when no parser matches returns nil`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
@@ -325,14 +325,16 @@ struct RouterTests {
     #expect(result == nil)
   }
 
-  // MARK: - Direct deepLinkHandler assignment
+  // MARK: - configureDeepLinks handler
 
   @Test
-  func `deepLinkHandler set directly works`() {
-    let root = Router<TestScene>(level: 0)
-    root.deepLinkHandler = { _ in .tab(.home) }
+  func `configureDeepLinks sets handler`() {
+    let root = Router<TestScene>()
+    root.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["home"], destination: .tab(.home)),
+    ])
 
-    let result = root.deepLinkHandler?(URL(string: "anything://whatever")!)
+    let result = root.deepLinkHandler?(URL(string: "test://home")!)
     #expect(result == .tab(.home))
   }
 
@@ -340,7 +342,7 @@ struct RouterTests {
 
   @Test
   func `activate is idempotent`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
     child.activate()
@@ -353,7 +355,7 @@ struct RouterTests {
 
   @Test
   func `selectAndPush on child with existing items preserves path`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     let child = root.childRouter(for: .settings)
     child.push(.nested)
 
@@ -366,7 +368,7 @@ struct RouterTests {
 
   @Test
   func `selectAndPush then popToRoot on child clears only child`() {
-    let root = Router<TestScene>(level: 0)
+    let root = Router<TestScene>()
     root.selectAndPush(tab: .settings, destination: .detail(id: "1"))
     let child = root.childRouter(for: .settings)
 

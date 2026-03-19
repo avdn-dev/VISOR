@@ -92,7 +92,7 @@ struct IntegrationTests {
     func `Router navigation does not interfere with VM observation`() async {
         let source = TestSource()
         let vm = IntegrationVM(source: source)
-        let router = Router<TestScene>(level: 0)
+        let router = Router<TestScene>()
 
         await observing(vm) { expect in
             await expect(\.state.count, equals: 0)
@@ -112,7 +112,7 @@ struct IntegrationTests {
 
     @Test
     func `Deep link end-to-end with child router`() {
-        let root = Router<TestScene>(level: 0)
+        let root = Router<TestScene>()
         root.configureDeepLinks(scheme: "test", parsers: [
             .equal(to: ["home"], destination: .tab(.home)),
             .equal(to: ["settings", "detail"], destination: .push(.detail(id: "deep"))),
@@ -132,7 +132,7 @@ struct IntegrationTests {
 
     @Test
     func `Routed factory with real Router creates working VM`() {
-        let router = Router<TestScene>(level: 0)
+        let router = Router<TestScene>()
         let factory: ViewModelFactory<RoutedIntegrationVM> = .routed { (r: Router<TestScene>) in
             RoutedIntegrationVM(routerID: ObjectIdentifier(r))
         }

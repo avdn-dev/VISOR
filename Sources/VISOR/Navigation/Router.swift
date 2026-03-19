@@ -32,8 +32,26 @@ public final class Router<Scene: NavigationScene> {
   ///   - identifierTab: The tab this router manages, or `nil` for root/modal routers.
   ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
   ///   - logger: Optional `os.Logger` for debug-level navigation logging.
-  public init(
-    level: Int = 0,
+  /// Creates a root router.
+  ///
+  /// - Parameter logger: Optional `os.Logger` for debug-level navigation logging.
+  public init(logger: Logger? = nil) {
+    self.level = 0
+    self.identifierTab = nil
+    self.parent = nil
+    self.logger = logger
+    isActive = true
+  }
+
+  /// Creates a router node in the navigation hierarchy.
+  ///
+  /// - Parameters:
+  ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
+  ///   - identifierTab: The tab this router manages, or `nil` for root/modal routers.
+  ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
+  ///   - logger: Optional `os.Logger` for debug-level navigation logging.
+  package init(
+    level: Int,
     identifierTab: Scene.Tab? = nil,
     parent: Router? = nil,
     logger: Logger? = nil)
@@ -203,7 +221,7 @@ public final class Router<Scene: NavigationScene> {
 
   /// Create a preview router with the given tab selected.
   public static func preview(tab: Scene.Tab? = nil) -> Router {
-    let router = Router(level: 0, identifierTab: nil)
+    let router = Router()
     router.selectedTab = tab
     return router
   }
@@ -215,7 +233,7 @@ public final class Router<Scene: NavigationScene> {
   /// This closure is retained for the router's lifetime (often app lifetime) and propagated
   /// to all child routers. Prefer `configureDeepLinks(scheme:parsers:)` which captures only
   /// value types. If setting directly, use `[weak self]` to avoid retain cycles.
-  @ObservationIgnored public package(set) var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
+  @ObservationIgnored public private(set) var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
 
   /// Configure deep link handling with a URL scheme and an ordered list of parsers.
   ///

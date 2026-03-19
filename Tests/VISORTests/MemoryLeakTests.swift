@@ -364,7 +364,7 @@ struct MemoryLeakTests {
 
     @Test(.timeLimit(.minutes(1)))
     func `Router child does not retain parent`() async throws {
-        var root: Router<TestScene>? = Router<TestScene>(level: 0)
+        var root: Router<TestScene>? = Router<TestScene>()
         weak let weakRoot = root
         let child = root!.childRouter(for: .home)
 
