@@ -38,6 +38,7 @@ public struct ReactionMacro: PeerMacro {
       current = node.parent
     }
 
+    context.diagnose(Diagnostic(node: Syntax(attribute), message: VISORDiagnostic.reactionNotInClass))
     return []
   }
 }

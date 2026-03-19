@@ -36,6 +36,8 @@ enum VISORDiagnostic: DiagnosticMessage {
   case polledOnLetProperty(propertyName: String)
   case polledPropertyHasDefault(propertyName: String)
   case polledMissingInterval(propertyName: String)
+  case polledOutsideState
+  case reactionNotInClass
   case invalidObservationPolicy
 
   // MARK: Internal
@@ -94,6 +96,10 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Polled on '\(propertyName)': remove the default value — state is initialized from the service"
     case .polledMissingInterval(let propertyName):
       "@Polled on '\(propertyName)': missing 'every:' interval parameter"
+    case .polledOutsideState:
+      "@Polled must be inside 'struct State' — move to the corresponding State property"
+    case .reactionNotInClass:
+      "@Reaction must be inside a class annotated with @ViewModel"
     case .invalidObservationPolicy:
       "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     }
@@ -127,6 +133,8 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .polledOnLetProperty: "polledOnLetProperty"
     case .polledPropertyHasDefault: "polledPropertyHasDefault"
     case .polledMissingInterval: "polledMissingInterval"
+    case .polledOutsideState: "polledOutsideState"
+    case .reactionNotInClass: "reactionNotInClass"
     case .invalidObservationPolicy: "invalidObservationPolicy"
     }
     return MessageID(domain: "VISOR", id: id)
@@ -144,7 +152,7 @@ enum VISORDiagnostic: DiagnosticMessage {
          .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
          .invalidReactionParameter, .boundPropertyHasDefault,
          .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
-         .invalidObservationPolicy:
+         .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy:
       .error
     }
   }
