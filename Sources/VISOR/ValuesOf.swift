@@ -5,7 +5,6 @@
 //  Created by Anh Nguyen on 18/2/2026.
 //
 
-import Observation
 
 /// Returns an `AsyncStream` that emits the current value produced by `emit` and re-emits on every change.
 ///

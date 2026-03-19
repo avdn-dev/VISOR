@@ -1,6 +1,5 @@
 import Foundation
 import VISOR
-import Observation
 import Testing
 
 // MARK: - Test ViewModels

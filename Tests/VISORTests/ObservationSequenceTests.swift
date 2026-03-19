@@ -6,7 +6,6 @@
 //
 
 import VISOR
-import Observation
 import Testing
 
 // MARK: - ObservationSequence tests

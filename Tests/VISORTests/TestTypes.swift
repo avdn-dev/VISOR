@@ -1,5 +1,4 @@
 import SwiftUI
-import Observation
 import VISOR
 
 // MARK: - Shared Observable Source

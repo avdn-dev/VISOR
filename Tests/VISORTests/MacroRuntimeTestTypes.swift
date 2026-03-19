@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 import VISOR
 
 // MARK: - Shared Dependencies for Macro Runtime Tests

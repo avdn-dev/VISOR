@@ -48,9 +48,11 @@ struct PolledValuesTests {
     counter = 2
 
     _ = await task.value
-    // First emission is immediate (0), subsequent are from polling
+    // First emission is immediate (0), subsequent values depend on poll timing
     #expect(emissions.count == 3)
     #expect(emissions[0] == 0)
+    #expect(emissions[1] >= emissions[0])
+    #expect(emissions[2] >= emissions[1])
   }
 
   @Test(.timeLimit(.minutes(1)))

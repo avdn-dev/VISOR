@@ -5,7 +5,6 @@
 //  Created by Anh Nguyen on 17/2/2026.
 //
 
-import Observation
 
 /// Custom `AsyncSequence` for pre-iOS 26, wrapping `withObservationTracking` in an `AsyncStream`.
 ///

@@ -1,5 +1,4 @@
 import VISOR
-import Observation
 import Testing
 
 // MARK: - Test Types
