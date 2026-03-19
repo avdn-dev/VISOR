@@ -206,24 +206,20 @@ Configure deep link handling with a URL scheme and composable parsers:
 
 ```swift
 router.configureDeepLinks(scheme: "myapp", parsers: [
-  // Static match
+  // Static match: myapp://settings
   .equal(to: ["settings"], destination: .tab(.settings)),
 
-  // Custom parser
+  // Custom parser: myapp://item/42
   DeepLinkParser { url in
-    guard url.deepLinkComponents.first == "item",
-          let id = url.deepLinkComponents.dropFirst().first
+    guard url.host() == "item",
+          let id = url.pathComponents.dropFirst().first
     else { return nil }
-    return .push(.detail(id: id))
+    return .push(.detail(id: String(id)))
   }
 ])
 ```
 
 ``DeepLinkParser`` provides `.equal(to:destination:)` for static matches and an init that takes a custom parsing closure. Parsers are tried in order; the first non-nil result wins.
-
-The URL extension `deepLinkComponents` strips the scheme and splits into components:
-- `myapp://settings` → `["settings"]`
-- `myapp://item/42` → `["item", "42"]`
 
 Deep link handlers propagate to child routers automatically.
 
