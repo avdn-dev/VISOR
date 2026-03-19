@@ -79,6 +79,18 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.polledOnLetProperty(propertyName: name)))
     }
 
+    // 2c. @Bound/@Polled on class-level properties (misplaced)
+    for _ in analysis.boundOutsideState {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.boundOutsideState))
+    }
+    for _ in analysis.polledOutsideState {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.polledOutsideState))
+    }
+
     // 3. Validate @Bound properties
     let boundProps = analysis.stateBoundProperties
     let storedLetNames = Set(properties.map(\.name))

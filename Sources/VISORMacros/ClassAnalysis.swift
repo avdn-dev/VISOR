@@ -94,6 +94,10 @@ struct ClassAnalysis {
   var polledOnLetProperties: [String] = []
   var polledMissingInterval: [String] = []
 
+  // @Bound/@Polled on class-level properties (misplaced — should be inside State)
+  var boundOutsideState: [String] = []
+  var polledOutsideState: [String] = []
+
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
       // Initializer check
@@ -120,6 +124,22 @@ struct ClassAnalysis {
 
       // Variable declarations
       if let varDecl = member.decl.as(VariableDeclSyntax.self) {
+        // Detect @Bound/@Polled on class-level properties (should be inside State)
+        for attr in varDecl.attributes {
+          guard let attrSyntax = attr.as(AttributeSyntax.self),
+                let attrName = attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+          else { continue }
+          if attrName == AttributeName.bound {
+            if let name = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text {
+              boundOutsideState.append(name)
+            }
+          } else if attrName == AttributeName.polled {
+            if let name = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text {
+              polledOutsideState.append(name)
+            }
+          }
+        }
+
         let bindingKind = varDecl.bindingSpecifier.text
 
         if bindingKind == "let" {

@@ -11,18 +11,16 @@ import SwiftSyntaxMacros
 
 // MARK: - BoundMacro
 
-/// Marker macro for `@ViewModel` — validates placement inside `struct State`.
-/// The actual code generation is handled by `@ViewModel` via `ClassAnalysis`.
+/// Marker macro for `@ViewModel` — placement is validated by `ClassAnalysis`.
+/// This peer macro is intentionally a no-op; it exists only so the compiler
+/// recognises `@Bound(…)` as a valid attribute on variable declarations.
 public struct BoundMacro: PeerMacro {
   public static func expansion(
-    of attribute: AttributeSyntax,
-    providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext)
+    of _: AttributeSyntax,
+    providingPeersOf _: some DeclSyntaxProtocol,
+    in _: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
-    if !isInsideStateStruct(declaration) {
-      context.diagnose(Diagnostic(node: Syntax(attribute), message: VISORDiagnostic.boundOutsideState))
-    }
-    return []
+    []
   }
 }

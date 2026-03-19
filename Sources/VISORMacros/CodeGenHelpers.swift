@@ -201,25 +201,6 @@ func accessLevel(of declaration: some DeclGroupSyntax) -> String {
   return ""
 }
 
-// MARK: - Placement Validation
-
-/// Checks whether the declaration is inside a `struct State` that is nested inside a class.
-/// Used by `@Bound` and `@Polled` to validate placement.
-func isInsideStateStruct(_ declaration: some DeclSyntaxProtocol) -> Bool {
-  var current: Syntax? = Syntax(declaration).parent
-  var foundState = false
-  while let node = current {
-    if let structDecl = node.as(StructDeclSyntax.self), structDecl.name.text == "State" {
-      foundState = true
-    }
-    if node.is(ClassDeclSyntax.self) {
-      return foundState
-    }
-    current = node.parent
-  }
-  return false
-}
-
 // MARK: - Protocol Extension Helper
 
 func makeProtocolExtension(

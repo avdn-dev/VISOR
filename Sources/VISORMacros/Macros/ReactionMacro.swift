@@ -11,7 +11,8 @@ import SwiftSyntaxMacros
 
 // MARK: - ReactionMacro
 
-/// Marker macro for `@ViewModel` — validates that it's on a method at the class level.
+/// Marker macro for `@ViewModel` — validates that it's on a method.
+/// Context validation (class-level vs nested type) is handled by `ClassAnalysis`.
 public struct ReactionMacro: PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
@@ -25,20 +26,6 @@ public struct ReactionMacro: PeerMacro {
       return []
     }
 
-    // Walk up to find containing type — must be a class, not a nested struct/enum
-    var current: Syntax? = Syntax(declaration).parent
-    while let node = current {
-      if node.is(ClassDeclSyntax.self) {
-        return [] // Valid — at class level
-      }
-      if node.is(StructDeclSyntax.self) || node.is(EnumDeclSyntax.self) {
-        context.diagnose(Diagnostic(node: Syntax(attribute), message: VISORDiagnostic.reactionInsideNestedType))
-        return []
-      }
-      current = node.parent
-    }
-
-    context.diagnose(Diagnostic(node: Syntax(attribute), message: VISORDiagnostic.reactionNotInClass))
     return []
   }
 }
