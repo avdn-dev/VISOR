@@ -8,7 +8,7 @@
 
 // MARK: - Single ViewModel Macro
 
-/// Attach to a View struct to enable lazy view model initialization.
+/// Attach to a View struct to enable lazy view model initialisation.
 /// Auto-generates factory environment, viewModel property, and body.
 ///
 /// The generated `body` includes a `.task(id:)` modifier that calls
@@ -40,7 +40,7 @@
 ///
 /// > The generated `viewModel` property force-unwraps the backing `@State`. This is safe
 /// > because the generated `body` guards with `if _viewModel != nil` before rendering
-/// > `content`, and initialization is guaranteed by the `.task` modifier.
+/// > `content`, and initialisation is guaranteed by the `.task` modifier.
 @attached(member, names: named(body), named(_viewModel), named(viewModel), named(stateBinding), named(factory), named(containerRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
   _: VM.Type,

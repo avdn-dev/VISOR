@@ -57,10 +57,10 @@ The key path must use the full class name as the root and include at least two c
 
 ### No Default Values
 
-`@Bound` properties cannot have default values. They're initialized from the service at `init` time:
+`@Bound` properties cannot have default values. They're initialised from the service at `init` time:
 
 ```swift
-// Correct — initialized from service
+// Correct — initialised from service
 @Bound(\MyViewModel.service.name) var name: String
 
 // Compile error — remove the default
@@ -89,7 +89,7 @@ final class DashboardViewModel {
 
 The generated code polls on a timer, using `updateState` for automatic deduplication. Zero CPU cost between polls.
 
-Like `@Bound`, `@Polled` properties cannot have default values — they're initialized from the source at creation time.
+Like `@Bound`, `@Polled` properties cannot have default values — they're initialised from the source at creation time.
 
 ## @Reaction — Method-Level Reactions
 

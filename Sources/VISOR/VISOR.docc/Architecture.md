@@ -115,7 +115,7 @@ private let profileService: ProfileService
 // }
 ```
 
-`@Bound` properties cannot have default values — they're always initialized from the service so state starts with real data, never stale placeholders. Non-bound properties coexist naturally and keep their defaults.
+`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Non-bound properties coexist naturally and keep their defaults.
 
 ## Factory Injection
 

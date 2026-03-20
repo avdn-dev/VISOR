@@ -12,7 +12,7 @@
 /// source property specified by the key path. The key path provides full
 /// autocomplete and compiler validation of the source property.
 ///
-/// Bound properties without default values are initialized from the service
+/// Bound properties without default values are initialised from the service
 /// at init time — no stale defaults.
 ///
 /// Use the `throttledBy:` variant to limit rapid-fire updates to a maximum

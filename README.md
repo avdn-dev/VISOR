@@ -12,7 +12,7 @@ VISOR provides opinionated answers with macros that eliminate the boilerplate:
 
 - **`@Bound`** declares which service properties a ViewModel tracks. The macro generates observation loops, deduplication, and initial state — you never write `for await` observation by hand.
 - **`@LazyViewModel`** separates view ownership from rendering. The `@LazyViewModel` view gets its ViewModel from a Factory; child views receive state as plain parameters, trivially previewable and testable.
-- **`Router`** centralizes navigation behind a type-safe API with deep linking, modal hierarchies, and tab management built in.
+- **`Router`** centralises navigation behind a type-safe API with deep linking, modal hierarchies, and tab management built in.
 - **`@Stubbable` / `@Spyable`** generate test doubles from protocol declarations — stubs with sensible defaults, spies with call recording.
 
 ## Requirements
@@ -62,7 +62,7 @@ final class ProfileViewModel {
 
   private let profileService: ProfileService
 }
-// @ViewModel generates: init(profileService:), var state (initialized from service),
+// @ViewModel generates: init(profileService:), var state (initialised from service),
 // startObserving() that watches profileService, and typealias Factory.
 
 // 2. View — @LazyViewModel view owns the VM, Content is pure UI
@@ -97,7 +97,7 @@ ProfileScreen()
   .environment(ProfileViewModel.Factory { ProfileViewModel(profileService: profileService) })
 ```
 
-When `profileService.name` or `.email` changes, the view updates automatically. `@Bound` properties have no default values — they're initialized from the service at creation time, so state always starts with real data.
+When `profileService.name` or `.email` changes, the view updates automatically. `@Bound` properties have no default values — they're initialised from the service at creation time, so state always starts with real data.
 
 ## What's Included
 
@@ -109,7 +109,7 @@ When `profileService.name` or `.email` changes, the view updates automatically. 
 | `@Reaction` | Calls a method whenever an observed property changes |
 | `@LazyViewModel` | Factory injection, lazy init, and observation lifecycle for views |
 | `Loadable<Value>` | Enum for per-field loading/empty/error states within `State` |
-| `Router` | Type-safe navigation with deep linking and modal hierarchies |
+| `Router` | Type-safe navigation with deep linking, externalised view resolution, and modal hierarchies |
 | `@Stubbable` / `@Spyable` | Generate test doubles from protocol declarations |
 | `observing()` / `Expectation` | Testing DSL for asserting on observable ViewModel state |
 
@@ -121,7 +121,7 @@ Full API documentation is available at [**avdn-dev.github.io/VISOR**](https://av
 
 - **Architecture** — VISOR layers, View/Content pattern, Factory injection
 - **Observation** — `@Bound`, `@Polled`, `@Reaction`, rate limiting, `valuesOf()`
-- **Navigation** — Router, NavigationScene, deep linking, NavigationContainer
+- **Navigation** — Router, NavigationScene, content-based view resolution, deep linking, NavigationContainer
 - **Testing** — `observing()` DSL, `@Stubbable`, `@Spyable`
 
 ## License

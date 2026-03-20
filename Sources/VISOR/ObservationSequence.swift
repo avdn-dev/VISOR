@@ -18,7 +18,7 @@
 /// so that task cancellation is prompt — `AsyncStream.Iterator.next()` cooperatively returns
 /// `nil` on cancellation, allowing the inner task to exit immediately without waiting for
 /// a property change. The extra allocation is a deliberate trade-off for correct cancellation
-/// behavior. On iOS 26+, `valuesOf()` uses `Observations` (SE-0475) instead.
+/// behaviour. On iOS 26+, `valuesOf()` uses `Observations` (SE-0475) instead.
 package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
   package typealias AsyncIterator = AsyncStream<Element>.AsyncIterator
   package let stream: AsyncStream<Element>
@@ -52,7 +52,7 @@ package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
     }
   }
 
-  /// Deduplicating initializer that skips emissions when the new value equals the previous one.
+  /// Deduplicating initialiser that skips emissions when the new value equals the previous one.
   /// Eliminates the extra AsyncStream + Task wrapper that the Equatable `valuesOf()` overload
   /// would otherwise need for pre-iOS 26.
   package init(

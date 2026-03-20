@@ -10,17 +10,19 @@ import SwiftUI
 // MARK: - Destination Protocols
 
 /// A destination that can be pushed onto a NavigationStack.
-public protocol PushDestination: Hashable, Sendable {
-  associatedtype Body: View
-  @ViewBuilder var destinationView: Body { get }
-}
+///
+/// Conforming types serve as identity-only route markers — they carry enough information
+/// to identify the destination (typically an enum case with associated data) but do not
+/// create the view themselves. View creation is handled by the content closures
+/// passed to ``NavigationContainer``.
+public protocol PushDestination: Hashable, Sendable {}
 
 /// Shared requirements for modal destinations (sheets, full-screen covers).
-/// `Identifiable` is required by SwiftUI's `.sheet(item:)` and `.fullScreenCover(item:)`.
-public protocol PresentableDestination: Hashable, Identifiable, Sendable {
-  associatedtype Body: View
-  @ViewBuilder var destinationView: Body { get }
-}
+///
+/// Conforming types serve as identity-only route markers. `Identifiable` is required
+/// by SwiftUI's `.sheet(item:)` and `.fullScreenCover(item:)`. View resolution is
+/// handled by the content closures passed to ``NavigationContainer``.
+public protocol PresentableDestination: Hashable, Identifiable, Sendable {}
 
 /// A destination that can be presented as a sheet.
 public protocol SheetDestination: PresentableDestination {}

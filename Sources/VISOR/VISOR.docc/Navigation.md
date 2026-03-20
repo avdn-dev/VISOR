@@ -4,52 +4,34 @@ Type-safe navigation with Router, NavigationScene, deep linking, and modal hiera
 
 ## Overview
 
-VISOR's navigation system centralizes all navigation state in a ``Router`` object, decoupling views from their destinations. Views never directly present other views — they tell the Router what to show, and ``NavigationContainer`` handles the SwiftUI wiring.
+VISOR's navigation system centralises all navigation state in a ``Router`` object, decoupling views from their destinations. Views never directly present other views — they tell the Router what to show, and ``NavigationContainer`` handles the SwiftUI wiring.
+
+Destination types are identity-only enums — they carry the data needed to identify a screen but don't create the view. View creation is handled by content closures passed to ``NavigationContainer``, which means the destination enums can live in a shared module without importing feature view types.
 
 ## Defining Destinations
 
-Start by defining destination types that conform to VISOR's protocols:
+Define destination types as plain `Hashable` enums:
 
 ```swift
-enum AppPush: PushDestination {
+nonisolated enum AppPush: PushDestination {
   case detail(id: String)
   case settings
-
-  var destinationView: some View {
-    switch self {
-    case .detail(let id): DetailScreen(id: id)
-    case .settings: SettingsScreen()
-    }
-  }
 }
 
-enum AppSheet: SheetDestination {
+nonisolated enum AppSheet: SheetDestination {
   case preferences
   case share(item: Item)
 
   var id: Self { self }
-
-  var destinationView: some View {
-    switch self {
-    case .preferences: PreferencesScreen()
-    case .share(let item): ShareScreen(item: item)
-    }
-  }
 }
 
-enum AppFullScreen: FullScreenDestination {
+nonisolated enum AppFullScreen: FullScreenDestination {
   case onboarding
 
   var id: Self { self }
-
-  var destinationView: some View {
-    switch self {
-    case .onboarding: OnboardingScreen()
-    }
-  }
 }
 
-enum AppTab: TabDestination {
+nonisolated enum AppTab: TabDestination {
   case home, search, profile
 }
 ```
@@ -58,9 +40,9 @@ enum AppTab: TabDestination {
 
 | Protocol | Requires | Used For |
 |----------|----------|----------|
-| ``PushDestination`` | `Hashable`, `destinationView` | `NavigationStack` push |
-| ``SheetDestination`` | `Hashable`, `Identifiable`, `destinationView` | `.sheet(item:)` |
-| ``FullScreenDestination`` | `Hashable`, `Identifiable`, `destinationView` | `.fullScreenCover(item:)` |
+| ``PushDestination`` | `Hashable` | `NavigationStack` push |
+| ``SheetDestination`` | `Hashable`, `Identifiable` | `.sheet(item:)` |
+| ``FullScreenDestination`` | `Hashable`, `Identifiable` | `.fullScreenCover(item:)` |
 | ``TabDestination`` | `Hashable` | Tab selection (no view — defined in your `TabView`) |
 
 ``SheetDestination`` and ``FullScreenDestination`` both inherit from ``PresentableDestination``, which provides the shared `Hashable & Identifiable` requirements.
@@ -79,6 +61,37 @@ enum AppScene: NavigationScene {
 ```
 
 This is the generic parameter used by ``Router``, ``NavigationContainer``, ``NavigationButton``, and ``Destination``.
+
+## Writing Content Closures
+
+Content closures map destination values to views. Write them as `@ViewBuilder` functions that switch over each destination:
+
+```swift
+@ViewBuilder
+func pushContent(for destination: AppPush) -> some View {
+  switch destination {
+  case .detail(let id): DetailScreen(id: id)
+  case .settings: SettingsScreen()
+  }
+}
+
+@ViewBuilder
+func sheetContent(for destination: AppSheet) -> some View {
+  switch destination {
+  case .preferences: PreferencesScreen()
+  case .share(let item): ShareScreen(item: item)
+  }
+}
+
+@ViewBuilder
+func fullScreenContent(for destination: AppFullScreen) -> some View {
+  switch destination {
+  case .onboarding: OnboardingScreen()
+  }
+}
+```
+
+Place these functions in a target that can see all feature view types (typically the app target). The compiler enforces exhaustive switching, so adding a new destination case immediately flags every call site that needs a view.
 
 ## Router
 
@@ -118,7 +131,7 @@ Routers form a tree. Each child tracks its depth (`level`) and the tab it manage
 - **Modal nesting**: Sheets and full-screen covers get their own child router, enabling push navigation within modals.
 - **Deep link routing**: Only the active router processes deep links.
 
-Pass an `os.Logger` to the initializer for debug-level navigation logging.
+Pass an `os.Logger` to the initialiser for debug-level navigation logging.
 
 ### Previews
 
@@ -130,16 +143,27 @@ Router<AppScene>.preview(tab: .home)
 
 ## NavigationContainer
 
-``NavigationContainer`` wires a ``Router`` to `NavigationStack`, `.sheet`, and `.fullScreenCover`:
+``NavigationContainer`` wires a ``Router`` to `NavigationStack`, `.sheet`, and `.fullScreenCover`. Pass content closures that map each destination type to its view:
 
 ```swift
 // For a tab
-NavigationContainer(parentRouter: router, tab: .home) {
+NavigationContainer(
+  parentRouter: router,
+  tab: .home,
+  pushContent: pushContent(for:),
+  sheetContent: sheetContent(for:),
+  fullScreenContent: fullScreenContent(for:)
+) {
   HomeScreen()
 }
 
 // For a modal (sheet or full-screen cover)
-NavigationContainer(parentRouter: router) {
+NavigationContainer(
+  parentRouter: router,
+  pushContent: pushContent(for:),
+  sheetContent: sheetContent(for:),
+  fullScreenContent: fullScreenContent(for:)
+) {
   ModalContentScreen()
 }
 ```
@@ -148,7 +172,7 @@ The container:
 - Creates a child Router from the parent.
 - Manages active state (`onAppear` / `onDisappear`).
 - Routes incoming URLs via `onOpenURL`.
-- Wraps sheets and full-screen covers in their own NavigationContainer, enabling push navigation within modals.
+- Wraps sheets and full-screen covers in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
 
 > Note: `fullScreenCover` is only available on iOS (`#if os(iOS)`).
 
@@ -163,12 +187,24 @@ struct MyApp: App {
     WindowGroup {
       TabView(selection: Bindable(router).selectedTab) {
         Tab("Home", systemImage: "house", value: AppTab.home) {
-          NavigationContainer(parentRouter: router, tab: .home) {
+          NavigationContainer(
+            parentRouter: router,
+            tab: .home,
+            pushContent: pushContent(for:),
+            sheetContent: sheetContent(for:),
+            fullScreenContent: fullScreenContent(for:)
+          ) {
             HomeScreen()
           }
         }
         Tab("Profile", systemImage: "person", value: AppTab.profile) {
-          NavigationContainer(parentRouter: router, tab: .profile) {
+          NavigationContainer(
+            parentRouter: router,
+            tab: .profile,
+            pushContent: pushContent(for:),
+            sheetContent: sheetContent(for:),
+            fullScreenContent: fullScreenContent(for:)
+          ) {
             ProfileScreen()
           }
         }

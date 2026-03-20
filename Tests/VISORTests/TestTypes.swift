@@ -23,10 +23,6 @@ nonisolated enum TestTab: Int, TabDestination {
 nonisolated enum TestPush: PushDestination {
   case detail(id: String)
   case nested
-
-  var destinationView: some View {
-    Text("push")
-  }
 }
 
 nonisolated enum TestSheet: String, SheetDestination {
@@ -34,10 +30,6 @@ nonisolated enum TestSheet: String, SheetDestination {
   case profile
 
   var id: String { rawValue }
-
-  var destinationView: some View {
-    Text("sheet")
-  }
 }
 
 nonisolated enum TestFullScreen: String, FullScreenDestination {
@@ -45,10 +37,6 @@ nonisolated enum TestFullScreen: String, FullScreenDestination {
   case tutorial
 
   var id: String { rawValue }
-
-  var destinationView: some View {
-    Text("fullScreen")
-  }
 }
 
 nonisolated enum TestScene: NavigationScene {

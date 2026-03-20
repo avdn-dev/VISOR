@@ -14,7 +14,7 @@
 /// Use `@Polled` for non-observable sources (hardware sensors, system APIs,
 /// computed properties) where the source doesn't participate in `@Observable`.
 ///
-/// Polled properties without default values are initialized from the service
+/// Polled properties without default values are initialised from the service
 /// at init time — same semantics as `@Bound`.
 ///
 /// ```swift
