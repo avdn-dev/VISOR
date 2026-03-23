@@ -69,22 +69,6 @@ private final class CounterViewModel: ViewModel {
     func startObserving() async {
         await observeCount()
     }
-
-    func load() {
-        updateState(\.isLoading, to: true)
-    }
-
-    func finishLoading() {
-        updateState(\.isLoading, to: false)
-    }
-
-    func setError(_ message: String) {
-        updateState(\.errorMessage, to: message)
-    }
-
-    func clearError() {
-        updateState(\.errorMessage, to: nil)
-    }
 }
 
 // MARK: - State Tests
@@ -152,9 +136,9 @@ struct UpdateStateTests {
         try await yieldForTracking()
 
         // Toggle loading on/off
-        vm.load()
+        vm.updateState(\.isLoading, to: true)
         try await yieldForTracking()
-        vm.finishLoading()
+        vm.updateState(\.isLoading, to: false)
         try await yieldForTracking()
 
         trackingTask.cancel()
@@ -228,13 +212,13 @@ struct UpdateStateTests {
 
         #expect(vm.state.errorMessage == nil)
 
-        vm.setError("something broke")
+        vm.updateState(\.errorMessage, to: "something broke")
         #expect(vm.state.errorMessage == "something broke")
 
-        vm.clearError()
+        vm.updateState(\.errorMessage, to: nil)
         #expect(vm.state.errorMessage == nil)
 
-        vm.setError("again")
+        vm.updateState(\.errorMessage, to: "again")
         #expect(vm.state.errorMessage == "again")
     }
 
