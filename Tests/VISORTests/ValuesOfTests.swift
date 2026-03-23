@@ -336,7 +336,7 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      source.count = 42
+      Task { @MainActor in source.count = 42 }
       await expect(\.state.count, equals: 42)
     }
   }
@@ -349,7 +349,7 @@ struct ExpectationDSLTests {
     await observing(vm) { expect in
       await expect(\.state.isActive, equals: false)
 
-      source.count = 1
+      Task { @MainActor in source.count = 1 }
       await expect(\.state.isActive, isNot: false)
     }
   }
@@ -360,7 +360,7 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      source.count = 15
+      Task { @MainActor in source.count = 15 }
       await expect(\.state.count, satisfies: { $0 > 10 })
     }
   }
@@ -371,7 +371,7 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      source.count = 1
+      Task { @MainActor in source.count = 1 }
       await expect(\.state.count, equals: 1)
     }
 
@@ -429,12 +429,15 @@ struct ExpectationDSLTests {
     let vm = BoundViewModel(source: source)
 
     await observing(vm) { expect in
-      // Set values that don't satisfy the predicate first
-      source.count = 1
-      source.count = 3
-      source.count = 5
-      // Now set one that does
-      source.count = 20
+      // Mutations happen after valuesOf starts waiting
+      Task { @MainActor in
+        // Non-matching values first
+        source.count = 1
+        source.count = 3
+        source.count = 5
+        // Now one that satisfies the predicate
+        source.count = 20
+      }
       await expect(\.state.count, satisfies: { $0 > 10 })
     }
   }
@@ -449,10 +452,10 @@ struct ExpectationDSLTests {
     await observing(vm) { expect in
       await expect(\.state.count, equals: 0)
 
-      source.count = 1
+      Task { @MainActor in source.count = 1 }
       await expect(\.state.count, equals: 1)
 
-      source.count = 10
+      Task { @MainActor in source.count = 10 }
       await expect(\.state.count, equals: 10)
     }
   }
@@ -467,7 +470,7 @@ struct ExpectationDSLTests {
 
     do {
       try await observing(vm) { expect in
-        source.count = 1
+        Task { @MainActor in source.count = 1 }
         await expect(\.state.count, equals: 1)
         throw TestError()
       }

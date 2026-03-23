@@ -221,23 +221,21 @@ struct UpdateStateTests {
 
     // MARK: - Optional Field Round-Trip
 
-    @Test(.timeLimit(.minutes(1)))
-    func `Optional field round-trip through nil`() async {
+    @Test
+    func `Optional field round-trip through nil`() {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.errorMessage, equals: nil)
+        #expect(vm.state.errorMessage == nil)
 
-            vm.setError("something broke")
-            await expect(\.state.errorMessage, equals: "something broke")
+        vm.setError("something broke")
+        #expect(vm.state.errorMessage == "something broke")
 
-            vm.clearError()
-            await expect(\.state.errorMessage, equals: nil)
+        vm.clearError()
+        #expect(vm.state.errorMessage == nil)
 
-            vm.setError("again")
-            await expect(\.state.errorMessage, equals: "again")
-        }
+        vm.setError("again")
+        #expect(vm.state.errorMessage == "again")
     }
 
     // MARK: - State Stable After Cancellation
@@ -342,20 +340,38 @@ struct UpdateStateTests {
 
     // MARK: - Non-Equatable updateState
 
-    @Test
-    func `Non-Equatable field always writes via updateState`() {
+    @Test(.timeLimit(.minutes(1)))
+    func `Non-Equatable field always writes via updateState`() async throws {
         let vm = NonEquatableVM()
 
-        vm.updateState(\.wrapper, to: NonEquatableWrapper(value: 1))
-        #expect(vm.state.wrapper.value == 1)
+        // Track state emissions to distinguish unconditional writes from deduplication
+        var stateEmissions = 0
+        let trackingTask = Task {
+            for await _ in valuesOf({ vm.state }) {
+                stateEmissions += 1
+                if stateEmissions >= 4 { break }
+            }
+        }
+        try await yieldForTracking()
 
-        // Same logical value — non-Equatable overload writes unconditionally
+        // Non-Equatable: both writes should trigger emissions
         vm.updateState(\.wrapper, to: NonEquatableWrapper(value: 1))
-        #expect(vm.state.wrapper.value == 1)
+        try await yieldForTracking()
+        vm.updateState(\.wrapper, to: NonEquatableWrapper(value: 1))
+        try await yieldForTracking()
 
-        // Equatable field deduplicates
+        // Equatable: second write is a no-op (same value), should NOT trigger emission
         vm.updateState(\.label, to: "hello")
-        vm.updateState(\.label, to: "hello") // no-op
-        #expect(vm.state.label == "hello")
+        try await yieldForTracking()
+        vm.updateState(\.label, to: "hello")
+        try await yieldForTracking()
+
+        trackingTask.cancel()
+        _ = await trackingTask.value
+
+        // Initial(1) + wrapper write(2) + wrapper write again(3) + label write(4) = 4
+        // The second label write should be deduplicated
+        #expect(stateEmissions == 4,
+                "Expected 4 emissions (initial + 2 non-Equatable + 1 Equatable), got \(stateEmissions)")
     }
 }

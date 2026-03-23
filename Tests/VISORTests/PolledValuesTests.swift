@@ -48,11 +48,10 @@ struct PolledValuesTests {
     counter = 2
 
     _ = await task.value
-    // First emission is immediate (0), subsequent values depend on poll timing
+    // First emission is immediate (0), subsequent polls must pick up mutations
     #expect(emissions.count == 3)
-    #expect(emissions[0] == 0)
-    #expect(emissions[1] >= emissions[0])
-    #expect(emissions[2] >= emissions[1])
+    #expect(emissions[0] == 0, "First emission should be initial value")
+    #expect(emissions.last == 2, "Final emission should reflect latest mutation")
   }
 
   @Test(.timeLimit(.minutes(1)))

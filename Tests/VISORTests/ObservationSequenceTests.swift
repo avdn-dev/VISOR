@@ -89,9 +89,14 @@ struct ObservationSequenceTests {
 
     try await yieldForTracking()
 
+    // After setup, only the initial emission should have fired
+    #expect(countEmissions == 1, "Expected 1 initial emission before untracked change, got \(countEmissions)")
+
     // Change a different property — should NOT trigger count stream
     service.name = "changed"
     try await Task.sleep(for: .milliseconds(100))
+
+    #expect(countEmissions == 1, "Untracked property change should not trigger emission, got \(countEmissions)")
 
     // Now change count to trigger the second emission and break
     service.count = 1
