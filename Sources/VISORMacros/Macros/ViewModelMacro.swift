@@ -176,10 +176,17 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
           message: VISORDiagnostic.stateNotDefaultInitializable))
         return []
       } else {
-        let stateDecl: DeclSyntax = """
-          \(raw: prefix)var state = State()
+        // Same manual observation wrappers as the @Bound path — @Observable
+        // won't track macro-generated stored vars.
+        let backingDecl: DeclSyntax = "private var _state: State = State()"
+        let computedDecl: DeclSyntax = """
+          \(raw: prefix)var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
           """
-        members.append(stateDecl)
+        members.append(backingDecl)
+        members.append(computedDecl)
       }
     } else if analysis.statePropertyMissingInitializer && !hasServiceInitProps {
       context.diagnose(Diagnostic(

@@ -25,11 +25,24 @@ struct ViewModelMacroRuntimeTests {
         #expect(vm.state.value == 0)
 
         await observing(vm) { expect in
-            vm.updateState(\.value, to: 1)
+            Task { @MainActor in vm.updateState(\.value, to: 1) }
             await expect(\.state.value, equals: 1)
 
-            vm.updateState(\.value, to: 2)
+            Task { @MainActor in vm.updateState(\.value, to: 2) }
             await expect(\.state.value, equals: 2)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `@Reaction on non-@Bound state property fires on mutation`() async {
+        let vm = ReactionOnStateVM()
+        #expect(vm.state.doubled == 0)
+
+        await observing(vm) { expect in
+            Task { @MainActor in
+                vm.updateState(\.counter, to: 5)
+            }
+            await expect(\.state.doubled, equals: 10)
         }
     }
 
@@ -502,6 +515,8 @@ struct ViewModelMacroRuntimeTests {
         try await Task.sleep(for: .milliseconds(400))
 
         let totalReactions = vm.state.reactionCount - baseline
+        #expect(totalReactions >= 1,
+                "At least one throttled reaction must fire")
         #expect(totalReactions < 10,
                 "ThrottledBy reaction should throttle: fired \(totalReactions) times for 10 changes")
         #expect(vm.state.latestCount == 10, "Should have the latest value")

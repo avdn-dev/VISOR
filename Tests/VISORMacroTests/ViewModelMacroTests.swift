@@ -820,7 +820,12 @@ struct ViewModelMacroTests {
 
           typealias Factory = ViewModelFactory<MyViewModel>
 
-          var state = State()
+          private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
       }
 
       extension MyViewModel: @MainActor ViewModel {
@@ -858,7 +863,12 @@ struct ViewModelMacroTests {
 
           typealias Factory = ViewModelFactory<MyViewModel>
 
-          var state = State()
+          private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
       }
 
       extension MyViewModel: @MainActor ViewModel {
@@ -1148,7 +1158,7 @@ struct ViewModelMacroTests {
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.router.pendingDestination)
+        @Reaction(\\Self.router.pendingDestination)
         func handleDeepLink(destination: Destination?) { }
         private let router: DeepLinkRouter
       }
@@ -1192,7 +1202,7 @@ struct ViewModelMacroTests {
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.uploadService.uploadState)
+        @Reaction(\\Self.uploadService.uploadState)
         func handleUploadState(state: UploadState) async { }
         private let uploadService: UploadService
       }
@@ -1237,7 +1247,7 @@ struct ViewModelMacroTests {
         struct State: Equatable {
           @Bound(\\MyViewModel.service.isLoading) var isLoading: Bool
         }
-        @Reaction(\\.router.pendingDestination)
+        @Reaction(\\Self.router.pendingDestination)
         func handleDeepLink(destination: Destination?) { }
         private let service: MyService
         private let router: DeepLinkRouter
@@ -1302,7 +1312,7 @@ struct ViewModelMacroTests {
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.router.pendingDestination)
+        @Reaction(\\Self.router.pendingDestination)
         func handleDeepLink() { }
         private let router: DeepLinkRouter
       }
@@ -1569,7 +1579,7 @@ struct ViewModelMacroTests {
       final class MyViewModel {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.router.pendingDestination)
+        @Reaction(\\Self.router.pendingDestination)
         func handleDeepLink(destination: Destination?, source: String) { }
         private let router: DeepLinkRouter
       }
@@ -2202,7 +2212,7 @@ struct ViewModelMacroTests {
       final class AudioVM {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.recorder.audioLevel, throttledBy: .seconds(0.1))
+        @Reaction(\\Self.recorder.audioLevel, throttledBy: .seconds(0.1))
         func handleLevel(level: Float) { }
         private let recorder: AudioRecorder
       }
@@ -2250,7 +2260,7 @@ struct ViewModelMacroTests {
       final class UploadVM {
         struct State: Equatable {}
         var state = State()
-        @Reaction(\\.uploadService.uploadState, throttledBy: .seconds(1))
+        @Reaction(\\Self.uploadService.uploadState, throttledBy: .seconds(1))
         func handleUploadState(state: UploadState) async { }
         private let uploadService: UploadService
       }

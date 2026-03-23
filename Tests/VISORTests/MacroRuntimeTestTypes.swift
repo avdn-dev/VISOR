@@ -43,6 +43,22 @@ final class AutoStateVM {
     }
 }
 
+// MARK: 1c. @Reaction observing the VM's own (non-@Bound) state property
+
+@Observable
+@ViewModel
+final class ReactionOnStateVM {
+    struct State: Equatable {
+        var counter = 0
+        var doubled = 0
+    }
+
+    @Reaction(\Self.state.counter)
+    func onCounterChanged(counter: Int) {
+        updateState(\.doubled, to: counter * 2)
+    }
+}
+
 // MARK: 2. Multiple dependencies (was MARK 2)
 
 @Observable
