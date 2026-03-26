@@ -15,12 +15,33 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
 
   // MARK: - Shared: collect stored property info from original declarations
 
+  /// Full property info (name + type + default) for init generation.
+  /// Only includes properties where the type can be determined.
   private struct StoredProp {
     let name: String
     let type: String
     let defaultExpr: String?
   }
 
+  /// Collects all stored var names for Equatable comparison.
+  /// Works on every stored var regardless of type inference.
+  private static func collectStoredPropertyNames(from declaration: some DeclGroupSyntax) -> [String] {
+    var names: [String] = []
+    for member in declaration.memberBlock.members {
+      guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { continue }
+      guard varDecl.bindingSpecifier.text == "var" else { continue }
+      for binding in varDecl.bindings {
+        guard binding.accessorBlock == nil else { continue }
+        guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self) else { continue }
+        names.append(identifier.identifier.text)
+      }
+    }
+    return names
+  }
+
+  /// Collects stored properties with resolvable types for init generation.
+  /// Properties with non-literal defaults and no type annotation are excluded —
+  /// they keep their @Observable backing-store defaults.
   private static func collectStoredProperties(from declaration: some DeclGroupSyntax) -> [StoredProp] {
     var props: [StoredProp] = []
 
@@ -131,14 +152,14 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
       }
     }
 
-    let props = collectStoredProperties(from: declaration)
-    guard !props.isEmpty else { return [] }
+    let names = collectStoredPropertyNames(from: declaration)
+    guard !names.isEmpty else { return [] }
 
     let access = accessLevel(of: declaration)
     let prefix = access.isEmpty ? "" : "\(access) "
 
-    let comparisons = props
-      .map { "lhs.\($0.name) == rhs.\($0.name)" }
+    let comparisons = names
+      .map { "lhs.\($0) == rhs.\($0)" }
       .joined(separator: "\n            && ")
 
     let equatableExt: DeclSyntax = """
