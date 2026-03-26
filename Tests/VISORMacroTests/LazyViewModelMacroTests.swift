@@ -41,7 +41,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -95,7 +98,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           public var body: some View {
@@ -163,7 +169,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyViewModel?
 
           var viewModel: MyViewModel {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           var bindableState: Bindable<MyViewModel.State> {
@@ -278,7 +287,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -332,7 +344,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -386,7 +401,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -440,7 +458,10 @@ struct LazyViewModelMacroTests {
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
-              _viewModel!
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
           }
 
           public var body: some View {

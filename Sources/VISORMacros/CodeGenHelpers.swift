@@ -39,7 +39,7 @@ func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: 
 // MARK: - Default Value Helper
 
 /// Returns a sensible default literal for known Swift types, or `nil` for custom types.
-/// Used by `@Stubbable` and `@Spyable` to initialize generated stub/spy properties.
+/// Used by `@Stubbable` and `@Spyable` to initialise generated stub/spy properties.
 func defaultValue(for type: String) -> String? {
   let trimmed = type.trimmingWhitespace
 
@@ -83,6 +83,20 @@ func defaultValue(for type: String) -> String? {
   if trimmed.hasPrefix("AsyncStream<") { return "AsyncStream { $0.finish() }" }
 
   return nil
+}
+
+// MARK: - Unknown Type Detection
+
+/// Returns `true` when any property or method return type has no known default and would
+/// produce an IUO property or an optional return-value variable.
+func hasUnknownTypeDefaults(properties: [ProtocolPropertyInfo], methods: [ProtocolMethodInfo]) -> Bool {
+  for prop in properties where prop.stubbableDefault == nil {
+    if defaultValue(for: prop.type) == nil { return true }
+  }
+  for method in methods {
+    if let rt = method.returnType, defaultValue(for: rt) == nil { return true }
+  }
+  return false
 }
 
 // MARK: - Method Name Disambiguation
@@ -148,7 +162,7 @@ func generateReturnStorage(
       if let innerDefault = defaultValue(for: returnType) {
         lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
       } else {
-        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>!")
+        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>?")
       }
     } else {
       lines.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
@@ -158,7 +172,7 @@ func generateReturnStorage(
     if let defaultVal = defaultValue(for: returnType) {
       lines.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
     } else {
-      lines.append("  \(prefix)var \(retVarName): \(returnType)!")
+      lines.append("  \(prefix)var \(retVarName): \(returnType)?")
     }
   }
 

@@ -37,6 +37,12 @@ public struct SpyableMacro: PeerMacro {
     let access = accessLevel(of: protocolDecl)
     let prefix = access.isEmpty ? "" : "\(access) "
 
+    if hasUnknownTypeDefaults(properties: properties, methods: methods) {
+      context.diagnose(Diagnostic(
+        node: Syntax(protocolDecl),
+        message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: "Spyable")))
+    }
+
     var members = generatePropertyDeclarations(properties, access: access)
     // Each method generates ~6-8 member lines + 1 Call case; reserve to avoid reallocations.
     members.reserveCapacity(members.count + methods.count * 8 + (methods.isEmpty ? 0 : 3))
@@ -93,13 +99,25 @@ public struct SpyableMacro: PeerMacro {
       }
 
       if method.isThrowing {
-        if method.returnType != nil {
-          bodyLines.append("    return try \(methodPrefix)Result.get()")
+        if let returnType = method.returnType {
+          let needsGuard = defaultValue(for: returnType) == nil
+          if needsGuard {
+            bodyLines.append("    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(\(methodPrefix)Result) before calling \(method.name)()\") }")
+            bodyLines.append("    return try result.get()")
+          } else {
+            bodyLines.append("    return try \(methodPrefix)Result.get()")
+          }
         } else {
           bodyLines.append("    try \(methodPrefix)Result.get()")
         }
-      } else if method.returnType != nil {
-        bodyLines.append("    return \(methodPrefix)ReturnValue")
+      } else if let returnType = method.returnType {
+        let needsGuard = defaultValue(for: returnType) == nil
+        if needsGuard {
+          bodyLines.append("    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(\(methodPrefix)ReturnValue) before calling \(method.name)()\") }")
+          bodyLines.append("    return value")
+        } else {
+          bodyLines.append("    return \(methodPrefix)ReturnValue")
+        }
       }
 
       let body = bodyLines.joined(separator: "\n")

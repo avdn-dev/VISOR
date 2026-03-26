@@ -66,7 +66,14 @@ public struct LazyViewModelMacro: MemberMacro {
 
     members.append(contentsOf: [
       "@State private var _viewModel: \(raw: viewModelType)?",
-      "var viewModel: \(raw: viewModelType) { _viewModel! }",
+      """
+      var viewModel: \(raw: viewModelType) {
+          guard let vm = _viewModel else {
+              preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+          }
+          return vm
+      }
+      """,
       "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }",
       """
       \(raw: prefix)var body: some View {

@@ -600,7 +600,7 @@ struct ViewModelMacroRuntimeTests {
         #expect(vm.state.profile.isEmpty)
     }
 
-    // MARK: - @Reaction deduplication behavior
+    // MARK: - @Reaction deduplication behaviour
 
     @Test(.timeLimit(.minutes(1)))
     func `Sync @Reaction deduplicates consecutive equal values`() async throws {

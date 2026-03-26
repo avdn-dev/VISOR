@@ -9,6 +9,11 @@
 
 /// Attach to a protocol to auto-generate a `Spy<Name>` test double with call recording.
 ///
+/// Known Swift types receive sensible defaults. Custom property types use implicitly unwrapped
+/// optionals; custom method return types use optionals guarded by `fatalError`. Both crash with
+/// a descriptive message if accessed before configuration. Use ``StubbableDefault(_:)`` for
+/// explicit defaults.
+///
 /// ```swift
 /// @Spyable
 /// protocol DataService {

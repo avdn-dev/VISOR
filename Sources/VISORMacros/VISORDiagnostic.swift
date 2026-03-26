@@ -81,7 +81,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .boundOnLetProperty(let name):
       "@Bound on '\(name)': use 'var' instead of 'let' — bound properties must be mutable"
     case .boundPropertyHasDefault(let propertyName):
-      "@Bound on '\(propertyName)': remove the default value — state is initialized from the service"
+      "@Bound on '\(propertyName)': remove the default value — state is initialised from the service"
     case .invalidPolledDependency(let name, let propertyName):
       "@Polled(\\.\(name)) on '\(propertyName)': no stored 'let \(name)' found on this class"
     case .malformedPolledKeyPath(let propertyName, let className):
@@ -89,7 +89,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .polledOnLetProperty(let name):
       "@Polled on '\(name)': use 'var' instead of 'let' — polled properties must be mutable"
     case .polledPropertyHasDefault(let propertyName):
-      "@Polled on '\(propertyName)': remove the default value — state is initialized from the service"
+      "@Polled on '\(propertyName)': remove the default value — state is initialised from the service"
     case .polledMissingInterval(let propertyName):
       "@Polled on '\(propertyName)': missing 'every:' interval parameter"
     case .polledOutsideState:

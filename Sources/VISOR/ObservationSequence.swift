@@ -37,6 +37,7 @@ package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
         }
         continuation.yield(initial)
 
+        // When the task is cancelled, signal.next() returns nil — the loop exits.
         for await _ in signal {
           guard !Task.isCancelled else { break }
           let value = withObservationTracking { emit() } onChange: {
@@ -68,6 +69,7 @@ package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
         continuation.yield(initial)
         var previous = initial
 
+        // When the task is cancelled, signal.next() returns nil — the loop exits.
         for await _ in signal {
           guard !Task.isCancelled else { break }
           let value = withObservationTracking { emit() } onChange: {

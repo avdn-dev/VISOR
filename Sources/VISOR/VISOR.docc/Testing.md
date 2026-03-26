@@ -90,6 +90,22 @@ The generated stub provides sensible defaults for common types:
 
 Methods with return values get a `<methodName>ReturnValue` property you can set. Void methods generate empty bodies.
 
+### Custom Type Defaults
+
+When a property type is a custom type without a known default (not `Bool`, `String`, `Int`, collections, optionals, etc.), the generated stub uses an implicitly unwrapped optional (IUO) — this is required for protocol conformance. Accessing it before configuration crashes at runtime.
+
+When a method return type is a custom type, the generated stub uses an `Optional` variable guarded by `fatalError` with a descriptive message. This crashes fast with clear guidance if you forget to configure the return value.
+
+A compiler note is emitted whenever either pattern is generated. To silence it and provide an explicit default, use `@StubbableDefault`:
+
+```swift
+@Stubbable
+protocol AnimationService {
+  @StubbableDefault(AnimationState.idle) var state: AnimationState { get }
+  func currentTheme() -> Theme  // ← generates optional + fatalError guard
+}
+```
+
 > Protocols with associated types are not supported (compile-time error). Subscripts and static members are skipped with a warning.
 
 ## @Spyable

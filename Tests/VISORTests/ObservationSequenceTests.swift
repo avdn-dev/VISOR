@@ -9,7 +9,7 @@ import VISOR
 import Testing
 
 // MARK: - ObservationSequence tests
-// Only tests behavior unique to ObservationSequence that is NOT exercised through valuesOf().
+// Only tests behaviour unique to ObservationSequence that is NOT exercised through valuesOf().
 
 @Suite("ObserveChanges – ObservationSequence (pre-iOS 26 path)")
 @MainActor

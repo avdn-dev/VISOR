@@ -14,6 +14,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
   case associatedTypesNotSupported(macroName: String)
   case subscriptsSkipped(macroName: String)
   case staticMembersSkipped(macroName: String)
+  case unknownTypeDefaults(macroName: String)
 
   // MARK: Internal
 
@@ -27,6 +28,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       "@\(macroName) skips subscript members (not yet supported)"
     case .staticMembersSkipped(let macroName):
       "@\(macroName) skips static members (not yet supported)"
+    case .unknownTypeDefaults(let macroName):
+      "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."
     }
   }
 
@@ -40,6 +43,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       MessageID(domain: "VISOR", id: "subscriptsSkipped")
     case .staticMembersSkipped:
       MessageID(domain: "VISOR", id: "staticMembersSkipped")
+    case .unknownTypeDefaults:
+      MessageID(domain: "VISOR", id: "unknownTypeDefaults")
     }
   }
 
@@ -49,6 +54,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       .error
     case .subscriptsSkipped, .staticMembersSkipped:
       .warning
+    case .unknownTypeDefaults:
+      .note
     }
   }
 }

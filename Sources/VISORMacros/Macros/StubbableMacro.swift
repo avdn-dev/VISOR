@@ -50,6 +50,12 @@ public struct StubbableMacro: PeerMacro {
     let access = accessLevel(of: protocolDecl)
     let prefix = access.isEmpty ? "" : "\(access) "
 
+    if hasUnknownTypeDefaults(properties: properties, methods: methods) {
+      context.diagnose(Diagnostic(
+        node: Syntax(protocolDecl),
+        message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: "Stubbable")))
+    }
+
     var members = generatePropertyDeclarations(properties, access: access)
 
     // Generate methods
@@ -58,9 +64,29 @@ public struct StubbableMacro: PeerMacro {
       members.append(contentsOf: generateReturnStorage(method: method, methodPrefix: methodPrefix, access: access))
       let sig = buildMethodSignature(method, access: access)
       if method.isThrowing {
-        members.append("  \(sig) { try \(methodPrefix)Result.get() }")
-      } else if method.returnType != nil {
-        members.append("  \(sig) { \(methodPrefix)ReturnValue }")
+        let needsGuard = method.returnType.flatMap({ defaultValue(for: $0) }) == nil && method.returnType != nil
+        if needsGuard {
+          members.append(contentsOf: [
+            "  \(sig) {",
+            "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(\(methodPrefix)Result) before calling \(method.name)()\") }",
+            "    return try result.get()",
+            "  }",
+          ])
+        } else {
+          members.append("  \(sig) { try \(methodPrefix)Result.get() }")
+        }
+      } else if let returnType = method.returnType {
+        let needsGuard = defaultValue(for: returnType) == nil
+        if needsGuard {
+          members.append(contentsOf: [
+            "  \(sig) {",
+            "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(\(methodPrefix)ReturnValue) before calling \(method.name)()\") }",
+            "    return value",
+            "  }",
+          ])
+        } else {
+          members.append("  \(sig) { \(methodPrefix)ReturnValue }")
+        }
       } else {
         members.append("  \(sig) { }")
       }

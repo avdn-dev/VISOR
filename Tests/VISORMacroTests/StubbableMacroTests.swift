@@ -101,7 +101,7 @@ struct StubbableMacroTests {
   }
 
   @Test
-  func `Uses IUO for unknown custom types`() {
+  func `Uses optional with fatalError for unknown custom return types`() {
     assertMacroExpansion(
       """
       @Stubbable
@@ -116,10 +116,16 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubThemeService: ThemeService {
-        var currentThemeReturnValue: Theme!
-        func currentTheme() -> Theme { currentThemeReturnValue }
+        var currentThemeReturnValue: Theme?
+        func currentTheme() -> Theme {
+          guard let value = currentThemeReturnValue else { fatalError("Configure \\(currentThemeReturnValue) before calling currentTheme()") }
+          return value
+        }
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -143,7 +149,7 @@ struct StubbableMacroTests {
   }
 
   @Test
-  func `Generates stub with labeled parameters`() {
+  func `Generates stub with labelled parameters`() {
     assertMacroExpansion(
       """
       @Stubbable
@@ -319,6 +325,9 @@ struct StubbableMacroTests {
         var theme: Theme! = nil
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -437,12 +446,18 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubLoadService: LoadService {
-        var loadByIdReturnValue: Item!
-        func load(byId id: String) -> Item { loadByIdReturnValue }
+        var loadByIdReturnValue: Item?
+        func load(byId id: String) -> Item {
+          guard let value = loadByIdReturnValue else { fatalError("Configure \\(loadByIdReturnValue) before calling load()") }
+          return value
+        }
         var loadMatchingReturnValue: [Item] = []
         func load(matching query: String) -> [Item] { loadMatchingReturnValue }
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -572,10 +587,16 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubResultService: ResultService {
-        var executeReturnValue: Result<String, any Error>!
-        func execute() -> Result<String, any Error> { executeReturnValue }
+        var executeReturnValue: Result<String, any Error>?
+        func execute() -> Result<String, any Error> {
+          guard let value = executeReturnValue else { fatalError("Configure \\(executeReturnValue) before calling execute()") }
+          return value
+        }
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -657,6 +678,9 @@ struct StubbableMacroTests {
         var result: Result<String, any Error>! = nil
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 

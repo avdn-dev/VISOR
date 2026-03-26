@@ -157,7 +157,7 @@ struct SpyableMacroTests {
   }
 
   @Test
-  func `Generates spy with IUO for unknown return type`() {
+  func `Generates spy with optional and fatalError for unknown return type`() {
     assertMacroExpansion(
       """
       @Spyable
@@ -174,11 +174,12 @@ struct SpyableMacroTests {
       final class SpyThemeService: ThemeService {
         // -- currentTheme --
         var currentThemeCallCount = 0
-        var currentThemeReturnValue: Theme!
+        var currentThemeReturnValue: Theme?
         func currentTheme() -> Theme {
           currentThemeCallCount += 1
           calls.append(.currentTheme)
-          return currentThemeReturnValue
+          guard let value = currentThemeReturnValue else { fatalError("Configure \\(currentThemeReturnValue) before calling currentTheme()") }
+          return value
         }
         enum Call {
           case currentTheme
@@ -186,6 +187,9 @@ struct SpyableMacroTests {
         var calls: [Call] = []
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -227,6 +231,9 @@ struct SpyableMacroTests {
         var currentTheme: Theme! = nil
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -291,13 +298,14 @@ struct SpyableMacroTests {
         var loadByIdCallCount = 0
         var loadByIdReceivedId: String?
         var loadByIdReceivedInvocations: [String] = []
-        var loadByIdReturnValue: Item!
+        var loadByIdReturnValue: Item?
         func load(byId id: String) -> Item {
           loadByIdCallCount += 1
           loadByIdReceivedId = id
           loadByIdReceivedInvocations.append(id)
           calls.append(.load(id: id))
-          return loadByIdReturnValue
+          guard let value = loadByIdReturnValue else { fatalError("Configure \\(loadByIdReturnValue) before calling load()") }
+          return value
         }
         // -- loadMatching --
         var loadMatchingCallCount = 0
@@ -318,6 +326,9 @@ struct SpyableMacroTests {
         var calls: [Call] = []
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 
@@ -505,11 +516,12 @@ struct SpyableMacroTests {
       final class SpyResultService: ResultService {
         // -- execute --
         var executeCallCount = 0
-        var executeReturnValue: Result<String, any Error>!
+        var executeReturnValue: Result<String, any Error>?
         func execute() -> Result<String, any Error> {
           executeCallCount += 1
           calls.append(.execute)
-          return executeReturnValue
+          guard let value = executeReturnValue else { fatalError("Configure \\(executeReturnValue) before calling execute()") }
+          return value
         }
         enum Call {
           case execute
@@ -517,6 +529,9 @@ struct SpyableMacroTests {
         var calls: [Call] = []
       }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+      ],
       macros: testMacros)
   }
 

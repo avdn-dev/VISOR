@@ -20,7 +20,7 @@
 /// never arrives — the DSL itself does not impose a timeout.
 @MainActor
 public struct Expectation<VM: Observable> {
-  package let viewModel: VM
+  let viewModel: VM
 
   /// Awaits until the property at `keyPath` equals `expected`.
   public func callAsFunction<T: Equatable & Sendable>(
