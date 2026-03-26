@@ -74,6 +74,7 @@ final class MultiDepVM {
     final class State {
         @Bound(\MultiDepVM.source.count) var count: Int
         @Bound(\MultiDepVM.second.name) var name: String
+        nonisolated init(count: Int, name: String) { self._count = count; self._name = name }
     }
     let source: RuntimeSource
     let second: SecondSource
@@ -88,6 +89,7 @@ final class AutoObserveSingleVM {
     @ViewModelState
     final class State {
         @Bound(\AutoObserveSingleVM.source.count) var count: Int
+        nonisolated init(count: Int) { self._count = count }
     }
     let source: RuntimeSource
 }
@@ -103,6 +105,7 @@ final class AutoObserveMultiVM {
         @Bound(\AutoObserveMultiVM.source.count) var count: Int
         @Bound(\AutoObserveMultiVM.source.label) var label: String
         @Bound(\AutoObserveMultiVM.source.isEnabled) var isEnabled: Bool
+        nonisolated init(count: Int, label: String, isEnabled: Bool) { self._count = count; self._label = label; self._isEnabled = isEnabled }
     }
     let source: RuntimeSource
 }
@@ -117,6 +120,7 @@ final class BoundWithSyncActionVM {
     final class State {
         @Bound(\BoundWithSyncActionVM.source.count) var count: Int
         var selectedIndex = 0
+        nonisolated init(count: Int) { self._count = count }
     }
 
     enum Action {
@@ -146,6 +150,7 @@ final class BoundWithAsyncActionVM {
     final class State {
         @Bound(\BoundWithAsyncActionVM.source.count) var count: Int
         var detail: Loadable<String> = .loading
+        nonisolated init(count: Int) { self._count = count }
     }
 
     enum Action {
@@ -217,6 +222,7 @@ final class BoundAndReactionVM {
     final class State {
         @Bound(\BoundAndReactionVM.source.count) var count: Int
         var lastNav: String? = nil
+        nonisolated init(count: Int) { self._count = count }
     }
     let source: RuntimeSource
     let nav: RuntimeSource
@@ -236,6 +242,7 @@ final class CustomInitVM {
     @ViewModelState
     final class State {
         @Bound(\CustomInitVM.source.count) var count: Int
+        nonisolated init(count: Int) { self._count = count }
     }
     let source: RuntimeSource
 
@@ -277,6 +284,7 @@ final class NoActionVM {
     @ViewModelState
     final class State {
         @Bound(\NoActionVM.source.count) var count: Int
+        nonisolated init(count: Int) { self._count = count }
     }
     let source: RuntimeSource
 }
@@ -335,6 +343,7 @@ final class PolledSingleVM {
     @ViewModelState
     final class State {
         @Polled(\PolledSingleVM.monitor.level, every: .milliseconds(50)) var level: Float
+        nonisolated init(level: Float) { self._level = level }
     }
     let monitor: BatteryMonitor
 }
@@ -350,6 +359,7 @@ final class BoundAndPolledVM {
         @Bound(\BoundAndPolledVM.source.count) var count: Int
         @Polled(\BoundAndPolledVM.monitor.level, every: .milliseconds(50)) var level: Float
         @Bound(\BoundAndPolledVM.source.label) var label: String
+        nonisolated init(count: Int, level: Float, label: String) { self._count = count; self._level = level; self._label = label }
     }
     let source: RuntimeSource
     let monitor: BatteryMonitor
@@ -364,6 +374,7 @@ final class ThrottledByBoundVM {
     @ViewModelState
     final class State {
         @Bound(\ThrottledByBoundVM.source.count, throttledBy: .milliseconds(100)) var count: Int
+        nonisolated init(count: Int) { self._count = count }
     }
     let source: RuntimeSource
 }
@@ -420,6 +431,7 @@ final class MixedThrottledByVM {
     final class State {
         @Bound(\MixedThrottledByVM.source.label) var label: String
         @Bound(\MixedThrottledByVM.source.count, throttledBy: .milliseconds(100)) var count: Int
+        nonisolated init(label: String, count: Int) { self._label = label; self._count = count }
     }
     let source: RuntimeSource
 }
