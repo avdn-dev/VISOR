@@ -74,6 +74,9 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     let props = collectStoredProperties(from: declaration)
     guard !props.isEmpty else { return [] }
 
+    let access = accessLevel(of: declaration)
+    let prefix = access.isEmpty ? "" : "\(access) "
+
     // Generate designated memberwise init.
     // Assigns to _name (the @Observable backing store) to avoid triggering
     // observation during init. @Observable renames var x → _x.
@@ -91,7 +94,7 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     var members: [DeclSyntax] = []
 
     let designatedInit: DeclSyntax = """
-      init(\(raw: initParams)) {
+      \(raw: prefix)init(\(raw: initParams)) {
           \(raw: initAssignments)
       }
       """
@@ -119,7 +122,7 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
       if canGenerateConvenience {
         let argList = convenienceArgs.joined(separator: ", ")
         let convenienceInit: DeclSyntax = """
-          convenience init() {
+          \(raw: prefix)convenience init() {
               self.init(\(raw: argList))
           }
           """
@@ -164,13 +167,16 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     let props = collectStoredProperties(from: declaration)
     guard !props.isEmpty else { return [] }
 
+    let access = accessLevel(of: declaration)
+    let prefix = access.isEmpty ? "" : "\(access) "
+
     let comparisons = props
       .map { "lhs.\($0.name) == rhs.\($0.name)" }
       .joined(separator: "\n            && ")
 
     let equatableExt: DeclSyntax = """
       extension \(type.trimmed): @preconcurrency Equatable {
-          static func == (lhs: \(type.trimmed), rhs: \(type.trimmed)) -> Bool {
+          \(raw: prefix)static func == (lhs: \(type.trimmed), rhs: \(type.trimmed)) -> Bool {
               \(raw: comparisons)
           }
       }
