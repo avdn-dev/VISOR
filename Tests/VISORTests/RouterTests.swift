@@ -325,19 +325,6 @@ struct RouterTests {
     #expect(result == nil)
   }
 
-  // MARK: - configureDeepLinks handler
-
-  @Test
-  func `configureDeepLinks sets handler`() {
-    let root = Router<TestScene>()
-    root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .tab(.home)),
-    ])
-
-    let result = root.deepLinkHandler?(URL(string: "test://home")!)
-    #expect(result == .tab(.home))
-  }
-
   // MARK: - activate idempotent
 
   @Test

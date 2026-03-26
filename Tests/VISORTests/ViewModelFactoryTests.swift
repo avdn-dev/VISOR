@@ -34,32 +34,6 @@ private final class FactoryTestVM: ViewModel {
   }
 }
 
-@Observable
-@MainActor
-private final class RoutedTestVM: ViewModel {
-  @Observable
-  final class State: @preconcurrency Equatable {
-    static func == (lhs: State, rhs: State) -> Bool { true }
-  }
-
-  @ObservationIgnored private var _state = State()
-  var state: State {
-    get { access(keyPath: \.state); return _state }
-    set { withMutation(keyPath: \.state) { _state = newValue } }
-  }
-
-  func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-    guard _state[keyPath: keyPath] != value else { return }
-    _state[keyPath: keyPath] = value
-  }
-
-  let routerID: ObjectIdentifier
-
-  init(routerID: ObjectIdentifier) {
-    self.routerID = routerID
-  }
-}
-
 // MARK: - ViewModelFactory Tests
 
 @Suite("ViewModelFactory")

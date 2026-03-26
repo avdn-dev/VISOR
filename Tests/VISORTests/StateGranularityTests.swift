@@ -1,7 +1,7 @@
 import Observation
 import SwiftUI
 import Testing
-@testable import VISOR
+import VISOR
 
 // MARK: - Class State Fixtures
 

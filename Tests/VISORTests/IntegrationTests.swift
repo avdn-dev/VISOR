@@ -44,32 +44,6 @@ private final class IntegrationVM: ViewModel {
     }
 }
 
-@Observable
-@MainActor
-private final class RoutedIntegrationVM: ViewModel {
-    @Observable
-    final class State: @preconcurrency Equatable {
-        static func == (lhs: State, rhs: State) -> Bool { true }
-    }
-
-    @ObservationIgnored private var _state = State()
-    var state: State {
-        get { access(keyPath: \.state); return _state }
-        set { withMutation(keyPath: \.state) { _state = newValue } }
-    }
-
-    func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-        guard _state[keyPath: keyPath] != value else { return }
-        _state[keyPath: keyPath] = value
-    }
-
-    let routerID: ObjectIdentifier
-
-    init(routerID: ObjectIdentifier) {
-        self.routerID = routerID
-    }
-}
-
 // MARK: - Integration Tests
 
 @Suite("Integration")
@@ -156,13 +130,39 @@ struct IntegrationTests {
         #expect(child.navigationPath == [.detail(id: "deep")])
     }
 
+    // MARK: - Deep link URL handling does not interfere with observation
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Deep link URL handling does not interfere with VM observation`() async {
+        let source = TestSource()
+        let vm = IntegrationVM(source: source)
+        let root = Router<TestScene>()
+        root.configureDeepLinks(scheme: "test", parsers: [
+            .equal(to: ["settings"], destination: .tab(.settings)),
+        ])
+
+        await observing(vm) { expect in
+            await expect(\.state.count, equals: 0)
+
+            // Deep link while observing
+            if let dest = root.deepLinkHandler?(URL(string: "test://settings")!) {
+                root.deepLinkOpen(to: dest)
+            }
+
+            source.count = 42
+            await expect(\.state.count, equals: 42)
+
+            #expect(root.selectedTab == .settings)
+        }
+    }
+
     // MARK: - Routed factory with real Router
 
     @Test
     func `Routed factory with real Router creates working VM`() {
         let router = Router<TestScene>()
-        let factory: ViewModelFactory<RoutedIntegrationVM> = .routed { (r: Router<TestScene>) in
-            RoutedIntegrationVM(routerID: ObjectIdentifier(r))
+        let factory: ViewModelFactory<RoutedTestVM> = .routed { (r: Router<TestScene>) in
+            RoutedTestVM(routerID: ObjectIdentifier(r))
         }
 
         let vm = factory.makeViewModel(router: router)
