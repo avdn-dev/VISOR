@@ -1564,5 +1564,43 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - @ViewModelState direct expansion
+
+  @Test
+  func `ViewModelState generates public init and Equatable for public class with mixed defaults`() {
+    let stateMacros: [String: Macro.Type] = [
+      "ViewModelState": ViewModelStateMacro.self,
+    ]
+    assertMacroExpansion(
+      """
+      @ViewModelState
+      public final class State {
+        public var appSettings = AppSettings.default
+        public var isLoading = false
+        public var errorMessage: String?
+      }
+      """,
+      expandedSource: """
+      public final class State {
+        public var appSettings = AppSettings.default
+        public var isLoading = false
+        public var errorMessage: String?
+
+          public init(isLoading: Bool = false, errorMessage: String? = nil) {
+              self._isLoading = isLoading
+              self._errorMessage = errorMessage
+          }
+      }
+
+      extension State: @preconcurrency Equatable {
+          public static func == (lhs: State, rhs: State) -> Bool {
+              lhs.appSettings == rhs.appSettings
+                  && lhs.isLoading == rhs.isLoading
+                  && lhs.errorMessage == rhs.errorMessage
+          }
+      }
+      """,
+      macros: stateMacros)
+  }
 }
 #endif
