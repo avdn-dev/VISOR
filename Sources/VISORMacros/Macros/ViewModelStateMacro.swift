@@ -106,8 +106,8 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     let prefix = access.isEmpty ? "" : "\(access) "
 
     // Generate designated memberwise init.
-    // Assigns to _name (the @Observable backing store) to avoid triggering
-    // observation during init. @Observable renames var x → _x.
+    // Assigns through the property name (not the _backing store) so the
+    // @ObservationTracked init(initialValue) accessor handles storage.
     let initParams = props.map { p in
       if let def = p.defaultExpr {
         return "\(p.name): \(p.type) = \(def)"
@@ -116,7 +116,7 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     }.joined(separator: ", ")
 
     let initAssignments = props.map { p in
-      "self._\(p.name) = \(p.name)"
+      "self.\(p.name) = \(p.name)"
     }.joined(separator: "\n        ")
 
     let designatedInit: DeclSyntax = """

@@ -1587,8 +1587,8 @@ struct ViewModelMacroTests {
         public var errorMessage: String?
 
           public init(isLoading: Bool = false, errorMessage: String? = nil) {
-              self._isLoading = isLoading
-              self._errorMessage = errorMessage
+              self.isLoading = isLoading
+              self.errorMessage = errorMessage
           }
       }
 
