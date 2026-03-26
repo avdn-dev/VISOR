@@ -168,9 +168,11 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     let hasServiceInitProps = !validBounds.isEmpty || !validPolled.isEmpty
 
-    // 5. Always generate @ObservationIgnored _state + computed state (unless user declared var state)
+    // 5. Generate @ObservationIgnored _state + computed state (unless user declared var state)
     if !analysis.hasStateProperty {
-      let backingDecl: DeclSyntax = "@ObservationIgnored private var _state: State = State()"
+      let backingDecl: DeclSyntax = hasServiceInitProps
+        ? "@ObservationIgnored private var _state: State"
+        : "@ObservationIgnored private var _state: State = State()"
       let computedDecl: DeclSyntax = """
         \(raw: prefix)var state: State {
             get { access(keyPath: \\.state); return _state }

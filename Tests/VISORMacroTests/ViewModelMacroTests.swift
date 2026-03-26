@@ -408,7 +408,7 @@ struct ViewModelMacroTests {
         }
         private let service: MyService
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           public var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -535,7 +535,7 @@ struct ViewModelMacroTests {
         }
         private let permissionService: PermissionService
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -608,7 +608,7 @@ struct ViewModelMacroTests {
         }
         private let connectionService: ConnectionService
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -1032,7 +1032,7 @@ struct ViewModelMacroTests {
         private let service: MyService
         private let router: DeepLinkRouter
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -1113,7 +1113,7 @@ struct ViewModelMacroTests {
         }
         private let monitor: BatteryMonitor
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -1193,7 +1193,7 @@ struct ViewModelMacroTests {
         private let service: MyService
         private let monitor: BatteryMonitor
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -1288,7 +1288,7 @@ struct ViewModelMacroTests {
         }
         private let tracker: HeadTracker
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
@@ -1519,7 +1519,7 @@ struct ViewModelMacroTests {
         }
         private let service: MyService
 
-          @ObservationIgnored private var _state: State = State()
+          @ObservationIgnored private var _state: State
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
