@@ -105,9 +105,22 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     let access = accessLevel(of: declaration)
     let prefix = access.isEmpty ? "" : "\(access) "
 
-    // Generate designated memberwise init.
-    // Assigns through the property name (not the _backing store) so the
-    // @ObservationTracked init(initialValue) accessor handles storage.
+    let allHaveDefaults = props.allSatisfy { $0.defaultExpr != nil }
+
+    // When all properties have defaults, generate an empty nonisolated init().
+    // Property defaults are applied automatically via @ObservationTracked's
+    // init(initialValue) accessor — no body assignments needed.
+    // This avoids a Swift compiler limitation where macro-generated inits that
+    // assign to @storageRestrictions backing stores aren't visible to callers.
+    if allHaveDefaults {
+      let emptyInit: DeclSyntax = """
+        \(raw: prefix)nonisolated init() {}
+        """
+      return [emptyInit]
+    }
+
+    // Otherwise generate the parameterised init for callers that supply values
+    // (e.g. the @ViewModel-generated init passing @Bound expressions).
     let initParams = props.map { p in
       if let def = p.defaultExpr {
         return "\(p.name): \(p.type) = \(def)"
@@ -116,11 +129,11 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
     }.joined(separator: ", ")
 
     let initAssignments = props.map { p in
-      "self.\(p.name) = \(p.name)"
+      "self._\(p.name) = \(p.name)"
     }.joined(separator: "\n        ")
 
     let designatedInit: DeclSyntax = """
-      \(raw: prefix)init(\(raw: initParams)) {
+      \(raw: prefix)nonisolated init(\(raw: initParams)) {
           \(raw: initAssignments)
       }
       """
