@@ -7,10 +7,26 @@ import Testing
 @Observable
 @MainActor
 private final class FactoryTestVM: ViewModel {
-  struct State: Equatable {
+  @Observable
+  final class State: @preconcurrency Equatable {
     var value = 0
+
+    static func == (lhs: State, rhs: State) -> Bool {
+      lhs.value == rhs.value
+    }
   }
-  var state = State()
+
+  @ObservationIgnored private var _state = State()
+  var state: State {
+    get { access(keyPath: \.state); return _state }
+    set { withMutation(keyPath: \.state) { _state = newValue } }
+  }
+
+  func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+    guard _state[keyPath: keyPath] != value else { return }
+    _state[keyPath: keyPath] = value
+  }
+
   let initialValue: Int
 
   init(value: Int = 0) {
@@ -21,8 +37,22 @@ private final class FactoryTestVM: ViewModel {
 @Observable
 @MainActor
 private final class RoutedTestVM: ViewModel {
-  struct State: Equatable {}
-  var state = State()
+  @Observable
+  final class State: @preconcurrency Equatable {
+    static func == (lhs: State, rhs: State) -> Bool { true }
+  }
+
+  @ObservationIgnored private var _state = State()
+  var state: State {
+    get { access(keyPath: \.state); return _state }
+    set { withMutation(keyPath: \.state) { _state = newValue } }
+  }
+
+  func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+    guard _state[keyPath: keyPath] != value else { return }
+    _state[keyPath: keyPath] = value
+  }
+
   let routerID: ObjectIdentifier
 
   init(routerID: ObjectIdentifier) {

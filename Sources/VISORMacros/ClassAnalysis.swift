@@ -63,6 +63,13 @@ struct ReactionMethodInfo {
   let throttleExpression: String? // Optional Duration expression for throttling
 }
 
+// MARK: - StateStoredPropertyInfo
+
+struct StateStoredPropertyInfo {
+  let name: String
+  let type: String
+}
+
 // MARK: - ClassAnalysis
 
 /// Single-pass analysis of a `ClassDeclSyntax` member list.
@@ -74,21 +81,25 @@ struct ClassAnalysis {
   var hasStartObserving = false
   var startObservingBodyText: String?
   var hasInitializer = false
-  // v2: State/Action detection
-  var hasStateStruct = false
-  var nonBoundPropertiesLackDefaults = false
+  // v3: State/Action detection
+  var hasStateClass = false
   var hasStateProperty = false
-  var statePropertyMissingInitializer = false
   var hasActionEnum = false
   var hasHandleMethod = false
   var handleHasWrongLabel = false
 
-  // v2: @Bound inside State struct
+  // v3: State class metadata
+  var stateStoredProperties: [StateStoredPropertyInfo] = []
+  var stateHasUserEquatable = false
+  var stateClassIsFinal = false
+  var stateClassHasObservable = false
+
+  // v2: @Bound inside State
   var stateBoundProperties: [BoundPropertyInfo] = []
   var malformedStateBoundAttributes: [String] = []
   var boundOnLetProperties: [String] = []
 
-  // v2: @Polled inside State struct
+  // v2: @Polled inside State
   var statePolledProperties: [PolledPropertyInfo] = []
   var malformedStatePolledAttributes: [String] = []
   var polledOnLetProperties: [String] = []
@@ -106,11 +117,15 @@ struct ClassAnalysis {
         continue
       }
 
-      // Nested struct/enum declarations
-      if let structDecl = member.decl.as(StructDeclSyntax.self) {
-        if structDecl.name.text == "State" {
-          hasStateStruct = true
-          scanStateStruct(structDecl)
+      // Nested class declarations — detect State class
+      if let nestedClassDecl = member.decl.as(ClassDeclSyntax.self) {
+        if nestedClassDecl.name.text == "State" {
+          hasStateClass = true
+          stateClassIsFinal = nestedClassDecl.modifiers.contains { $0.name.text == "final" }
+          stateClassHasObservable = nestedClassDecl.attributes.contains { attr in
+            attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.observable
+          }
+          scanState(nestedClassDecl)
         }
         continue
       }
@@ -165,20 +180,10 @@ struct ClassAnalysis {
             continue
           }
 
-          // Detect `var state: State` property (type must be State if annotated)
+          // Detect `var state` property
           if identifier.identifier.text == "state" {
-            if let typeAnnotation = binding.typeAnnotation {
-              if typeAnnotation.type.trimmedDescription == "State" {
-                hasStateProperty = true
-                if binding.initializer == nil {
-                  statePropertyMissingInitializer = true
-                }
-              }
-            } else {
-              hasStateProperty = true
-            }
+            hasStateProperty = true
           }
-
         }
         continue
       }
@@ -264,11 +269,21 @@ struct ClassAnalysis {
     }
   }
 
-  /// Scans the nested `struct State` for @Bound/@Polled attributes and default-init eligibility.
-  private mutating func scanStateStruct(_ structDecl: StructDeclSyntax) {
+  /// Scans the nested `class State` for @Bound/@Polled attributes and stored properties.
+  private mutating func scanState(_ classDecl: ClassDeclSyntax) {
     var declarationOrder = 0
 
-    for member in structDecl.memberBlock.members {
+    // Check for user-defined Equatable conformance (static func ==)
+    for member in classDecl.memberBlock.members {
+      if let funcDecl = member.decl.as(FunctionDeclSyntax.self),
+         funcDecl.name.text == "==",
+         funcDecl.modifiers.contains(where: { $0.name.text == "static" })
+      {
+        stateHasUserEquatable = true
+      }
+    }
+
+    for member in classDecl.memberBlock.members {
       guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
         continue
       }
@@ -283,15 +298,27 @@ struct ClassAnalysis {
         else if name == AttributeName.polled { polledAttr = attrSyntax }
       }
 
-      // Non-bound/non-polled stored properties without defaults prevent State() auto-init
-      if boundAttr == nil && polledAttr == nil {
-        if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
-          for binding in varDecl.bindings where binding.accessorBlock == nil {
-            if binding.initializer == nil {
-              nonBoundPropertiesLackDefaults = true
+      // Track ALL stored var properties for Equatable generation
+      if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
+        for binding in varDecl.bindings where binding.accessorBlock == nil {
+          if let identifier = binding.pattern.as(IdentifierPatternSyntax.self) {
+            let type: String
+            if let typeAnnotation = binding.typeAnnotation {
+              type = typeAnnotation.type.trimmedDescription
+            } else {
+              // Type inferred from initializer — can't determine statically
+              type = ""
+            }
+            if !type.isEmpty {
+              stateStoredProperties.append(StateStoredPropertyInfo(
+                name: identifier.identifier.text,
+                type: type))
             }
           }
         }
+      }
+
+      if boundAttr == nil && polledAttr == nil {
         continue
       }
 

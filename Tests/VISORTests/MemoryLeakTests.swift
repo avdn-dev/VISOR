@@ -8,10 +8,26 @@ import Testing
 @Observable
 @MainActor
 final class ManualLeakVM: ViewModel {
-    struct State: Equatable {
+    @Observable
+    final class State: @preconcurrency Equatable {
         var count = 0
+
+        static func == (lhs: State, rhs: State) -> Bool {
+            lhs.count == rhs.count
+        }
     }
-    var state = State()
+
+    @ObservationIgnored private var _state = State()
+    var state: State {
+        get { access(keyPath: \.state); return _state }
+        set { withMutation(keyPath: \.state) { _state = newValue } }
+    }
+
+    func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+        guard _state[keyPath: keyPath] != value else { return }
+        _state[keyPath: keyPath] = value
+    }
+
     let source: RuntimeSource
 
     init(source: RuntimeSource) {
@@ -29,15 +45,15 @@ final class ManualLeakVM: ViewModel {
 @Observable
 @ViewModel
 final class LeakAsyncActionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var items: Loadable<[String]> = .loading
     }
 
     enum Action {
         case load
     }
-
-    var state = State()
 
     func handle(_ action: Action) async {
         updateState(\.items, to: .loading)

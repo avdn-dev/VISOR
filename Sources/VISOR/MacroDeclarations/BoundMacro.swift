@@ -12,8 +12,8 @@
 /// source property specified by the key path. The key path provides full
 /// autocomplete and compiler validation of the source property.
 ///
-/// Bound properties without default values are initialised from the service
-/// at init time — no stale defaults.
+/// Bound properties must not have default values — state is initialised from the
+/// service at init time.
 ///
 /// Use the `throttledBy:` variant to limit rapid-fire updates to a maximum
 /// frequency. The observation loop pauses after each update, dropping
@@ -22,7 +22,8 @@
 /// ```swift
 /// @ViewModel
 /// final class ConnectionsViewModel {
-///   struct State: Equatable {
+///   @Observable
+///   final class State {
 ///     @Bound(\ConnectionsViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
 ///     @Bound(\ConnectionsViewModel.headTracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
 ///   }

@@ -11,28 +11,30 @@
 /// 1. Memberwise `init` from stored `let` properties (skipped if init already exists)
 /// 2. `ViewModel` protocol conformance via extension
 /// 3. `typealias Factory = ViewModelFactory<ClassName>`
-/// 4. `startObserving()` combining `@Bound` (from State struct) and `@Reaction` observation methods
+/// 4. `@ObservationIgnored private var _state` + computed `var state` with manual observation
+/// 5. `updateState(_:to:)` writing to `_state` directly for per-field granularity
+/// 6. `startObserving()` combining `@Bound` and `@Reaction` observation methods
+/// 7. `startObserving()` combining `@Bound` and `@Reaction` observation methods
 ///
 /// ## State + Action pattern
 ///
-/// Define a nested `struct State: Equatable` with all view state, and an optional
+/// Define a nested `@Observable final class State` with all view state, and an optional
 /// `enum Action` with a `handle(_ action: Action) async` method:
 ///
 /// ```swift
 /// @Observable
 /// @ViewModel
 /// final class ItemsViewModel {
-///   struct State: Equatable {
+///   @Observable
+///   final class State {
 ///     var items: Loadable<[Item]> = .loading
-///     @Bound(\ItemsViewModel.service) var isAuthenticated = false
+///     @Bound(\ItemsViewModel.service.isAuthenticated) var isAuthenticated: Bool
 ///   }
 ///
 ///   enum Action {
 ///     case refresh
 ///     case delete(Item.ID)
 ///   }
-///
-///   var state = State()
 ///
 ///   func handle(_ action: Action) async {
 ///     switch action {
@@ -51,7 +53,7 @@
 ///
 /// ## @Bound inside State
 ///
-/// `@Bound` annotations on State struct properties generate observe methods that
+/// `@Bound` annotations on State class properties generate observe methods that
 /// use `updateState` for deduplication:
 /// ```swift
 /// func observeIsAuthenticated() async {
@@ -72,7 +74,7 @@
 /// **Important:** Do not store the Task from calling `startObserving()` on `self`
 /// (e.g. `self.task = Task { await self.startObserving() }`), as this creates a
 /// retain cycle. Use SwiftUI's `.task` modifier or the `observing()` test DSL instead.
-@attached(member, names: named(init), named(Factory), named(startObserving), arbitrary)
+@attached(member, names: named(init), named(Factory), named(startObserving), named(updateState), arbitrary)
 @attached(extension, conformances: ViewModel)
 public macro ViewModel() = #externalMacro(
   module: "VISORMacros",

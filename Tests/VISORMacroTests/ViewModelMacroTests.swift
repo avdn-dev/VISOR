@@ -19,11 +19,6 @@ private let testMacros: [String: Macro.Type] = [
   "ViewModel": ViewModelMacro.self,
 ]
 
-private nonisolated(unsafe) let observableWarning = DiagnosticSpec(
-  message: "@ViewModel requires @Observable on the class to enable observation tracking",
-  line: 1, column: 1, severity: .warning
-)
-
 // MARK: - ViewModelMacroTests
 
 @Suite("ViewModel Macro")
@@ -35,24 +30,42 @@ struct ViewModelMacroTests {
   func `Generates memberwise init and Factory typealias`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var count = 0
         }
-        var state = State()
         private let service: MyService
         private let store: DataStore
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var count = 0
         }
-        var state = State()
         private let service: MyService
         private let store: DataStore
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService, store: DataStore) {
               self.service = service
@@ -64,8 +77,13 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -73,10 +91,13 @@ struct ViewModelMacroTests {
   func `Skips init when already exists`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       class MyViewModel: NSObject {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var value = 0
+        }
         init(service: MyService) {
           self.service = service
           super.init()
@@ -85,22 +106,46 @@ struct ViewModelMacroTests {
       }
       """,
       expandedSource: """
+      @Observable
       class MyViewModel: NSObject {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var value = 0
+        }
         init(service: MyService) {
           self.service = service
           super.init()
         }
         private let service: MyService
 
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
           typealias Factory = ViewModelFactory<MyViewModel>
       }
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.value == rhs.value
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -110,20 +155,42 @@ struct ViewModelMacroTests {
   func `Skips var properties`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         var mutableProp: String = ""
         private let service: MyService
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         var mutableProp: String = ""
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService) {
               self.service = service
@@ -134,8 +201,13 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -143,20 +215,42 @@ struct ViewModelMacroTests {
   func `Skips let with default value`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         private let defaulted: String = "hello"
         private let service: MyService
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         private let defaulted: String = "hello"
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService) {
               self.service = service
@@ -167,8 +261,13 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -178,56 +277,49 @@ struct ViewModelMacroTests {
   func `No dependencies produces Factory typealias only`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class SimpleViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
       }
       """,
       expandedSource: """
+      @Observable
       final class SimpleViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           typealias Factory = ViewModelFactory<SimpleViewModel>
       }
 
       extension SimpleViewModel: @MainActor ViewModel {
       }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
 
-  // MARK: - @Observable Present (no warning)
-
-  @Test
-  func `No warning with @Observable`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
+      extension SimpleViewModel.State: Equatable {
+          static func == (lhs: SimpleViewModel.State, rhs: SimpleViewModel.State) -> Bool {
+              lhs.count == rhs.count
           }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
       }
       """,
       macros: testMacros)
@@ -242,17 +334,37 @@ struct ViewModelMacroTests {
       @Observable
       @ViewModel
       public final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         private let service: MyService
       }
       """,
       expandedSource: """
       @Observable
       public final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          public var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           public init(service: MyService) {
               self.service = service
@@ -263,37 +375,11 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-      """,
-      macros: testMacros)
-  }
 
-  @Test
-  func `Package class propagates access to init and Factory`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      package final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      package final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let service: MyService
-
-          package init(service: MyService) {
-              self.service = service
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
           }
-
-          package typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
       }
       """,
       macros: testMacros)
@@ -306,7 +392,8 @@ struct ViewModelMacroTests {
       @Observable
       @ViewModel
       public final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\MyViewModel.service.isLoading) var isLoading: Bool
         }
         private let service: MyService
@@ -315,16 +402,26 @@ struct ViewModelMacroTests {
       expandedSource: """
       @Observable
       public final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var isLoading: Bool
         }
         private let service: MyService
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           public var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           public init(service: MyService) {
@@ -347,6 +444,12 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.isLoading == rhs.isLoading
+          }
+      }
       """,
       macros: testMacros)
   }
@@ -359,18 +462,50 @@ struct ViewModelMacroTests {
       """
       @ViewModel
       struct NotAClass {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
       }
       """,
       expandedSource: """
       struct NotAClass {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
       }
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel can only be applied to classes", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Missing Observable on outer class emits error`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+        }
+        private let service: MyService
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
@@ -381,26 +516,39 @@ struct ViewModelMacroTests {
   func `@Bound inside State generates updateState observe method`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\MyViewModel.permissionService.isCameraDenied) var isCameraDenied: Bool
         }
         private let permissionService: PermissionService
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var isCameraDenied: Bool
         }
         private let permissionService: PermissionService
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(permissionService: PermissionService) {
@@ -423,8 +571,13 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.isCameraDenied == rhs.isCameraDenied
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -432,9 +585,11 @@ struct ViewModelMacroTests {
   func `Multiple @Bound inside State generates withDiscardingTaskGroup`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\MyViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
           @Bound(\\MyViewModel.connectionService.isLoading) var isLoading: Bool
           @Bound(\\MyViewModel.connectionService.connections) var connections: [Connection]
@@ -443,19 +598,30 @@ struct ViewModelMacroTests {
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var isAuthenticated: Bool
           var isLoading: Bool
           var connections: [Connection]
         }
         private let connectionService: ConnectionService
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(connectionService: ConnectionService) {
@@ -494,281 +660,22 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
 
-  @Test
-  func `Multiple different dependency sources in State`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Bound(\\MyViewModel.widgetService.selectedId) var selectedId: String
-          @Bound(\\MyViewModel.connectionService.connections) var connections: [Connection]
-          @Bound(\\MyViewModel.sharingService.isSending) var isSending: Bool
-        }
-        private let widgetService: WidgetService
-        private let connectionService: ConnectionService
-        private let sharingService: SharingService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var selectedId: String
-          var connections: [Connection]
-          var isSending: Bool
-        }
-        private let widgetService: WidgetService
-        private let connectionService: ConnectionService
-        private let sharingService: SharingService
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(widgetService: WidgetService, connectionService: ConnectionService, sharingService: SharingService) {
-              self.widgetService = widgetService
-              self.connectionService = connectionService
-              self.sharingService = sharingService
-              self._state = State(selectedId: widgetService.selectedId, connections: connectionService.connections, isSending: sharingService.isSending)
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-
-          func observeSelectedId() async {
-              for await value in VISOR.valuesOf({ self.widgetService.selectedId }) {
-                  self.updateState(\\.selectedId, to: value)
-              }
-          }
-
-          func observeConnections() async {
-              for await value in VISOR.valuesOf({ self.connectionService.connections }) {
-                  self.updateState(\\.connections, to: value)
-              }
-          }
-
-          func observeIsSending() async {
-              for await value in VISOR.valuesOf({ self.sharingService.isSending }) {
-                  self.updateState(\\.isSending, to: value)
-              }
-          }
-
-          func startObserving() async {
-              await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeSelectedId() }
-                  group.addTask { await self.observeConnections() }
-                  group.addTask { await self.observeIsSending() }
-              }
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.isAuthenticated == rhs.isAuthenticated
+              && lhs.isLoading == rhs.isLoading
+              && lhs.connections == rhs.connections
           }
       }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
       """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Bound inside State with invalid dependency emits error`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Bound(\\MyViewModel.typoService.value) var value = false
-        }
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var value = false
-        }
-        var state = State()
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound(\.typoService) on 'value': no stored 'let typoService' found on this class"#, line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Bound inside State with malformed key path emits warning`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Bound("invalid") var value = false
-        }
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var value = false
-        }
-        var state = State()
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound on 'value': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Bound with single-component key path emits warning`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Bound(\\MyViewModel.service) var value = false
-        }
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var value = false
-        }
-        var state = State()
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Bound on 'value': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Bound on let inside State emits warning`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Bound(\\MyViewModel.service.value) let value = false
-        }
-        var state = State()
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          let value = false
-        }
-        var state = State()
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Bound on 'value': use 'var' instead of 'let' — bound properties must be mutable", line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - @Bound on class-level var (BoundMacro is a no-op; @ViewModel ignores it)
-
-  @Test
-  func `@Bound on class-level var is ignored`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        @Bound(\\MyViewModel.service.value) var value = false
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        var value = false
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .error),
-      ],
       macros: testMacros)
   }
 
   // MARK: - State/Action diagnostics
 
   @Test
-  func `Missing State struct emits error`() {
+  func `Missing State class emits error`() {
     assertMacroExpansion(
       """
       @Observable
@@ -784,153 +691,127 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires a nested 'struct State: Equatable { }'", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@ViewModel requires a nested '@Observable final class State { }'", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `State struct without state property generates it`() {
+  func `State class not final emits error`() {
     assertMacroExpansion(
       """
       @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        class State {
           var count = 0
         }
-        enum Action { case refresh }
-        func handle(_ action: Action) async {}
         private let service: MyService
       }
       """,
       expandedSource: """
       @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        class State {
           var count = 0
         }
-        enum Action { case refresh }
-        func handle(_ action: Action) async {}
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService) {
               self.service = service
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          private var _state: State = State()
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
       }
 
       extension MyViewModel: @MainActor ViewModel {
       }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
+      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class must be 'final'", line: 1, column: 1, severity: .error),
+      ],
       macros: testMacros)
   }
 
   @Test
-  func `var state with non-State type still generates state property`() {
+  func `State class missing Observable emits error`() {
     assertMacroExpansion(
       """
       @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        final class State {
           var count = 0
         }
-        var state: Int = 0
         private let service: MyService
       }
       """,
       expandedSource: """
       @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        final class State {
           var count = 0
         }
-        var state: Int = 0
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService) {
               self.service = service
           }
 
           typealias Factory = ViewModelFactory<MyViewModel>
-
-          private var _state: State = State()
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
       }
 
       extension MyViewModel: @MainActor ViewModel {
       }
-      """,
-      macros: testMacros)
-  }
 
-  @Test
-  func `var state without initializer emits error`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          var count = 0
-        }
-        var state: State
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {
-          var count = 0
-        }
-        var state: State
-        private let service: MyService
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'var state' must have a default value (e.g., 'var state = State()')", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `State without defaults and no var state emits error`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          var name: String
-        }
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {
-          var name: String
-        }
-        private let service: MyService
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: all State properties must have default values when 'var state' is not declared (auto-generates 'var state = State()')", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "State class requires @Observable", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
@@ -942,19 +823,39 @@ struct ViewModelMacroTests {
       @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {}
+        @Observable
+        final class State {
+          var count = 0
+        }
         enum Action { case refresh }
-        var state = State()
         private let service: MyService
       }
       """,
       expandedSource: """
       @Observable
       final class MyViewModel {
-        struct State: Equatable {}
+        @Observable
+        final class State {
+          var count = 0
+        }
         enum Action { case refresh }
-        var state = State()
         private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(service: MyService) {
               self.service = service
@@ -964,83 +865,17 @@ struct ViewModelMacroTests {
       }
 
       extension MyViewModel: @MainActor ViewModel {
+      }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
       }
       """,
       diagnostics: [
         DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
       ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Action enum with async handle emits no diagnostic`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: Action) async {}
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: Action) async {}
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      macros: testMacros)
-  }
-
-  @Test
-  func `Action enum with non-async handle emits no warning`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: Action) {}
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: Action) {}
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
       macros: testMacros)
   }
 
@@ -1051,100 +886,48 @@ struct ViewModelMacroTests {
       @Observable
       @ViewModel
       final class SimpleViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
       }
       """,
       expandedSource: """
       @Observable
       final class SimpleViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var count = 0
+        }
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           typealias Factory = ViewModelFactory<SimpleViewModel>
       }
 
       extension SimpleViewModel: @MainActor ViewModel {
       }
-      """,
-      macros: testMacros)
-  }
 
-  @Test
-  func `Action enum with wrong handle parameter type emits diagnostic`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: String) async {}
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(_ action: String) async {}
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
+      extension SimpleViewModel.State: Equatable {
+          static func == (lhs: SimpleViewModel.State, rhs: SimpleViewModel.State) -> Bool {
+              lhs.count == rhs.count
           }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Action enum with wrong handle label emits error`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(action: Action) async {}
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        enum Action { case refresh }
-        var state = State()
-        func handle(action: Action) async {}
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'", line: 1, column: 1, severity: .error),
-      ],
       macros: testMacros)
   }
 
@@ -1154,21 +937,43 @@ struct ViewModelMacroTests {
   func `Sync @Reaction generates for-await loop`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var lastDestination: String? = nil
+        }
         @Reaction(\\Self.router.pendingDestination)
         func handleDeepLink(destination: Destination?) { }
         private let router: DeepLinkRouter
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
+        @Observable
+        final class State {
+          var lastDestination: String? = nil
+        }
         func handleDeepLink(destination: Destination?) { }
         private let router: DeepLinkRouter
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
 
           init(router: DeepLinkRouter) {
               self.router = router
@@ -1189,52 +994,13 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
 
-  @Test
-  func `Async @Reaction generates for-await loop`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction(\\Self.uploadService.uploadState)
-        func handleUploadState(state: UploadState) async { }
-        private let uploadService: UploadService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        func handleUploadState(state: UploadState) async { }
-        private let uploadService: UploadService
-
-          init(uploadService: UploadService) {
-              self.uploadService = uploadService
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-
-          func observeHandleUploadState() async {
-              for await state in VISOR.valuesOf({ self.uploadService.uploadState }) {
-                  await self.handleUploadState(state: state)
-              }
-          }
-
-          func startObserving() async {
-              await observeHandleUploadState()
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.lastDestination == rhs.lastDestination
           }
       }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -1242,9 +1008,11 @@ struct ViewModelMacroTests {
   func `Mixed @Bound in State and @Reaction generates combined startObserving`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\MyViewModel.service.isLoading) var isLoading: Bool
         }
         @Reaction(\\Self.router.pendingDestination)
@@ -1254,19 +1022,30 @@ struct ViewModelMacroTests {
       }
       """,
       expandedSource: """
+      @Observable
       final class MyViewModel {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var isLoading: Bool
         }
         func handleDeepLink(destination: Destination?) { }
         private let service: MyService
         private let router: DeepLinkRouter
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(service: MyService, router: DeepLinkRouter) {
@@ -1299,366 +1078,11 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
 
-  @Test
-  func `@Reaction with zero params emits diagnostic`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction(\\Self.router.pendingDestination)
-        func handleDeepLink() { }
-        private let router: DeepLinkRouter
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        func handleDeepLink() { }
-        private let router: DeepLinkRouter
-
-          init(router: DeepLinkRouter) {
-              self.router = router
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.isLoading == rhs.isLoading
           }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Reaction on 'handleDeepLink': method must have exactly one parameter", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - @Reaction with malformed key path
-
-  @Test
-  func `@Reaction with non-key-path argument emits diagnostic`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction("bogus")
-        func handleChange(value: String) { }
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        func handleChange(value: String) { }
-        private let service: MyService
-
-          init(service: MyService) {
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        observableWarning,
-        DiagnosticSpec(message: #"@Reaction on 'handleChange': expected key path argument like \.dependency.property"#, line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - Router Type Detection
-
-  @Test
-  func `Router property included in init`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let router: Router<AppScene>
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let router: Router<AppScene>
-        private let service: MyService
-
-          init(router: Router<AppScene>, service: MyService) {
-              self.router = router
-              self.service = service
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
-
-  // MARK: - Existential `any` Protocol Types
-
-  @Test
-  func `Existential any types preserved in init`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let router: Router<AppScene>
-        private let sessionInteractor: any SessionInteractor
-        private let distractionInteractor: any DistractionInteractor
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let router: Router<AppScene>
-        private let sessionInteractor: any SessionInteractor
-        private let distractionInteractor: any DistractionInteractor
-
-          init(router: Router<AppScene>, sessionInteractor: any SessionInteractor, distractionInteractor: any DistractionInteractor) {
-              self.router = router
-              self.sessionInteractor = sessionInteractor
-              self.distractionInteractor = distractionInteractor
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      macros: testMacros)
-  }
-
-  // MARK: - Manual startObserving missing Bound observe method
-
-  @Test
-  func `Manual startObserving missing @Bound observe method emits warning`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class ItemsViewModel {
-        struct State: Equatable {
-          @Bound(\\ItemsViewModel.service.items) var items: [String]
-        }
-        func startObserving() async {
-          // forgot to call observeItems
-        }
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class ItemsViewModel {
-        struct State: Equatable {
-          var items: [String]
-        }
-        func startObserving() async {
-          // forgot to call observeItems
-        }
-        private let service: MyService
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(service: MyService) {
-              self.service = service
-              self._state = State(items: service.items)
-          }
-
-          typealias Factory = ViewModelFactory<ItemsViewModel>
-
-          func observeItems() async {
-              for await value in VISOR.valuesOf({ self.service.items }) {
-                  self.updateState(\\.items, to: value)
-              }
-          }
-      }
-
-      extension ItemsViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "startObserving() does not call observeItems(); state derivation will not run", line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Multi-binding let declaration captures all properties`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let serviceA: ServiceA, serviceB: ServiceB
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        private let serviceA: ServiceA, serviceB: ServiceB
-
-          init(serviceA: ServiceA, serviceB: ServiceB) {
-              self.serviceA = serviceA
-              self.serviceB = serviceB
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
-
-  // MARK: - Error when applied to enum
-
-  @Test
-  func `Error when applied to enum`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      enum NotAClass {
-        case a
-      }
-      """,
-      expandedSource: """
-      enum NotAClass {
-        case a
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel can only be applied to classes", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - @Reaction with two parameters
-
-  @Test
-  func `@Reaction with two parameters emits diagnostic`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction(\\Self.router.pendingDestination)
-        func handleDeepLink(destination: Destination?, source: String) { }
-        private let router: DeepLinkRouter
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {}
-        var state = State()
-        func handleDeepLink(destination: Destination?, source: String) { }
-        private let router: DeepLinkRouter
-
-          init(router: DeepLinkRouter) {
-              self.router = router
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        observableWarning,
-        DiagnosticSpec(message: "@Reaction on 'handleDeepLink': method must have exactly one parameter", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - Manual startObserving calling correct observe methods emits no diagnostic
-
-  @Test
-  func `Manual startObserving calling observe methods emits no diagnostic`() {
-    assertMacroExpansion(
-      """
-      @Observable
-      @ViewModel
-      final class ItemsViewModel {
-        struct State: Equatable {
-          @Bound(\\ItemsViewModel.service.items) var items: [String]
-        }
-        func startObserving() async {
-          await observeItems()
-        }
-        private let service: MyService
-      }
-      """,
-      expandedSource: """
-      @Observable
-      final class ItemsViewModel {
-        struct State: Equatable {
-          var items: [String]
-        }
-        func startObserving() async {
-          await observeItems()
-        }
-        private let service: MyService
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(service: MyService) {
-              self.service = service
-              self._state = State(items: service.items)
-          }
-
-          typealias Factory = ViewModelFactory<ItemsViewModel>
-
-          func observeItems() async {
-              for await value in VISOR.valuesOf({ self.service.items }) {
-                  self.updateState(\\.items, to: value)
-              }
-          }
-      }
-
-      extension ItemsViewModel: @MainActor ViewModel {
       }
       """,
       macros: testMacros)
@@ -1670,26 +1094,39 @@ struct ViewModelMacroTests {
   func `Single @Polled generates inlined poll loop`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class DashboardVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Polled(\\DashboardVM.monitor.level, every: .seconds(30)) var level: Float
         }
         private let monitor: BatteryMonitor
       }
       """,
       expandedSource: """
+      @Observable
       final class DashboardVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var level: Float
         }
         private let monitor: BatteryMonitor
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(monitor: BatteryMonitor) {
@@ -1717,80 +1154,13 @@ struct ViewModelMacroTests {
 
       extension DashboardVM: @MainActor ViewModel {
       }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
 
-  @Test
-  func `Multiple @Polled generates task group startObserving`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class SensorVM {
-        struct State: Equatable {
-          @Polled(\\SensorVM.monitor.level, every: .seconds(30)) var level: Float
-          @Polled(\\SensorVM.monitor.temperature, every: .seconds(10)) var temperature: Double
-        }
-        private let monitor: SensorMonitor
-      }
-      """,
-      expandedSource: """
-      final class SensorVM {
-        struct State: Equatable {
-          var level: Float
-          var temperature: Double
-        }
-        private let monitor: SensorMonitor
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(monitor: SensorMonitor) {
-              self.monitor = monitor
-              self._state = State(level: monitor.level, temperature: monitor.temperature)
-          }
-
-          typealias Factory = ViewModelFactory<SensorVM>
-
-          func observeLevel() async {
-              self.updateState(\\.level, to: self.monitor.level)
-              do {
-                  while !Task.isCancelled {
-                      try await Task.sleep(for: .seconds(30))
-                      self.updateState(\\.level, to: self.monitor.level)
-                  }
-              } catch {
-              }
-          }
-
-          func observeTemperature() async {
-              self.updateState(\\.temperature, to: self.monitor.temperature)
-              do {
-                  while !Task.isCancelled {
-                      try await Task.sleep(for: .seconds(10))
-                      self.updateState(\\.temperature, to: self.monitor.temperature)
-                  }
-              } catch {
-              }
-          }
-
-          func startObserving() async {
-              await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeLevel() }
-                  group.addTask { await self.observeTemperature() }
-              }
+      extension DashboardVM.State: Equatable {
+          static func == (lhs: DashboardVM.State, rhs: DashboardVM.State) -> Bool {
+              lhs.level == rhs.level
           }
       }
-
-      extension SensorVM: @MainActor ViewModel {
-      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
@@ -1798,9 +1168,11 @@ struct ViewModelMacroTests {
   func `Mixed @Bound and @Polled preserves declaration order in init`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class MixedVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\MixedVM.service.name) var name: String
           @Polled(\\MixedVM.monitor.level, every: .seconds(5)) var level: Float
           @Bound(\\MixedVM.service.count) var count: Int
@@ -1810,8 +1182,10 @@ struct ViewModelMacroTests {
       }
       """,
       expandedSource: """
+      @Observable
       final class MixedVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var name: String
           var level: Float
           var count: Int
@@ -1819,11 +1193,20 @@ struct ViewModelMacroTests {
         private let service: MyService
         private let monitor: BatteryMonitor
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(service: MyService, monitor: BatteryMonitor) {
@@ -1868,311 +1251,57 @@ struct ViewModelMacroTests {
 
       extension MixedVM: @MainActor ViewModel {
       }
+
+      extension MixedVM.State: Equatable {
+          static func == (lhs: MixedVM.State, rhs: MixedVM.State) -> Bool {
+              lhs.name == rhs.name
+              && lhs.level == rhs.level
+              && lhs.count == rhs.count
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
-  @Test
-  func `@Polled with invalid dependency emits error`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled(\\MyViewModel.typoMonitor.level, every: .seconds(5)) var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Polled(\.typoMonitor) on 'level': no stored 'let typoMonitor' found on this class"#, line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Polled with malformed key path emits warning`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled("invalid", every: .seconds(5)) var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: #"@Polled on 'level': expected key path like \MyViewModel.dependency.property"#, line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Polled on let emits warning`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) let level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          let level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Polled on 'level': use 'var' instead of 'let' — polled properties must be mutable", line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Polled with default value emits error`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) var level: Float = 0.5
-        }
-        private let monitor: BatteryMonitor
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var level: Float = 0.5
-        }
-        private let monitor: BatteryMonitor
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-              self._state = State(level: monitor.level)
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-
-          func observeLevel() async {
-              self.updateState(\\.level, to: self.monitor.level)
-              do {
-                  while !Task.isCancelled {
-                      try await Task.sleep(for: .seconds(5))
-                      self.updateState(\\.level, to: self.monitor.level)
-                  }
-              } catch {
-              }
-          }
-
-          func startObserving() async {
-              await observeLevel()
-          }
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Polled on 'level': remove the default value — state is initialized from the service", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `@Polled missing interval emits error`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled(\\MyViewModel.monitor.level) var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var level = 0.0
-        }
-        var state = State()
-        private let monitor: BatteryMonitor
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "@Polled on 'level': missing 'every:' interval parameter", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Manual startObserving warns for missing @Polled observe call`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MyViewModel {
-        struct State: Equatable {
-          @Polled(\\MyViewModel.monitor.level, every: .seconds(5)) var level: Float
-        }
-        private let monitor: BatteryMonitor
-
-        func startObserving() async {
-          // Forgot to call observeLevel()
-        }
-      }
-      """,
-      expandedSource: """
-      final class MyViewModel {
-        struct State: Equatable {
-          var level: Float
-        }
-        private let monitor: BatteryMonitor
-
-        func startObserving() async {
-          // Forgot to call observeLevel()
-        }
-
-          private var _state: State
-
-          var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
-          }
-
-          init(monitor: BatteryMonitor) {
-              self.monitor = monitor
-              self._state = State(level: monitor.level)
-          }
-
-          typealias Factory = ViewModelFactory<MyViewModel>
-
-          func observeLevel() async {
-              self.updateState(\\.level, to: self.monitor.level)
-              do {
-                  while !Task.isCancelled {
-                      try await Task.sleep(for: .seconds(5))
-                      self.updateState(\\.level, to: self.monitor.level)
-                  }
-              } catch {
-              }
-          }
-      }
-
-      extension MyViewModel: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@ViewModel requires @Observable on the class to enable observation tracking", line: 1, column: 1, severity: .warning),
-        DiagnosticSpec(message: "startObserving() does not call observeLevel(); state derivation will not run", line: 1, column: 1, severity: .warning),
-      ],
-      macros: testMacros)
-  }
-
-  // MARK: - @Bound with throttledBy:
+  // MARK: - @Bound with throttledBy
 
   @Test
   func `@Bound with throttledBy generates sleep after updateState`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
       final class HeadVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           @Bound(\\HeadVM.tracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
         }
         private let tracker: HeadTracker
       }
       """,
       expandedSource: """
+      @Observable
       final class HeadVM {
-        struct State: Equatable {
+        @Observable
+        final class State {
           var posture: Posture
         }
         private let tracker: HeadTracker
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
           init(tracker: HeadTracker) {
@@ -2199,173 +1328,239 @@ struct ViewModelMacroTests {
 
       extension HeadVM: @MainActor ViewModel {
       }
+
+      extension HeadVM.State: Equatable {
+          static func == (lhs: HeadVM.State, rhs: HeadVM.State) -> Bool {
+              lhs.posture == rhs.posture
+          }
+      }
       """,
-      diagnostics: [observableWarning],
       macros: testMacros)
   }
 
-  @Test
-  func `Sync @Reaction with throttledBy generates sleep after method call`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class AudioVM {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction(\\Self.recorder.audioLevel, throttledBy: .seconds(0.1))
-        func handleLevel(level: Float) { }
-        private let recorder: AudioRecorder
-      }
-      """,
-      expandedSource: """
-      final class AudioVM {
-        struct State: Equatable {}
-        var state = State()
-        func handleLevel(level: Float) { }
-        private let recorder: AudioRecorder
-
-          init(recorder: AudioRecorder) {
-              self.recorder = recorder
-          }
-
-          typealias Factory = ViewModelFactory<AudioVM>
-
-          func observeHandleLevel() async {
-              for await level in VISOR.valuesOf({ self.recorder.audioLevel }) {
-                  self.handleLevel(level: level)
-                  do {
-                      try await Task.sleep(for: .seconds(0.1))
-                  } catch {
-                  }
-              }
-          }
-
-          func startObserving() async {
-              await observeHandleLevel()
-          }
-      }
-
-      extension AudioVM: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
+  // MARK: - Existential `any` Protocol Types
 
   @Test
-  func `Async @Reaction with throttledBy generates for-await with sleep instead of latestValuesOf`() {
+  func `Existential any types preserved in init`() {
     assertMacroExpansion(
       """
+      @Observable
       @ViewModel
-      final class UploadVM {
-        struct State: Equatable {}
-        var state = State()
-        @Reaction(\\Self.uploadService.uploadState, throttledBy: .seconds(1))
-        func handleUploadState(state: UploadState) async { }
-        private let uploadService: UploadService
-      }
-      """,
-      expandedSource: """
-      final class UploadVM {
-        struct State: Equatable {}
-        var state = State()
-        func handleUploadState(state: UploadState) async { }
-        private let uploadService: UploadService
-
-          init(uploadService: UploadService) {
-              self.uploadService = uploadService
-          }
-
-          typealias Factory = ViewModelFactory<UploadVM>
-
-          func observeHandleUploadState() async {
-              for await state in VISOR.valuesOf({ self.uploadService.uploadState }) {
-                  await self.handleUploadState(state: state)
-                  do {
-                      try await Task.sleep(for: .seconds(1))
-                  } catch {
-                  }
-              }
-          }
-
-          func startObserving() async {
-              await observeHandleUploadState()
-          }
-      }
-
-      extension UploadVM: @MainActor ViewModel {
-      }
-      """,
-      diagnostics: [observableWarning],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Mixed throttledBy and unthrottledBy @Bound in same State`() {
-    assertMacroExpansion(
-      """
-      @ViewModel
-      final class MixedThrottledByVM {
-        struct State: Equatable {
-          @Bound(\\MixedThrottledByVM.service.name) var name: String
-          @Bound(\\MixedThrottledByVM.tracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
         }
-        private let service: MyService
-        private let tracker: HeadTracker
+        private let router: Router<AppScene>
+        private let sessionInteractor: any SessionInteractor
       }
       """,
       expandedSource: """
-      final class MixedThrottledByVM {
-        struct State: Equatable {
-          var name: String
-          var posture: Posture
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
         }
-        private let service: MyService
-        private let tracker: HeadTracker
+        private let router: Router<AppScene>
+        private let sessionInteractor: any SessionInteractor
 
-          private var _state: State
+          @ObservationIgnored private var _state: State = State()
 
           var state: State {
               get { access(keyPath: \\.state); return _state }
               set { withMutation(keyPath: \\.state) { _state = newValue } }
           }
 
-          init(service: MyService, tracker: HeadTracker) {
-              self.service = service
-              self.tracker = tracker
-              self._state = State(name: service.name, posture: tracker.posture)
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
           }
 
-          typealias Factory = ViewModelFactory<MixedThrottledByVM>
-
-          func observeName() async {
-              for await value in VISOR.valuesOf({ self.service.name }) {
-                  self.updateState(\\.name, to: value)
-              }
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
           }
 
-          func observePosture() async {
-              for await value in VISOR.valuesOf({ self.tracker.posture }) {
-                  self.updateState(\\.posture, to: value)
-                  do {
-                      try await Task.sleep(for: .seconds(0.125))
-                  } catch {
-                  }
-              }
+          init(router: Router<AppScene>, sessionInteractor: any SessionInteractor) {
+              self.router = router
+              self.sessionInteractor = sessionInteractor
           }
 
-          func startObserving() async {
-              await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeName() }
-                  group.addTask { await self.observePosture() }
-              }
-          }
+          typealias Factory = ViewModelFactory<MyViewModel>
       }
 
-      extension MixedThrottledByVM: @MainActor ViewModel {
+      extension MyViewModel: @MainActor ViewModel {
+      }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
       }
       """,
-      diagnostics: [observableWarning],
+      macros: testMacros)
+  }
+
+  // MARK: - Error when applied to enum
+
+  @Test
+  func `Error when applied to enum`() {
+    assertMacroExpansion(
+      """
+      @ViewModel
+      enum NotAClass {
+        case a
+      }
+      """,
+      expandedSource: """
+      enum NotAClass {
+        case a
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@ViewModel can only be applied to classes", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  // MARK: - @Bound outside State
+
+  @Test
+  func `@Bound on class-level var emits error`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+        }
+        @Bound(\\MyViewModel.service.value) var value = false
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+        }
+        var value = false
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+
+      extension MyViewModel.State: Equatable {
+          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
+              lhs.count == rhs.count
+          }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@Bound must be inside 'class State' — move to the corresponding State property", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  // MARK: - Manual startObserving
+
+  @Test
+  func `Manual startObserving missing @Bound observe method emits warning`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class ItemsViewModel {
+        @Observable
+        final class State {
+          @Bound(\\ItemsViewModel.service.items) var items: [String]
+        }
+        func startObserving() async {
+          // forgot to call observeItems
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class ItemsViewModel {
+        @Observable
+        final class State {
+          var items: [String]
+        }
+        func startObserving() async {
+          // forgot to call observeItems
+        }
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+              self._state = State(items: service.items)
+          }
+
+          typealias Factory = ViewModelFactory<ItemsViewModel>
+
+          func observeItems() async {
+              for await value in VISOR.valuesOf({ self.service.items }) {
+                  self.updateState(\\.items, to: value)
+              }
+          }
+      }
+
+      extension ItemsViewModel: @MainActor ViewModel {
+      }
+
+      extension ItemsViewModel.State: Equatable {
+          static func == (lhs: ItemsViewModel.State, rhs: ItemsViewModel.State) -> Bool {
+              lhs.items == rhs.items
+          }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "startObserving() does not call observeItems(); state derivation will not run", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 

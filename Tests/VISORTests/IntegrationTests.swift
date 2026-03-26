@@ -7,11 +7,26 @@ import Testing
 @Observable
 @MainActor
 private final class IntegrationVM: ViewModel {
-    struct State: Equatable {
+    @Observable
+    final class State: @preconcurrency Equatable {
         var count = 0
+
+        static func == (lhs: State, rhs: State) -> Bool {
+            lhs.count == rhs.count
+        }
     }
 
-    var state = State()
+    @ObservationIgnored private var _state = State()
+    var state: State {
+        get { access(keyPath: \.state); return _state }
+        set { withMutation(keyPath: \.state) { _state = newValue } }
+    }
+
+    func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+        guard _state[keyPath: keyPath] != value else { return }
+        _state[keyPath: keyPath] = value
+    }
+
     private let source: TestSource
 
     init(source: TestSource) {
@@ -32,8 +47,22 @@ private final class IntegrationVM: ViewModel {
 @Observable
 @MainActor
 private final class RoutedIntegrationVM: ViewModel {
-    struct State: Equatable {}
-    var state = State()
+    @Observable
+    final class State: @preconcurrency Equatable {
+        static func == (lhs: State, rhs: State) -> Bool { true }
+    }
+
+    @ObservationIgnored private var _state = State()
+    var state: State {
+        get { access(keyPath: \.state); return _state }
+        set { withMutation(keyPath: \.state) { _state = newValue } }
+    }
+
+    func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+        guard _state[keyPath: keyPath] != value else { return }
+        _state[keyPath: keyPath] = value
+    }
+
     let routerID: ObjectIdentifier
 
     init(routerID: ObjectIdentifier) {

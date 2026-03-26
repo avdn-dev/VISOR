@@ -27,10 +27,11 @@ final class SecondSource {
 @Observable
 @ViewModel
 final class MinimalVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var value = 0
     }
-    var state = State()
 }
 
 // MARK: 1b. Minimal VM with auto-generated state property
@@ -38,7 +39,9 @@ final class MinimalVM {
 @Observable
 @ViewModel
 final class AutoStateVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var value = 0
     }
 }
@@ -48,7 +51,9 @@ final class AutoStateVM {
 @Observable
 @ViewModel
 final class ReactionOnStateVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var counter = 0
         var doubled = 0
     }
@@ -64,7 +69,9 @@ final class ReactionOnStateVM {
 @Observable
 @ViewModel
 final class MultiDepVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\MultiDepVM.source.count) var count: Int
         @Bound(\MultiDepVM.second.name) var name: String
     }
@@ -77,7 +84,9 @@ final class MultiDepVM {
 @Observable
 @ViewModel
 final class AutoObserveSingleVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\AutoObserveSingleVM.source.count) var count: Int
     }
     let source: RuntimeSource
@@ -88,7 +97,9 @@ final class AutoObserveSingleVM {
 @Observable
 @ViewModel
 final class AutoObserveMultiVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\AutoObserveMultiVM.source.count) var count: Int
         @Bound(\AutoObserveMultiVM.source.label) var label: String
         @Bound(\AutoObserveMultiVM.source.isEnabled) var isEnabled: Bool
@@ -101,7 +112,9 @@ final class AutoObserveMultiVM {
 @Observable
 @ViewModel
 final class BoundWithSyncActionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\BoundWithSyncActionVM.source.count) var count: Int
         var selectedIndex = 0
     }
@@ -128,7 +141,9 @@ final class BoundWithSyncActionVM {
 @Observable
 @ViewModel
 final class BoundWithAsyncActionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\BoundWithAsyncActionVM.source.count) var count: Int
         var detail: Loadable<String> = .loading
     }
@@ -157,11 +172,12 @@ final class BoundWithAsyncActionVM {
 @Observable
 @ViewModel
 final class SyncReactionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var lastDestination: String? = nil
         var reactionCount = 0
     }
-    var state = State()
     let nav: RuntimeSource
 
     @Reaction(\SyncReactionVM.nav.destination)
@@ -176,10 +192,11 @@ final class SyncReactionVM {
 @Observable
 @ViewModel
 final class AsyncReactionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var processedValue: String? = nil
     }
-    var state = State()
     let nav: RuntimeSource
 
     @Reaction(\AsyncReactionVM.nav.destination)
@@ -195,7 +212,9 @@ final class AsyncReactionVM {
 @Observable
 @ViewModel
 final class BoundAndReactionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\BoundAndReactionVM.source.count) var count: Int
         var lastNav: String? = nil
     }
@@ -213,15 +232,16 @@ final class BoundAndReactionVM {
 @Observable
 @ViewModel
 final class CustomInitVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\CustomInitVM.source.count) var count: Int
     }
-    var state: State
     let source: RuntimeSource
 
     init(customSource: RuntimeSource) {
         self.source = customSource
-        self.state = State(count: customSource.count)
+        self._state = State(count: customSource.count)
     }
 }
 
@@ -230,15 +250,15 @@ final class CustomInitVM {
 @Observable
 @ViewModel
 final class NoDepsVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var text = ""
     }
 
     enum Action {
         case setText(String)
     }
-
-    var state = State()
 
     func handle(_ action: Action) {
         switch action {
@@ -253,7 +273,9 @@ final class NoDepsVM {
 @Observable
 @ViewModel
 final class NoActionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\NoActionVM.source.count) var count: Int
     }
     let source: RuntimeSource
@@ -264,7 +286,9 @@ final class NoActionVM {
 @Observable
 @ViewModel
 final class LoadableStatesVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var items: Loadable<[String]> = .loading
         var profile: Loadable<String> = .empty
     }
@@ -275,8 +299,6 @@ final class LoadableStatesVM {
         case failItems
         case clearProfile
     }
-
-    var state = State()
 
     func handle(_ action: Action) async {
         switch action {
@@ -309,7 +331,9 @@ final class BatteryMonitor {
 @Observable
 @ViewModel
 final class PolledSingleVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Polled(\PolledSingleVM.monitor.level, every: .milliseconds(50)) var level: Float
     }
     let monitor: BatteryMonitor
@@ -320,7 +344,9 @@ final class PolledSingleVM {
 @Observable
 @ViewModel
 final class BoundAndPolledVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\BoundAndPolledVM.source.count) var count: Int
         @Polled(\BoundAndPolledVM.monitor.level, every: .milliseconds(50)) var level: Float
         @Bound(\BoundAndPolledVM.source.label) var label: String
@@ -334,7 +360,9 @@ final class BoundAndPolledVM {
 @Observable
 @ViewModel
 final class ThrottledByBoundVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\ThrottledByBoundVM.source.count, throttledBy: .milliseconds(100)) var count: Int
     }
     let source: RuntimeSource
@@ -345,11 +373,12 @@ final class ThrottledByBoundVM {
 @Observable
 @ViewModel
 final class ThrottledBySyncReactionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var latestCount = 0
         var reactionCount = 0
     }
-    var state = State()
     let source: RuntimeSource
 
     @Reaction(\ThrottledBySyncReactionVM.source.count, throttledBy: .milliseconds(100))
@@ -364,11 +393,12 @@ final class ThrottledBySyncReactionVM {
 @Observable
 @ViewModel
 final class ThrottledByAsyncReactionVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         var processedCount = 0
         var completedHandlers = 0
     }
-    var state = State()
     let source: RuntimeSource
 
     @Reaction(\ThrottledByAsyncReactionVM.source.count, throttledBy: .milliseconds(100))
@@ -385,7 +415,9 @@ final class ThrottledByAsyncReactionVM {
 @Observable
 @ViewModel
 final class MixedThrottledByVM {
-    struct State: Equatable {
+    @Observable
+    @ViewModelState
+    final class State {
         @Bound(\MixedThrottledByVM.source.label) var label: String
         @Bound(\MixedThrottledByVM.source.count, throttledBy: .milliseconds(100)) var count: Int
     }
@@ -401,7 +433,8 @@ struct NonEquatableWrapper { let value: Int }
 @Observable
 @MainActor
 final class NonEquatableVM: ViewModel {
-    struct State: Equatable {
+    @Observable
+    final class State: @preconcurrency Equatable {
         // wrapper is non-Equatable, but State itself conforms via manual implementation
         var wrapper = NonEquatableWrapper(value: 0)
         var label = ""
@@ -411,7 +444,20 @@ final class NonEquatableVM: ViewModel {
             lhs.label == rhs.label
         }
     }
-    var state = State()
+    @ObservationIgnored private var _state = State()
+    var state: State {
+        get { access(keyPath: \.state); return _state }
+        set { withMutation(keyPath: \.state) { _state = newValue } }
+    }
+
+    func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+        guard _state[keyPath: keyPath] != value else { return }
+        _state[keyPath: keyPath] = value
+    }
+
+    func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+        _state[keyPath: keyPath] = value
+    }
 }
 
 // MARK: - @Stubbable / @Spyable Macro Test Protocols

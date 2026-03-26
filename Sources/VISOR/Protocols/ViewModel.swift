@@ -11,17 +11,17 @@
 
 /// The base protocol for all ViewModels in the VISOR architecture.
 ///
-/// Conforming types must be `@Observable` classes with an `Equatable` `State` struct
+/// Conforming types must be `@Observable` classes with a nested `@Observable final class State`
 /// and an optional `Action` enum for user-initiated mutations.
 ///
-/// - State is the complete representation of all view state.
+/// - State is an `@Observable` class for per-field SwiftUI granularity.
 /// - Actions are dispatched via `handle(_:)`. Implement sync or async as needed.
-/// - Use `updateState(_:to:)` for keypath-based mutation with deduplication.
+/// - `updateState(_:to:)` is macro-generated on each VM using `_state` directly.
 ///
 /// - Note: Requires Swift 6.2+ with `MainActorByDefault` enabled in the consuming target.
 public protocol ViewModel: Observable, AnyObject {
-  /// The complete representation of all view state. Must be `Equatable` to enable deduplication.
-  associatedtype State: Equatable
+  /// The complete representation of all view state. Must be an `@Observable` class conforming to `Equatable`.
+  associatedtype State: Observable, AnyObject, Equatable
   /// The enum of user-initiated mutations. Defaults to `Never` for read-only ViewModels.
   associatedtype Action = Never
 
@@ -41,31 +41,3 @@ extension ViewModel {
 extension ViewModel where Action == Never {
   public func handle(_ action: Never) async {}
 }
-
-// MARK: - updateState (keypath mutation with deduplication)
-
-extension ViewModel {
-  /// Mutate a single state field by key path. Skips the write if the new value equals the
-  /// current one, preventing unnecessary observation triggers.
-  ///
-  /// - Parameters:
-  ///   - keyPath: A writable key path into `State`.
-  ///   - value: The new value to set.
-  public func updateState<V: Equatable>(
-    _ keyPath: WritableKeyPath<State, V>,
-    to value: V
-  ) {
-    guard state[keyPath: keyPath] != value else { return }
-    state[keyPath: keyPath] = value
-  }
-
-  /// Non-Equatable fallback — always writes (no deduplication possible).
-  public func updateState<V>(
-    _ keyPath: WritableKeyPath<State, V>,
-    to value: V
-  ) {
-    state[keyPath: keyPath] = value
-  }
-}
-
-

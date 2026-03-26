@@ -25,8 +25,6 @@ enum VISORDiagnostic: DiagnosticMessage {
   case reactionInsideNestedType
   case manualStartObservingMissingMethod(methodName: String)
   case missingState
-  case statePropertyMissingInitializer
-  case stateNotDefaultInitializable
   case actionWithoutHandle
   case handleWrongLabel
   case boundOnLetProperty(propertyName: String)
@@ -39,6 +37,8 @@ enum VISORDiagnostic: DiagnosticMessage {
   case polledOutsideState
   case reactionNotInClass
   case invalidObservationPolicy
+  case stateClassNotFinal
+  case stateClassMissingObservable
 
   // MARK: Internal
 
@@ -61,7 +61,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .malformedBoundKeyPath(let propertyName, let className):
       "@Bound on '\(propertyName)': expected key path like \\\(className).dependency.property"
     case .boundOutsideState:
-      "@Bound must be inside 'struct State' — move to the corresponding State property"
+      "@Bound must be inside 'class State' — move to the corresponding State property"
     case .invalidReactionParameter(let methodName):
       "@Reaction on '\(methodName)': method must have exactly one parameter"
     case .malformedReactionKeyPath(let methodName):
@@ -73,11 +73,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
     case .missingState:
-      "@ViewModel requires a nested 'struct State: Equatable { }'"
-    case .statePropertyMissingInitializer:
-      "@ViewModel: 'var state' must have a default value (e.g., 'var state = State()')"
-    case .stateNotDefaultInitializable:
-      "@ViewModel: all State properties must have default values when 'var state' is not declared (auto-generates 'var state = State()')"
+      "@ViewModel requires a nested '@Observable final class State { }'"
     case .actionWithoutHandle:
       "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
     case .handleWrongLabel:
@@ -97,11 +93,15 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .polledMissingInterval(let propertyName):
       "@Polled on '\(propertyName)': missing 'every:' interval parameter"
     case .polledOutsideState:
-      "@Polled must be inside 'struct State' — move to the corresponding State property"
+      "@Polled must be inside 'class State' — move to the corresponding State property"
     case .reactionNotInClass:
       "@Reaction must be inside a class annotated with @ViewModel"
     case .invalidObservationPolicy:
       "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
+    case .stateClassNotFinal:
+      "State class must be 'final'"
+    case .stateClassMissingObservable:
+      "State class requires @Observable"
     }
   }
 
@@ -122,8 +122,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .reactionInsideNestedType: "reactionInsideNestedType"
     case .manualStartObservingMissingMethod: "manualStartObservingMissingMethod"
     case .missingState: "missingState"
-    case .statePropertyMissingInitializer: "statePropertyMissingInitializer"
-    case .stateNotDefaultInitializable: "stateNotDefaultInitializable"
     case .actionWithoutHandle: "actionWithoutHandle"
     case .handleWrongLabel: "handleWrongLabel"
     case .boundOnLetProperty: "boundOnLetProperty"
@@ -136,6 +134,8 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .polledOutsideState: "polledOutsideState"
     case .reactionNotInClass: "reactionNotInClass"
     case .invalidObservationPolicy: "invalidObservationPolicy"
+    case .stateClassNotFinal: "stateClassNotFinal"
+    case .stateClassMissingObservable: "stateClassMissingObservable"
     }
     return MessageID(domain: "VISOR", id: id)
   }
@@ -148,11 +148,12 @@ enum VISORDiagnostic: DiagnosticMessage {
       .warning
     case .missingObservable, .boundOutsideState, .reactionNotOnMethod, .reactionInsideNestedType,
          .missingContent, .notAClass, .notAStruct, .missingArguments, .missingSelfSuffix,
-         .missingState, .statePropertyMissingInitializer, .stateNotDefaultInitializable,
-         .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
-         .invalidReactionParameter, .boundPropertyHasDefault,
+         .missingState, .actionWithoutHandle, .handleWrongLabel, .invalidBoundDependency,
+         .invalidReactionParameter,
          .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
-         .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy:
+         .boundPropertyHasDefault,
+         .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy,
+         .stateClassNotFinal, .stateClassMissingObservable:
       .error
     }
   }

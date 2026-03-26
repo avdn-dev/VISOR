@@ -67,7 +67,7 @@ public struct LazyViewModelMacro: MemberMacro {
     members.append(contentsOf: [
       "@State private var _viewModel: \(raw: viewModelType)?",
       "var viewModel: \(raw: viewModelType) { _viewModel! }",
-      "var stateBinding: Binding<\(raw: viewModelType).State> { Bindable(viewModel).state }",
+      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }",
       """
       \(raw: prefix)var body: some View {
           Group {
