@@ -73,7 +73,14 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
           continue
         }
 
-        let defaultExpr = binding.initializer?.value.trimmedDescription
+        var defaultExpr = binding.initializer?.value.trimmedDescription
+
+        // Optional types implicitly default to nil in Swift; mirror that in the init.
+        if defaultExpr == nil,
+           type.hasSuffix("?") || type.hasPrefix("Optional<")
+        {
+          defaultExpr = "nil"
+        }
 
         props.append(StoredProp(name: name, type: type, defaultExpr: defaultExpr))
       }
