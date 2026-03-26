@@ -91,46 +91,13 @@ public struct ViewModelStateMacro: MemberMacro, ExtensionMacro {
       "self._\(p.name) = \(p.name)"
     }.joined(separator: "\n        ")
 
-    var members: [DeclSyntax] = []
-
     let designatedInit: DeclSyntax = """
       \(raw: prefix)init(\(raw: initParams)) {
           \(raw: initAssignments)
       }
       """
-    members.append(designatedInit)
 
-    // If any param lacks a default, also generate convenience init()
-    let propsWithoutDefaults = props.filter { $0.defaultExpr == nil }
-    if !propsWithoutDefaults.isEmpty {
-      var convenienceArgs: [String] = []
-      var canGenerateConvenience = true
-
-      for p in props {
-        if p.defaultExpr != nil {
-          // Has a default — omit from call (uses parameter default)
-        } else {
-          if let syntheticDefault = defaultValue(for: p.type) {
-            convenienceArgs.append("\(p.name): \(syntheticDefault)")
-          } else {
-            canGenerateConvenience = false
-            break
-          }
-        }
-      }
-
-      if canGenerateConvenience {
-        let argList = convenienceArgs.joined(separator: ", ")
-        let convenienceInit: DeclSyntax = """
-          \(raw: prefix)convenience init() {
-              self.init(\(raw: argList))
-          }
-          """
-        members.append(convenienceInit)
-      }
-    }
-
-    return members
+    return [designatedInit]
   }
 
   // MARK: - ExtensionMacro (generates Equatable conformance)
