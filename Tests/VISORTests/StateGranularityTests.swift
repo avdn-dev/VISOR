@@ -7,20 +7,10 @@ import VISOR
 
 /// @Observable class State — per-field tracking.
 @Observable
-private final class ClassState: @preconcurrency Equatable {
+private final class ClassState {
   var fieldA = "a"
   var fieldB = "b"
   @ObservationIgnored var ignored = "ignored"
-
-  init(fieldA: String = "a", fieldB: String = "b", ignored: String = "ignored") {
-    self.fieldA = fieldA
-    self.fieldB = fieldB
-    self.ignored = ignored
-  }
-
-  static func == (lhs: ClassState, rhs: ClassState) -> Bool {
-    lhs.fieldA == rhs.fieldA && lhs.fieldB == rhs.fieldB && lhs.ignored == rhs.ignored
-  }
 }
 
 /// Uses updateState that writes through @ObservationIgnored _state,
@@ -51,18 +41,9 @@ private final class ClassStateFixedVM: ViewModel {
 @MainActor
 private final class NestedClassStateVM: ViewModel {
   @Observable
-  final class State: @preconcurrency Equatable {
+  final class State {
     var fieldA = "a"
     var fieldB = "b"
-
-    init(fieldA: String = "a", fieldB: String = "b") {
-      self.fieldA = fieldA
-      self.fieldB = fieldB
-    }
-
-    static func == (lhs: State, rhs: State) -> Bool {
-      lhs.fieldA == rhs.fieldA && lhs.fieldB == rhs.fieldB
-    }
   }
 
   @ObservationIgnored private var _state = State()
@@ -78,18 +59,9 @@ private final class NestedClassStateVM: ViewModel {
 }
 
 /// Class WITHOUT @Observable — proves @Observable is required.
-private final class PlainClassState: @preconcurrency Equatable {
+private final class PlainClassState {
   var fieldA = "a"
   var fieldB = "b"
-
-  init(fieldA: String = "a", fieldB: String = "b") {
-    self.fieldA = fieldA
-    self.fieldB = fieldB
-  }
-
-  static func == (lhs: PlainClassState, rhs: PlainClassState) -> Bool {
-    lhs.fieldA == rhs.fieldA && lhs.fieldB == rhs.fieldB
-  }
 }
 
 /// NOT a ViewModel — plain class State can't satisfy Observable constraint.
@@ -268,15 +240,6 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("Nested: Equatable compares by value")
-  func nested_equatableByValue() {
-    let vm = NestedClassStateVM()
-    let other = NestedClassStateVM.State(fieldA: "a", fieldB: "b")
-    #expect(vm.state == other)
-    vm.updateState(\.fieldA, to: "new")
-    #expect(vm.state != other)
-  }
-
   @Test("Nested: @Bindable gives per-field granularity")
   func nested_bindable_noCrossFieldFire() async {
     let vm = NestedClassStateVM()
@@ -340,13 +303,6 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("@ObservationIgnored field: still included in Equatable comparison")
-  func observationIgnored_stillInEquatable() {
-    let a = ClassState(fieldA: "a", fieldB: "b", ignored: "x")
-    let b = ClassState(fieldA: "a", fieldB: "b", ignored: "y")
-    #expect(a != b)
-  }
-
   // MARK: - Plain class (no @Observable): proves Observable is required
 
   @Test("Plain class: field write is INVISIBLE (no per-field tracking)")
@@ -363,24 +319,4 @@ struct StateGranularityTests {
     }
   }
 
-  // MARK: - Equatable
-
-  @Test("Equatable compares by value, not reference")
-  func classState_equatableByValue() {
-    let vm = ClassStateFixedVM()
-    let other = ClassState(fieldA: "a", fieldB: "b")
-    #expect(vm.state == other)
-
-    vm.state.fieldA = "new"
-    #expect(vm.state != other)
-  }
-
-  @Test("Snapshot comparison uses a fresh expected instance, not a captured reference")
-  func snapshot_compareAgainstExpected() {
-    let vm = ClassStateFixedVM()
-    vm.updateState(\.fieldA, to: "updated")
-    vm.updateState(\.fieldB, to: "changed")
-
-    #expect(vm.state == ClassState(fieldA: "updated", fieldB: "changed"))
-  }
 }

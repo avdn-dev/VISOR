@@ -20,8 +20,8 @@
 ///
 /// - Note: Requires Swift 6.2+ with `MainActorByDefault` enabled in the consuming target.
 public protocol ViewModel: Observable, AnyObject {
-  /// The complete representation of all view state. Must be an `@Observable` class conforming to `Equatable`.
-  associatedtype State: Observable, AnyObject, Equatable
+  /// The complete representation of all view state. Must be an `@Observable` class.
+  associatedtype State: Observable, AnyObject
   /// The enum of user-initiated mutations. Defaults to `Never` for read-only ViewModels.
   associatedtype Action = Never
 

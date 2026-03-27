@@ -53,9 +53,7 @@ nonisolated enum TestScene: NavigationScene {
 @MainActor
 final class RoutedTestVM: ViewModel {
   @Observable
-  final class State: @preconcurrency Equatable {
-    static func == (lhs: State, rhs: State) -> Bool { true }
-  }
+  final class State {}
 
   @ObservationIgnored private var _state = State()
   var state: State {

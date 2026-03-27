@@ -28,7 +28,6 @@ final class SecondSource {
 @ViewModel
 final class MinimalVM {
     @Observable
-    @ViewModelState
     final class State {
         var value = 0
     }
@@ -40,7 +39,6 @@ final class MinimalVM {
 @ViewModel
 final class AutoStateVM {
     @Observable
-    @ViewModelState
     final class State {
         var value = 0
     }
@@ -52,7 +50,6 @@ final class AutoStateVM {
 @ViewModel
 final class ReactionOnStateVM {
     @Observable
-    @ViewModelState
     final class State {
         var counter = 0
         var doubled = 0
@@ -70,7 +67,6 @@ final class ReactionOnStateVM {
 @ViewModel
 final class MultiDepVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\MultiDepVM.source.count) var count: Int
         @Bound(\MultiDepVM.second.name) var name: String
@@ -86,7 +82,6 @@ final class MultiDepVM {
 @ViewModel
 final class AutoObserveSingleVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\AutoObserveSingleVM.source.count) var count: Int
         nonisolated init(count: Int) { self._count = count }
@@ -100,7 +95,6 @@ final class AutoObserveSingleVM {
 @ViewModel
 final class AutoObserveMultiVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\AutoObserveMultiVM.source.count) var count: Int
         @Bound(\AutoObserveMultiVM.source.label) var label: String
@@ -116,7 +110,6 @@ final class AutoObserveMultiVM {
 @ViewModel
 final class BoundWithSyncActionVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\BoundWithSyncActionVM.source.count) var count: Int
         var selectedIndex = 0
@@ -146,7 +139,6 @@ final class BoundWithSyncActionVM {
 @ViewModel
 final class BoundWithAsyncActionVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\BoundWithAsyncActionVM.source.count) var count: Int
         var detail: Loadable<String> = .loading
@@ -178,7 +170,6 @@ final class BoundWithAsyncActionVM {
 @ViewModel
 final class SyncReactionVM {
     @Observable
-    @ViewModelState
     final class State {
         var lastDestination: String? = nil
         var reactionCount = 0
@@ -198,7 +189,6 @@ final class SyncReactionVM {
 @ViewModel
 final class AsyncReactionVM {
     @Observable
-    @ViewModelState
     final class State {
         var processedValue: String? = nil
     }
@@ -218,7 +208,6 @@ final class AsyncReactionVM {
 @ViewModel
 final class BoundAndReactionVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\BoundAndReactionVM.source.count) var count: Int
         var lastNav: String? = nil
@@ -239,7 +228,6 @@ final class BoundAndReactionVM {
 @ViewModel
 final class CustomInitVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\CustomInitVM.source.count) var count: Int
         nonisolated init(count: Int) { self._count = count }
@@ -258,7 +246,6 @@ final class CustomInitVM {
 @ViewModel
 final class NoDepsVM {
     @Observable
-    @ViewModelState
     final class State {
         var text = ""
     }
@@ -281,7 +268,6 @@ final class NoDepsVM {
 @ViewModel
 final class NoActionVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\NoActionVM.source.count) var count: Int
         nonisolated init(count: Int) { self._count = count }
@@ -295,7 +281,6 @@ final class NoActionVM {
 @ViewModel
 final class LoadableStatesVM {
     @Observable
-    @ViewModelState
     final class State {
         var items: Loadable<[String]> = .loading
         var profile: Loadable<String> = .empty
@@ -340,7 +325,6 @@ final class BatteryMonitor {
 @ViewModel
 final class PolledSingleVM {
     @Observable
-    @ViewModelState
     final class State {
         @Polled(\PolledSingleVM.monitor.level, every: .milliseconds(50)) var level: Float
         nonisolated init(level: Float) { self._level = level }
@@ -354,7 +338,6 @@ final class PolledSingleVM {
 @ViewModel
 final class BoundAndPolledVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\BoundAndPolledVM.source.count) var count: Int
         @Polled(\BoundAndPolledVM.monitor.level, every: .milliseconds(50)) var level: Float
@@ -371,7 +354,6 @@ final class BoundAndPolledVM {
 @ViewModel
 final class ThrottledByBoundVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\ThrottledByBoundVM.source.count, throttledBy: .milliseconds(100)) var count: Int
         nonisolated init(count: Int) { self._count = count }
@@ -385,7 +367,6 @@ final class ThrottledByBoundVM {
 @ViewModel
 final class ThrottledBySyncReactionVM {
     @Observable
-    @ViewModelState
     final class State {
         var latestCount = 0
         var reactionCount = 0
@@ -405,7 +386,6 @@ final class ThrottledBySyncReactionVM {
 @ViewModel
 final class ThrottledByAsyncReactionVM {
     @Observable
-    @ViewModelState
     final class State {
         var processedCount = 0
         var completedHandlers = 0
@@ -427,7 +407,6 @@ final class ThrottledByAsyncReactionVM {
 @ViewModel
 final class MixedThrottledByVM {
     @Observable
-    @ViewModelState
     final class State {
         @Bound(\MixedThrottledByVM.source.label) var label: String
         @Bound(\MixedThrottledByVM.source.count, throttledBy: .milliseconds(100)) var count: Int
@@ -446,15 +425,9 @@ struct NonEquatableWrapper { let value: Int }
 @MainActor
 final class NonEquatableVM: ViewModel {
     @Observable
-    final class State: @preconcurrency Equatable {
-        // wrapper is non-Equatable, but State itself conforms via manual implementation
+    final class State {
         var wrapper = NonEquatableWrapper(value: 0)
         var label = ""
-
-        // Intentionally compares only `label` to test the non-Equatable updateState overload on `wrapper`
-        static func == (lhs: State, rhs: State) -> Bool {
-            lhs.label == rhs.label
-        }
     }
     @ObservationIgnored private var _state = State()
     var state: State {

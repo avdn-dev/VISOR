@@ -77,11 +77,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -139,11 +134,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.value == rhs.value
-          }
       }
       """,
       macros: testMacros)
@@ -201,11 +191,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -261,11 +246,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -315,11 +295,6 @@ struct ViewModelMacroTests {
 
       extension SimpleViewModel: @MainActor ViewModel {
       }
-
-      extension SimpleViewModel.State: Equatable {
-          static func == (lhs: SimpleViewModel.State, rhs: SimpleViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -375,11 +350,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -444,11 +414,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.isLoading == rhs.isLoading
-          }
       }
       """,
       macros: testMacros)
@@ -571,11 +536,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.isCameraDenied == rhs.isCameraDenied
-          }
       }
       """,
       macros: testMacros)
@@ -660,13 +620,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.isAuthenticated == rhs.isAuthenticated
-              && lhs.isLoading == rhs.isLoading
-              && lhs.connections == rhs.connections
-          }
       }
       """,
       macros: testMacros)
@@ -744,11 +697,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       diagnostics: [
@@ -803,11 +751,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       diagnostics: [
@@ -866,11 +809,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       diagnostics: [
@@ -921,11 +859,6 @@ struct ViewModelMacroTests {
 
       extension SimpleViewModel: @MainActor ViewModel {
       }
-
-      extension SimpleViewModel.State: Equatable {
-          static func == (lhs: SimpleViewModel.State, rhs: SimpleViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -994,11 +927,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.lastDestination == rhs.lastDestination
-          }
       }
       """,
       macros: testMacros)
@@ -1078,11 +1006,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.isLoading == rhs.isLoading
-          }
       }
       """,
       macros: testMacros)
@@ -1154,11 +1077,6 @@ struct ViewModelMacroTests {
 
       extension DashboardVM: @MainActor ViewModel {
       }
-
-      extension DashboardVM.State: Equatable {
-          static func == (lhs: DashboardVM.State, rhs: DashboardVM.State) -> Bool {
-              lhs.level == rhs.level
-          }
       }
       """,
       macros: testMacros)
@@ -1251,13 +1169,6 @@ struct ViewModelMacroTests {
 
       extension MixedVM: @MainActor ViewModel {
       }
-
-      extension MixedVM.State: Equatable {
-          static func == (lhs: MixedVM.State, rhs: MixedVM.State) -> Bool {
-              lhs.name == rhs.name
-              && lhs.level == rhs.level
-              && lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -1328,11 +1239,6 @@ struct ViewModelMacroTests {
 
       extension HeadVM: @MainActor ViewModel {
       }
-
-      extension HeadVM.State: Equatable {
-          static func == (lhs: HeadVM.State, rhs: HeadVM.State) -> Bool {
-              lhs.posture == rhs.posture
-          }
       }
       """,
       macros: testMacros)
@@ -1391,11 +1297,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       macros: testMacros)
@@ -1475,11 +1376,6 @@ struct ViewModelMacroTests {
 
       extension MyViewModel: @MainActor ViewModel {
       }
-
-      extension MyViewModel.State: Equatable {
-          static func == (lhs: MyViewModel.State, rhs: MyViewModel.State) -> Bool {
-              lhs.count == rhs.count
-          }
       }
       """,
       diagnostics: [
@@ -1551,11 +1447,6 @@ struct ViewModelMacroTests {
 
       extension ItemsViewModel: @MainActor ViewModel {
       }
-
-      extension ItemsViewModel.State: Equatable {
-          static func == (lhs: ItemsViewModel.State, rhs: ItemsViewModel.State) -> Bool {
-              lhs.items == rhs.items
-          }
       }
       """,
       diagnostics: [
@@ -1564,43 +1455,5 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - @ViewModelState direct expansion
-
-  @Test
-  func `ViewModelState generates public init and Equatable for public class with mixed defaults`() {
-    let stateMacros: [String: Macro.Type] = [
-      "ViewModelState": ViewModelStateMacro.self,
-    ]
-    assertMacroExpansion(
-      """
-      @ViewModelState
-      public final class State {
-        public var appSettings = AppSettings.default
-        public var isLoading = false
-        public var errorMessage: String?
-      }
-      """,
-      expandedSource: """
-      public final class State {
-        public var appSettings = AppSettings.default
-        public var isLoading = false
-        public var errorMessage: String?
-
-          public nonisolated init(isLoading: Bool = false, errorMessage: String? = nil) {
-              self._isLoading = isLoading
-              self._errorMessage = errorMessage
-          }
-      }
-
-      extension State: @preconcurrency Equatable {
-          public static func == (lhs: State, rhs: State) -> Bool {
-              lhs.appSettings == rhs.appSettings
-                  && lhs.isLoading == rhs.isLoading
-                  && lhs.errorMessage == rhs.errorMessage
-          }
-      }
-      """,
-      macros: stateMacros)
-  }
 }
 #endif

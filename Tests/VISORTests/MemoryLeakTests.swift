@@ -46,7 +46,6 @@ final class ManualLeakVM: ViewModel {
 @ViewModel
 final class LeakAsyncActionVM {
     @Observable
-    @ViewModelState
     final class State {
         var items: Loadable<[String]> = .loading
     }

@@ -90,7 +90,6 @@ struct ClassAnalysis {
 
   // v3: State class metadata
   var stateStoredProperties: [StateStoredPropertyInfo] = []
-  var stateHasUserEquatable = false
   var stateClassIsFinal = false
   var stateClassHasObservable = false
 
@@ -273,16 +272,6 @@ struct ClassAnalysis {
   private mutating func scanState(_ classDecl: ClassDeclSyntax) {
     var declarationOrder = 0
 
-    // Check for user-defined Equatable conformance (static func ==)
-    for member in classDecl.memberBlock.members {
-      if let funcDecl = member.decl.as(FunctionDeclSyntax.self),
-         funcDecl.name.text == "==",
-         funcDecl.modifiers.contains(where: { $0.name.text == "static" })
-      {
-        stateHasUserEquatable = true
-      }
-    }
-
     for member in classDecl.memberBlock.members {
       guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
         continue
@@ -298,7 +287,7 @@ struct ClassAnalysis {
         else if name == AttributeName.polled { polledAttr = attrSyntax }
       }
 
-      // Track ALL stored var properties for Equatable generation
+      // Track ALL stored var properties
       if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
         for binding in varDecl.bindings where binding.accessorBlock == nil {
           if let identifier = binding.pattern.as(IdentifierPatternSyntax.self) {
