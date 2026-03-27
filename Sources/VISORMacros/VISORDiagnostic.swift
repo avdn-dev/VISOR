@@ -157,9 +157,10 @@ enum VISORDiagnostic: DiagnosticMessage {
          .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
          .boundPropertyHasDefault,
          .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy,
-         .stateClassNotFinal, .stateClassMissingObservable,
-         .stateClassMissingInit:
+         .stateClassNotFinal, .stateClassMissingObservable:
       .error
+    case .stateClassMissingInit:
+      .warning
     }
   }
 }
