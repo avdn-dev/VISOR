@@ -92,6 +92,7 @@ struct ClassAnalysis {
   var stateStoredProperties: [StateStoredPropertyInfo] = []
   var stateClassIsFinal = false
   var stateClassHasObservable = false
+  var stateClassHasInit = false
 
   // v2: @Bound inside State
   var stateBoundProperties: [BoundPropertyInfo] = []
@@ -271,6 +272,14 @@ struct ClassAnalysis {
   /// Scans the nested `class State` for @Bound/@Polled attributes and stored properties.
   private mutating func scanState(_ classDecl: ClassDeclSyntax) {
     var declarationOrder = 0
+
+    // Check for user-declared init
+    for member in classDecl.memberBlock.members {
+      if member.decl.is(InitializerDeclSyntax.self) {
+        stateClassHasInit = true
+        break
+      }
+    }
 
     for member in classDecl.memberBlock.members {
       guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {

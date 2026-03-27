@@ -65,6 +65,18 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.stateClassMissingObservable))
     }
 
+    if !analysis.stateClassHasInit {
+      let boundNames = analysis.stateBoundProperties.map(\.propertyName)
+      let polledNames = analysis.statePolledProperties.map(\.propertyName)
+      let paramNames = boundNames + polledNames
+      let sig = paramNames.isEmpty
+        ? "nonisolated init() {}"
+        : "nonisolated init(\(paramNames.joined(separator: ":, ")):) { ... }"
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.stateClassMissingInit(expectedSignature: sig)))
+    }
+
     if analysis.hasActionEnum && !analysis.hasHandleMethod {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),

@@ -39,6 +39,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case invalidObservationPolicy
   case stateClassNotFinal
   case stateClassMissingObservable
+  case stateClassMissingInit(expectedSignature: String)
 
   // MARK: Internal
 
@@ -102,6 +103,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "State class must be 'final'"
     case .stateClassMissingObservable:
       "State class requires @Observable"
+    case .stateClassMissingInit(let sig):
+      "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig)"
     }
   }
 
@@ -136,6 +139,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .invalidObservationPolicy: "invalidObservationPolicy"
     case .stateClassNotFinal: "stateClassNotFinal"
     case .stateClassMissingObservable: "stateClassMissingObservable"
+    case .stateClassMissingInit: "stateClassMissingInit"
     }
     return MessageID(domain: "VISOR", id: id)
   }
@@ -153,7 +157,8 @@ enum VISORDiagnostic: DiagnosticMessage {
          .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
          .boundPropertyHasDefault,
          .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy,
-         .stateClassNotFinal, .stateClassMissingObservable:
+         .stateClassNotFinal, .stateClassMissingObservable,
+         .stateClassMissingInit:
       .error
     }
   }
