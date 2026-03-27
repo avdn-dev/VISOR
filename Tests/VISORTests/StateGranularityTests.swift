@@ -80,8 +80,8 @@ struct StateGranularityTests {
 
   // MARK: - Class State: per-field granularity (updateState via _state)
 
-  @Test("updateState fieldA does NOT fire fieldB observer")
-  func fixed_updateState_noCrossFieldFire() async {
+  @Test
+  func `updateState on fieldA does not fire fieldB observer`() async {
     let vm = ClassStateFixedVM()
 
     await confirmation(expectedCount: 0) { confirmed in
@@ -94,8 +94,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("updateState fieldB DOES fire its observer")
-  func fixed_updateState_sameFieldFires() async {
+  @Test
+  func `updateState on fieldB fires its own observer`() async {
     let vm = ClassStateFixedVM()
 
     await confirmation { confirmed in
@@ -108,8 +108,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("updateState dedup still works")
-  func fixed_updateState_sameValue_noFire() async {
+  @Test
+  func `updateState with same value does not fire observer`() async {
     let vm = ClassStateFixedVM()
 
     await confirmation(expectedCount: 0) { confirmed in
@@ -122,8 +122,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("3 fieldA updateState calls → 0 spurious fieldB fires")
-  func fixed_repeatedUpdateState_noCrossFieldFires() async {
+  @Test
+  func `repeated updateState on fieldA produces zero spurious fieldB fires`() async {
     let vm = ClassStateFixedVM()
 
     await confirmation(expectedCount: 0) { confirmed in
@@ -138,8 +138,8 @@ struct StateGranularityTests {
 
   // MARK: - Bindable(vm.state) — the v3 stateBinding pattern
 
-  @Test("Bindable(vm.state).fieldA write does NOT fire fieldB observer")
-  func bindableVMState_noCrossField() async {
+  @Test
+  func `Bindable vm state fieldA write does not fire fieldB observer`() async {
     let vm = NestedClassStateVM()
     let stateBinding = Bindable(vm.state)
 
@@ -154,8 +154,8 @@ struct StateGranularityTests {
     #expect(vm.state.fieldA == "via Bindable(vm.state)")
   }
 
-  @Test("Bindable(vm.state).fieldB write DOES fire fieldB observer")
-  func bindableVMState_sameFieldFires() async {
+  @Test
+  func `Bindable vm state fieldB write fires fieldB observer`() async {
     let vm = NestedClassStateVM()
     let stateBinding = Bindable(vm.state)
 
@@ -171,8 +171,8 @@ struct StateGranularityTests {
 
   // MARK: - @Bindable on State directly
 
-  @Test("@Bindable<State> projected write fires correct field observer")
-  func bindable_projectedWrite_firesCorrectObserver() async {
+  @Test
+  func `Bindable projected write fires correct field observer`() async {
     let vm = ClassStateFixedVM()
     @Bindable var state = vm.state
 
@@ -186,8 +186,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("@Bindable<State> projected write does NOT fire cross-field")
-  func bindable_projectedWrite_noCrossFieldFire() async {
+  @Test
+  func `Bindable projected write does not fire cross-field observer`() async {
     let vm = ClassStateFixedVM()
     @Bindable var state = vm.state
 
@@ -201,8 +201,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("@Bindable<State> projected write mutates the state")
-  func bindable_projectedWrite_mutatesState() {
+  @Test
+  func `Bindable projected write mutates the state`() {
     let vm = ClassStateFixedVM()
     @Bindable var state = vm.state
 
@@ -212,8 +212,8 @@ struct StateGranularityTests {
 
   // MARK: - Nested class State (real-world pattern)
 
-  @Test("Nested: updateState fieldA does NOT fire fieldB observer")
-  func nested_updateState_noCrossFieldFire() async {
+  @Test
+  func `Nested updateState on fieldA does not fire fieldB observer`() async {
     let vm = NestedClassStateVM()
 
     await confirmation(expectedCount: 0) { confirmed in
@@ -226,8 +226,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("Nested: updateState fieldB DOES fire its observer")
-  func nested_updateState_sameFieldFires() async {
+  @Test
+  func `Nested updateState on fieldB fires its observer`() async {
     let vm = NestedClassStateVM()
 
     await confirmation { confirmed in
@@ -240,8 +240,8 @@ struct StateGranularityTests {
     }
   }
 
-  @Test("Nested: @Bindable gives per-field granularity")
-  func nested_bindable_noCrossFieldFire() async {
+  @Test
+  func `Nested Bindable gives per-field granularity`() async {
     let vm = NestedClassStateVM()
     @Bindable var state = vm.state
 
@@ -257,8 +257,8 @@ struct StateGranularityTests {
 
   // MARK: - valuesOf on class state field
 
-  @Test("valuesOf on class state field only emits when THAT field changes")
-  func valuesOf_classState_perFieldEmission() async throws {
+  @Test
+  func `valuesOf on class state field only emits when that field changes`() async throws {
     let vm = ClassStateFixedVM()
     var fieldBEmissions: [String] = []
 
@@ -289,8 +289,8 @@ struct StateGranularityTests {
 
   // MARK: - @ObservationIgnored in class State
 
-  @Test("@ObservationIgnored field: mutation does NOT fire observer")
-  func observationIgnored_mutationInvisible() async {
+  @Test
+  func `ObservationIgnored field mutation does not fire observer`() async {
     let vm = ClassStateFixedVM()
 
     await confirmation(expectedCount: 0) { confirmed in
@@ -305,8 +305,8 @@ struct StateGranularityTests {
 
   // MARK: - Plain class (no @Observable): proves Observable is required
 
-  @Test("Plain class: field write is INVISIBLE (no per-field tracking)")
-  func plainClass_fieldWriteInvisible() async {
+  @Test
+  func `Plain class field write is invisible without Observable`() async {
     let vm = PlainClassStateVM()
 
     await confirmation(expectedCount: 0) { confirmed in

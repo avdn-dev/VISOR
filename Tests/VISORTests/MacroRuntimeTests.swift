@@ -717,6 +717,28 @@ struct StubbableMacroRuntimeTests {
         let result = try await service.fetchItems()
         #expect(result == ["stubbed"])
     }
+
+    @Test
+    func `Stub method throws configured error`() async {
+        struct TestError: Error, Equatable {}
+        let stub = StubItemService()
+        stub.fetchItemsResult = .failure(TestError())
+
+        await #expect(throws: TestError.self) {
+            try await stub.fetchItems()
+        }
+    }
+
+    @Test
+    func `Stub void method throws configured error`() async {
+        struct SaveError: Error, Equatable {}
+        let stub = StubItemService()
+        stub.saveResult = .failure(SaveError())
+
+        await #expect(throws: SaveError.self) {
+            try await stub.save("item")
+        }
+    }
 }
 
 // MARK: - @Spyable Runtime Tests
@@ -803,6 +825,18 @@ struct SpyableMacroRuntimeTests {
         #expect(spy.trackEventReceivedInvocations == ["launch", "tap"])
         #expect(spy.trackScreenReceivedInvocations.count == 1)
         #expect(spy.trackScreenReceivedInvocations[0].name == "Home")
+    }
+
+    @Test
+    func `Spy method throws configured error`() async {
+        struct ReportError: Error, Equatable {}
+        let spy = SpyAnalyticsService()
+        spy.fetchReportResult = .failure(ReportError())
+
+        await #expect(throws: ReportError.self) {
+            try await spy.fetchReport()
+        }
+        #expect(spy.fetchReportCallCount == 1)
     }
 
 }
