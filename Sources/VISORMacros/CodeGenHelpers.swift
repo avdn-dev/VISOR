@@ -120,9 +120,9 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
     guard nameCounts[method.name, default: 0] > 1 else { return method.name }
     let suffix = method.parameters.map { param in
       if let label = param.externalLabel {
-        return label.capitalizedFirst
+        return label.capitalisedFirst
       }
-      return param.type.filter(\.isLetter).capitalizedFirst
+      return param.type.filter(\.isLetter).capitalisedFirst
     }.joined()
     return suffix.isEmpty ? method.name : "\(method.name)\(suffix)"
   }
@@ -231,11 +231,9 @@ func makeProtocolExtension(
 // MARK: - String Extension
 
 extension String {
-  var capitalizedFirst: String {
-    guard !isEmpty else { return self }
-    var result = self
-    result.replaceSubrange(startIndex...startIndex, with: self[startIndex].uppercased())
-    return result
+  var capitalisedFirst: String {
+    guard let first else { return self }
+    return first.uppercased() + dropFirst()
   }
 
   var lowercasedFirst: String {
@@ -248,6 +246,7 @@ extension String {
   var trimmingWhitespace: String {
     let start = firstIndex(where: { !$0.isWhitespace }) ?? startIndex
     let end = lastIndex(where: { !$0.isWhitespace }).map(index(after:)) ?? endIndex
+    if start == startIndex && end == endIndex { return self }
     return String(self[start..<end])
   }
 }

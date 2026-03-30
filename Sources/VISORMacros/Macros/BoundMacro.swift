@@ -5,7 +5,6 @@
 //  Created by Anh Nguyen on 19/2/2026.
 //
 
-import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 

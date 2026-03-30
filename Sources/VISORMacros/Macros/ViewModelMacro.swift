@@ -71,7 +71,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       let paramNames = boundNames + polledNames
       let sig = paramNames.isEmpty
         ? "nonisolated init() {}"
-        : "nonisolated init(\(paramNames.joined(separator: ":, ")):) { ... }"
+        : "nonisolated init(\(paramNames.map { $0 + ":" }.joined(separator: ", "))) { ... }"
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.stateClassMissingInit(expectedSignature: sig)))
@@ -254,7 +254,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     allObserveMethodNames.reserveCapacity(validBounds.count + validPolled.count + analysis.reactionMethods.count)
 
     for prop in validBounds {
-      let methodName = "observe\(prop.propertyName.capitalizedFirst)"
+      let methodName = "observe\(prop.propertyName.capitalisedFirst)"
       allObserveMethodNames.append(methodName)
       let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax
@@ -283,7 +283,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // 8b. Generate observe methods from @Polled properties inside State
     for prop in validPolled {
-      let methodName = "observe\(prop.propertyName.capitalizedFirst)"
+      let methodName = "observe\(prop.propertyName.capitalisedFirst)"
       allObserveMethodNames.append(methodName)
       let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax = """
@@ -300,7 +300,14 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       members.append(observeMethod)
     }
 
-    // 8c. Diagnose invalid @Reaction methods
+    // 8c. Diagnose @Reaction inside nested types
+    for methodName in analysis.reactionsInsideNestedTypes {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.reactionInsideNestedType(methodName: methodName)))
+    }
+
+    // 8d. Diagnose invalid @Reaction methods
     for methodName in analysis.invalidReactionMethods {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
@@ -315,7 +322,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     // Generate observe wrappers for @Reaction methods
     for reaction in analysis.reactionMethods {
-      let methodName = "observe\(reaction.methodName.capitalizedFirst)"
+      let methodName = "observe\(reaction.methodName.capitalisedFirst)"
       allObserveMethodNames.append(methodName)
       if reaction.isAsync {
         let observeMethod: DeclSyntax
@@ -370,9 +377,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     if !allObserveMethodNames.isEmpty {
       if analysis.hasStartObserving {
         let body = analysis.startObservingBodyText ?? ""
-        let bodyTokens = Set(body.split(whereSeparator: { !$0.isLetter && $0 != "_" && !$0.isNumber }).map(String.init))
         for methodName in allObserveMethodNames {
-          if !bodyTokens.contains(methodName) {
+          if !body.contains(methodName) {
             context.diagnose(Diagnostic(
               node: Syntax(declaration),
               message: VISORDiagnostic.manualStartObservingMissingMethod(methodName: methodName)))

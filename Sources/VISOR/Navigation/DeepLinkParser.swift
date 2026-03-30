@@ -29,6 +29,9 @@ public struct DeepLinkParser<Scene: NavigationScene>: Sendable {
 
   // MARK: Lifecycle
 
+  /// Creates a parser from a closure that maps a URL to a destination.
+  ///
+  /// - Parameter parse: Returns a destination if the URL matches, `nil` otherwise.
   public init(_ parse: @escaping @MainActor @Sendable (URL) -> Destination<Scene>?) {
     self.parse = parse
   }

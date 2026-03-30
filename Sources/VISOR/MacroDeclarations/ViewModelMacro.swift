@@ -13,8 +13,8 @@
 /// 3. `typealias Factory = ViewModelFactory<ClassName>`
 /// 4. `@ObservationIgnored private var _state` + computed `var state` with manual observation
 /// 5. `updateState(_:to:)` writing to `_state` directly for per-field granularity
-/// 6. `startObserving()` combining `@Bound` and `@Reaction` observation methods
-/// 7. `startObserving()` combining `@Bound` and `@Reaction` observation methods
+/// 6. `startObserving()` combining `@Bound`, `@Polled`, and `@Reaction` observation methods
+/// 7. Per-property `observeX()` methods for each `@Bound`, `@Polled`, and `@Reaction` annotation
 ///
 /// ## State + Action pattern
 ///

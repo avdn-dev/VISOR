@@ -19,7 +19,8 @@ public func polledValuesOf<T: Sendable>(
   _ read: @MainActor @Sendable @escaping () -> T,
   every interval: Duration
 ) -> AsyncStream<T> {
-  AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+  precondition(interval > .zero, "polledValuesOf interval must be positive")
+  return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
     let task = Task { @MainActor in
       // Emit immediately
       continuation.yield(read())
@@ -42,7 +43,8 @@ public func polledValuesOf<T: Sendable & Equatable>(
   _ read: @MainActor @Sendable @escaping () -> T,
   every interval: Duration
 ) -> AsyncStream<T> {
-  AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+  precondition(interval > .zero, "polledValuesOf interval must be positive")
+  return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
     let task = Task { @MainActor in
       var previous: T?
       // Emit immediately

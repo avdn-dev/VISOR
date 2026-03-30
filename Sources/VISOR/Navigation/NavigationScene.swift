@@ -5,8 +5,6 @@
 //  Created by Anh Nguyen on 17/2/2026.
 //
 
-import SwiftUI
-
 // MARK: - Destination Protocols
 
 /// A destination that can be pushed onto a NavigationStack.

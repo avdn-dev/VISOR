@@ -22,7 +22,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case invalidReactionParameter(methodName: String)
   case malformedReactionKeyPath(methodName: String)
   case reactionNotOnMethod
-  case reactionInsideNestedType
+  case reactionInsideNestedType(methodName: String)
   case manualStartObservingMissingMethod(methodName: String)
   case missingState
   case actionWithoutHandle
@@ -35,7 +35,6 @@ enum VISORDiagnostic: DiagnosticMessage {
   case polledPropertyHasDefault(propertyName: String)
   case polledMissingInterval(propertyName: String)
   case polledOutsideState
-  case reactionNotInClass
   case invalidObservationPolicy
   case stateClassNotFinal
   case stateClassMissingObservable
@@ -69,8 +68,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Reaction on '\(methodName)': expected key path argument like \\.dependency.property"
     case .reactionNotOnMethod:
       "@Reaction can only annotate methods"
-    case .reactionInsideNestedType:
-      "@Reaction must be at the class level, not inside a nested type"
+    case .reactionInsideNestedType(let methodName):
+      "@Reaction on '\(methodName)' must be at the class level, not inside a nested type"
     case .manualStartObservingMissingMethod(let methodName):
       "startObserving() does not call \(methodName)(); state derivation will not run"
     case .missingState:
@@ -95,8 +94,6 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@Polled on '\(propertyName)': missing 'every:' interval parameter"
     case .polledOutsideState:
       "@Polled must be inside 'class State' — move to the corresponding State property"
-    case .reactionNotInClass:
-      "@Reaction must be inside a class annotated with @ViewModel"
     case .invalidObservationPolicy:
       "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     case .stateClassNotFinal:
@@ -135,7 +132,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .polledPropertyHasDefault: "polledPropertyHasDefault"
     case .polledMissingInterval: "polledMissingInterval"
     case .polledOutsideState: "polledOutsideState"
-    case .reactionNotInClass: "reactionNotInClass"
     case .invalidObservationPolicy: "invalidObservationPolicy"
     case .stateClassNotFinal: "stateClassNotFinal"
     case .stateClassMissingObservable: "stateClassMissingObservable"
@@ -156,7 +152,7 @@ enum VISORDiagnostic: DiagnosticMessage {
          .invalidReactionParameter,
          .invalidPolledDependency, .polledPropertyHasDefault, .polledMissingInterval,
          .boundPropertyHasDefault,
-         .polledOutsideState, .reactionNotInClass, .invalidObservationPolicy,
+         .polledOutsideState, .invalidObservationPolicy,
          .stateClassNotFinal, .stateClassMissingObservable:
       .error
     case .stateClassMissingInit:

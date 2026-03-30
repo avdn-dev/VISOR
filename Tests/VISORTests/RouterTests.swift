@@ -27,7 +27,7 @@ struct RouterTests {
     let child = root.childRouter(for: .home)
 
     #expect(child.level == 1)
-    #expect(child.identifierTab == .home)
+    #expect(child.tab == .home)
     #expect(child.parent === root)
   }
 
@@ -142,7 +142,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     let modal = root.childRouter()
 
-    #expect(modal.identifierTab == nil)
+    #expect(modal.tab == nil)
     #expect(modal.level == 1)
     #expect(modal.parent === root)
   }

@@ -59,7 +59,7 @@ public struct SpyableMacro: PeerMacro {
       // Track received args
       if method.parameters.count == 1 {
         let param = method.parameters[0]
-        let capName = param.internalName.capitalizedFirst
+        let capName = param.internalName.capitalisedFirst
         members.append("  \(prefix)var \(methodPrefix)Received\(capName): \(param.type)?")
         members.append("  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(param.type)] = []")
       } else if method.parameters.count > 1 {
@@ -78,7 +78,7 @@ public struct SpyableMacro: PeerMacro {
 
       if method.parameters.count == 1 {
         let param = method.parameters[0]
-        let capName = param.internalName.capitalizedFirst
+        let capName = param.internalName.capitalisedFirst
         bodyLines.append("    \(methodPrefix)Received\(capName) = \(param.internalName)")
         bodyLines.append("    \(methodPrefix)ReceivedInvocations.append(\(param.internalName))")
       } else if method.parameters.count > 1 {

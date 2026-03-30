@@ -5,8 +5,8 @@
 //  Created by Anh Nguyen on 17/2/2026.
 //
 
+import Foundation
 import OSLog
-import SwiftUI
 
 // MARK: - Router
 
@@ -25,19 +25,12 @@ public final class Router<Scene: NavigationScene> {
   // with nonisolated deinit produces different SIL that avoids the crash.
   nonisolated deinit { }
 
-  /// Creates a router node in the navigation hierarchy.
-  ///
-  /// - Parameters:
-  ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
-  ///   - identifierTab: The tab this router manages, or `nil` for root/modal routers.
-  ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
-  ///   - logger: Optional `os.Logger` for debug-level navigation logging.
   /// Creates a root router.
   ///
   /// - Parameter logger: Optional `os.Logger` for debug-level navigation logging.
   public init(logger: Logger? = nil) {
     self.level = 0
-    self.identifierTab = nil
+    self.tab = nil
     self.parent = nil
     self.logger = logger
     isActive = true
@@ -47,17 +40,17 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// - Parameters:
   ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
-  ///   - identifierTab: The tab this router manages, or `nil` for root/modal routers.
+  ///   - tab: The tab this router manages, or `nil` for root/modal routers.
   ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
   ///   - logger: Optional `os.Logger` for debug-level navigation logging.
   package init(
     level: Int,
-    identifierTab: Scene.Tab? = nil,
+    tab: Scene.Tab? = nil,
     parent: Router? = nil,
     logger: Logger? = nil)
   {
     self.level = level
-    self.identifierTab = identifierTab
+    self.tab = tab
     self.parent = parent
     self.logger = logger
     isActive = parent == nil // root is active by default
@@ -83,7 +76,7 @@ public final class Router<Scene: NavigationScene> {
   public let level: Int
 
   /// The tab this router is associated with (nil for root/modal routers).
-  public let identifierTab: Scene.Tab?
+  public let tab: Scene.Tab?
 
   /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
   package weak let parent: Router?
@@ -196,7 +189,7 @@ public final class Router<Scene: NavigationScene> {
     }
     let child = Router(
       level: level + 1,
-      identifierTab: tab,
+      tab: tab,
       parent: self,
       logger: logger)
     child.deepLinkHandler = deepLinkHandler
@@ -209,7 +202,7 @@ public final class Router<Scene: NavigationScene> {
   package func childRouter() -> Router {
     let child = Router(
       level: level + 1,
-      identifierTab: nil,
+      tab: nil,
       parent: self,
       logger: logger)
     child.deepLinkHandler = deepLinkHandler

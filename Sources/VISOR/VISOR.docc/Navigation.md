@@ -125,7 +125,7 @@ router.popToRoot()
 
 ### Parent-Child Hierarchy
 
-Routers form a tree. Each child tracks its depth (`level`) and the tab it manages (`identifierTab`). The hierarchy enables:
+Routers form a tree. Each child tracks its depth (`level`) and the tab it manages (`tab`). The hierarchy enables:
 
 - **Tab isolation**: Each tab has its own navigation stack via `childRouter(for:)`.
 - **Modal nesting**: Sheets and full-screen covers get their own child router, enabling push navigation within modals.

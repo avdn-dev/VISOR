@@ -109,6 +109,9 @@ struct ClassAnalysis {
   var boundOutsideState: [String] = []
   var polledOutsideState: [String] = []
 
+  // @Reaction on methods inside nested types (should be at class level)
+  var reactionsInsideNestedTypes: [String] = []
+
   init(_ classDecl: ClassDeclSyntax) {
     for member in classDecl.memberBlock.members {
       // Initializer check
@@ -126,6 +129,8 @@ struct ClassAnalysis {
             attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.observable
           }
           scanState(nestedClassDecl)
+        } else {
+          scanForMisplacedReactions(nestedClassDecl.memberBlock)
         }
         continue
       }
@@ -133,7 +138,14 @@ struct ClassAnalysis {
       if let enumDecl = member.decl.as(EnumDeclSyntax.self) {
         if enumDecl.name.text == "Action" {
           hasActionEnum = true
+        } else {
+          scanForMisplacedReactions(enumDecl.memberBlock)
         }
+        continue
+      }
+
+      if let structDecl = member.decl.as(StructDeclSyntax.self) {
+        scanForMisplacedReactions(structDecl.memberBlock)
         continue
       }
 
@@ -433,6 +445,19 @@ struct ClassAnalysis {
           hasDefault: hasDefault,
           declarationOrder: declarationOrder))
         declarationOrder += 1
+      }
+    }
+  }
+
+  /// Scans a nested type's member block for `@Reaction` methods that should be at class level.
+  private mutating func scanForMisplacedReactions(_ memberBlock: MemberBlockSyntax) {
+    for member in memberBlock.members {
+      guard let funcDecl = member.decl.as(FunctionDeclSyntax.self) else { continue }
+      let hasReaction = funcDecl.attributes.contains { attr in
+        attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.reaction
+      }
+      if hasReaction {
+        reactionsInsideNestedTypes.append(funcDecl.name.text)
       }
     }
   }
