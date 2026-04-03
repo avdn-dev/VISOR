@@ -13,7 +13,7 @@ import SwiftSyntaxMacros
 
 struct ProtocolPropertyInfo {
   let name: String
-  let type: String
+  var type: String
   let hasSetter: Bool
   let stubbableDefault: String?
 }
@@ -23,17 +23,24 @@ struct ProtocolPropertyInfo {
 struct ParameterInfo {
   let externalLabel: String? // nil means no external label (e.g., `_ item: Item`)
   let internalName: String
-  let type: String
+  var type: String
 }
 
 // MARK: - ProtocolMethodInfo
 
 struct ProtocolMethodInfo {
   let name: String
-  let parameters: [ParameterInfo]
+  var parameters: [ParameterInfo]
   let isAsync: Bool
   let isThrowing: Bool
-  let returnType: String? // nil means Void
+  var returnType: String? // nil means Void
+}
+
+// MARK: - ProtocolTypeAliasInfo
+
+struct ProtocolTypeAliasInfo {
+  let name: String
+  let type: TypeSyntax
 }
 
 // MARK: - ProtocolAnalysis
@@ -44,6 +51,7 @@ struct ProtocolAnalysis {
   var properties: [ProtocolPropertyInfo] = []
   var methods: [ProtocolMethodInfo] = []
   var staticMembers: [String] = []
+  var typeAliases: [ProtocolTypeAliasInfo] = []
   var hasAssociatedTypes = false
   var hasSubscripts = false
 
@@ -52,6 +60,16 @@ struct ProtocolAnalysis {
       // Associated types
       if member.decl.is(AssociatedTypeDeclSyntax.self) {
         hasAssociatedTypes = true
+        continue
+      }
+      
+      // Typealiases
+      if let typeAliasDecl = member.decl.as(TypeAliasDeclSyntax.self) {
+        let name = typeAliasDecl.name.text
+        let typeSyntax = typeAliasDecl.initializer.value
+        typeAliases.append(ProtocolTypeAliasInfo(
+          name: name,
+          type: typeSyntax))
         continue
       }
 
@@ -140,6 +158,39 @@ struct ProtocolAnalysis {
           returnType: returnType))
       }
     }
+    
+    // Prefix the protocol type for every type that matches the typealias
+    let typeAliasNames = Set(typeAliases.map(\.name))
+    let protocolName = protocolDecl.name.text
+    
+    func prefixProtocolName(_ type: inout String) {
+      type = "\(protocolName).\(type)"
+    }
+    
+    // Methods
+    for i in methods.indices {
+      
+      // Method parameters
+      for j in methods[i].parameters.indices {
+        if typeAliasNames.contains(methods[i].parameters[j].type) {
+          prefixProtocolName(&methods[i].parameters[j].type)
+        }
+      }
+      
+      // Method return types
+      if let name = methods[i].returnType, typeAliasNames.contains(name) {
+        prefixProtocolName(&methods[i].returnType!)
+      }
+      
+    }
+    
+    // Properties
+    for i in properties.indices {
+      if typeAliasNames.contains(properties[i].type) {
+        prefixProtocolName(&properties[i].type)
+      }
+    }
+    
   }
 }
 
