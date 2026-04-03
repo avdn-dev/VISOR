@@ -18,7 +18,8 @@ private let testMacros: [String: Macro.Type] = [
   "StubbableDefault": StubbableDefaultMacro.self,
 ]
 
-final class ProtocolTypealiasTests: XCTestCase {
+// MARK: - Spyable
+final class SpyableProtocolTypealiasTests: XCTestCase {
   
   func testSpyableSingleTypealias() {
     assertMacroExpansion(
@@ -29,8 +30,7 @@ final class ProtocolTypealiasTests: XCTestCase {
         func processFoo(_ foo: Foo) -> Foo
       }
       """,
-      expandedSource:
-      """
+      expandedSource: """
       protocol FooService {
         typealias Foo = String
         func processFoo(_ foo: Foo) -> Foo
@@ -64,6 +64,50 @@ final class ProtocolTypealiasTests: XCTestCase {
           message:
             """
             @Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
+            Use @StubbableDefault to provide explicit defaults.
+            """,
+          line: 1,
+          column: 1,
+          severity: .note)
+      ],
+      macros: testMacros)
+  }
+  
+}
+
+final class StubbableProtocolTypealiasTests: XCTestCase {
+  
+  func testStubbableSimpleTypealias() {
+    assertMacroExpansion(
+      """
+      @Stubbable
+      protocol FooService {
+        typealias Foo = String
+        func processFoo(_ foo: Foo) -> Foo
+      }
+      """,
+      expandedSource: """
+      protocol FooService {
+        typealias Foo = String
+        func processFoo(_ foo: Foo) -> Foo
+      }
+      
+      @Observable
+      final class StubFooService: FooService {
+        var processFooReturnValue: FooService.Foo?
+        func processFoo(_ foo: FooService.Foo) -> FooService.Foo {
+          guard let value = processFooReturnValue else {
+              fatalError("Configure \\(processFooReturnValue) before calling processFoo()")
+          }
+          return value
+        }
+      }
+      """,
+      diagnostics: [
+        .init(
+          message:
+            """
+            @Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
             Use @StubbableDefault to provide explicit defaults.
             """,
           line: 1,
