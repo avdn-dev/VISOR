@@ -26,7 +26,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with properties and methods`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol DataService {
@@ -77,7 +77,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy for void methods`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol LogService {
@@ -121,7 +121,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with multiple parameters`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol SearchService {
@@ -158,7 +158,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with optional and fatalError for unknown return type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ThemeService {
@@ -195,7 +195,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy for empty protocol`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol EmptyService {
@@ -214,7 +214,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Uses IUO for unknown property types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ThemeService {
@@ -239,7 +239,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with external label different from internal name`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ItemService {
@@ -278,7 +278,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Disambiguates methods with same name but different labels`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol LoadService {
@@ -334,7 +334,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Non-colliding methods keep simple names alongside overloads`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol MixedService {
@@ -395,7 +395,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Public protocol generates public spy`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       public protocol DataService {
@@ -434,7 +434,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Spy property with StubbableDefault uses custom default`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ExtractionService {
@@ -473,7 +473,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Properties-only protocol generates spy without Call enum`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ConfigService {
@@ -500,7 +500,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with generic return type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol ResultService {
@@ -537,7 +537,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with generic parameter type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol BatchService {
@@ -574,7 +574,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       struct NotAProtocol {
@@ -592,7 +592,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error when applied to class`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       class NotAProtocol {
@@ -610,7 +610,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error on protocol with associated types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol HasAssoc {
@@ -632,7 +632,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Warning on protocol with static members`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol HasStatic {
@@ -668,7 +668,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Warning on protocol with subscripts`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Spyable
       protocol HasSubscript {

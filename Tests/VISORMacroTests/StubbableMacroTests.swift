@@ -26,7 +26,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with properties and methods`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol DataService {
@@ -59,7 +59,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with default values for known types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ConfigService {
@@ -102,7 +102,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Uses optional with fatalError for unknown custom return types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ThemeService {
@@ -131,7 +131,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub for empty protocol`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol EmptyService {
@@ -150,7 +150,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with labelled parameters`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol SearchService {
@@ -173,7 +173,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with optional return type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol CacheService {
@@ -198,7 +198,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Public protocol generates public stub`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       public protocol DataService {
@@ -229,7 +229,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Package protocol generates package stub`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       package protocol DataService {
@@ -255,7 +255,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Fileprivate protocol generates fileprivate stub`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       fileprivate protocol DataService {
@@ -283,7 +283,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Property with StubbableDefault uses custom default`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ExtractionService {
@@ -305,7 +305,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Property without StubbableDefault uses defaultValue as before`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ExtractionService {
@@ -333,7 +333,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Mixed properties with and without StubbableDefault`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ExtractionService {
@@ -361,7 +361,7 @@ struct StubbableMacroTests {
 
   @Test
   func `AsyncStream property gets default`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol StreamService {
@@ -383,7 +383,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Set property gets empty default`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol TagService {
@@ -405,7 +405,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Method with external label different from internal name`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ItemService {
@@ -430,7 +430,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates methods with same name but different labels`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol LoadService {
@@ -463,7 +463,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates void overloads`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol EventService {
@@ -488,7 +488,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overload with underscore label using type name`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol Finder {
@@ -515,7 +515,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overloads with same labels but different return types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol Converter {
@@ -542,7 +542,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Non-colliding methods keep simple names`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol MixedService {
@@ -573,7 +573,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with generic return type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol ResultService {
@@ -602,7 +602,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with generic parameter type`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol StorageService {
@@ -628,7 +628,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overloads with generic underscore parameter types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol Processor {
@@ -655,7 +655,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generic property types use correct defaults`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol CacheService {
@@ -688,7 +688,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       struct NotValid {
@@ -706,7 +706,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Error on protocol with associated types`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol HasAssoc {
@@ -728,7 +728,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Warning on protocol with static members`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol HasStatic {
@@ -755,7 +755,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Warning on protocol with subscripts`() {
-    assertMacroExpansionSwiftTesting(
+    assertMacroExpansion(
       """
       @Stubbable
       protocol HasSubscript {

@@ -1,5 +1,5 @@
 //
-//  assertMacroExpansionSwiftTesting.swift
+//  AssertMacroExpansion.swift
 //  VISOR
 //
 //  Created by Matthew Yuen on 3/4/2026.
