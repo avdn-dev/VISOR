@@ -163,7 +163,7 @@ struct ProtocolAnalysis {
     let typeAliasNames = Set(typeAliases.map(\.name))
     let protocolName = protocolDecl.name.text
     
-    func prefixProtocolName(_ type: inout String) {
+    func addPrefixProtocolName(to type: inout String) {
       type = "\(protocolName).\(type)"
     }
     
@@ -171,24 +171,20 @@ struct ProtocolAnalysis {
     for i in methods.indices {
       
       // Method parameters
-      for j in methods[i].parameters.indices {
-        if typeAliasNames.contains(methods[i].parameters[j].type) {
-          prefixProtocolName(&methods[i].parameters[j].type)
-        }
+      for j in methods[i].parameters.indices where typeAliasNames.contains(methods[i].parameters[j].type) {
+        addPrefixProtocolName(to: &methods[i].parameters[j].type)
       }
       
       // Method return types
       if let name = methods[i].returnType, typeAliasNames.contains(name) {
-        prefixProtocolName(&methods[i].returnType!)
+        addPrefixProtocolName(to: &methods[i].returnType!)
       }
       
     }
     
     // Properties
-    for i in properties.indices {
-      if typeAliasNames.contains(properties[i].type) {
-        prefixProtocolName(&properties[i].type)
-      }
+    for i in properties.indices where typeAliasNames.contains(properties[i].type)  {
+      addPrefixProtocolName(to: &properties[i].type)
     }
     
   }
