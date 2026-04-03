@@ -41,11 +41,4 @@ let package = Package(
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
       ]),
     
-    .testTarget(
-      name: "VISORMacroXCTests",
-      dependencies: [
-        "VISORMacros",
-        .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
-      ]
-    )
   ])

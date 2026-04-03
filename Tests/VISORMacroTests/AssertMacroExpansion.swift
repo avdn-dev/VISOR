@@ -17,24 +17,6 @@ public typealias NoteSpec = SwiftSyntaxMacrosGenericTestSupport.NoteSpec
 public typealias FixItSpec = SwiftSyntaxMacrosGenericTestSupport.FixItSpec
 public typealias DiagnosticSpec = SwiftSyntaxMacrosGenericTestSupport.DiagnosticSpec
 
-/// Assert that expanding the given macros in the original source produces
-/// the given expanded source code.
-///
-/// - Parameters:
-///   - originalSource: The original source code, which is expected to contain
-///     macros in various places (e.g., `#stringify(x + y)`).
-///   - expectedExpandedSource: The source code that we expect to see after
-///     performing macro expansion on the original source.
-///   - diagnostics: The diagnostics when expanding any macro
-///   - macros: The macros that should be expanded, provided as a dictionary
-///     mapping macro names (e.g., `"stringify"`) to implementation types
-///     (e.g., `StringifyMacro.self`).
-///   - testModuleName: The name of the test module to use.
-///   - testFileName: The name of the test file name to use.
-///   - indentationWidth: The indentation width used in the expansion.
-///
-/// - SeeAlso: ``assertMacroExpansionSwiftTesting(_:expandedSource:diagnostics:macroSpecs:applyFixIts:fixedSource:testModuleName:testFileName:indentationWidth:file:line:)``
-///   to also specify the list of conformances passed to the macro expansion.
 public func assertMacroExpansionSwiftTesting(
   _ originalSource: String,
   expandedSource expectedExpandedSource: String,
@@ -70,24 +52,6 @@ public func assertMacroExpansionSwiftTesting(
   )
 }
 
-/// Assert that expanding the given macros in the original source produces
-/// the given expanded source code.
-///
-/// - Parameters:
-///   - originalSource: The original source code, which is expected to contain
-///     macros in various places (e.g., `#stringify(x + y)`).
-///   - expectedExpandedSource: The source code that we expect to see after
-///     performing macro expansion on the original source.
-///   - diagnostics: The diagnostics when expanding any macro
-///   - macroSpecs: The macros that should be expanded, provided as a dictionary
-///     mapping macro names (e.g., `"CodableMacro"`) to specification with macro type
-///     (e.g., `CodableMacro.self`) and a list of conformances macro provides
-///     (e.g., `["Decodable", "Encodable"]`).
-///   - applyFixIts: If specified, filters the Fix-Its that are applied to generate `fixedSource` to only those whose message occurs in this array. If `nil`, all Fix-Its from the diagnostics are applied.
-///   - fixedSource: If specified, asserts that the source code after applying Fix-Its matches this string.
-///   - testModuleName: The name of the test module to use.
-///   - testFileName: The name of the test file name to use.
-///   - indentationWidth: The indentation width used in the expansion.
 public func assertMacroExpansionSwiftTesting(
   _ originalSource: String,
   expandedSource expectedExpandedSource: String,

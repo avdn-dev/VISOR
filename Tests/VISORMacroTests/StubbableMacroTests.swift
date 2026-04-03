@@ -779,5 +779,54 @@ struct StubbableMacroTests {
       ],
       macros: testMacros)
   }
+  
+  // MARK: - Typealias
+  
+  @Test
+  func `Single typealias`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Stubbable
+      protocol FooService {
+        typealias Foo = String
+        func processFoo(_ foo: Foo) -> Foo
+      }
+      """,
+      expandedSource: """
+      protocol FooService {
+        typealias Foo = String
+        func processFoo(_ foo: Foo) -> Foo
+      }
+      
+      @Observable
+      final class StubFooService: FooService {
+        var processFooReturnValue: FooService.Foo?
+        func processFoo(_ foo: FooService.Foo) -> FooService.Foo {
+          guard let value = processFooReturnValue else {
+              fatalError("Configure \\(processFooReturnValue) before calling processFoo()")
+          }
+          return value
+        }
+      }
+      """,
+      diagnostics: [
+        .init(
+          message:
+            """
+            @Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
+            Use @StubbableDefault to provide explicit defaults.
+            """,
+          line: 1,
+          column: 1,
+          severity: .note)
+      ],
+      macros: testMacros)
+  }
+  
 }
+
+
+
+
+
 #endif
