@@ -23,7 +23,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Content mode generates correct expansion`() {
-    assertMacroExpansion(
+    VISORMacroTests.assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self)
       struct MyView: View {
@@ -80,7 +80,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Public struct propagates access to body only`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self)
       public struct MyView: View {
@@ -133,7 +133,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when applied to class`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel.self)
       class NotAStruct: View {
@@ -153,7 +153,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when missing content`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel.self)
       struct MyView: View {
@@ -209,7 +209,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when no argument provided`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel
       struct MyView: View {
@@ -229,7 +229,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when argument missing .self suffix`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel)
       struct MyView: View {
@@ -249,7 +249,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when applied to enum`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel.self)
       enum NotAStruct {
@@ -269,7 +269,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Explicit alwaysObserving produces same expansion as default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .alwaysObserving)
       struct MyView: View {
@@ -324,7 +324,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `pauseInBackground generates scenePhase environment and modified task`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
       struct MyView: View {
@@ -381,7 +381,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `pauseWhenInactive generates scenePhase environment and modified task`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseWhenInactive)
       struct MyView: View {
@@ -438,7 +438,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Public struct with pauseInBackground propagates access`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
       public struct MyView: View {
@@ -491,7 +491,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Invalid observation policy emits diagnostic`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .never)
       struct MyView: View {

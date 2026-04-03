@@ -28,7 +28,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Generates memberwise init and Factory typealias`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -84,7 +84,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Skips init when already exists`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -143,7 +143,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Skips var properties`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -198,7 +198,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Skips let with default value`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -255,7 +255,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `No dependencies produces Factory typealias only`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -304,7 +304,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Public class propagates access to init and Factory`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -357,7 +357,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Public class with @Bound propagates access to protocol requirements`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -423,7 +423,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       struct NotAClass {
@@ -449,7 +449,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Missing Observable on outer class emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       final class MyViewModel {
@@ -479,7 +479,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound inside State generates updateState observe method`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -543,7 +543,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Multiple @Bound inside State generates withDiscardingTaskGroup`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -629,7 +629,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Missing State class emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -651,7 +651,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `State class not final emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -707,7 +707,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `State class missing Observable emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -761,7 +761,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Action enum without handle emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -819,7 +819,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `No Action no handle emits no diagnostic`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -868,7 +868,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Sync @Reaction generates for-await loop`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -934,7 +934,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Mixed @Bound in State and @Reaction generates combined startObserving`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1015,7 +1015,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Single @Polled generates inlined poll loop`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1084,7 +1084,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Mixed @Bound and @Polled preserves declaration order in init`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1178,7 +1178,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound with throttledBy generates sleep after updateState`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1248,7 +1248,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Existential any types preserved in init`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1306,7 +1306,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Error when applied to enum`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       enum NotAClass {
@@ -1328,7 +1328,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound on class-level var emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1388,7 +1388,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Manual startObserving missing @Bound observe method emits warning`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
