@@ -924,4 +924,46 @@ func `Multiple typealiases used in method signature`() {
     macros: testMacros)
 }
 
+@Test
+func `Handle nested typealiases`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @Stubbable
+    protocol EggsService {
+      typealias Foo = String
+      typealias Bar = Int
+    
+      var foo: Foo { get }
+      var fooArray: [Foo] { get }
+      var fooDictionary: [Foo : Bar] { get }
+    
+      var everything: Dictionary<[Set<Foo> : [Bar]], Array<[Set<Foo>]>> { get }
+    }
+    """,
+    expandedSource: """
+    protocol EggsService {
+      typealias Foo = String
+      typealias Bar = Int
+    
+      var foo: Foo { get }
+      var fooArray: [Foo] { get }
+      var fooDictionary: [Foo : Bar] { get }
+    
+      var everything: Dictionary<[Set<Foo> : [Bar]], Array<[Set<Foo>]>> { get }
+    }
+    
+    @Observable
+    final class StubEggsService: EggsService {
+      var foo: EggsService.Foo! = nil
+      var fooArray: [EggsService.Foo] = []
+      var fooDictionary: [EggsService.Foo : EggsService.Bar] = [:]
+      var everything: Dictionary<[Set<EggsService.Foo> : [EggsService.Bar]], Array<[Set<EggsService.Foo>]>> = [:]
+    }
+    """,
+    diagnostics: [
+      .init(message: stubbableDefaultWarning, line: 1, column: 1, severity: .note)
+    ],
+    macros: testMacros)
+}
+
 #endif
