@@ -17,6 +17,11 @@ private let testMacros: [String: Macro.Type] = [
   "StubbableDefault": StubbableDefaultMacro.self,
 ]
 
+private let stubbableDefaultWarning = """
+  @Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
+  Use @StubbableDefault to provide explicit defaults.
+  """
+
 // MARK: - StubbableMacroTests
 
 @Suite("Stubbable Macro")
@@ -783,7 +788,7 @@ struct StubbableMacroTests {
   // MARK: - Typealias
   
   @Test
-  func `Single typealias`() {
+  func `Single typealias used in function`() {
     assertMacroExpansionSwiftTesting(
       """
       @Stubbable
@@ -811,11 +816,7 @@ struct StubbableMacroTests {
       """,
       diagnostics: [
         .init(
-          message:
-            """
-            @Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
-            Use @StubbableDefault to provide explicit defaults.
-            """,
+          message: stubbableDefaultWarning,
           line: 1,
           column: 1,
           severity: .note)
@@ -825,8 +826,99 @@ struct StubbableMacroTests {
   
 }
 
+@Test
+func `Single typealias used in property`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @Stubbable
+    protocol BarService {
+      typealias Bar = Int
+      @StubbableDefault(0)
+      var bar: Bar { get }
+    }
+    """,
+    expandedSource: """
+    protocol BarService {
+      typealias Bar = Int
+      var bar: Bar { get }
+    }
+    
+    @Observable
+    final class StubBarService: BarService {
+      var bar: BarService.Bar = 0
+    }
+    """,
+    macros: testMacros)
+}
 
+@Test(.disabled("Not implemented yet"))
+func `Generic typealias used in property`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    enum FooError: Swift.Error { }
+    
+    @Stubbable
+    protocol BazService {
+      typealias Value = Int
+      typealias ErrorType = FooError
+    
+      var result: Result<Value, ErrorType> { get }
+    }
+    """,
+    expandedSource: """
+    enum FooError: Swift.Error { }
+    
+    protocol BazService {
+      typealias Value = Int
+      typealias ErrorType = FooError
+      var result: Result<Value, ErrorType> { get }
+    }
+    
+    @Observable
+    final class StubBazService: BazService {
+      var result: Result<BazService.Value, BazService.ErrorType>! = nil
+    }
+    """,
+    macros: testMacros)
+}
 
-
+@Test
+func `Multiple typealiases used in method signature`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @Stubbable
+    protocol SpamService {
+      typealias Foo = Int
+      typealias Bar = String
+      typealias Baz = [Int]
+    
+      func perform(_ foo: Foo, bar: Bar) async throws -> Baz
+    }
+    """,
+    expandedSource: """
+    protocol SpamService {
+      typealias Foo = Int
+      typealias Bar = String
+      typealias Baz = [Int]
+    
+      func perform(_ foo: Foo, bar: Bar) async throws -> Baz
+    }
+    
+    @Observable
+    final class StubSpamService: SpamService {
+      var performResult: Result<SpamService.Baz, any Error>?
+      func perform(_ foo: SpamService.Foo, bar: SpamService.Bar) async throws -> SpamService.Baz {
+        guard let result = performResult else {
+            fatalError("Configure \\(performResult) before calling perform()")
+        }
+        return try result.get()
+      }
+    }
+    """,
+    diagnostics: [
+      .init(message: stubbableDefaultWarning, line: 1, column: 1, severity: .note)
+    ],
+    macros: testMacros)
+}
 
 #endif

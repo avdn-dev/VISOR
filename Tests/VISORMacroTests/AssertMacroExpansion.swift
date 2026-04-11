@@ -5,7 +5,6 @@
 //  Created by Matthew Yuen on 3/4/2026.
 //
 
-#if compiler(<6.4)
 import Testing
 import SwiftSyntax
 import SwiftSyntaxMacroExpansion
@@ -87,5 +86,3 @@ public func assertMacroExpansionSwiftTesting(
     column: column
   )
 }
-
-#endif // compiler(<6.4)
