@@ -851,7 +851,7 @@ func `Single typealias used in property`() {
     macros: testMacros)
 }
 
-@Test(.disabled("Not implemented yet"))
+@Test
 func `Generic typealias used in property`() {
   assertMacroExpansionSwiftTesting(
     """
@@ -867,10 +867,10 @@ func `Generic typealias used in property`() {
     """,
     expandedSource: """
     enum FooError: Swift.Error { }
-    
     protocol BazService {
       typealias Value = Int
       typealias ErrorType = FooError
+    
       var result: Result<Value, ErrorType> { get }
     }
     
@@ -879,6 +879,9 @@ func `Generic typealias used in property`() {
       var result: Result<BazService.Value, BazService.ErrorType>! = nil
     }
     """,
+    diagnostics: [
+      .init(message: stubbableDefaultWarning, line: 3, column: 1, severity: .note)
+    ],
     macros: testMacros)
 }
 
