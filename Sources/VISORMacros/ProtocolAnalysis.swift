@@ -209,6 +209,11 @@ private struct TypeAliasHandler {
       syntax.element = newElement
       return TypeSyntax(syntax)
       
+    case .attributedType(var syntax):
+      let newBaseType = qualifiedType(for: syntax.baseType)
+      syntax.baseType = newBaseType
+      return TypeSyntax(syntax)
+      
     case .compositionType(var syntax):
       let newElements = qualifiedType(for: syntax.elements)
       syntax.elements = newElements
@@ -238,6 +243,11 @@ private struct TypeAliasHandler {
       let newElement = qualifiedType(for: syntax.element)
       syntax.count = newCount
       syntax.element = newElement
+      return TypeSyntax(syntax)
+      
+    case .metatypeType(var syntax):
+      let newBaseType = qualifiedType(for: syntax.baseType)
+      syntax.baseType = newBaseType
       return TypeSyntax(syntax)
       
     case .namedOpaqueReturnType(var syntax):
@@ -276,7 +286,7 @@ private struct TypeAliasHandler {
       return typeSyntax
       
     // Other type Syntaxes we can ignore
-    case .attributedType, .metatypeType, .missingType, .suppressedType, .classRestrictionType:
+    case .missingType, .suppressedType, .classRestrictionType:
       return typeSyntax
     
     // To handle future TypeSyntaxes

@@ -996,4 +996,29 @@ func `Handle function property typealiases`() {
     macros: testMacros)
 }
 
+@Test
+func `Handle typealias in attributed use site`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @Stubbable
+    protocol BarService {
+      typealias Bar = String
+      func bar(_ bar: sending Bar)
+    }
+    """,
+    expandedSource: """
+    protocol BarService {
+      typealias Bar = String
+      func bar(_ bar: sending Bar)
+    }
+    
+    @Observable
+    final class StubBarService: BarService {
+      func bar(_ bar: sending BarService.Bar) {
+      }
+    }
+    """,
+    macros: testMacros)
+}
+
 #endif
