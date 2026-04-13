@@ -966,4 +966,34 @@ func `Handle nested typealiases`() {
     macros: testMacros)
 }
 
+@Test
+func `Handle function property typealiases`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @Stubbable
+    protocol FooFactoryProvider {
+      typealias Foo = Int
+      typealias Bar = Int
+    
+      @StubbableDefault({ (_: FooFactoryProvider.Foo) -> FooFactoryProvider.Bar in 0 })
+      var fooFactory: (Foo) -> Bar { get }
+    }
+    """,
+    expandedSource: """
+    protocol FooFactoryProvider {
+      typealias Foo = Int
+      typealias Bar = Int
+      var fooFactory: (Foo) -> Bar { get }
+    }
+    
+    @Observable
+    final class StubFooFactoryProvider: FooFactoryProvider {
+      var fooFactory: (FooFactoryProvider.Foo) -> FooFactoryProvider.Bar = { (_: FooFactoryProvider.Foo) -> FooFactoryProvider.Bar in
+          0
+      }
+    }
+    """,
+    macros: testMacros)
+}
+
 #endif
