@@ -18,7 +18,7 @@ View  →  ViewModel  →  Interactor  →  Service
 Dependencies only point downward: **View → ViewModel / Router → Interactor → Service**. Services may depend on other services.
 
 - **View**: UI only. The `@LazyViewModel` view owns the ViewModel; child Content views receive state as plain parameters.
-- **ViewModel**: The "brain" of the view. Owns a `struct State: Equatable` that is directly mutated via `updateState`. Dispatches user intent via an `Action` enum.
+- **ViewModel**: The "brain" of the view. Owns an `@Observable final class State` that is directly mutated via `updateState` for per-field invalidation. Dispatches user intent via an `Action` enum.
 - **Router**: Type-safe navigation state with parent-child hierarchy, deep linking, and modal support.
 - **Factory**: `ViewModelFactory<VM>` injected via `@Environment`, creates ViewModel instances with their dependencies.
 - **Interactor** (optional): Coordinates multiple services for complex use cases.

@@ -18,10 +18,16 @@
 /// at init time — same semantics as `@Bound`.
 ///
 /// ```swift
+/// @Observable
 /// @ViewModel
 /// final class DashboardViewModel {
-///   struct State: Equatable {
+///   @Observable
+///   final class State {
 ///     @Polled(\DashboardViewModel.batteryMonitor.level, every: .seconds(30)) var batteryLevel: Float
+///
+///     nonisolated init(batteryLevel: Float) {
+///       self._batteryLevel = batteryLevel
+///     }
 ///   }
 ///   private let batteryMonitor: BatteryMonitor
 /// }

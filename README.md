@@ -26,7 +26,7 @@ Add VISOR to your project via Swift Package Manager:
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/avdn-dev/VISOR.git", from: "1.0.0"),
+  .package(url: "https://github.com/avdn-dev/VISOR.git", from: "9.0.0"),
 ]
 ```
 
@@ -47,9 +47,15 @@ import VISOR
 @Observable
 @ViewModel
 final class ProfileViewModel {
-  struct State: Equatable {
+  @Observable
+  final class State {
     @Bound(\ProfileViewModel.profileService.name) var name: String
     @Bound(\ProfileViewModel.profileService.email) var email: String
+
+    nonisolated init(name: String, email: String) {
+      self._name = name
+      self._email = email
+    }
   }
 
   enum Action { case refresh }
@@ -97,7 +103,7 @@ ProfileScreen()
   .environment(ProfileViewModel.Factory { ProfileViewModel(profileService: profileService) })
 ```
 
-When `profileService.name` or `.email` changes, the view updates automatically. `@Bound` properties have no default values — they're initialised from the service at creation time, so state always starts with real data.
+When `profileService.name` or `.email` changes, the view updates automatically. `State` is an `@Observable` class for per-field SwiftUI invalidation. `@Bound` properties have no default values — they're initialised from the service at creation time, so state always starts with real data.
 
 ## What's Included
 

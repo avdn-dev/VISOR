@@ -10,15 +10,21 @@ All three support `throttledBy:` for rate-limiting rapid-fire updates.
 
 ## @Bound — Push-Based Observation
 
-`@Bound` marks a property inside `struct State` for automatic observation from an `@Observable` source. The key path identifies the source property on a dependency:
+`@Bound` marks a property inside the ViewModel's `@Observable final class State` for automatic observation from an `@Observable` source. The key path identifies the source property on a dependency:
 
 ```swift
 @Observable
 @ViewModel
 final class ConnectionsViewModel {
-  struct State: Equatable {
+  @Observable
+  final class State {
     @Bound(\ConnectionsViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
     @Bound(\ConnectionsViewModel.connectionService.recentItems) var recentItems: [String]
+
+    nonisolated init(isAuthenticated: Bool, recentItems: [String]) {
+      self._isAuthenticated = isAuthenticated
+      self._recentItems = recentItems
+    }
   }
 
   private let connectionService: ConnectionService
@@ -67,7 +73,7 @@ The key path must use the full class name as the root and include at least two c
 @Bound(\MyViewModel.service.name) var name = ""
 ```
 
-This ensures state always starts with real data. Non-bound properties in the same State struct keep their defaults normally.
+This ensures state always starts with real data. Since `State` is a class, bound fields need an initializer that assigns the macro-generated backing storage (`_name`, `_count`, etc.). Non-bound properties in the same State class keep their defaults normally.
 
 ## @Polled — Pull-Based Observation
 
@@ -77,9 +83,15 @@ This ensures state always starts with real data. Non-bound properties in the sam
 @Observable
 @ViewModel
 final class DashboardViewModel {
-  struct State: Equatable {
+  @Observable
+  final class State {
     @Polled(\DashboardViewModel.batteryMonitor.level, every: .seconds(30)) var batteryLevel: Float
     @Polled(\DashboardViewModel.locationTracker.heading, every: .seconds(1)) var heading: Double
+
+    nonisolated init(batteryLevel: Float, heading: Double) {
+      self._batteryLevel = batteryLevel
+      self._heading = heading
+    }
   }
 
   private let batteryMonitor: BatteryMonitor
@@ -136,12 +148,18 @@ If you need cancel-previous semantics (where a new value cancels the in-flight h
 All three observation attributes support `throttledBy:` to limit rapid-fire updates. The observation loop pauses after each update, dropping intermediate values:
 
 ```swift
-struct State: Equatable {
+@Observable
+final class State {
   // Limit to ~8 updates/second
   @Bound(\MyViewModel.headTracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
 
   // Poll heading, but also throttle processing
   @Polled(\MyViewModel.compass.heading, every: .seconds(0.5)) var heading: Double
+
+  nonisolated init(posture: Posture, heading: Double) {
+    self._posture = posture
+    self._heading = heading
+  }
 }
 
 // Throttle a reaction

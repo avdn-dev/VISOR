@@ -5,11 +5,12 @@
 //  Created by Anh Nguyen on 13/2/2026.
 //
 
-/// A standalone enum for per-field loading semantics within State structs.
+/// A standalone enum for per-field loading semantics within State classes.
 ///
-/// Use inside a ViewModel's `State` struct for any field that has loading/empty/error states:
+/// Use inside a ViewModel's `State` class for any field that has loading/empty/error states:
 /// ```swift
-/// struct State: Equatable {
+/// @Observable
+/// final class State {
 ///     var items: Loadable<[Item]> = .loading
 ///     var filter: Filter = .all
 /// }

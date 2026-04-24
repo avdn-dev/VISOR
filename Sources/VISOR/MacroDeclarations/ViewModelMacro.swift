@@ -29,6 +29,10 @@
 ///   final class State {
 ///     var items: Loadable<[Item]> = .loading
 ///     @Bound(\ItemsViewModel.service.isAuthenticated) var isAuthenticated: Bool
+///
+///     nonisolated init(isAuthenticated: Bool) {
+///       self._isAuthenticated = isAuthenticated
+///     }
 ///   }
 ///
 ///   enum Action {

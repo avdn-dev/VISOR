@@ -20,12 +20,18 @@
 /// intermediate values. Zero CPU cost when the source is quiet.
 ///
 /// ```swift
+/// @Observable
 /// @ViewModel
 /// final class ConnectionsViewModel {
 ///   @Observable
 ///   final class State {
 ///     @Bound(\ConnectionsViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
 ///     @Bound(\ConnectionsViewModel.headTracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
+///
+///     nonisolated init(isAuthenticated: Bool, posture: Posture) {
+///       self._isAuthenticated = isAuthenticated
+///       self._posture = posture
+///     }
 ///   }
 ///   private let connectionService: ConnectionService
 ///   private let headTracker: HeadTracker

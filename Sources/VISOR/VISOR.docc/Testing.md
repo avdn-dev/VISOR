@@ -190,4 +190,4 @@ struct ProfileContent: View {
 }
 ```
 
-No factories, no services, no mocks — just static state.
+No factories, no services, no mocks — just static state. For class-based `State`, use the initializer you define on the nested `State` class.

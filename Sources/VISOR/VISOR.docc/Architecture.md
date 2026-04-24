@@ -69,7 +69,8 @@ Apply `@Observable` and `@ViewModel` to a class to generate:
 @Observable
 @ViewModel
 final class CounterViewModel {
-  struct State: Equatable {
+  @Observable
+  final class State {
     var count = 0
   }
 
@@ -85,7 +86,7 @@ final class CounterViewModel {
 
 ### State and Actions
 
-Every ViewModel requires a nested `struct State: Equatable`. Actions are optional — omit the `Action` enum for read-only ViewModels.
+Every ViewModel requires a nested `@Observable final class State`. Actions are optional — omit the `Action` enum for read-only ViewModels.
 
 Mutate state via `updateState(_:to:)`, which skips the write when the new value equals the current one (preventing unnecessary observation triggers):
 
@@ -100,10 +101,16 @@ The `handle(_:)` method can be sync or async. The protocol requires `async`, but
 When `@Bound` or `@Polled` properties exist in State, the generated init reads their initial values from the service:
 
 ```swift
-struct State: Equatable {
+@Observable
+final class State {
   @Bound(\ProfileViewModel.profileService.name) var name: String
   @Bound(\ProfileViewModel.profileService.email) var email: String
   var filter: Filter = .all  // non-bound properties still use defaults
+
+  nonisolated init(name: String, email: String) {
+    self._name = name
+    self._email = email
+  }
 }
 
 private let profileService: ProfileService
@@ -115,7 +122,7 @@ private let profileService: ProfileService
 // }
 ```
 
-`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Non-bound properties coexist naturally and keep their defaults.
+`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Because `State` is a class, provide an initializer for bound or polled fields and assign the macro-generated backing storage (`_name`, `_email`, etc.). Non-bound properties coexist naturally and keep their defaults.
 
 ## Factory Injection
 
@@ -152,7 +159,8 @@ let factory: GalleryViewModel.Factory = .routed { (router: Router<AppScene>) in
 `Loadable<Value>` is a standalone enum for per-field loading semantics within State:
 
 ```swift
-struct State: Equatable {
+@Observable
+final class State {
   var items: Loadable<[Item]> = .loading
   var profile: Loadable<Profile> = .loading
   var filter: Filter = .all
