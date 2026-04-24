@@ -4,14 +4,23 @@ Macro-powered architecture for SwiftUI — eliminates observation boilerplate, e
 
 ## Why VISOR?
 
-`@Observable` solved reactivity. It didn't solve architecture.
+SwiftUI gives you powerful primitives, but it leaves most feature architecture as an exercise for the app. `@Observable` solved "how does the view notice a value changed?" It did not solve "where should this state come from, who owns the async work, how do I test it, and how do I keep navigation from leaking through the whole feature?"
 
-A typical SwiftUI feature still requires you to manually wire observation loops for every service property, manage task lifecycles and deduplication, create test doubles for every protocol, and couple views to their navigation destinations. Multiply that by every feature in your app.
+VISOR is useful when your SwiftUI app has moved past simple local view state and into the usual product-app problems:
 
-VISOR provides opinionated answers with macros that eliminate the boilerplate:
+- **State is duplicated across layers.** Services already know the source of truth, but screens still need shaped, UI-ready state. VISOR lets a ViewModel declare exactly which service properties it mirrors, then generates the observation, initial seeding, and deduplication code.
+- **Feature code accumulates invisible async plumbing.** Without a convention, every screen invents its own observation tasks, cancellation behavior, polling loops, throttling, and "only update if changed" checks. VISOR makes those mechanics declarative so the ViewModel mostly shows product intent.
+- **Views become hard to preview and test.** If a SwiftUI view constructs dependencies or reaches into services directly, previews and tests need too much setup. VISOR's View/Content split keeps the owning view responsible for integration while the Content view is plain UI over plain state and action closures.
+- **Navigation becomes ambient coupling.** Large SwiftUI apps often spread `NavigationStack`, sheets, deep links, and tab selection through unrelated views. VISOR's `Router` centralises navigation state behind a typed API so features can request navigation without owning destination construction.
+- **Testing architecture has a tax.** Protocol-oriented services are testable in theory, but handwritten stubs and spies are repetitive enough that teams skip them. VISOR generates those doubles from the protocol, making the testable path the cheap path.
+
+The package is intentionally opinionated. It is probably overkill for a tiny app, a throwaway prototype, or a screen whose state is entirely local. It is aimed at apps with repeated feature modules, service-backed state, async side effects, previews that need to stay cheap, and tests that should assert behavior without booting the whole dependency graph.
+
+In practice, VISOR gives you a consistent feature shape:
 
 - **`@Bound`** declares which service properties a ViewModel tracks. The macro generates observation loops, deduplication, and initial state — you never write `for await` observation by hand.
 - **`@LazyViewModel`** separates view ownership from rendering. The `@LazyViewModel` view gets its ViewModel from a Factory; child views receive state as plain parameters, trivially previewable and testable.
+- **Interactors** are optional plain Swift use-case objects for workflows that coordinate multiple services, keeping ViewModels focused on state and user intent.
 - **`Router`** centralises navigation behind a type-safe API with deep linking, modal hierarchies, and tab management built in.
 - **`@Stubbable` / `@Spyable`** generate test doubles from protocol declarations — stubs with sensible defaults, spies with call recording.
 
@@ -43,7 +52,18 @@ Importing `VISOR` re-exports `Observation`, so a single import is sufficient.
 ```swift
 import VISOR
 
-// 1. ViewModel — declare state bindings, the macro handles the rest
+// 1. Service — observable source of truth for the feature
+@Observable
+final class ProfileService {
+  var name = "Alice"
+  var email = "alice@example.com"
+
+  func refresh() async {
+    // Fetch profile data, then update name/email.
+  }
+}
+
+// 2. ViewModel — declare state bindings, the macro handles the rest
 @Observable
 @ViewModel
 final class ProfileViewModel {
@@ -71,7 +91,7 @@ final class ProfileViewModel {
 // @ViewModel generates: init(profileService:), var state (initialised from service),
 // startObserving() that watches profileService, and typealias Factory.
 
-// 2. View — @LazyViewModel view owns the VM, Content is pure UI
+// 3. View — @LazyViewModel view owns the VM, Content is pure UI
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileScreen: View {
   var content: some View {
@@ -98,7 +118,9 @@ struct ProfileContent: View {
   ProfileContent(state: .init(name: "Alice", email: "alice@example.com")) {}
 }
 
-// 3. Inject the factory at the composition root
+// 4. Inject the factory at the composition root
+let profileService = ProfileService()
+
 ProfileScreen()
   .environment(ProfileViewModel.Factory { ProfileViewModel(profileService: profileService) })
 ```
@@ -115,6 +137,7 @@ When `profileService.name` or `.email` changes, the view updates automatically. 
 | `@Reaction` | Calls a method whenever an observed property changes |
 | `@LazyViewModel` | Factory injection, lazy init, and observation lifecycle for views |
 | `Loadable<Value>` | Enum for per-field loading/empty/error states within `State` |
+| Interactors | Optional use-case layer for coordinating multiple services |
 | `Router` | Type-safe navigation with deep linking, externalised view resolution, and modal hierarchies |
 | `@Stubbable` / `@Spyable` | Generate test doubles from protocol declarations |
 | `observing()` / `Expectation` | Testing DSL for asserting on observable ViewModel state |
@@ -125,7 +148,7 @@ All observation macros support `throttledBy:` for rate-limiting rapid-fire updat
 
 Full API documentation is available at [**avdn-dev.github.io/VISOR**](https://avdn-dev.github.io/VISOR/documentation/visor/), or locally via Xcode (**Product > Build Documentation**):
 
-- **Architecture** — VISOR layers, View/Content pattern, Factory injection
+- **Architecture** — VISOR layers, View/Content pattern, Interactors, Factory injection
 - **Observation** — `@Bound`, `@Polled`, `@Reaction`, rate limiting, `valuesOf()`
 - **Navigation** — Router, NavigationScene, content-based view resolution, deep linking, NavigationContainer
 - **Testing** — `observing()` DSL, `@Stubbable`, `@Spyable`

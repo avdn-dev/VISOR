@@ -1,6 +1,6 @@
 # Architecture
 
-The VISOR layers, View/Content pattern, and Factory injection.
+The VISOR layers, View/Content pattern, Interactors, and Factory injection.
 
 ## The Layers
 
@@ -54,6 +54,82 @@ struct DashboardContent: View {
   )
 }
 ```
+
+## Interactors
+
+Interactors are optional plain Swift objects that model application use cases. Use one when a user action needs to coordinate multiple services, enforce domain sequencing, or perform work that would make the ViewModel more about workflow than state.
+
+Keep the boundaries simple:
+
+- **ViewModel** owns UI state, observes services, and translates user actions into work.
+- **Interactor** coordinates a use case across services and returns a domain result.
+- **Service** owns platform or persistence concerns such as networking, storage, auth, sensors, or caches.
+
+You usually do not need an Interactor when a ViewModel only forwards a single action to a single service. Introduce one when the behavior has a name in the product domain, is shared across screens, or needs focused tests without ViewModel state machinery.
+
+```swift
+protocol SessionInteractor {
+  func signIn(email: String, password: String) async throws -> User
+}
+
+final class LiveSessionInteractor: SessionInteractor {
+  private let authService: AuthService
+  private let profileService: ProfileService
+  private let analyticsService: AnalyticsService
+
+  init(
+    authService: AuthService,
+    profileService: ProfileService,
+    analyticsService: AnalyticsService
+  ) {
+    self.authService = authService
+    self.profileService = profileService
+    self.analyticsService = analyticsService
+  }
+
+  func signIn(email: String, password: String) async throws -> User {
+    let session = try await authService.signIn(email: email, password: password)
+    let user = try await profileService.loadProfile(for: session.userID)
+    analyticsService.track(.signedIn(user.id))
+    return user
+  }
+}
+
+@Observable
+@ViewModel
+final class SignInViewModel {
+  @Observable
+  final class State {
+    var email = ""
+    var password = ""
+    var user: Loadable<User> = .empty
+  }
+
+  enum Action {
+    case submit
+  }
+
+  private let sessionInteractor: any SessionInteractor
+
+  func handle(_ action: Action) async {
+    switch action {
+    case .submit:
+      updateState(\.user, to: .loading)
+      do {
+        let user = try await sessionInteractor.signIn(
+          email: state.email,
+          password: state.password
+        )
+        updateState(\.user, to: .loaded(user))
+      } catch {
+        updateState(\.user, to: .error(error.localizedDescription))
+      }
+    }
+  }
+}
+```
+
+Interactors pair well with `@Stubbable` and `@Spyable`: define the Interactor as a protocol, use a live implementation in production, and generate test doubles for ViewModel tests.
 
 ## @ViewModel Macro
 
