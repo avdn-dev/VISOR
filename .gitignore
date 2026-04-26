@@ -2,3 +2,4 @@
 .swiftpm/
 Package.resolved
 RELEASE_NOTES.md
+.DS_Store
