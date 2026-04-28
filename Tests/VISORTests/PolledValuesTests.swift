@@ -77,7 +77,7 @@ struct PolledValuesTests {
   @Test(.timeLimit(.minutes(1)))
   func `Non-Equatable overload emits on every poll`() async throws {
     struct Wrapper: Sendable { let value: Int }
-    var counter = 10
+    let counter = 10
     var emissions: [Int] = []
 
     let task = Task {

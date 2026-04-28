@@ -30,6 +30,7 @@ final class MinimalVM {
     @Observable
     final class State {
         var value = 0
+        nonisolated init() {}
     }
 }
 
@@ -41,6 +42,7 @@ final class AutoStateVM {
     @Observable
     final class State {
         var value = 0
+        nonisolated init() {}
     }
 }
 
@@ -53,6 +55,7 @@ final class ReactionOnStateVM {
     final class State {
         var counter = 0
         var doubled = 0
+        nonisolated init() {}
     }
 
     @Reaction(\Self.state.counter)
@@ -173,6 +176,7 @@ final class SyncReactionVM {
     final class State {
         var lastDestination: String? = nil
         var reactionCount = 0
+        nonisolated init() {}
     }
     let nav: RuntimeSource
 
@@ -191,6 +195,7 @@ final class AsyncReactionVM {
     @Observable
     final class State {
         var processedValue: String? = nil
+        nonisolated init() {}
     }
     let nav: RuntimeSource
 
@@ -248,6 +253,7 @@ final class NoDepsVM {
     @Observable
     final class State {
         var text = ""
+        nonisolated init() {}
     }
 
     enum Action {
@@ -284,6 +290,7 @@ final class LoadableStatesVM {
     final class State {
         var items: Loadable<[String]> = .loading
         var profile: Loadable<String> = .empty
+        nonisolated init() {}
     }
 
     enum Action {
@@ -370,6 +377,7 @@ final class ThrottledBySyncReactionVM {
     final class State {
         var latestCount = 0
         var reactionCount = 0
+        nonisolated init() {}
     }
     let source: RuntimeSource
 
@@ -389,6 +397,7 @@ final class ThrottledByAsyncReactionVM {
     final class State {
         var processedCount = 0
         var completedHandlers = 0
+        nonisolated init() {}
     }
     let source: RuntimeSource
 

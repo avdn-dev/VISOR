@@ -48,6 +48,7 @@ final class LeakAsyncActionVM {
     @Observable
     final class State {
         var items: Loadable<[String]> = .loading
+        nonisolated init() {}
     }
 
     enum Action {
@@ -68,7 +69,13 @@ final class LeakAsyncActionVM {
 @MainActor
 struct MemoryLeakTests {
 
-    // MARK: - Helper
+    // MARK: - Helpers
+
+    /// Creates a Task that calls startObserving() without capturing the caller's `var vm`,
+    /// avoiding "mutated after capture by sendable closure" warnings.
+    private func startObservingTask<VM: ViewModel>(for vm: VM) -> Task<Void, Never> {
+        Task { await vm.startObserving() }
+    }
 
     /// Starts observation, exercises the VM, cancels, nils out, and asserts deallocation.
     private func assertNoLeak<VM: ViewModel>(
@@ -80,7 +87,11 @@ struct MemoryLeakTests {
         var vm: VM? = make()
         weak let weakVM = vm
 
-        let task = Task { await vm!.startObserving() }
+        let task: Task<Void, Never>
+        do {
+            let observingVM = vm!
+            task = Task { await observingVM.startObserving() }
+        }
         try await yieldForTracking()
 
         try await exercise(vm!)
@@ -190,7 +201,7 @@ struct MemoryLeakTests {
         var vm: PolledSingleVM? = PolledSingleVM(monitor: monitor)
         weak let weakVM = vm
 
-        let task = Task { await vm!.startObserving() }
+        let task = startObservingTask(for: vm!)
         try await yieldForTracking()
 
         monitor.level = 0.8
@@ -213,7 +224,7 @@ struct MemoryLeakTests {
         weak let weakSource = source
         var vm: AutoObserveSingleVM? = AutoObserveSingleVM(source: source!)
 
-        let task = Task { await vm!.startObserving() }
+        let task = startObservingTask(for: vm!)
         try await yieldForTracking()
 
         source!.count = 1
@@ -330,8 +341,8 @@ struct MemoryLeakTests {
         weak let weakVM1 = vm1
         weak let weakVM2 = vm2
 
-        let task1 = Task { await vm1!.startObserving() }
-        let task2 = Task { await vm2!.startObserving() }
+        let task1 = startObservingTask(for: vm1!)
+        let task2 = startObservingTask(for: vm2!)
         try await yieldForTracking()
 
         source.count = 1
@@ -363,7 +374,7 @@ struct MemoryLeakTests {
         var vm: ManualLeakVM? = ManualLeakVM(source: source)
         weak let weakVM = vm
 
-        let task = Task { await vm!.startObserving() }
+        let task = startObservingTask(for: vm!)
         // Cancel immediately — no yieldForTracking() first
         task.cancel()
         _ = await task.value
