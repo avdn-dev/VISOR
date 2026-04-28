@@ -127,6 +127,8 @@ ProfileScreen()
 
 When `profileService.name` or `.email` changes, the view updates automatically. `State` is an `@Observable` class for per-field SwiftUI invalidation. `@Bound` properties have no default values — they're initialised from the service at creation time, so state always starts with real data.
 
+`State` initializers use `nonisolated` so previews and generated view-model initializers can construct state without a main-actor hop. Assign the `@Observable` backing storage (`self._name = name`), not the observable property setter (`self.name = name`), inside these initializers.
+
 ## What's Included
 
 | Feature | Description |

@@ -39,6 +39,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case stateClassNotFinal
   case stateClassMissingObservable
   case stateClassMissingInit(expectedSignature: String)
+  case stateInitAssignsObservableProperty(propertyName: String)
 
   // MARK: Internal
 
@@ -101,7 +102,9 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .stateClassMissingObservable:
       "State class requires @Observable"
     case .stateClassMissingInit(let sig):
-      "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig)"
+      "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig), assigning backing storage such as self._property = property"
+    case .stateInitAssignsObservableProperty(let propertyName):
+      "State nonisolated init assigns '\(propertyName)' through its observable setter; assign backing storage instead: self._\(propertyName) = \(propertyName)"
     }
   }
 
@@ -136,6 +139,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .stateClassNotFinal: "stateClassNotFinal"
     case .stateClassMissingObservable: "stateClassMissingObservable"
     case .stateClassMissingInit: "stateClassMissingInit"
+    case .stateInitAssignsObservableProperty: "stateInitAssignsObservableProperty"
     }
     return MessageID(domain: "VISOR", id: id)
   }
@@ -155,7 +159,7 @@ enum VISORDiagnostic: DiagnosticMessage {
          .polledOutsideState, .invalidObservationPolicy,
          .stateClassNotFinal, .stateClassMissingObservable:
       .error
-    case .stateClassMissingInit:
+    case .stateClassMissingInit, .stateInitAssignsObservableProperty:
       .warning
     }
   }

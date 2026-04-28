@@ -37,6 +37,9 @@
 ///   private let headTracker: HeadTracker
 /// }
 /// ```
+///
+/// In `nonisolated` State initializers, assign backing storage (`self._posture = posture`)
+/// rather than the observable property setter (`self.posture = posture`).
 @attached(peer)
 public macro Bound<Root, Value>(_ keyPath: KeyPath<Root, Value>) = #externalMacro(
   module: "VISORMacros", type: "BoundMacro")

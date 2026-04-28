@@ -32,6 +32,9 @@
 ///   private let batteryMonitor: BatteryMonitor
 /// }
 /// ```
+///
+/// In `nonisolated` State initializers, assign backing storage (`self._batteryLevel = batteryLevel`)
+/// rather than the observable property setter (`self.batteryLevel = batteryLevel`).
 @attached(peer)
 public macro Polled<Root, Value>(
   _ keyPath: KeyPath<Root, Value>,

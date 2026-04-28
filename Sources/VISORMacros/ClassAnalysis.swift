@@ -70,6 +70,13 @@ struct StateStoredPropertyInfo {
   let type: String
 }
 
+// MARK: - StateInitDirectAssignmentInfo
+
+struct StateInitDirectAssignmentInfo {
+  let propertyName: String
+  let node: Syntax
+}
+
 // MARK: - ClassAnalysis
 
 /// Single-pass analysis of a `ClassDeclSyntax` member list.
@@ -93,6 +100,7 @@ struct ClassAnalysis {
   var stateClassIsFinal = false
   var stateClassHasObservable = false
   var stateClassHasInit = false
+  var stateInitDirectAssignments: [StateInitDirectAssignmentInfo] = []
 
   // v2: @Bound inside State
   var stateBoundProperties: [BoundPropertyInfo] = []
@@ -284,12 +292,16 @@ struct ClassAnalysis {
   /// Scans the nested `class State` for @Bound/@Polled attributes and stored properties.
   private mutating func scanState(_ classDecl: ClassDeclSyntax) {
     var declarationOrder = 0
+    var stateStoredPropertyNames: [String] = []
+    var nonisolatedInitializers: [InitializerDeclSyntax] = []
 
     // Check for user-declared init
     for member in classDecl.memberBlock.members {
-      if member.decl.is(InitializerDeclSyntax.self) {
+      if let initDecl = member.decl.as(InitializerDeclSyntax.self) {
         stateClassHasInit = true
-        break
+        if initDecl.modifiers.contains(where: { $0.name.text == "nonisolated" }) {
+          nonisolatedInitializers.append(initDecl)
+        }
       }
     }
 
@@ -312,6 +324,9 @@ struct ClassAnalysis {
       if varDecl.bindingSpecifier.text == "var" || varDecl.bindingSpecifier.text == "let" {
         for binding in varDecl.bindings where binding.accessorBlock == nil {
           if let identifier = binding.pattern.as(IdentifierPatternSyntax.self) {
+            if varDecl.bindingSpecifier.text == "var", !varDecl.hasObservationIgnoredAttribute {
+              stateStoredPropertyNames.append(identifier.identifier.text)
+            }
             let type: String
             if let typeAnnotation = binding.typeAnnotation {
               type = typeAnnotation.type.trimmedDescription
@@ -447,6 +462,25 @@ struct ClassAnalysis {
         declarationOrder += 1
       }
     }
+
+    scanStateInitializers(nonisolatedInitializers, propertyNames: stateStoredPropertyNames)
+  }
+
+  private mutating func scanStateInitializers(
+    _ initializers: [InitializerDeclSyntax],
+    propertyNames: [String])
+  {
+    guard !propertyNames.isEmpty else { return }
+
+    for initDecl in initializers {
+      let body = initDecl.body?.statements.trimmedDescription ?? ""
+      let compactBody = body.filter { !$0.isWhitespace }
+      for propertyName in propertyNames where compactBody.contains("self.\(propertyName)=") {
+        stateInitDirectAssignments.append(StateInitDirectAssignmentInfo(
+          propertyName: propertyName,
+          node: Syntax(initDecl)))
+      }
+    }
   }
 
   /// Scans a nested type's member block for `@Reaction` methods that should be at class level.
@@ -459,6 +493,14 @@ struct ClassAnalysis {
       if hasReaction {
         reactionsInsideNestedTypes.append(funcDecl.name.text)
       }
+    }
+  }
+}
+
+private extension VariableDeclSyntax {
+  var hasObservationIgnoredAttribute: Bool {
+    attributes.contains { attr in
+      attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "ObservationIgnored"
     }
   }
 }

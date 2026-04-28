@@ -55,6 +55,10 @@
 /// }
 /// ```
 ///
+/// In `nonisolated` State initializers, assign the `@Observable` backing storage
+/// (`self._isAuthenticated = isAuthenticated`) rather than the observable property
+/// setter (`self.isAuthenticated = isAuthenticated`).
+///
 /// ## @Bound inside State
 ///
 /// `@Bound` annotations on State class properties generate observe methods that

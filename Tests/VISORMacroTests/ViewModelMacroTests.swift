@@ -542,6 +542,79 @@ struct ViewModelMacroTests {
   }
 
   @Test
+  func `Nonisolated State init assigning observable property emits warning`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          @Bound(\\MyViewModel.service.count) var count: Int
+          nonisolated init(count: Int) {
+            self.count = count
+          }
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var count: Int
+          nonisolated init(count: Int) {
+            self.count = count
+          }
+        }
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+              self._state = State(count: service.count)
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeCount() async {
+              for await value in VISOR.valuesOf({ self.service.count }) {
+                  self.updateState(\\.count, to: value)
+              }
+          }
+
+          func startObserving() async {
+              await observeCount()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "State nonisolated init assigns 'count' through its observable setter; assign backing storage instead: self._count = count", line: 7, column: 5, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Multiple @Bound inside State generates withDiscardingTaskGroup`() {
     assertMacroExpansion(
       """

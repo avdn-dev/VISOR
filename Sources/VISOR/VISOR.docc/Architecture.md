@@ -198,7 +198,7 @@ private let profileService: ProfileService
 // }
 ```
 
-`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Because `State` is a class, provide an initializer for bound or polled fields and assign the macro-generated backing storage (`_name`, `_email`, etc.). Non-bound properties coexist naturally and keep their defaults.
+`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Because `State` is a class, provide a `nonisolated` initializer for bound or polled fields and assign the macro-generated backing storage (`self._name = name`, `self._email = email`, etc.). Do not assign through the observable property setters (`self.name = name`) inside a `nonisolated` initializer; those setters are actor-isolated when using main-actor default isolation. Non-bound properties coexist naturally and keep their defaults.
 
 ## Factory Injection
 

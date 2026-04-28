@@ -77,6 +77,12 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         message: VISORDiagnostic.stateClassMissingInit(expectedSignature: sig)))
     }
 
+    for assignment in analysis.stateInitDirectAssignments {
+      context.diagnose(Diagnostic(
+        node: assignment.node,
+        message: VISORDiagnostic.stateInitAssignsObservableProperty(propertyName: assignment.propertyName)))
+    }
+
     if analysis.hasActionEnum && !analysis.hasHandleMethod {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
