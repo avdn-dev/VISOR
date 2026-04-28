@@ -6,7 +6,6 @@
 //
 
 import SwiftSyntaxMacros
-import SwiftSyntaxMacrosTestSupport
 import Testing
 
 #if canImport(VISORMacros)
@@ -26,7 +25,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with properties and methods`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol DataService {
@@ -77,7 +76,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy for void methods`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol LogService {
@@ -121,7 +120,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with multiple parameters`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol SearchService {
@@ -158,7 +157,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with optional and fatalError for unknown return type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ThemeService {
@@ -178,7 +177,9 @@ struct SpyableMacroTests {
         func currentTheme() -> Theme {
           currentThemeCallCount += 1
           calls.append(.currentTheme)
-          guard let value = currentThemeReturnValue else { fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()") }
+          guard let value = currentThemeReturnValue else {
+              fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()")
+          }
           return value
         }
         enum Call {
@@ -188,14 +189,14 @@ struct SpyableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Generates spy for empty protocol`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol EmptyService {
@@ -207,6 +208,7 @@ struct SpyableMacroTests {
 
       @Observable
       final class SpyEmptyService: EmptyService {
+
       }
       """,
       macros: testMacros)
@@ -214,7 +216,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Uses IUO for unknown property types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ThemeService {
@@ -232,14 +234,14 @@ struct SpyableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Generates spy with external label different from internal name`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ItemService {
@@ -278,7 +280,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Disambiguates methods with same name but different labels`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol LoadService {
@@ -304,7 +306,9 @@ struct SpyableMacroTests {
           loadByIdReceivedId = id
           loadByIdReceivedInvocations.append(id)
           calls.append(.load(id: id))
-          guard let value = loadByIdReturnValue else { fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()") }
+          guard let value = loadByIdReturnValue else {
+              fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()")
+          }
           return value
         }
         // -- loadMatching --
@@ -327,14 +331,14 @@ struct SpyableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Non-colliding methods keep simple names alongside overloads`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol MixedService {
@@ -372,7 +376,7 @@ struct SpyableMacroTests {
         }
         // -- sendError --
         var sendErrorCallCount = 0
-        var sendErrorReceivedError: (any Error)?
+        var sendErrorReceivedError: any Error?
         var sendErrorReceivedInvocations: [any Error] = []
         func send(error: any Error) {
           sendErrorCallCount += 1
@@ -395,7 +399,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Public protocol generates public spy`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       public protocol DataService {
@@ -424,7 +428,8 @@ struct SpyableMacroTests {
           case fetch
         }
         public var calls: [Call] = []
-        public init() {}
+        public init() {
+        }
       }
       """,
       macros: testMacros)
@@ -434,7 +439,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Spy property with StubbableDefault uses custom default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ExtractionService {
@@ -473,7 +478,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Properties-only protocol generates spy without Call enum`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ConfigService {
@@ -500,7 +505,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Generates spy with generic return type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol ResultService {
@@ -520,7 +525,9 @@ struct SpyableMacroTests {
         func execute() -> Result<String, any Error> {
           executeCallCount += 1
           calls.append(.execute)
-          guard let value = executeReturnValue else { fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()") }
+          guard let value = executeReturnValue else {
+              fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()")
+          }
           return value
         }
         enum Call {
@@ -530,14 +537,14 @@ struct SpyableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Spyable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Generates spy with generic parameter type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol BatchService {
@@ -574,7 +581,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       struct NotAProtocol {
@@ -592,7 +599,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error when applied to class`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       class NotAProtocol {
@@ -610,7 +617,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Error on protocol with associated types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol HasAssoc {
@@ -632,7 +639,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Warning on protocol with static members`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol HasStatic {
@@ -668,7 +675,7 @@ struct SpyableMacroTests {
 
   @Test
   func `Warning on protocol with subscripts`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Spyable
       protocol HasSubscript {

@@ -6,7 +6,6 @@
 //
 
 import SwiftSyntaxMacros
-import SwiftSyntaxMacrosTestSupport
 import Testing
 
 #if canImport(VISORMacros)
@@ -31,7 +30,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with properties and methods`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol DataService {
@@ -54,9 +53,13 @@ struct StubbableMacroTests {
         var items: [Item] = []
         var isLoading: Bool = false
         var fetchResult: Result<[Item], any Error> = .success([])
-        func fetch() async throws -> [Item] { try fetchResult.get() }
+        func fetch() async throws -> [Item] {
+            try fetchResult.get()
+        }
         var saveResult: Result<Void, any Error> = .success(())
-        func save(_ item: Item) async throws { try saveResult.get() }
+        func save(_ item: Item) async throws {
+            try saveResult.get()
+        }
       }
       """,
       macros: testMacros)
@@ -64,7 +67,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with default values for known types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ConfigService {
@@ -107,7 +110,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Uses optional with fatalError for unknown custom return types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ThemeService {
@@ -123,20 +126,22 @@ struct StubbableMacroTests {
       final class StubThemeService: ThemeService {
         var currentThemeReturnValue: Theme?
         func currentTheme() -> Theme {
-          guard let value = currentThemeReturnValue else { fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()") }
+          guard let value = currentThemeReturnValue else {
+              fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()")
+          }
           return value
         }
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Generates stub for empty protocol`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol EmptyService {
@@ -148,6 +153,7 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubEmptyService: EmptyService {
+
       }
       """,
       macros: testMacros)
@@ -155,7 +161,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with labelled parameters`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol SearchService {
@@ -170,7 +176,9 @@ struct StubbableMacroTests {
       @Observable
       final class StubSearchService: SearchService {
         var searchResult: Result<[Result], any Error> = .success([])
-        func search(query: String, limit: Int) async throws -> [Result] { try searchResult.get() }
+        func search(query: String, limit: Int) async throws -> [Result] {
+            try searchResult.get()
+        }
       }
       """,
       macros: testMacros)
@@ -178,7 +186,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with optional return type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol CacheService {
@@ -193,7 +201,9 @@ struct StubbableMacroTests {
       @Observable
       final class StubCacheService: CacheService {
         var getReturnValue: Data? = nil
-        func get(key: String) -> Data? { getReturnValue }
+        func get(key: String) -> Data? {
+            getReturnValue
+        }
       }
       """,
       macros: testMacros)
@@ -203,7 +213,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Public protocol generates public stub`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       public protocol DataService {
@@ -223,10 +233,15 @@ struct StubbableMacroTests {
       public final class StubDataService: DataService {
         public var items: [Item] = []
         public var fetchResult: Result<[Item], any Error> = .success([])
-        public func fetch() async throws -> [Item] { try fetchResult.get() }
+        public func fetch() async throws -> [Item] {
+            try fetchResult.get()
+        }
         public var saveResult: Result<Void, any Error> = .success(())
-        public func save(_ item: Item) async throws { try saveResult.get() }
-        public init() {}
+        public func save(_ item: Item) async throws {
+            try saveResult.get()
+        }
+        public init() {
+        }
       }
       """,
       macros: testMacros)
@@ -234,7 +249,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Package protocol generates package stub`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       package protocol DataService {
@@ -252,7 +267,9 @@ struct StubbableMacroTests {
       package final class StubDataService: DataService {
         package var items: [Item] = []
         package var fetchResult: Result<[Item], any Error> = .success([])
-        package func fetch() async throws -> [Item] { try fetchResult.get() }
+        package func fetch() async throws -> [Item] {
+            try fetchResult.get()
+        }
       }
       """,
       macros: testMacros)
@@ -260,7 +277,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Fileprivate protocol generates fileprivate stub`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       fileprivate protocol DataService {
@@ -278,7 +295,9 @@ struct StubbableMacroTests {
       fileprivate final class StubDataService: DataService {
         fileprivate var items: [Item] = []
         fileprivate var fetchResult: Result<[Item], any Error> = .success([])
-        fileprivate func fetch() async throws -> [Item] { try fetchResult.get() }
+        fileprivate func fetch() async throws -> [Item] {
+            try fetchResult.get()
+        }
       }
       """,
       macros: testMacros)
@@ -288,7 +307,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Property with StubbableDefault uses custom default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ExtractionService {
@@ -310,7 +329,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Property without StubbableDefault uses defaultValue as before`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ExtractionService {
@@ -331,14 +350,14 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Mixed properties with and without StubbableDefault`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ExtractionService {
@@ -366,7 +385,7 @@ struct StubbableMacroTests {
 
   @Test
   func `AsyncStream property gets default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol StreamService {
@@ -380,7 +399,9 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubStreamService: StreamService {
-        var updates: AsyncStream<Int> = AsyncStream { $0.finish() }
+        var updates: AsyncStream<Int> = AsyncStream {
+            $0.finish()
+        }
       }
       """,
       macros: testMacros)
@@ -388,7 +409,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Set property gets empty default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol TagService {
@@ -410,7 +431,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Method with external label different from internal name`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ItemService {
@@ -425,7 +446,9 @@ struct StubbableMacroTests {
       @Observable
       final class StubItemService: ItemService {
         var performResult: Result<Void, any Error> = .success(())
-        func perform(with item: Item) async throws { try performResult.get() }
+        func perform(with item: Item) async throws {
+            try performResult.get()
+        }
       }
       """,
       macros: testMacros)
@@ -435,7 +458,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates methods with same name but different labels`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol LoadService {
@@ -453,22 +476,26 @@ struct StubbableMacroTests {
       final class StubLoadService: LoadService {
         var loadByIdReturnValue: Item?
         func load(byId id: String) -> Item {
-          guard let value = loadByIdReturnValue else { fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()") }
+          guard let value = loadByIdReturnValue else {
+              fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()")
+          }
           return value
         }
         var loadMatchingReturnValue: [Item] = []
-        func load(matching query: String) -> [Item] { loadMatchingReturnValue }
+        func load(matching query: String) -> [Item] {
+            loadMatchingReturnValue
+        }
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Disambiguates void overloads`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol EventService {
@@ -484,8 +511,10 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubEventService: EventService {
-        func send(event: String) { }
-        func send(error: any Error) { }
+        func send(event: String) {
+        }
+        func send(error: any Error) {
+        }
       }
       """,
       macros: testMacros)
@@ -493,7 +522,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overload with underscore label using type name`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol Finder {
@@ -510,9 +539,13 @@ struct StubbableMacroTests {
       @Observable
       final class StubFinder: Finder {
         var findItemReturnValue: Bool = false
-        func find(_ expected: Item) -> Bool { findItemReturnValue }
+        func find(_ expected: Item) -> Bool {
+            findItemReturnValue
+        }
         var findByIDReturnValue: Bool = false
-        func find(byID id: String) -> Bool { findByIDReturnValue }
+        func find(byID id: String) -> Bool {
+            findByIDReturnValue
+        }
       }
       """,
       macros: testMacros)
@@ -520,7 +553,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overloads with same labels but different return types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol Converter {
@@ -537,9 +570,13 @@ struct StubbableMacroTests {
       @Observable
       final class StubConverter: Converter {
         var convertFromReturningIntReturnValue: Int = 0
-        func convert(from value: String) -> Int { convertFromReturningIntReturnValue }
+        func convert(from value: String) -> Int {
+            convertFromReturningIntReturnValue
+        }
         var convertFromReturningDoubleReturnValue: Double = 0.0
-        func convert(from value: String) -> Double { convertFromReturningDoubleReturnValue }
+        func convert(from value: String) -> Double {
+            convertFromReturningDoubleReturnValue
+        }
       }
       """,
       macros: testMacros)
@@ -547,7 +584,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Non-colliding methods keep simple names`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol MixedService {
@@ -566,9 +603,13 @@ struct StubbableMacroTests {
       @Observable
       final class StubMixedService: MixedService {
         var fetchReturnValue: [Item] = []
-        func fetch() -> [Item] { fetchReturnValue }
-        func save(_ item: Item) { }
-        func delete(byId id: String) { }
+        func fetch() -> [Item] {
+            fetchReturnValue
+        }
+        func save(_ item: Item) {
+        }
+        func delete(byId id: String) {
+        }
       }
       """,
       macros: testMacros)
@@ -578,7 +619,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generates stub with generic return type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol ResultService {
@@ -594,20 +635,22 @@ struct StubbableMacroTests {
       final class StubResultService: ResultService {
         var executeReturnValue: Result<String, any Error>?
         func execute() -> Result<String, any Error> {
-          guard let value = executeReturnValue else { fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()") }
+          guard let value = executeReturnValue else {
+              fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()")
+          }
           return value
         }
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Generates stub with generic parameter type`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol StorageService {
@@ -623,9 +666,12 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubStorageService: StorageService {
-        func store(_ value: Set<String>) { }
+        func store(_ value: Set<String>) {
+        }
         var retrieveReturnValue: [String: [Int]] = [:]
-        func retrieve() -> [String: [Int]] { retrieveReturnValue }
+        func retrieve() -> [String: [Int]] {
+            retrieveReturnValue
+        }
       }
       """,
       macros: testMacros)
@@ -633,7 +679,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Disambiguates overloads with generic underscore parameter types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol Processor {
@@ -650,9 +696,13 @@ struct StubbableMacroTests {
       @Observable
       final class StubProcessor: Processor {
         var processSetStringReturnValue: Int = 0
-        func process(_ items: Set<String>) -> Int { processSetStringReturnValue }
+        func process(_ items: Set<String>) -> Int {
+            processSetStringReturnValue
+        }
         var processArrayIntReturnValue: Int = 0
-        func process(_ items: Array<Int>) -> Int { processArrayIntReturnValue }
+        func process(_ items: Array<Int>) -> Int {
+            processArrayIntReturnValue
+        }
       }
       """,
       macros: testMacros)
@@ -660,7 +710,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Generic property types use correct defaults`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol CacheService {
@@ -684,7 +734,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 2, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -693,7 +743,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       struct NotValid {
@@ -711,7 +761,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Error on protocol with associated types`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol HasAssoc {
@@ -733,7 +783,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Warning on protocol with static members`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol HasStatic {
@@ -749,7 +799,8 @@ struct StubbableMacroTests {
 
       @Observable
       final class StubHasStatic: HasStatic {
-        func doWork() { }
+        func doWork() {
+        }
       }
       """,
       diagnostics: [
@@ -760,7 +811,7 @@ struct StubbableMacroTests {
 
   @Test
   func `Warning on protocol with subscripts`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Stubbable
       protocol HasSubscript {
