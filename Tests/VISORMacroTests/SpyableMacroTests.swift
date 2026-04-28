@@ -178,7 +178,7 @@ struct SpyableMacroTests {
         func currentTheme() -> Theme {
           currentThemeCallCount += 1
           calls.append(.currentTheme)
-          guard let value = currentThemeReturnValue else { fatalError("Configure \\(currentThemeReturnValue) before calling currentTheme()") }
+          guard let value = currentThemeReturnValue else { fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()") }
           return value
         }
         enum Call {
@@ -304,7 +304,7 @@ struct SpyableMacroTests {
           loadByIdReceivedId = id
           loadByIdReceivedInvocations.append(id)
           calls.append(.load(id: id))
-          guard let value = loadByIdReturnValue else { fatalError("Configure \\(loadByIdReturnValue) before calling load()") }
+          guard let value = loadByIdReturnValue else { fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()") }
           return value
         }
         // -- loadMatching --
@@ -520,7 +520,7 @@ struct SpyableMacroTests {
         func execute() -> Result<String, any Error> {
           executeCallCount += 1
           calls.append(.execute)
-          guard let value = executeReturnValue else { fatalError("Configure \\(executeReturnValue) before calling execute()") }
+          guard let value = executeReturnValue else { fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()") }
           return value
         }
         enum Call {
@@ -724,7 +724,7 @@ struct SpyableMacroTests {
           processFooReceivedInvocations.append(foo)
           calls.append(.processFoo(foo: foo))
           guard let value = processFooReturnValue else {
-              fatalError("Configure \\(processFooReturnValue) before calling processFoo()")
+              fatalError("Configure \\(String(describing: processFooReturnValue)) before calling processFoo()")
           }
           return value
         }

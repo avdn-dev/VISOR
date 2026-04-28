@@ -68,7 +68,7 @@ public struct StubbableMacro: PeerMacro {
         if needsGuard {
           members.append(contentsOf: [
             "  \(sig) {",
-            "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(\(methodPrefix)Result) before calling \(method.name)()\") }",
+            "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }",
             "    return try result.get()",
             "  }",
           ])
@@ -80,7 +80,7 @@ public struct StubbableMacro: PeerMacro {
         if needsGuard {
           members.append(contentsOf: [
             "  \(sig) {",
-            "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(\(methodPrefix)ReturnValue) before calling \(method.name)()\") }",
+            "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }",
             "    return value",
             "  }",
           ])

@@ -102,7 +102,7 @@ public struct SpyableMacro: PeerMacro {
         if let returnType = method.returnType {
           let needsGuard = defaultValue(for: returnType) == nil
           if needsGuard {
-            bodyLines.append("    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(\(methodPrefix)Result) before calling \(method.name)()\") }")
+            bodyLines.append("    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }")
             bodyLines.append("    return try result.get()")
           } else {
             bodyLines.append("    return try \(methodPrefix)Result.get()")
@@ -113,7 +113,7 @@ public struct SpyableMacro: PeerMacro {
       } else if let returnType = method.returnType {
         let needsGuard = defaultValue(for: returnType) == nil
         if needsGuard {
-          bodyLines.append("    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(\(methodPrefix)ReturnValue) before calling \(method.name)()\") }")
+          bodyLines.append("    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }")
           bodyLines.append("    return value")
         } else {
           bodyLines.append("    return \(methodPrefix)ReturnValue")

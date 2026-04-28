@@ -123,7 +123,7 @@ struct StubbableMacroTests {
       final class StubThemeService: ThemeService {
         var currentThemeReturnValue: Theme?
         func currentTheme() -> Theme {
-          guard let value = currentThemeReturnValue else { fatalError("Configure \\(currentThemeReturnValue) before calling currentTheme()") }
+          guard let value = currentThemeReturnValue else { fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()") }
           return value
         }
       }
@@ -453,7 +453,7 @@ struct StubbableMacroTests {
       final class StubLoadService: LoadService {
         var loadByIdReturnValue: Item?
         func load(byId id: String) -> Item {
-          guard let value = loadByIdReturnValue else { fatalError("Configure \\(loadByIdReturnValue) before calling load()") }
+          guard let value = loadByIdReturnValue else { fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()") }
           return value
         }
         var loadMatchingReturnValue: [Item] = []
@@ -594,7 +594,7 @@ struct StubbableMacroTests {
       final class StubResultService: ResultService {
         var executeReturnValue: Result<String, any Error>?
         func execute() -> Result<String, any Error> {
-          guard let value = executeReturnValue else { fatalError("Configure \\(executeReturnValue) before calling execute()") }
+          guard let value = executeReturnValue else { fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()") }
           return value
         }
       }
@@ -808,7 +808,7 @@ struct StubbableMacroTests {
         var processFooReturnValue: FooService.Foo?
         func processFoo(_ foo: FooService.Foo) -> FooService.Foo {
           guard let value = processFooReturnValue else {
-              fatalError("Configure \\(processFooReturnValue) before calling processFoo()")
+              fatalError("Configure \\(String(describing: processFooReturnValue)) before calling processFoo()")
           }
           return value
         }
@@ -912,7 +912,7 @@ func `Multiple typealiases used in method signature`() {
       var performResult: Result<SpamService.Baz, any Error>?
       func perform(_ foo: SpamService.Foo, bar: SpamService.Bar) async throws -> SpamService.Baz {
         guard let result = performResult else {
-            fatalError("Configure \\(performResult) before calling perform()")
+            fatalError("Configure \\(String(describing: performResult)) before calling perform()")
         }
         return try result.get()
       }
