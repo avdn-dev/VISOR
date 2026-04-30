@@ -330,13 +330,19 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     for reaction in analysis.reactionMethods {
       let methodName = "observe\(reaction.methodName.capitalisedFirst)"
       allObserveMethodNames.append(methodName)
+      let callArg: String
+      if let label = reaction.callLabel {
+        callArg = "\(label): \(reaction.valueName)"
+      } else {
+        callArg = reaction.valueName
+      }
       if reaction.isAsync {
         let observeMethod: DeclSyntax
         if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
-                    await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    await self.\(raw: reaction.methodName)(\(raw: callArg))
                     do {
                         try await Task.sleep(for: \(raw: throttleExpr))
                     } catch {}
@@ -346,8 +352,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
-                    await self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    await self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
             """
@@ -358,8 +364,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
-                    self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    self.\(raw: reaction.methodName)(\(raw: callArg))
                     do {
                         try await Task.sleep(for: \(raw: throttleExpr))
                     } catch {}
@@ -369,8 +375,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.parameterName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
-                    self.\(raw: reaction.methodName)(\(raw: reaction.parameterName): \(raw: reaction.parameterName))
+                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                    self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
             """

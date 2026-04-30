@@ -1528,5 +1528,139 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - @Reaction Wildcard Parameter
+
+  @Test
+  func `Sync @Reaction wildcard parameter uses synthetic value name`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        @Reaction(\\Self.router.pendingDestination)
+        func onDestinationChanged(_: String) { }
+        private let router: Router
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        func onDestinationChanged(_: String) { }
+        private let router: Router
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(router: Router) {
+              self.router = router
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeOnDestinationChanged() async {
+              for await value in VISOR.valuesOf({ self.router.pendingDestination }) {
+                  self.onDestinationChanged(value)
+              }
+          }
+
+          func startObserving() async {
+              await observeOnDestinationChanged()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Async @Reaction wildcard parameter uses synthetic value name`() {
+    assertMacroExpansion(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        @Reaction(\\Self.router.pendingDestination)
+        func onDestinationChanged(_: String) async { }
+        private let router: Router
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        func onDestinationChanged(_: String) async { }
+        private let router: Router
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get { access(keyPath: \\.state); return _state }
+              set { withMutation(keyPath: \\.state) { _state = newValue } }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else { return }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(router: Router) {
+              self.router = router
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeOnDestinationChanged() async {
+              for await value in VISOR.valuesOf({ self.router.pendingDestination }) {
+                  await self.onDestinationChanged(value)
+              }
+          }
+
+          func startObserving() async {
+              await observeOnDestinationChanged()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      }
+      """,
+      macros: testMacros)
+  }
+
 }
 #endif

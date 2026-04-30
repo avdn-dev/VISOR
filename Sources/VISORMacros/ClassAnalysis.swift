@@ -57,7 +57,8 @@ struct PolledPropertyInfo {
 
 struct ReactionMethodInfo {
   let methodName: String        // "handleDeepLink"
-  let parameterName: String     // "destination"
+  let callLabel: String?        // nil when wildcard `_` — caller passes positionally
+  let valueName: String         // loop variable name (synthetic "value" for unnamed params)
   let observeExpression: String // "self.deepLinkRouter.pendingDestination"
   let isAsync: Bool
   let throttleExpression: String? // Optional Duration expression for throttling
@@ -267,7 +268,20 @@ struct ClassAnalysis {
           continue
         }
 
-        let parameterName = param.secondName?.text ?? param.firstName.text
+        let firstName = param.firstName.text
+        let secondName = param.secondName?.text
+        // When the external label is `_` (wildcard), the parameter has no label in the call.
+        // When the internal name is also nil (e.g. `_: Type`), the parameter is unnamed
+        // in the body too — use a synthetic name for the loop variable.
+        let callLabel: String?
+        let valueName: String
+        if firstName == "_" {
+            callLabel = nil
+            valueName = secondName ?? "value"
+        } else {
+            callLabel = firstName
+            valueName = secondName ?? firstName
+        }
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
 
         var throttleExpr: String? = nil
@@ -281,7 +295,8 @@ struct ClassAnalysis {
 
         reactionMethods.append(ReactionMethodInfo(
           methodName: funcDecl.name.text,
-          parameterName: parameterName,
+          callLabel: callLabel,
+          valueName: valueName,
           observeExpression: "self." + components.joined(separator: "."),
           isAsync: isAsync,
           throttleExpression: throttleExpr))
