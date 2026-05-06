@@ -40,7 +40,10 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
 
     let className = classDecl.name.trimmedDescription
     let access = accessLevel(of: classDecl)
-    let prefix = access.isEmpty ? "" : "\(access) "
+    // Only propagate public/open to generated members. Other access levels
+    // (internal, package, fileprivate, private) are inherited from the type,
+    // avoiding "more accessible than enclosing type" build errors.
+    let prefix = (access == "public" || access == "open") ? "\(access) " : ""
     let analysis = ClassAnalysis(classDecl)
     let properties = analysis.storedLetProperties
     var members: [DeclSyntax] = []

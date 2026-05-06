@@ -419,6 +419,264 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Access Modifier Propagation
+
+  @Test
+  func `Private class inherits access — no explicit modifier on generated members`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      private final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      private final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Fileprivate class inherits access — no explicit modifier on generated members`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      fileprivate final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      fileprivate final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Package class inherits access — no explicit modifier on generated members`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      package final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+      }
+      """,
+      expandedSource: """
+      @Observable
+      package final class MyViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let service: MyService
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(service: MyService) {
+              self.service = service
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Nested class inside fileprivate type inherits enclosing access`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      fileprivate class Container {
+        @Observable
+        @ViewModel
+        final class InnerVM {
+          @Observable
+          final class State {
+            var count = 0
+            nonisolated init() {}
+          }
+          private let service: MyService
+        }
+      }
+      """,
+      expandedSource: """
+      fileprivate class Container {
+        @Observable
+        final class InnerVM {
+          @Observable
+          final class State {
+            var count = 0
+            nonisolated init() {}
+          }
+          private let service: MyService
+
+            @ObservationIgnored private var _state: State = State()
+
+            var state: State {
+                get {
+                    access(keyPath: \\.state);
+                    return _state
+                }
+                set {
+                    withMutation(keyPath: \\.state) {
+                        _state = newValue
+                    }
+                }
+            }
+
+            func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+                guard _state[keyPath: keyPath] != value else {
+                    return
+                }
+                _state[keyPath: keyPath] = value
+            }
+
+            func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+                _state[keyPath: keyPath] = value
+            }
+
+            init(service: MyService) {
+                self.service = service
+            }
+
+            typealias Factory = ViewModelFactory<InnerVM>
+        }
+      }
+
+      extension Container.InnerVM: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Error Diagnostics
 
   @Test

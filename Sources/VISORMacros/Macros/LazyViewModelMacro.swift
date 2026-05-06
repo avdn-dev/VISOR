@@ -42,7 +42,10 @@ public struct LazyViewModelMacro: MemberMacro {
     }
 
     let access = accessLevel(of: structDecl)
-    let prefix = access.isEmpty ? "" : "\(access) "
+    // Only propagate public/open to generated members. Other access levels
+    // (internal, package, fileprivate, private) are inherited from the type,
+    // avoiding "more accessible than enclosing type" build errors.
+    let prefix = (access == "public" || access == "open") ? "\(access) " : ""
 
     let (taskIdExpression, guardCondition) = switch observationPolicy {
     case "pauseInBackground":

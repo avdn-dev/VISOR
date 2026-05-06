@@ -6,7 +6,6 @@
 //
 
 import SwiftSyntaxMacros
-import SwiftSyntaxMacrosTestSupport
 import Testing
 
 #if canImport(VISORMacros)
@@ -23,7 +22,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Content mode generates correct expansion`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self)
       struct MyView: View {
@@ -80,7 +79,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Public struct propagates access to body only`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self)
       public struct MyView: View {
@@ -102,6 +101,10 @@ struct LazyViewModelMacroTests {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
           }
 
           public var body: some View {
@@ -129,53 +132,35 @@ struct LazyViewModelMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - Error Diagnostics
+  // MARK: - Access Modifier Propagation (continued)
 
   @Test
-  func `Error when applied to class`() {
-    assertMacroExpansion(
+  func `Private struct inherits access — no explicit modifier on generated body`() {
+    assertMacroExpansionSwiftTesting(
       """
-      @LazyViewModel(MyViewModel.self)
-      class NotAStruct: View {
+      @LazyViewModel(MyVM.self)
+      private struct MyView: View {
         var content: some View { Text("") }
       }
       """,
       expandedSource: """
-      class NotAStruct: View {
+      private struct MyView: View {
         var content: some View { Text("") }
-      }
-      """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel can only be applied to structs", line: 1, column: 1, severity: .error),
-      ],
-      macros: testMacros)
-  }
-
-  @Test
-  func `Error when missing content`() {
-    assertMacroExpansion(
-      """
-      @LazyViewModel(MyViewModel.self)
-      struct MyView: View {
-      }
-      """,
-      expandedSource: """
-      struct MyView: View {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyViewModel.Factory.self) private var factory
+          @Environment(MyVM.Factory.self) private var factory
 
-          @State private var _viewModel: MyViewModel?
+          @State private var _viewModel: MyVM?
 
-          var viewModel: MyViewModel {
+          var viewModel: MyVM {
               guard let vm = _viewModel else {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
           }
 
-          var bindableState: Bindable<MyViewModel.State> {
+          var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
 
@@ -201,6 +186,212 @@ struct LazyViewModelMacroTests {
           }
       }
       """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Fileprivate struct inherits access — no explicit modifier on generated body`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyVM.self)
+      fileprivate struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      fileprivate struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Package struct inherits access — no explicit modifier on generated body`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyVM.self)
+      package struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      package struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Nested struct inside fileprivate type inherits enclosing access`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      fileprivate class Container {
+        @LazyViewModel(MyVM.self)
+        struct InnerView: View {
+          var content: some View { Text("") }
+        }
+      }
+      """,
+      expandedSource: """
+      fileprivate class Container {
+        struct InnerView: View {
+          var content: some View { Text("") }
+
+            @Environment(\\.router) private var containerRouter
+
+            @Environment(MyVM.Factory.self) private var factory
+
+            @State private var _viewModel: MyVM?
+
+            var viewModel: MyVM {
+                guard let vm = _viewModel else {
+                    preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                }
+                return vm
+            }
+
+            var bindableState: Bindable<MyVM.State> {
+                Bindable(viewModel.state)
+            }
+
+            var body: some View {
+                Group {
+                    if _viewModel != nil {
+                        content
+                    } else {
+                        Color.clear
+                    }
+                }
+                .task {
+                    if _viewModel == nil {
+                        _viewModel = factory.makeViewModel(router: containerRouter)
+                    }
+                }
+                .task(id: _viewModel != nil) {
+                    guard let vm = _viewModel else {
+                        return
+                    }
+                    await vm.startObserving()
+                }
+            }
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  // MARK: - Error Diagnostics
+
+  @Test
+  func `Error when applied to class`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyViewModel.self)
+      class NotAStruct: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      class NotAStruct: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel can only be applied to structs", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Error when missing content`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyViewModel.self)
+      struct MyView: View {
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+      }
+      """,
       diagnostics: [
         DiagnosticSpec(message: "@LazyViewModel requires: var content: some View", line: 1, column: 1, severity: .error),
       ],
@@ -209,7 +400,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when no argument provided`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel
       struct MyView: View {
@@ -229,7 +420,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when argument missing .self suffix`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel)
       struct MyView: View {
@@ -249,7 +440,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Error when applied to enum`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyViewModel.self)
       enum NotAStruct {
@@ -269,7 +460,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Explicit alwaysObserving produces same expansion as default`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .alwaysObserving)
       struct MyView: View {
@@ -324,7 +515,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `pauseInBackground generates scenePhase environment and modified task`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
       struct MyView: View {
@@ -381,7 +572,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `pauseWhenInactive generates scenePhase environment and modified task`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseWhenInactive)
       struct MyView: View {
@@ -438,7 +629,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Public struct with pauseInBackground propagates access`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
       public struct MyView: View {
@@ -462,6 +653,10 @@ struct LazyViewModelMacroTests {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
           }
 
           public var body: some View {
@@ -491,7 +686,7 @@ struct LazyViewModelMacroTests {
 
   @Test
   func `Invalid observation policy emits diagnostic`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .never)
       struct MyView: View {

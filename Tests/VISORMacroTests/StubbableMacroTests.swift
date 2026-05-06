@@ -303,6 +303,34 @@ struct StubbableMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Private protocol generates private stub`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Stubbable
+      private protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      private protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      private final class StubDataService: DataService {
+        private var items: [Item] = []
+        private var fetchResult: Result<[Item], any Error> = .success([])
+        private func fetch() async throws -> [Item] {
+            try fetchResult.get()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - @StubbableDefault
 
   @Test

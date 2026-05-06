@@ -435,6 +435,114 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Package protocol generates package spy`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      package protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      package final class SpyDataService: DataService {
+        package var items: [Item] = []
+        // -- fetch --
+        package var fetchCallCount = 0
+        package var fetchResult: Result<[Item], any Error> = .success([])
+        package func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return try fetchResult.get()
+        }
+        package enum Call {
+          case fetch
+        }
+        package var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Fileprivate protocol generates fileprivate spy`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      fileprivate protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      fileprivate protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      fileprivate final class SpyDataService: DataService {
+        fileprivate var items: [Item] = []
+        // -- fetch --
+        fileprivate var fetchCallCount = 0
+        fileprivate var fetchResult: Result<[Item], any Error> = .success([])
+        fileprivate func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return try fetchResult.get()
+        }
+        fileprivate enum Call {
+          case fetch
+        }
+        fileprivate var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Private protocol generates private spy`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      private protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+      """,
+      expandedSource: """
+      private protocol DataService {
+        var items: [Item] { get }
+        func fetch() async throws -> [Item]
+      }
+
+      @Observable
+      private final class SpyDataService: DataService {
+        private var items: [Item] = []
+        // -- fetch --
+        private var fetchCallCount = 0
+        private var fetchResult: Result<[Item], any Error> = .success([])
+        private func fetch() async throws -> [Item] {
+          fetchCallCount += 1
+          calls.append(.fetch)
+          return try fetchResult.get()
+        }
+        private enum Call {
+          case fetch
+        }
+        private var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - @StubbableDefault
 
   @Test
