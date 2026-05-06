@@ -28,7 +28,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Generates memberwise init and Factory typealias`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -50,41 +50,52 @@ struct ViewModelMacroTests {
         }
         private let service: MyService
         private let store: DataStore
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService, store: DataStore) {
               self.service = service
-              self.store = store
+                  self.store = store
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Skips init when already exists`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -112,30 +123,41 @@ struct ViewModelMacroTests {
           super.init()
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -143,7 +165,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Skips var properties`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -165,40 +187,51 @@ struct ViewModelMacroTests {
         }
         var mutableProp: String = ""
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Skips let with default value`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -220,34 +253,45 @@ struct ViewModelMacroTests {
         }
         private let defaulted: String = "hello"
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -255,7 +299,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `No dependencies produces Factory typealias only`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -273,30 +317,41 @@ struct ViewModelMacroTests {
         final class State {
           var count = 0
         }
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           typealias Factory = ViewModelFactory<SimpleViewModel>
       }
-
+      
       extension SimpleViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -304,7 +359,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Public class propagates access to init and Factory`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -324,40 +379,51 @@ struct ViewModelMacroTests {
           var count = 0
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           public var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           public init(service: MyService) {
               self.service = service
           }
-
+      
           public typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Public class with @Bound propagates access to protocol requirements`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -377,45 +443,57 @@ struct ViewModelMacroTests {
           var isLoading: Bool
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State
-
+      
           public var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           public init(service: MyService) {
               self.service = service
-              self._state = State(isLoading: service.isLoading)
+                  self._state = State(isLoading: service.isLoading)
           }
-
+      
           public typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.service.isLoading }) {
+              for await value in VISOR.valuesOf({ self.service.isLoading
+                  }) {
                   self.updateState(\\.isLoading, to: value)
               }
           }
-
+      
           public func startObserving() async {
               await observeIsLoading()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -681,7 +759,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Error when applied to struct`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       struct NotAClass {
@@ -707,7 +785,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Missing Observable on outer class emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       final class MyViewModel {
@@ -719,12 +797,16 @@ struct ViewModelMacroTests {
       }
       """,
       expandedSource: """
+      
       final class MyViewModel {
         @Observable
         final class State {
           var count = 0
         }
         private let service: MyService
+      }
+      
+      extension MyViewModel: @MainActor ViewModel {
       }
       """,
       diagnostics: [
@@ -737,7 +819,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound inside State generates updateState observe method`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -757,51 +839,63 @@ struct ViewModelMacroTests {
           var isCameraDenied: Bool
         }
         private let permissionService: PermissionService
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(permissionService: PermissionService) {
               self.permissionService = permissionService
-              self._state = State(isCameraDenied: permissionService.isCameraDenied)
+                  self._state = State(isCameraDenied: permissionService.isCameraDenied)
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeIsCameraDenied() async {
-              for await value in VISOR.valuesOf({ self.permissionService.isCameraDenied }) {
+              for await value in VISOR.valuesOf({ self.permissionService.isCameraDenied
+                  }) {
                   self.updateState(\\.isCameraDenied, to: value)
               }
           }
-
+      
           func startObserving() async {
               await observeIsCameraDenied()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isCameraDenied:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Nonisolated State init assigning observable property emits warning`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -827,43 +921,52 @@ struct ViewModelMacroTests {
           }
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
-              self._state = State(count: service.count)
+                  self._state = State(count: service.count)
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeCount() async {
-              for await value in VISOR.valuesOf({ self.service.count }) {
+              for await value in VISOR.valuesOf({ self.service.count
+                  }) {
                   self.updateState(\\.count, to: value)
               }
           }
-
+      
           func startObserving() async {
               await observeCount()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
@@ -874,7 +977,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Multiple @Bound inside State generates withDiscardingTaskGroup`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -898,61 +1001,81 @@ struct ViewModelMacroTests {
           var connections: [Connection]
         }
         private let connectionService: ConnectionService
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(connectionService: ConnectionService) {
               self.connectionService = connectionService
-              self._state = State(isAuthenticated: connectionService.isAuthenticated, isLoading: connectionService.isLoading, connections: connectionService.connections)
+                  self._state = State(isAuthenticated: connectionService.isAuthenticated, isLoading: connectionService.isLoading, connections: connectionService.connections)
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeIsAuthenticated() async {
-              for await value in VISOR.valuesOf({ self.connectionService.isAuthenticated }) {
+              for await value in VISOR.valuesOf({ self.connectionService.isAuthenticated
+                  }) {
                   self.updateState(\\.isAuthenticated, to: value)
               }
           }
-
+      
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.connectionService.isLoading }) {
+              for await value in VISOR.valuesOf({ self.connectionService.isLoading
+                  }) {
                   self.updateState(\\.isLoading, to: value)
               }
           }
-
+      
           func observeConnections() async {
-              for await value in VISOR.valuesOf({ self.connectionService.connections }) {
+              for await value in VISOR.valuesOf({ self.connectionService.connections
+                  }) {
                   self.updateState(\\.connections, to: value)
               }
           }
-
+      
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeIsAuthenticated() }
-                  group.addTask { await self.observeIsLoading() }
-                  group.addTask { await self.observeConnections() }
+                      group.addTask {
+                          await self.observeIsAuthenticated()
+                      }
+                      group.addTask {
+                          await self.observeIsLoading()
+                      }
+                      group.addTask {
+                          await self.observeConnections()
+                      }
               }
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isAuthenticated:, isLoading:, connections:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -960,7 +1083,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Missing State class emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -972,6 +1095,9 @@ struct ViewModelMacroTests {
       @Observable
       final class MyViewModel {
         private let service: MyService
+      }
+      
+      extension MyViewModel: @MainActor ViewModel {
       }
       """,
       diagnostics: [
@@ -982,7 +1108,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `State class not final emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1002,43 +1128,52 @@ struct ViewModelMacroTests {
           var count = 0
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
         DiagnosticSpec(message: "State class must be 'final'", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
 
   @Test
   func `State class missing Observable emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1056,43 +1191,52 @@ struct ViewModelMacroTests {
           var count = 0
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
         DiagnosticSpec(message: "State class requires @Observable", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
 
   @Test
   func `Action enum without handle emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1112,37 +1256,47 @@ struct ViewModelMacroTests {
         final class State {
           var count = 0
         }
-        enum Action { case refresh }
+        enum Action { case refresh 
+      }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
@@ -1150,7 +1304,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `No Action no handle emits no diagnostic`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1168,30 +1322,41 @@ struct ViewModelMacroTests {
         final class State {
           var count = 0
         }
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           typealias Factory = ViewModelFactory<SimpleViewModel>
       }
-
+      
       extension SimpleViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -1199,7 +1364,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Sync @Reaction generates for-await loop`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1222,50 +1387,62 @@ struct ViewModelMacroTests {
         }
         func handleDeepLink(destination: Destination?) { }
         private let router: DeepLinkRouter
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(router: DeepLinkRouter) {
               self.router = router
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeHandleDeepLink() async {
-              for await destination in VISOR.valuesOf({ self.router.pendingDestination }) {
+              for await destination in VISOR.valuesOf({ self.router.pendingDestination
+                  }) {
                   self.handleDeepLink(destination: destination)
               }
           }
-
+      
           func startObserving() async {
               await observeHandleDeepLink()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Mixed @Bound in State and @Reaction generates combined startObserving`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1290,55 +1467,72 @@ struct ViewModelMacroTests {
         func handleDeepLink(destination: Destination?) { }
         private let service: MyService
         private let router: DeepLinkRouter
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService, router: DeepLinkRouter) {
               self.service = service
-              self.router = router
-              self._state = State(isLoading: service.isLoading)
+                  self.router = router
+                  self._state = State(isLoading: service.isLoading)
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.service.isLoading }) {
+              for await value in VISOR.valuesOf({ self.service.isLoading
+                  }) {
                   self.updateState(\\.isLoading, to: value)
               }
           }
-
+      
           func observeHandleDeepLink() async {
-              for await destination in VISOR.valuesOf({ self.router.pendingDestination }) {
+              for await destination in VISOR.valuesOf({ self.router.pendingDestination
+                  }) {
                   self.handleDeepLink(destination: destination)
               }
           }
-
+      
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeIsLoading() }
-                  group.addTask { await self.observeHandleDeepLink() }
+                      group.addTask {
+                          await self.observeIsLoading()
+                      }
+                      group.addTask {
+                          await self.observeHandleDeepLink()
+                      }
               }
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -1346,7 +1540,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Single @Polled generates inlined poll loop`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1366,30 +1560,39 @@ struct ViewModelMacroTests {
           var level: Float
         }
         private let monitor: BatteryMonitor
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(monitor: BatteryMonitor) {
               self.monitor = monitor
-              self._state = State(level: monitor.level)
+                  self._state = State(level: monitor.level)
           }
-
+      
           typealias Factory = ViewModelFactory<DashboardVM>
-
+      
           func observeLevel() async {
               self.updateState(\\.level, to: self.monitor.level)
               do {
@@ -1400,22 +1603,24 @@ struct ViewModelMacroTests {
               } catch {
               }
           }
-
+      
           func startObserving() async {
               await observeLevel()
           }
       }
-
+      
       extension DashboardVM: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(level:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Mixed @Bound and @Polled preserves declaration order in init`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1441,43 +1646,54 @@ struct ViewModelMacroTests {
         }
         private let service: MyService
         private let monitor: BatteryMonitor
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService, monitor: BatteryMonitor) {
               self.service = service
-              self.monitor = monitor
-              self._state = State(name: service.name, level: monitor.level, count: service.count)
+                  self.monitor = monitor
+                  self._state = State(name: service.name, level: monitor.level, count: service.count)
           }
-
+      
           typealias Factory = ViewModelFactory<MixedVM>
-
+      
           func observeName() async {
-              for await value in VISOR.valuesOf({ self.service.name }) {
+              for await value in VISOR.valuesOf({ self.service.name
+                  }) {
                   self.updateState(\\.name, to: value)
               }
           }
-
+      
           func observeCount() async {
-              for await value in VISOR.valuesOf({ self.service.count }) {
+              for await value in VISOR.valuesOf({ self.service.count
+                  }) {
                   self.updateState(\\.count, to: value)
               }
           }
-
+      
           func observeLevel() async {
               self.updateState(\\.level, to: self.monitor.level)
               do {
@@ -1488,20 +1704,28 @@ struct ViewModelMacroTests {
               } catch {
               }
           }
-
+      
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                  group.addTask { await self.observeName() }
-                  group.addTask { await self.observeCount() }
-                  group.addTask { await self.observeLevel() }
+                      group.addTask {
+                          await self.observeName()
+                      }
+                      group.addTask {
+                          await self.observeCount()
+                      }
+                      group.addTask {
+                          await self.observeLevel()
+                      }
               }
           }
       }
-
+      
       extension MixedVM: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(name:, count:, level:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -1509,7 +1733,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound with throttledBy generates sleep after updateState`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1529,32 +1753,42 @@ struct ViewModelMacroTests {
           var posture: Posture
         }
         private let tracker: HeadTracker
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(tracker: HeadTracker) {
               self.tracker = tracker
-              self._state = State(posture: tracker.posture)
+                  self._state = State(posture: tracker.posture)
           }
-
+      
           typealias Factory = ViewModelFactory<HeadVM>
-
+      
           func observePosture() async {
-              for await value in VISOR.valuesOf({ self.tracker.posture }) {
+              for await value in VISOR.valuesOf({ self.tracker.posture
+                  }) {
                   self.updateState(\\.posture, to: value)
                   do {
                       try await Task.sleep(for: .seconds(0.125))
@@ -1562,16 +1796,18 @@ struct ViewModelMacroTests {
                   }
               }
           }
-
+      
           func startObserving() async {
               await observePosture()
           }
       }
-
+      
       extension HeadVM: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(posture:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -1579,7 +1815,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Existential any types preserved in init`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1601,35 +1837,46 @@ struct ViewModelMacroTests {
         }
         private let router: Router<AppScene>
         private let sessionInteractor: any SessionInteractor
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(router: Router<AppScene>, sessionInteractor: any SessionInteractor) {
               self.router = router
-              self.sessionInteractor = sessionInteractor
+                  self.sessionInteractor = sessionInteractor
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
@@ -1637,7 +1884,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Error when applied to enum`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @ViewModel
       enum NotAClass {
@@ -1659,7 +1906,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `@Bound on class-level var emits error`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1681,35 +1928,44 @@ struct ViewModelMacroTests {
         }
         var value = false
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "@Bound must be inside 'class State' — move to the corresponding State property", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
@@ -1719,7 +1975,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Manual startObserving missing @Bound observe method emits warning`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1745,42 +2001,52 @@ struct ViewModelMacroTests {
           // forgot to call observeItems
         }
         private let service: MyService
-
+      
           @ObservationIgnored private var _state: State
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(service: MyService) {
               self.service = service
-              self._state = State(items: service.items)
+                  self._state = State(items: service.items)
           }
-
+      
           typealias Factory = ViewModelFactory<ItemsViewModel>
-
+      
           func observeItems() async {
-              for await value in VISOR.valuesOf({ self.service.items }) {
+              for await value in VISOR.valuesOf({ self.service.items
+                  }) {
                   self.updateState(\\.items, to: value)
               }
           }
       }
-
+      
       extension ItemsViewModel: @MainActor ViewModel {
-      }
       }
       """,
       diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(items:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "startObserving() does not call observeItems(); state derivation will not run", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
@@ -1790,7 +2056,7 @@ struct ViewModelMacroTests {
 
   @Test
   func `Sync @Reaction wildcard parameter uses synthetic value name`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1813,50 +2079,62 @@ struct ViewModelMacroTests {
         }
         func onDestinationChanged(_: String) { }
         private let router: Router
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(router: Router) {
               self.router = router
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeOnDestinationChanged() async {
-              for await value in VISOR.valuesOf({ self.router.pendingDestination }) {
+              for await value in VISOR.valuesOf({ self.router.pendingDestination
+                  }) {
                   self.onDestinationChanged(value)
               }
           }
-
+      
           func startObserving() async {
               await observeOnDestinationChanged()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
   @Test
   func `Async @Reaction wildcard parameter uses synthetic value name`() {
-    assertMacroExpansion(
+    assertMacroExpansionSwiftTesting(
       """
       @Observable
       @ViewModel
@@ -1879,44 +2157,56 @@ struct ViewModelMacroTests {
         }
         func onDestinationChanged(_: String) async { }
         private let router: Router
-
+      
           @ObservationIgnored private var _state: State = State()
-
+      
           var state: State {
-              get { access(keyPath: \\.state); return _state }
-              set { withMutation(keyPath: \\.state) { _state = newValue } }
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
           }
-
+      
           func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-              guard _state[keyPath: keyPath] != value else { return }
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
               _state[keyPath: keyPath] = value
           }
-
+      
           func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
               _state[keyPath: keyPath] = value
           }
-
+      
           init(router: Router) {
               self.router = router
           }
-
+      
           typealias Factory = ViewModelFactory<MyViewModel>
-
+      
           func observeOnDestinationChanged() async {
-              for await value in VISOR.valuesOf({ self.router.pendingDestination }) {
+              for await value in VISOR.valuesOf({ self.router.pendingDestination
+                  }) {
                   await self.onDestinationChanged(value)
               }
           }
-
+      
           func startObserving() async {
               await observeOnDestinationChanged()
           }
       }
-
+      
       extension MyViewModel: @MainActor ViewModel {
       }
-      }
       """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
