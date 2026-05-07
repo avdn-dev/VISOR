@@ -271,16 +271,24 @@ struct ClassAnalysis {
         let firstName = param.firstName.text
         let secondName = param.secondName?.text
         // When the external label is `_` (wildcard), the parameter has no label in the call.
-        // When the internal name is also nil (e.g. `_: Type`), the parameter is unnamed
-        // in the body too — use a synthetic name for the loop variable.
+        // When the internal name is nil or `_` (e.g. `_: Type` or `label _: Type`),
+        // the parameter has no usable name in the body — use a synthetic name.
         let callLabel: String?
         let valueName: String
         if firstName == "_" {
             callLabel = nil
-            valueName = secondName ?? "value"
+            if let secondName, secondName != "_" {
+                valueName = secondName
+            } else {
+                valueName = "value"
+            }
         } else {
             callLabel = firstName
-            valueName = secondName ?? firstName
+            if let secondName, secondName != "_" {
+                valueName = secondName
+            } else {
+                valueName = firstName
+            }
         }
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
 

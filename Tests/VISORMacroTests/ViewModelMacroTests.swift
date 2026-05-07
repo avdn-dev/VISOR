@@ -2210,5 +2210,83 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Sync @Reaction wildcard internal name uses external label as value name`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        @Reaction(\\Self.router.pendingDestination)
+        func onDestinationChanged(label _: String) { }
+        private let router: Router
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var lastValue: String? = nil
+        }
+        func onDestinationChanged(label _: String) { }
+        private let router: Router
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(router: Router) {
+              self.router = router
+          }
+
+          typealias Factory = ViewModelFactory<MyViewModel>
+
+          func observeOnDestinationChanged() async {
+              for await label in VISOR.valuesOf({ self.router.pendingDestination
+                  }) {
+                  self.onDestinationChanged(label: label)
+              }
+          }
+
+          func startObserving() async {
+              await observeOnDestinationChanged()
+          }
+      }
+
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
 }
 #endif
