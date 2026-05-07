@@ -499,3 +499,193 @@ struct ExpectationDSLTests {
     #expect(vm.state.count == countBefore)
   }
 }
+
+// MARK: - becomes Tests
+
+@Suite("becomes")
+@MainActor
+struct BecomesTests {
+
+  @Test
+  func `waits for matching value`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    try await observing(vm) { expect in
+      Task { @MainActor in source.count = 42 }
+      try await expect(\.state.count, becomes: 42)
+    }
+
+    #expect(vm.state.count == 42)
+  }
+
+  @Test
+  func `throws when initial value already matches`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+    // state.count starts at 0
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(vm) { expect in
+        Task { @MainActor in source.count = 0 } // never runs; guard fires first
+        try await expect(\.state.count, becomes: 0)
+      }
+    }
+  }
+
+  @Test
+  func `throws on intermediate mismatch`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(vm) { expect in
+        Task { @MainActor in source.count = 99 }
+        try await expect(\.state.count, becomes: 42, timeout: .milliseconds(500))
+      }
+    }
+  }
+
+  @Test
+  func `times out when value never changes`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(vm) { expect in
+        try await expect(\.state.count, becomes: 42, timeout: .milliseconds(50))
+      }
+    }
+  }
+
+  @Test
+  func `works with plain Observable via new observing overload`() async throws {
+    let source = TestSource()
+
+    try await observing(source) { expect in
+      Task { @MainActor in source.count = 7 }
+      try await expect(\.count, becomes: 7, timeout: .seconds(1))
+    }
+
+    #expect(source.count == 7)
+  }
+
+  @Test
+  func `throws when plain Observable initial value already matches`() async throws {
+    let source = TestSource()
+    // count starts at 0
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(source) { expect in
+        try await expect(\.count, becomes: 0, timeout: .milliseconds(50))
+      }
+    }
+  }
+
+  @Test
+  func `multiple sequential becomes in same observing scope`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    try await observing(vm) { expect in
+      #expect(vm.state.count == 0)
+
+      Task { @MainActor in source.count = 1 }
+      try await expect(\.state.count, becomes: 1)
+
+      Task { @MainActor in source.count = 10 }
+      try await expect(\.state.count, becomes: 10)
+    }
+
+    #expect(vm.state.count == 10)
+  }
+}
+
+// MARK: - eventually Tests
+
+@Suite("eventually")
+@MainActor
+struct EventuallyTests {
+
+  @Test
+  func `waits for matching value`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    try await observing(vm) { expect in
+      Task { @MainActor in source.count = 42 }
+      try await expect(\.state.count, eventually: 42)
+    }
+
+    #expect(vm.state.count == 42)
+  }
+
+  @Test
+  func `throws when initial value already matches`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(vm) { expect in
+        try await expect(\.state.count, eventually: 0)
+      }
+    }
+  }
+
+  @Test
+  func `tolerates intermediate values that differ`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    try await observing(vm) { expect in
+      Task { @MainActor in
+        source.count = 1
+        source.count = 3
+        source.count = 5
+        source.count = 20
+      }
+      try await expect(\.state.count, eventually: 20, timeout: .seconds(1))
+    }
+
+    #expect(vm.state.count == 20)
+  }
+
+  @Test
+  func `times out when value never arrives`() async throws {
+    let source = TestSource()
+    let vm = BoundViewModel(source: source)
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(vm) { expect in
+        Task { @MainActor in source.count = 1 }
+        try await expect(\.state.count, eventually: 42, timeout: .milliseconds(50))
+      }
+    }
+  }
+
+  @Test
+  func `works with plain Observable via new observing overload`() async throws {
+    let source = TestSource()
+
+    try await observing(source) { expect in
+      Task { @MainActor in
+        source.count = 1
+        source.count = 7
+      }
+      try await expect(\.count, eventually: 7, timeout: .seconds(1))
+    }
+
+    #expect(source.count == 7)
+  }
+
+  @Test
+  func `throws when plain Observable initial value already matches`() async throws {
+    let source = TestSource()
+
+    await #expect(throws: ExpectationError.self) {
+      try await observing(source) { expect in
+        try await expect(\.count, eventually: 0, timeout: .milliseconds(50))
+      }
+    }
+  }
+}

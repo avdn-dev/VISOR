@@ -839,5 +839,18 @@ struct SpyableMacroRuntimeTests {
         #expect(spy.fetchReportCallCount == 1)
     }
 
-}
+    @Test
+    func `Spy is observable via valuesOf`() async {
+        let spy = SpyAnalyticsService()
+        var iterator = valuesOf { spy.trackEventCallCount }.makeAsyncIterator()
 
+        let initial = await iterator.next()
+        #expect(initial == 0)
+
+        spy.trackEvent("test")
+
+        let after = await iterator.next()
+        #expect(after == 1, "Expected valuesOf to emit 1 after spy property mutation")
+    }
+
+}
