@@ -40,6 +40,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case stateClassMissingObservable
   case stateClassMissingInit(expectedSignature: String)
   case stateInitAssignsObservableProperty(propertyName: String)
+  case lazyViewModelStateAliasCollision
 
   // MARK: Internal
 
@@ -105,6 +106,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig), assigning backing storage such as self._property = property"
     case .stateInitAssignsObservableProperty(let propertyName):
       "State nonisolated init assigns '\(propertyName)' through its observable setter; assign backing storage instead: self._\(propertyName) = \(propertyName)"
+    case .lazyViewModelStateAliasCollision:
+      "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member"
     }
   }
 
@@ -140,6 +143,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .stateClassMissingObservable: "stateClassMissingObservable"
     case .stateClassMissingInit: "stateClassMissingInit"
     case .stateInitAssignsObservableProperty: "stateInitAssignsObservableProperty"
+    case .lazyViewModelStateAliasCollision: "lazyViewModelStateAliasCollision"
     }
     return MessageID(domain: "VISOR", id: id)
   }
@@ -159,7 +163,8 @@ enum VISORDiagnostic: DiagnosticMessage {
          .polledOutsideState, .invalidObservationPolicy,
          .stateClassNotFinal, .stateClassMissingObservable:
       .error
-    case .stateClassMissingInit, .stateInitAssignsObservableProperty:
+    case .stateClassMissingInit, .stateInitAssignsObservableProperty,
+         .lazyViewModelStateAliasCollision:
       .warning
     }
   }

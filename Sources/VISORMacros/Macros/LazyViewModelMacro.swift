@@ -34,6 +34,7 @@ public struct LazyViewModelMacro: MemberMacro {
     }
 
     let hasContent = structDecl.hasContentProperty
+    let hasStateMember = structDecl.hasMemberNamed("state")
 
     // Validate: must have content
     if !hasContent {
@@ -77,6 +78,15 @@ public struct LazyViewModelMacro: MemberMacro {
           return vm
       }
       """,
+    ])
+
+    if hasStateMember {
+      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.lazyViewModelStateAliasCollision))
+    } else {
+      members.append("var state: \(raw: viewModelType).State { viewModel.state }")
+    }
+
+    members.append(contentsOf: [
       "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }",
       """
       \(raw: prefix)var body: some View {

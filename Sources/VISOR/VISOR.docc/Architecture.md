@@ -28,7 +28,7 @@ VISOR splits UI into two roles:
 @LazyViewModel(DashboardViewModel.self)
 struct DashboardView: View {
   var content: some View {
-    DashboardContent(state: viewModel.state) { action in
+    DashboardContent(state: state) { action in
       Task { await viewModel.handle(action) }
     }
   }

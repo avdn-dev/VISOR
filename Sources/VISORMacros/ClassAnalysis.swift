@@ -11,15 +11,29 @@ import SwiftSyntax
 
 extension StructDeclSyntax {
   var hasContentProperty: Bool {
+    hasMemberNamed("content")
+  }
+
+  func hasMemberNamed(_ name: String) -> Bool {
     memberBlock.members.contains { member in
-      guard
-        let varDecl = member.decl.as(VariableDeclSyntax.self),
-        let binding = varDecl.bindings.first,
-        let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
-      else {
+      let decl = member.decl
+
+      if let varDecl = decl.as(VariableDeclSyntax.self) {
+        for binding in varDecl.bindings {
+          if let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+             identifier.identifier.text == name
+          {
+            return true
+          }
+        }
         return false
       }
-      return identifier.identifier.text == "content"
+
+      if let funcDecl = decl.as(FunctionDeclSyntax.self) {
+        return funcDecl.name.text == name
+      }
+
+      return false
     }
   }
 }

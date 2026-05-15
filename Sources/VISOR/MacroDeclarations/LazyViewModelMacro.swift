@@ -20,13 +20,20 @@
 /// @LazyViewModel(DashboardViewModel.self)
 /// struct DashboardView: View {
 ///   var content: some View {
-///     DashboardContent(state: viewModel.state, onAction: viewModel.handle)
+///     DashboardContent(state: state) { action in
+///       Task { await viewModel.handle(action) }
+///     }
 ///   }
 /// }
 /// ```
 ///
 /// The `@LazyViewModel` view owns the VM. The Content view is a pure function of
 /// state + onAction, trivially previewable with static state and no factory.
+///
+/// **Read-only state:** Use the generated `state` alias for reading:
+/// ```swift
+/// Text(state.title)
+/// ```
 ///
 /// **Bindings:** Use the generated `bindableState` property for SwiftUI controls:
 /// ```swift
@@ -41,7 +48,7 @@
 /// > The generated `viewModel` property force-unwraps the backing `@State`. This is safe
 /// > because the generated `body` guards with `if _viewModel != nil` before rendering
 /// > `content`, and initialisation is guaranteed by the `.task` modifier.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(bindableState), named(factory), named(containerRouter), named(scenePhase))
+@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(containerRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
   _: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving

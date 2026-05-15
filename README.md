@@ -95,7 +95,7 @@ final class ProfileViewModel {
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileScreen: View {
   var content: some View {
-    ProfileContent(state: viewModel.state) {
+    ProfileContent(state: state) {
       Task { await viewModel.handle(.refresh) }
     }
   }

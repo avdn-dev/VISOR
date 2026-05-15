@@ -46,6 +46,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -101,6 +105,10 @@ struct LazyViewModelMacroTests {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
+          }
+
+          var state: MyVM.State {
+              viewModel.state
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -160,6 +168,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -215,6 +227,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -268,6 +284,10 @@ struct LazyViewModelMacroTests {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
+          }
+
+          var state: MyVM.State {
+              viewModel.state
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -326,6 +346,10 @@ struct LazyViewModelMacroTests {
                     preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
                 }
                 return vm
+            }
+
+            var state: MyVM.State {
+                viewModel.state
             }
 
             var bindableState: Bindable<MyVM.State> {
@@ -484,6 +508,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -539,6 +567,10 @@ struct LazyViewModelMacroTests {
                   preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
               }
               return vm
+          }
+
+          var state: MyVM.State {
+              viewModel.state
           }
 
           var bindableState: Bindable<MyVM.State> {
@@ -598,6 +630,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -655,6 +691,10 @@ struct LazyViewModelMacroTests {
               return vm
           }
 
+          var state: MyVM.State {
+              viewModel.state
+          }
+
           var bindableState: Bindable<MyVM.State> {
               Bindable(viewModel.state)
           }
@@ -681,6 +721,128 @@ struct LazyViewModelMacroTests {
           }
       }
       """,
+      macros: testMacros)
+  }
+
+  // MARK: - State Alias Collision
+
+  @Test
+  func `State alias collision skips alias and emits warning`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyVM.self)
+      struct MyView: View {
+        var state: Int = 0
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var state: Int = 0
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member", line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `State alias collision with multi-binding let declaration`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyVM.self)
+      struct MyView: View {
+        let title = "", state = 0
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        let title = "", state = 0
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+              }
+              return vm
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if _viewModel != nil {
+                      content
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+              .task(id: _viewModel != nil) {
+                  guard let vm = _viewModel else {
+                      return
+                  }
+                  await vm.startObserving()
+              }
+          }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member", line: 1, column: 1, severity: .warning),
+      ],
       macros: testMacros)
   }
 
