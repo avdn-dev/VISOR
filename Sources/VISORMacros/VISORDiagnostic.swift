@@ -103,9 +103,9 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .stateClassMissingObservable:
       "State class requires @Observable"
     case .stateClassMissingInit(let sig):
-      "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig), assigning backing storage such as self._property = property"
+      "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: \(sig), assigning backing storage such as _property = property"
     case .stateInitAssignsObservableProperty(let propertyName):
-      "State nonisolated init assigns '\(propertyName)' through its observable setter; assign backing storage instead: self._\(propertyName) = \(propertyName)"
+      "State nonisolated init assigns '\(propertyName)' through its observable setter; assign backing storage instead: _\(propertyName) = \(propertyName)"
     case .lazyViewModelStateAliasCollision:
       "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member"
     }

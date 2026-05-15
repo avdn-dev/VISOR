@@ -88,7 +88,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -156,7 +156,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -224,7 +224,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -290,7 +290,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -350,7 +350,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -416,7 +416,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -492,7 +492,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -888,7 +888,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isCameraDenied:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isCameraDenied:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -970,7 +970,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State nonisolated init assigns 'count' through its observable setter; assign backing storage instead: self._count = count", line: 7, column: 5, severity: .warning),
+        DiagnosticSpec(message: "State nonisolated init assigns 'count' through its observable setter; assign backing storage instead: _count = count", line: 7, column: 5, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1074,7 +1074,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isAuthenticated:, isLoading:, connections:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isAuthenticated:, isLoading:, connections:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1166,7 +1166,7 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "State class must be 'final'", line: 1, column: 1, severity: .error),
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1229,7 +1229,7 @@ struct ViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "State class requires @Observable", line: 1, column: 1, severity: .error),
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1296,7 +1296,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
@@ -1355,7 +1355,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1435,7 +1435,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1531,7 +1531,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(isLoading:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1613,7 +1613,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(level:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(level:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1724,7 +1724,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(name:, count:, level:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(name:, count:, level:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1806,7 +1806,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(posture:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(posture:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1875,7 +1875,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -1965,7 +1965,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "@Bound must be inside 'class State' — move to the corresponding State property", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
@@ -2046,7 +2046,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(items:) { ... }, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init(items:) { ... }, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
         DiagnosticSpec(message: "startObserving() does not call observeItems(); state derivation will not run", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
@@ -2127,7 +2127,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -2205,7 +2205,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -2283,7 +2283,7 @@ struct ViewModelMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as self._property = property", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
