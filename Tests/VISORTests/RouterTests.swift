@@ -364,4 +364,103 @@ struct RouterTests {
     #expect(root.selectedTab == .settings)
   }
 
+  // MARK: - present delegation to selected tab
+
+  @Test
+  func `present fullScreen from root with selectedTab delegates to tab child`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .home
+    let child = root.childRouter(for: .home)
+
+    root.present(fullScreen: .tutorial)
+
+    // Root should NOT hold the presentation — tab child does.
+    #expect(root.presentingFullScreen == nil)
+    #expect(child.presentingFullScreen == .tutorial)
+  }
+
+  @Test
+  func `present sheet from root with selectedTab delegates to tab child`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .settings
+    let child = root.childRouter(for: .settings)
+
+    root.present(sheet: .preferences)
+
+    #expect(root.presentingSheet == nil)
+    #expect(child.presentingSheet == .preferences)
+  }
+
+  @Test
+  func `present fullScreen from child without tab presents on self`() {
+    let root = Router<TestScene>()
+    let modal = root.childRouter()
+
+    modal.present(fullScreen: .onboarding)
+
+    #expect(modal.presentingFullScreen == .onboarding)
+  }
+
+  // MARK: - dismiss walking up parent chain
+
+  @Test
+  func `dismissFullScreen walks up from deep child to clear presentation`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .home
+    let tabChild = root.childRouter(for: .home)
+    tabChild.present(fullScreen: .tutorial)
+    let fullScreenChild = tabChild.childRouter()
+
+    // fullScreenChild doesn't hold the presentation — tabChild does.
+    fullScreenChild.dismissFullScreen()
+
+    #expect(tabChild.presentingFullScreen == nil)
+  }
+
+  @Test
+  func `dismissSheet walks up from deep child to clear presentation`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .home
+    let tabChild = root.childRouter(for: .home)
+    tabChild.present(sheet: .profile)
+    let sheetChild = tabChild.childRouter()
+
+    sheetChild.dismissSheet()
+
+    #expect(tabChild.presentingSheet == nil)
+  }
+
+  @Test
+  func `dismissFullScreen is no-op when no ancestor holds presentation`() {
+    let root = Router<TestScene>()
+
+    root.dismissFullScreen()
+
+    #expect(root.presentingFullScreen == nil)
+  }
+
+  @Test
+  func `navigate fullScreen from root delegates to selected tab child`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .home
+    let child = root.childRouter(for: .home)
+
+    root.navigate(to: .fullScreen(.tutorial))
+
+    #expect(root.presentingFullScreen == nil)
+    #expect(child.presentingFullScreen == .tutorial)
+  }
+
+  @Test
+  func `navigate sheet from root delegates to selected tab child`() {
+    let root = Router<TestScene>()
+    root.selectedTab = .settings
+    let child = root.childRouter(for: .settings)
+
+    root.navigate(to: .sheet(.profile))
+
+    #expect(root.presentingSheet == nil)
+    #expect(child.presentingSheet == .profile)
+  }
+
 }

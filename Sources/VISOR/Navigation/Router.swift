@@ -93,15 +93,33 @@ public final class Router<Scene: NavigationScene> {
   }
 
   /// Present a sheet.
+  ///
+  /// When called on the root router and a tab is selected, delegates to the
+  /// selected tab's child router so the `.sheet` modifier in the tab's
+  /// NavigationContainer observes the presentation.
   public func present(sheet: Scene.Sheet) {
-    log("present sheet: \(sheet)")
-    presentingSheet = sheet
+    if let selectedTab, let child = tabChildren[selectedTab] {
+      log("present sheet (delegating to \(selectedTab)): \(sheet)")
+      child.present(sheet: sheet)
+    } else {
+      log("present sheet: \(sheet)")
+      presentingSheet = sheet
+    }
   }
 
   /// Present a full-screen cover.
+  ///
+  /// When called on the root router and a tab is selected, delegates to the
+  /// selected tab's child router so the `.fullScreenCover` modifier in the
+  /// tab's NavigationContainer observes the presentation.
   public func present(fullScreen: Scene.FullScreen) {
-    log("present fullScreen: \(fullScreen)")
-    presentingFullScreen = fullScreen
+    if let selectedTab, let child = tabChildren[selectedTab] {
+      log("present fullScreen (delegating to \(selectedTab)): \(fullScreen)")
+      child.present(fullScreen: fullScreen)
+    } else {
+      log("present fullScreen: \(fullScreen)")
+      presentingFullScreen = fullScreen
+    }
   }
 
   /// Select a tab (propagates to parent if this is a child router).
@@ -142,15 +160,32 @@ public final class Router<Scene: NavigationScene> {
   }
 
   /// Dismiss the currently presented sheet.
+  ///
+  /// When called on a router that does not itself hold the sheet presentation,
+  /// walks up the parent chain to find the ancestor that does and clears it there.
   public func dismissSheet() {
-    log("dismissSheet")
-    presentingSheet = nil
+    if presentingSheet != nil {
+      log("dismissSheet")
+      presentingSheet = nil
+    } else if let parent {
+      log("dismissSheet (walking up)")
+      parent.dismissSheet()
+    }
   }
 
   /// Dismiss the currently presented full-screen cover.
+  ///
+  /// When called on a router that does not itself hold the full-screen
+  /// presentation, walks up the parent chain to find the ancestor that does
+  /// and clears it there.
   public func dismissFullScreen() {
-    log("dismissFullScreen")
-    presentingFullScreen = nil
+    if presentingFullScreen != nil {
+      log("dismissFullScreen")
+      presentingFullScreen = nil
+    } else if let parent {
+      log("dismissFullScreen (walking up)")
+      parent.dismissFullScreen()
+    }
   }
 
   // MARK: - Active State
