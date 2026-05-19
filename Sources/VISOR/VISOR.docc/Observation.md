@@ -169,6 +169,17 @@ func handleAudioLevel(level: Float) { ... }
 
 When the source is quiet, there's zero CPU cost — throttling only adds a sleep after processing an actual change.
 
+## Debouncing Reactions with debouncedBy:
+
+`@Reaction` also supports `debouncedBy:` for work that should run only after a burst of changes settles. New values cancel the pending handler, and only the latest value is delivered after the quiet interval:
+
+```swift
+@Reaction(\Self.state.searchText, debouncedBy: .milliseconds(300))
+func performSearch(query: String) async { ... }
+```
+
+Use debouncing for side effects such as saves, searches, or network requests where intermediate values are stale. Use `throttledBy:` when you still want periodic updates during continuous change.
+
 ## Low-Level: valuesOf() and latestValuesOf()
 
 The macros are built on two public functions you can use directly:

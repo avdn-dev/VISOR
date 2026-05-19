@@ -1441,6 +1441,78 @@ struct ViewModelMacroTests {
   }
 
   @Test
+  func `Sync @Reaction with debouncedBy uses VISOR debounced values`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var query = ""
+        }
+        @Reaction(\\Self.state.query, debouncedBy: .milliseconds(300))
+        func saveQuery(query: String) { }
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class MyViewModel {
+        @Observable
+        final class State {
+          var query = ""
+        }
+        func saveQuery(query: String) { }
+      
+          @ObservationIgnored private var _state: State = State()
+      
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+      
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+      
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+      
+          typealias Factory = ViewModelFactory<MyViewModel>
+      
+          func observeSaveQuery() async {
+              for await query in VISOR.debouncedValuesOf({ self.state.query
+                  }, for: .milliseconds(300)) {
+                  self.saveQuery(query: query)
+              }
+          }
+      
+          func startObserving() async {
+              await observeSaveQuery()
+          }
+      }
+      
+      extension MyViewModel: @MainActor ViewModel {
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(message: "State class needs a user-declared init — #Preview cannot see macro-generated initialisers. Add: nonisolated init() {}, assigning backing storage such as _property = property", line: 1, column: 1, severity: .warning),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
   func `Mixed @Bound in State and @Reaction generates combined startObserving`() {
     assertMacroExpansionSwiftTesting(
       """

@@ -5,6 +5,7 @@
 //  Created by Anh Nguyen on 18/2/2026.
 //
 
+import AsyncAlgorithms
 
 /// Returns an `AsyncStream` that emits the current value produced by `emit` and re-emits on every change.
 ///
@@ -95,3 +96,24 @@ public func latestValuesOf<T: Sendable>(
   handlerTask?.cancel()
 }
 
+/// Returns values from ``valuesOf(_:)`` after the source has stayed quiet for `interval`.
+///
+/// This wraps Swift Async Algorithms' `debounce(for:)` operator so generated macro code
+/// can keep depending on the VISOR module surface instead of requiring consumers to
+/// import `AsyncAlgorithms` directly.
+@MainActor
+public func debouncedValuesOf<T: Sendable>(
+  _ emit: @MainActor @Sendable @escaping () -> T,
+  for interval: Duration
+) -> AsyncStream<T> {
+  AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+    let task = Task { @MainActor in
+      for await value in valuesOf(emit).debounce(for: interval) {
+        guard !Task.isCancelled else { break }
+        continuation.yield(value)
+      }
+      continuation.finish()
+    }
+    continuation.onTermination = { _ in task.cancel() }
+  }
+}

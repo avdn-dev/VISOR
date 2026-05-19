@@ -550,6 +550,40 @@ struct ViewModelMacroRuntimeTests {
         observeTask.cancel()
     }
 
+    // MARK: - DebouncedBy @Reaction (sync)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `DebouncedBy sync @Reaction waits for quiet period and handles latest value`() async throws {
+        let source = RuntimeSource()
+        let vm = DebouncedBySyncReactionVM(source: source)
+
+        try await observing(vm) { expect in
+            for i in 1...10 {
+                source.count = i
+            }
+
+            try await expect(\.state.latestCount, eventually: 10)
+            #expect(vm.state.reactionCount == 1, "Debounced reaction should fire once for a rapid burst")
+        }
+    }
+
+    // MARK: - DebouncedBy @Reaction (async)
+
+    @Test(.timeLimit(.minutes(1)))
+    func `DebouncedBy async @Reaction cancels pending handlers and completes latest value`() async throws {
+        let source = RuntimeSource()
+        let vm = DebouncedByAsyncReactionVM(source: source)
+
+        try await observing(vm) { expect in
+            for i in 1...10 {
+                source.count = i
+            }
+
+            try await expect(\.state.processedCount, eventually: 10)
+            #expect(vm.state.completedHandlers == 1, "Debounced async reaction should complete once for a rapid burst")
+        }
+    }
+
     // MARK: - Mixed throttledBy + unthrottledBy @Bound
 
     @Test(.timeLimit(.minutes(1)))

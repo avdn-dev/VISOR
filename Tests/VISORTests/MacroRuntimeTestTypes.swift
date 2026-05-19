@@ -410,7 +410,51 @@ final class ThrottledByAsyncReactionVM {
     }
 }
 
-// MARK: 20. Mixed throttledBy + non-throttled @Bound
+// MARK: 20. DebouncedBy sync @Reaction
+
+@Observable
+@ViewModel
+final class DebouncedBySyncReactionVM {
+    @Observable
+    final class State {
+        var latestCount = 0
+        var reactionCount = 0
+        nonisolated init() {}
+    }
+    let source: RuntimeSource
+
+    @Reaction(\DebouncedBySyncReactionVM.source.count, debouncedBy: .milliseconds(100))
+    func handleCount(count: Int) {
+        guard count != 0 else { return }
+        updateState(\.latestCount, to: count)
+        updateState(\.reactionCount, to: state.reactionCount + 1)
+    }
+}
+
+// MARK: 21. DebouncedBy async @Reaction
+
+@Observable
+@ViewModel
+final class DebouncedByAsyncReactionVM {
+    @Observable
+    final class State {
+        var processedCount = 0
+        var completedHandlers = 0
+        nonisolated init() {}
+    }
+    let source: RuntimeSource
+
+    @Reaction(\DebouncedByAsyncReactionVM.source.count, debouncedBy: .milliseconds(100))
+    func handleCount(count: Int) async {
+        guard count != 0 else { return }
+        try? await Task.sleep(for: .milliseconds(10))
+        guard !Task.isCancelled else { return }
+        updateState(\.processedCount, to: count)
+        updateState(\.completedHandlers, to: state.completedHandlers + 1)
+    }
+}
+
+// MARK: 22. Mixed throttledBy + non-throttled @Bound
 
 @Observable
 @ViewModel

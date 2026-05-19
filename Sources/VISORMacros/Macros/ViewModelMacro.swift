@@ -341,7 +341,15 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       }
       if reaction.isAsync {
         let observeMethod: DeclSyntax
-        if let throttleExpr = reaction.throttleExpression {
+        if let debounceExpr = reaction.debounceExpression {
+          observeMethod = """
+            func \(raw: methodName)() async {
+                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf({ \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
+                    await self.\(raw: reaction.methodName)(\(raw: callArg))
+                }
+            }
+            """
+        } else if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
                 for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
@@ -364,7 +372,15 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         members.append(observeMethod)
       } else {
         let observeMethod: DeclSyntax
-        if let throttleExpr = reaction.throttleExpression {
+        if let debounceExpr = reaction.debounceExpression {
+          observeMethod = """
+            func \(raw: methodName)() async {
+                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf({ \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
+                    self.\(raw: reaction.methodName)(\(raw: callArg))
+                }
+            }
+            """
+        } else if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
                 for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {

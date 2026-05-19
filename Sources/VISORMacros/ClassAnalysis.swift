@@ -76,6 +76,7 @@ struct ReactionMethodInfo {
   let observeExpression: String // "self.deepLinkRouter.pendingDestination"
   let isAsync: Bool
   let throttleExpression: String? // Optional Duration expression for throttling
+  let debounceExpression: String? // Optional Duration expression for debouncing
 }
 
 // MARK: - StateStoredPropertyInfo
@@ -307,11 +308,14 @@ struct ClassAnalysis {
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
 
         var throttleExpr: String? = nil
+        var debounceExpr: String? = nil
         let secondIndex = arguments.index(after: arguments.startIndex)
         if secondIndex != arguments.endIndex {
           let secondArg = arguments[secondIndex]
           if secondArg.label?.text == "throttledBy" {
             throttleExpr = secondArg.expression.trimmedDescription
+          } else if secondArg.label?.text == "debouncedBy" {
+            debounceExpr = secondArg.expression.trimmedDescription
           }
         }
 
@@ -321,7 +325,8 @@ struct ClassAnalysis {
           valueName: valueName,
           observeExpression: "self." + components.joined(separator: "."),
           isAsync: isAsync,
-          throttleExpression: throttleExpr))
+          throttleExpression: throttleExpr,
+          debounceExpression: debounceExpr))
       }
     }
   }

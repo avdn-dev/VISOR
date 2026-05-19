@@ -12,6 +12,7 @@ let package = Package(
       targets: ["VISOR"]),
   ],
   dependencies: [
+    .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
   ],
@@ -26,7 +27,10 @@ let package = Package(
 
     .target(
       name: "VISOR",
-      dependencies: ["VISORMacros"],
+      dependencies: [
+        "VISORMacros",
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+      ],
       swiftSettings: [.defaultIsolation(MainActor.self)]),
 
     .testTarget(

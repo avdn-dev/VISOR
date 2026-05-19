@@ -17,6 +17,10 @@
 /// Use `throttledBy:` to limit rapid-fire changes. The observation loop pauses after
 /// each handler completes, dropping intermediate values.
 ///
+/// Use `debouncedBy:` to wait until changes have been quiet for the interval before
+/// running the handler. New values cancel the pending handler, so only the latest value
+/// is delivered.
+///
 /// ```swift
 /// @ViewModel
 /// final class ContentViewModel {
@@ -25,6 +29,9 @@
 ///
 ///   @Reaction(\Self.recorder.audioLevel, throttledBy: .seconds(0.1))
 ///   func handleAudioLevel(level: Float) { ... }
+///
+///   @Reaction(\Self.state.searchText, debouncedBy: .milliseconds(300))
+///   func performSearch(query: String) async { ... }
 /// }
 /// ```
 @attached(peer)
@@ -35,4 +42,10 @@ public macro Reaction<Root, Value>(_ keyPath: KeyPath<Root, Value>) = #externalM
 public macro Reaction<Root, Value>(
   _ keyPath: KeyPath<Root, Value>,
   throttledBy interval: Duration
+) = #externalMacro(module: "VISORMacros", type: "ReactionMacro")
+
+@attached(peer)
+public macro Reaction<Root, Value>(
+  _ keyPath: KeyPath<Root, Value>,
+  debouncedBy interval: Duration
 ) = #externalMacro(module: "VISORMacros", type: "ReactionMacro")
