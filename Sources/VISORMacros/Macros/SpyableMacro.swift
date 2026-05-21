@@ -49,10 +49,26 @@ public struct SpyableMacro: PeerMacro {
 
     // Generate method spies
     let methodPrefixes = uniqueMethodPrefixes(for: methods)
+    let implementationNames = implementationStorageNames(
+      for: methods,
+      methodPrefixes: methodPrefixes,
+      properties: properties)
     var callCases: [String] = []
     callCases.reserveCapacity(methods.count)
 
-    for (method, methodPrefix) in zip(methods, methodPrefixes) {
+    for ((method, methodPrefix), implementationName) in zip(zip(methods, methodPrefixes), implementationNames) {
+      let preferredImplementationName = "\(methodPrefix)Implementation"
+
+      if implementationName != preferredImplementationName {
+        context.diagnose(Diagnostic(
+          node: Syntax(protocolDecl),
+          message: TestDoubleDiagnostic.implementationNameCollision(
+            methodName: method.name,
+            preferredName: preferredImplementationName,
+            generatedName: implementationName,
+            macroName: "Spyable")))
+      }
+
       members.append("  // -- \(methodPrefix) --")
       members.append("  \(prefix)var \(methodPrefix)CallCount = 0")
 
@@ -70,6 +86,9 @@ public struct SpyableMacro: PeerMacro {
 
       // Return value / Result storage
       members.append(contentsOf: generateReturnStorage(method: method, methodPrefix: methodPrefix, access: access))
+
+      // Implementation closure storage
+      members.append(contentsOf: generateImplementationStorage(method: method, implementationName: implementationName, access: access))
 
       // Method implementation
       let sig = buildMethodSignature(method, access: access)
@@ -98,26 +117,50 @@ public struct SpyableMacro: PeerMacro {
         bodyLines.append("    calls.append(.\(method.name)(\(callArgs)))")
       }
 
-      if method.isThrowing {
-        if let returnType = method.returnType {
+      // Build try/await prefix
+      let tryAwait = [
+        method.isThrowing ? "try " : "",
+        method.isAsync ? "await " : ""
+      ].joined()
+
+      let implArgs = implementationInvocationArguments(for: method)
+
+      if method.returnType != nil || method.isAsync || method.isThrowing {
+        // Methods with fallback (return value or throwing Result)
+        bodyLines.append("    if let \(implementationName) {")
+        if method.returnType != nil {
+          bodyLines.append("      return \(tryAwait)\(implementationName)(\(implArgs))")
+        } else {
+          bodyLines.append("      \(tryAwait)\(implementationName)(\(implArgs))")
+          bodyLines.append("      return")
+        }
+        bodyLines.append("    }")
+
+        // Existing fallback logic
+        if method.isThrowing {
+          if let returnType = method.returnType {
+            let needsGuard = defaultValue(for: returnType) == nil
+            if needsGuard {
+              bodyLines.append("    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }")
+              bodyLines.append("    return try result.get()")
+            } else {
+              bodyLines.append("    return try \(methodPrefix)Result.get()")
+            }
+          } else {
+            bodyLines.append("    try \(methodPrefix)Result.get()")
+          }
+        } else if let returnType = method.returnType {
           let needsGuard = defaultValue(for: returnType) == nil
           if needsGuard {
-            bodyLines.append("    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }")
-            bodyLines.append("    return try result.get()")
+            bodyLines.append("    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }")
+            bodyLines.append("    return value")
           } else {
-            bodyLines.append("    return try \(methodPrefix)Result.get()")
+            bodyLines.append("    return \(methodPrefix)ReturnValue")
           }
-        } else {
-          bodyLines.append("    try \(methodPrefix)Result.get()")
         }
-      } else if let returnType = method.returnType {
-        let needsGuard = defaultValue(for: returnType) == nil
-        if needsGuard {
-          bodyLines.append("    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }")
-          bodyLines.append("    return value")
-        } else {
-          bodyLines.append("    return \(methodPrefix)ReturnValue")
-        }
+      } else {
+        // Non-throwing void — no fallback, just optional call
+        bodyLines.append("    \(implementationName)?(\(implArgs))")
       }
 
       let body = bodyLines.joined(separator: "\n")

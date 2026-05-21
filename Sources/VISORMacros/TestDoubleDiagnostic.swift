@@ -15,6 +15,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
   case subscriptsSkipped(macroName: String)
   case staticMembersSkipped(macroName: String)
   case unknownTypeDefaults(macroName: String)
+  case implementationNameCollision(methodName: String, preferredName: String, generatedName: String, macroName: String)
 
   // MARK: Internal
 
@@ -30,6 +31,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       "@\(macroName) skips static members (not yet supported)"
     case .unknownTypeDefaults(let macroName):
       "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."
+    case .implementationNameCollision(let methodName, let preferredName, let generatedName, let macroName):
+      "@\(macroName): '\(preferredName)' collides with an existing protocol member; using '\(generatedName)' for the generated implementation closure for '\(methodName)()'."
     }
   }
 
@@ -45,6 +48,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       MessageID(domain: "VISOR", id: "staticMembersSkipped")
     case .unknownTypeDefaults:
       MessageID(domain: "VISOR", id: "unknownTypeDefaults")
+    case .implementationNameCollision:
+      MessageID(domain: "VISOR", id: "implementationNameCollision")
     }
   }
 
@@ -56,6 +61,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       .warning
     case .unknownTypeDefaults:
       .note
+    case .implementationNameCollision:
+      .warning
     }
   }
 }

@@ -179,6 +179,80 @@ func generateReturnStorage(
   return lines
 }
 
+// MARK: - Implementation Closure Helpers
+
+/// Builds the closure type string for a method's implementation closure.
+///
+/// Examples:
+/// - `func reset()` → `(() -> Void)?`
+/// - `func save(_ item: Item) throws` → `((Item) throws -> Void)?`
+/// - `func search(query: String, limit: Int) async throws -> [Result]` → `((String, Int) async throws -> [Result])?`
+func implementationClosureType(for method: ProtocolMethodInfo) -> String {
+  let paramsStr = method.parameters.map(\.type).joined(separator: ", ")
+
+  var effects = ""
+  if method.isAsync { effects += " async" }
+  if method.isThrowing { effects += " throws" }
+
+  let returnStr = method.returnType ?? "Void"
+
+  return "((\(paramsStr))\(effects) -> \(returnStr))?"
+}
+
+/// Returns the invocation arguments for an implementation closure — internal
+/// parameter names in source order, comma-separated.
+func implementationInvocationArguments(for method: ProtocolMethodInfo) -> String {
+  method.parameters.map(\.internalName).joined(separator: ", ")
+}
+
+/// Returns collision-free implementation-closure storage names.
+///
+/// The normal API remains `<methodPrefix>Implementation`. If the protocol already
+/// has a property or method with that name, use a predictable fallback so the
+/// generated spy still conforms without redeclarations.
+func implementationStorageNames(
+  for methods: [ProtocolMethodInfo],
+  methodPrefixes: [String],
+  properties: [ProtocolPropertyInfo]
+) -> [String] {
+  var reservedNames = Set(properties.map(\.name))
+  reservedNames.formUnion(methods.map(\.name))
+
+  return methodPrefixes.map { methodPrefix in
+    let preferredName = "\(methodPrefix)Implementation"
+    guard reservedNames.contains(preferredName) else {
+      reservedNames.insert(preferredName)
+      return preferredName
+    }
+
+    let fallbackBase = "\(preferredName)Closure"
+    var candidate = fallbackBase
+    var suffix = 2
+    while reservedNames.contains(candidate) {
+      candidate = "\(fallbackBase)\(suffix)"
+      suffix += 1
+    }
+
+    reservedNames.insert(candidate)
+    return candidate
+  }
+}
+
+/// Generates the `@ObservationIgnored` implementation-closure storage property
+/// for a spy method.
+func generateImplementationStorage(
+  method: ProtocolMethodInfo,
+  implementationName: String,
+  access: String
+) -> [String] {
+  let prefix = access.isEmpty ? "" : "\(access) "
+  let closureType = implementationClosureType(for: method)
+  return [
+    "  @ObservationIgnored",
+    "  \(prefix)var \(implementationName): \(closureType)"
+  ]
+}
+
 // MARK: - Method Signature Helper
 
 func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> String {

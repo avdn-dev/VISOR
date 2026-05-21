@@ -887,4 +887,63 @@ struct SpyableMacroRuntimeTests {
         #expect(after == 1, "Expected valuesOf to emit 1 after spy property mutation")
     }
 
+    // MARK: - Implementation closures
+
+    @Test
+    func `Implementation closure overrides ReturnValue`() {
+        let spy = SpyGreeterService()
+        spy.greetReturnValue = "default"
+
+        spy.greetImplementation = { name in
+            "Hello, \(name)!"
+        }
+
+        let result = spy.greet("World")
+        #expect(result == "Hello, World!")
+    }
+
+    @Test
+    func `Implementation closure records calls before delegating`() {
+        let spy = SpyGreeterService()
+
+        spy.greetImplementation = { name in
+            "Hi, \(name)"
+        }
+
+        _ = spy.greet("Alice")
+        _ = spy.greet("Bob")
+
+        #expect(spy.greetCallCount == 2)
+        #expect(spy.greetReceivedInvocations == ["Alice", "Bob"])
+        #expect(spy.greetReceivedName == "Bob")
+        #expect(spy.calls.count == 2)
+    }
+
+    @Test
+    func `Implementation closure falls back to ReturnValue when nil`() {
+        let spy = SpyGreeterService()
+        spy.greetReturnValue = "fallback"
+
+        let result = spy.greet("Test")
+        #expect(result == "fallback")
+        #expect(spy.greetCallCount == 1)
+    }
+
+    @Test
+    func `Void implementation closure records calls`() {
+        let spy = SpyGreeterService()
+
+        var resetCount = 0
+        spy.resetImplementation = {
+            resetCount += 1
+        }
+
+        spy.reset()
+        spy.reset()
+
+        #expect(resetCount == 2)
+        #expect(spy.resetCallCount == 2)
+        #expect(spy.calls.count == 2)
+    }
+
 }

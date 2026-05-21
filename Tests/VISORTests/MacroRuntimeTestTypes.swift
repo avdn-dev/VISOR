@@ -515,3 +515,9 @@ protocol AnalyticsService {
     func trackScreen(name: String, category: String)
     func fetchReport() async throws -> String
 }
+
+@Spyable
+protocol GreeterService {
+    func greet(_ name: String) -> String
+    func reset()
+}
