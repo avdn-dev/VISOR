@@ -521,3 +521,8 @@ protocol GreeterService {
     func greet(_ name: String) -> String
     func reset()
 }
+
+@Spyable
+protocol CallbackService {
+    func register(_ callback: @escaping (String) -> Void)
+}

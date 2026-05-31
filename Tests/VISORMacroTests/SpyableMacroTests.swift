@@ -1221,5 +1221,88 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Escaping Closures
+
+  @Test
+  func `Strips escaping from implementation closure and Call enum but preserves in signature`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      protocol CallbackService {
+        func register(_ callback: @escaping (String) -> Void)
+      }
+      """,
+      expandedSource: """
+      protocol CallbackService {
+        func register(_ callback: @escaping (String) -> Void)
+      }
+
+      @Observable
+      final class SpyCallbackService: CallbackService {
+        // -- register --
+        var registerCallCount = 0
+        @ObservationIgnored
+        var registerReceivedCallback: ((String) -> Void)?
+        @ObservationIgnored
+        var registerReceivedInvocations: [((String) -> Void)] = []
+        @ObservationIgnored
+        var registerImplementation: (((String) -> Void) -> Void)?
+        func register(_ callback: @escaping (String) -> Void) {
+          registerCallCount += 1
+          registerReceivedCallback = callback
+          registerReceivedInvocations.append(callback)
+          calls.append(.register(callback: callback))
+          registerImplementation?(callback)
+        }
+        enum Call {
+          case register(callback: (String) -> Void)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Strips escaping but preserves Sendable in implementation closure and Call enum`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      protocol HandlerService {
+        func handle(_ completion: @escaping @Sendable (String) -> Void)
+      }
+      """,
+      expandedSource: """
+      protocol HandlerService {
+        func handle(_ completion: @escaping @Sendable (String) -> Void)
+      }
+
+      @Observable
+      final class SpyHandlerService: HandlerService {
+        // -- handle --
+        var handleCallCount = 0
+        @ObservationIgnored
+        var handleReceivedCompletion: (@Sendable (String) -> Void)?
+        @ObservationIgnored
+        var handleReceivedInvocations: [(@Sendable (String) -> Void)] = []
+        @ObservationIgnored
+        var handleImplementation: ((@Sendable (String) -> Void) -> Void)?
+        func handle(_ completion: @escaping @Sendable (String) -> Void) {
+          handleCallCount += 1
+          handleReceivedCompletion = completion
+          handleReceivedInvocations.append(completion)
+          calls.append(.handle(completion: completion))
+          handleImplementation?(completion)
+        }
+        enum Call {
+          case handle(completion: @Sendable (String) -> Void)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
 }
+
 #endif

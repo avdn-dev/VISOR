@@ -946,4 +946,43 @@ struct SpyableMacroRuntimeTests {
         #expect(spy.calls.count == 2)
     }
 
+    // MARK: Escaping closure parameters
+
+    @Test
+    func `Spy with escaping closure tracks calls, arguments and enum`() {
+        let spy = SpyCallbackService()
+
+        let cb1: (String) -> Void = { _ in }
+        let cb2: (String) -> Void = { _ in }
+
+        spy.register(cb1)
+        spy.register(cb2)
+
+        // Call count
+        #expect(spy.registerCallCount == 2)
+        // Received value — stored property with function type still works after @escaping stripped
+        #expect(spy.registerReceivedCallback != nil)
+        // Invocations array tracks both
+        #expect(spy.registerReceivedInvocations.count == 2)
+        // Call enum — associated value with function type works after @escaping stripped
+        #expect(spy.calls.count == 2)
+    }
+
+    @Test
+    func `Spy with escaping closure supports implementation override`() {
+        let spy = SpyCallbackService()
+
+        spy.registerImplementation = { callback in
+            callback("from impl")
+        }
+
+        var received: String?
+        spy.register { received = $0 }
+
+        #expect(received == "from impl")
+        #expect(spy.registerCallCount == 1)
+        // Calls still recorded even with implementation override
+        #expect(spy.calls.count == 1)
+    }
+
 }

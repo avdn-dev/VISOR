@@ -188,7 +188,7 @@ func generateReturnStorage(
 /// - `func save(_ item: Item) throws` → `((Item) throws -> Void)?`
 /// - `func search(query: String, limit: Int) async throws -> [Result]` → `((String, Int) async throws -> [Result])?`
 func implementationClosureType(for method: ProtocolMethodInfo) -> String {
-  let paramsStr = method.parameters.map(\.type).joined(separator: ", ")
+  let paramsStr = method.parameters.map { stripEscaping(from: $0.type) }.joined(separator: ", ")
 
   var effects = ""
   if method.isAsync { effects += " async" }
@@ -197,6 +197,21 @@ func implementationClosureType(for method: ProtocolMethodInfo) -> String {
   let returnStr = method.returnType ?? "Void"
 
   return "((\(paramsStr))\(effects) -> \(returnStr))?"
+}
+
+/// Strips the `@escaping` attribute from a function type string.
+/// Used when a parameter's type is placed inside a nested function type
+/// or enum associated value where `@escaping` is not valid.
+func stripEscaping(from typeString: String) -> String {
+  typeString
+    .split(separator: " ", omittingEmptySubsequences: true)
+    .filter { $0 != "@escaping" }
+    .joined(separator: " ")
+}
+
+/// Returns `true` when `typeString` represents a function type (contains `->`).
+func isFunctionType(_ typeString: String) -> Bool {
+  typeString.contains("->")
 }
 
 /// Returns the invocation arguments for an implementation closure — internal

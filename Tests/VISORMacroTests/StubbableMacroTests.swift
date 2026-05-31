@@ -1100,4 +1100,29 @@ func `Handle typealias in attributed use site`() {
     macros: testMacros)
 }
 
+  // MARK: - Escaping Closures
+
+  @Test
+  func `Preserves escaping in method signature for stub`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Stubbable
+      protocol CallbackService {
+        func register(_ callback: @escaping (String) -> Void)
+      }
+      """,
+      expandedSource: """
+      protocol CallbackService {
+        func register(_ callback: @escaping (String) -> Void)
+      }
+
+      @Observable
+      final class StubCallbackService: CallbackService {
+        func register(_ callback: @escaping (String) -> Void) {
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
 #endif

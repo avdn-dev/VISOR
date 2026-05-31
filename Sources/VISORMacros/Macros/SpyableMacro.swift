@@ -76,12 +76,20 @@ public struct SpyableMacro: PeerMacro {
       if method.parameters.count == 1 {
         let param = method.parameters[0]
         let capName = param.internalName.capitalisedFirst
-        members.append("  \(prefix)var \(methodPrefix)Received\(capName): \(param.type)?")
-        members.append("  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(param.type)] = []")
+        let strippedType = stripEscaping(from: param.type)
+        // Wrap function types in parens so ? applies to the whole function, not just the return type
+        let wrappedType = isFunctionType(strippedType) ? "(\(strippedType))" : strippedType
+        let fnIgnored = isFunctionType(strippedType) ? "  @ObservationIgnored\n" : ""
+        members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)Received\(capName): \(wrappedType)?")
+        members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(wrappedType)] = []")
       } else if method.parameters.count > 1 {
-        let tupleType = "(" + method.parameters.map { "\($0.internalName): \($0.type)" }.joined(separator: ", ") + ")"
-        members.append("  \(prefix)var \(methodPrefix)ReceivedArguments: \(tupleType)?")
-        members.append("  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(tupleType)] = []")
+        let innerTypes = method.parameters.map { stripEscaping(from: $0.type) }
+        let anyFn = innerTypes.contains(where: isFunctionType)
+        let tupleType = "(" + zip(method.parameters, innerTypes).map { "\($0.0.internalName): \($0.1)" }.joined(separator: ", ") + ")"
+        let wrappedType = anyFn ? "(\(tupleType))" : tupleType
+        let fnIgnored = anyFn ? "  @ObservationIgnored\n" : ""
+        members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)ReceivedArguments: \(wrappedType)?")
+        members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(wrappedType)] = []")
       }
 
       // Return value / Result storage
@@ -111,7 +119,7 @@ public struct SpyableMacro: PeerMacro {
         callCases.append("    case \(method.name)")
         bodyLines.append("    calls.append(.\(method.name))")
       } else {
-        let caseParams = method.parameters.map { "\($0.internalName): \($0.type)" }.joined(separator: ", ")
+        let caseParams = method.parameters.map { "\($0.internalName): \(stripEscaping(from: $0.type))" }.joined(separator: ", ")
         callCases.append("    case \(method.name)(\(caseParams))")
         let callArgs = method.parameters.map { "\($0.internalName): \($0.internalName)" }.joined(separator: ", ")
         bodyLines.append("    calls.append(.\(method.name)(\(callArgs)))")
