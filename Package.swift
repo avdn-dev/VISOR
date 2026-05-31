@@ -13,7 +13,7 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
-    .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
+    .package(url: "https://github.com/swiftlang/swift-syntax.git", "602.0.0"..<"604.0.0"),
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
   ],
   targets: [
