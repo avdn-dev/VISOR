@@ -985,4 +985,84 @@ struct SpyableMacroRuntimeTests {
         #expect(spy.calls.count == 1)
     }
 
+    // MARK: - Inout parameters
+
+    @Test
+    func `Inout method records calls and preserves value without implementation`() {
+        let spy = SpyInoutService()
+        var value = 99
+
+        spy.update(value: &value)
+
+        #expect(value == 99)
+        #expect(spy.updateCallCount == 1)
+        #expect(spy.calls.count == 1)
+    }
+
+    @Test
+    func `Inout method implementation closure mutates caller value via ampersand`() {
+        let spy = SpyInoutService()
+
+        spy.updateImplementation = { value in
+            value += 1
+        }
+
+        var value = 41
+        spy.update(value: &value)
+        #expect(value == 42)
+        #expect(spy.updateCallCount == 1)
+    }
+
+    @Test
+    func `Mixed inout and regular params track only non-inout args`() {
+        let spy = SpyMixedInoutService()
+        var output = "initial"
+
+        spy.process(name: "test", output: &output)
+
+        #expect(spy.processCallCount == 1)
+        // Regular param tracked
+        #expect(spy.processReceivedName == "test")
+        #expect(spy.processReceivedInvocations == ["test"])
+        // Call enum captures both (inout type stripped)
+        #expect(spy.calls.count == 1)
+    }
+
+    @Test
+    func `Mixed inout and regular params implementation closure`() {
+        let spy = SpyMixedInoutService()
+
+        spy.processImplementation = { name, output in
+            output = "processed by \(name)"
+        }
+
+        var result = "before"
+        spy.process(name: "Alice", output: &result)
+        #expect(result == "processed by Alice")
+        #expect(spy.processCallCount == 1)
+    }
+
+    @Test
+    func `Inout call enum captures value snapshot`() {
+        let spy = SpyInoutService()
+
+        var value = 10
+        spy.update(value: &value)
+        value = 20
+        spy.update(value: &value)
+
+        #expect(spy.calls.count == 2)
+        // Each call captured the value at the time of the call
+        if case .update(let captured) = spy.calls[0] {
+            #expect(captured == 10)
+        } else {
+            #expect(Bool(false), "Expected .update(10)")
+        }
+        if case .update(let captured) = spy.calls[1] {
+            #expect(captured == 20)
+        } else {
+            #expect(Bool(false), "Expected .update(20)")
+        }
+    }
+
 }

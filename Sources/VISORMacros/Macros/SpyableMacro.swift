@@ -72,9 +72,10 @@ public struct SpyableMacro: PeerMacro {
       members.append("  // -- \(methodPrefix) --")
       members.append("  \(prefix)var \(methodPrefix)CallCount = 0")
 
-      // Track received args
-      if method.parameters.count == 1 {
-        let param = method.parameters[0]
+      // Track received args (inout params are excluded — they can't be stored)
+      let storableParams = method.parameters.filter { !$0.isInout }
+      if storableParams.count == 1 {
+        let param = storableParams[0]
         let capName = param.internalName.capitalisedFirst
         let strippedType = stripEscaping(from: param.type)
         // Wrap function types in parens so ? applies to the whole function, not just the return type
@@ -82,10 +83,10 @@ public struct SpyableMacro: PeerMacro {
         let fnIgnored = isFunctionType(strippedType) ? "  @ObservationIgnored\n" : ""
         members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)Received\(capName): \(wrappedType)?")
         members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)ReceivedInvocations: [\(wrappedType)] = []")
-      } else if method.parameters.count > 1 {
-        let innerTypes = method.parameters.map { stripEscaping(from: $0.type) }
+      } else if storableParams.count > 1 {
+        let innerTypes = storableParams.map { stripEscaping(from: $0.type) }
         let anyFn = innerTypes.contains(where: isFunctionType)
-        let tupleType = "(" + zip(method.parameters, innerTypes).map { "\($0.0.internalName): \($0.1)" }.joined(separator: ", ") + ")"
+        let tupleType = "(" + zip(storableParams, innerTypes).map { "\($0.0.internalName): \($0.1)" }.joined(separator: ", ") + ")"
         let wrappedType = anyFn ? "(\(tupleType))" : tupleType
         let fnIgnored = anyFn ? "  @ObservationIgnored\n" : ""
         members.append("\(fnIgnored)  \(prefix)var \(methodPrefix)ReceivedArguments: \(wrappedType)?")
@@ -103,13 +104,13 @@ public struct SpyableMacro: PeerMacro {
       var bodyLines: [String] = []
       bodyLines.append("    \(methodPrefix)CallCount += 1")
 
-      if method.parameters.count == 1 {
-        let param = method.parameters[0]
+      if storableParams.count == 1 {
+        let param = storableParams[0]
         let capName = param.internalName.capitalisedFirst
         bodyLines.append("    \(methodPrefix)Received\(capName) = \(param.internalName)")
         bodyLines.append("    \(methodPrefix)ReceivedInvocations.append(\(param.internalName))")
-      } else if method.parameters.count > 1 {
-        let tupleVal = "(" + method.parameters.map(\.internalName).joined(separator: ", ") + ")"
+      } else if storableParams.count > 1 {
+        let tupleVal = "(" + storableParams.map(\.internalName).joined(separator: ", ") + ")"
         bodyLines.append("    \(methodPrefix)ReceivedArguments = \(tupleVal)")
         bodyLines.append("    \(methodPrefix)ReceivedInvocations.append(\(tupleVal))")
       }
@@ -119,7 +120,7 @@ public struct SpyableMacro: PeerMacro {
         callCases.append("    case \(method.name)")
         bodyLines.append("    calls.append(.\(method.name))")
       } else {
-        let caseParams = method.parameters.map { "\($0.internalName): \(stripEscaping(from: $0.type))" }.joined(separator: ", ")
+        let caseParams = method.parameters.map { "\($0.internalName): \(stripInout(from: stripEscaping(from: $0.type)))" }.joined(separator: ", ")
         callCases.append("    case \(method.name)(\(caseParams))")
         let callArgs = method.parameters.map { "\($0.internalName): \($0.internalName)" }.joined(separator: ", ")
         bodyLines.append("    calls.append(.\(method.name)(\(callArgs)))")

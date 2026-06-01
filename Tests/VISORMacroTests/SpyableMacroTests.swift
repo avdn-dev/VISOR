@@ -1303,6 +1303,114 @@ struct SpyableMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Inout Parameters
+
+  @Test
+  func `Generates spy for method with single inout parameter`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      protocol MigratorService {
+        func registerMigrations(migrator: inout DatabaseMigrator)
+      }
+      """,
+      expandedSource: """
+      protocol MigratorService {
+        func registerMigrations(migrator: inout DatabaseMigrator)
+      }
+
+      @Observable
+      final class SpyMigratorService: MigratorService {
+        // -- registerMigrations --
+        var registerMigrationsCallCount = 0
+        @ObservationIgnored
+        var registerMigrationsImplementation: ((inout DatabaseMigrator) -> Void)?
+        func registerMigrations(migrator: inout DatabaseMigrator) {
+          registerMigrationsCallCount += 1
+          calls.append(.registerMigrations(migrator: migrator))
+          registerMigrationsImplementation?(&migrator)
+        }
+        enum Call {
+          case registerMigrations(migrator: DatabaseMigrator)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy for method mixing inout and regular parameters`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      protocol ProcessorService {
+        func process(name: String, output: inout String)
+      }
+      """,
+      expandedSource: """
+      protocol ProcessorService {
+        func process(name: String, output: inout String)
+      }
+
+      @Observable
+      final class SpyProcessorService: ProcessorService {
+        // -- process --
+        var processCallCount = 0
+        var processReceivedName: String?
+        var processReceivedInvocations: [String] = []
+        @ObservationIgnored
+        var processImplementation: ((String, inout String) -> Void)?
+        func process(name: String, output: inout String) {
+          processCallCount += 1
+          processReceivedName = name
+          processReceivedInvocations.append(name)
+          calls.append(.process(name: name, output: output))
+          processImplementation?(name, &output)
+        }
+        enum Call {
+          case process(name: String, output: String)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy for method with only inout parameters in multi-param`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Spyable
+      protocol SwapperService {
+        func swap(a: inout Int, b: inout Int)
+      }
+      """,
+      expandedSource: """
+      protocol SwapperService {
+        func swap(a: inout Int, b: inout Int)
+      }
+
+      @Observable
+      final class SpySwapperService: SwapperService {
+        // -- swap --
+        var swapCallCount = 0
+        @ObservationIgnored
+        var swapImplementation: ((inout Int, inout Int) -> Void)?
+        func swap(a: inout Int, b: inout Int) {
+          swapCallCount += 1
+          calls.append(.swap(a: a, b: b))
+          swapImplementation?(&a, &b)
+        }
+        enum Call {
+          case swap(a: Int, b: Int)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
 }
 
 #endif

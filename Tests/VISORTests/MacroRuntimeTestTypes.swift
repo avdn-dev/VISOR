@@ -526,3 +526,13 @@ protocol GreeterService {
 protocol CallbackService {
     func register(_ callback: @escaping (String) -> Void)
 }
+
+@Spyable
+protocol InoutService {
+    func update(value: inout Int)
+}
+
+@Spyable
+protocol MixedInoutService {
+    func process(name: String, output: inout String)
+}

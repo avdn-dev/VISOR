@@ -209,15 +209,26 @@ func stripEscaping(from typeString: String) -> String {
     .joined(separator: " ")
 }
 
+/// Strips the `inout` specifier from a type string.
+/// Used for enum associated values and storage properties where `inout` is invalid.
+func stripInout(from typeString: String) -> String {
+  var result = typeString
+  if result.hasPrefix("inout ") {
+    result = String(result.dropFirst(6))
+  }
+  return result
+}
+
 /// Returns `true` when `typeString` represents a function type (contains `->`).
 func isFunctionType(_ typeString: String) -> Bool {
   typeString.contains("->")
 }
 
 /// Returns the invocation arguments for an implementation closure — internal
-/// parameter names in source order, comma-separated.
+/// parameter names in source order, comma-separated. Inout parameters are
+/// prefixed with `&` so they compile when forwarded to the closure.
 func implementationInvocationArguments(for method: ProtocolMethodInfo) -> String {
-  method.parameters.map(\.internalName).joined(separator: ", ")
+  method.parameters.map { $0.isInout ? "&\($0.internalName)" : $0.internalName }.joined(separator: ", ")
 }
 
 /// Returns collision-free implementation-closure storage names.

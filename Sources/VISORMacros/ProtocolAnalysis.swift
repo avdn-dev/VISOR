@@ -25,6 +25,7 @@ struct ParameterInfo {
   let externalLabel: String? // nil means no external label (e.g., `_ item: Item`)
   let internalName: String
   var type: String
+  var isInout: Bool
 }
 
 // MARK: - ProtocolMethodInfo
@@ -151,7 +152,8 @@ struct ProtocolAnalysis {
           let externalLabel = param.firstName.tokenKind == .wildcard ? nil : param.firstName.text
           let internalName = param.secondName?.text ?? param.firstName.text
           let type = taHandler.protocolQualifiedTypeName(for: param.type)
-          return ParameterInfo(externalLabel: externalLabel, internalName: internalName, type: type)
+          let isInout = param.type.hasInoutSpecifier
+          return ParameterInfo(externalLabel: externalLabel, internalName: internalName, type: type, isInout: isInout)
         }
         
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
@@ -393,3 +395,19 @@ func validateProtocolForTestDouble(
 
 // accessLevel(of:) — use the generic version from CodeGenHelpers.swift.
 // ProtocolDeclSyntax conforms to DeclGroupSyntax, so it matches directly.
+
+// MARK: - Inout Detection
+
+extension TypeSyntax {
+  /// Returns `true` when this type syntax has an `inout` specifier
+  /// (e.g., `inout DatabaseMigrator`).
+  var hasInoutSpecifier: Bool {
+    guard let attributedType = self.as(AttributedTypeSyntax.self) else { return false }
+    for specifier in attributedType.specifiers {
+      if specifier.as(SimpleTypeSpecifierSyntax.self)?.specifier.tokenKind == .keyword(.inout) {
+        return true
+      }
+    }
+    return false
+  }
+}
