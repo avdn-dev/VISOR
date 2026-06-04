@@ -16,12 +16,13 @@
 /// - Cancellation breaks the loop cooperatively.
 /// - Uses `.bufferingNewest(1)` policy.
 public func polledValuesOf<T: Sendable>(
+  name: String? = nil,
   _ read: @MainActor @Sendable @escaping () -> T,
   every interval: Duration
 ) -> AsyncStream<T> {
   precondition(interval > .zero, "polledValuesOf interval must be positive")
   return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-    let task = Task { @MainActor in
+    let task = Task(name: name) { @MainActor in
       // Emit immediately
       continuation.yield(read())
       do {
@@ -40,12 +41,13 @@ public func polledValuesOf<T: Sendable>(
 
 /// Equatable-constrained overload that deduplicates consecutive equal values.
 public func polledValuesOf<T: Sendable & Equatable>(
+  name: String? = nil,
   _ read: @MainActor @Sendable @escaping () -> T,
   every interval: Duration
 ) -> AsyncStream<T> {
   precondition(interval > .zero, "polledValuesOf interval must be positive")
   return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-    let task = Task { @MainActor in
+    let task = Task(name: name) { @MainActor in
       var previous: T?
       // Emit immediately
       let initial = read()

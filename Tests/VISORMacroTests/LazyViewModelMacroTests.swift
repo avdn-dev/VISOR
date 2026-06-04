@@ -67,7 +67,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -128,7 +128,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -189,7 +189,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -248,7 +248,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -307,7 +307,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -369,7 +369,7 @@ struct LazyViewModelMacroTests {
                         _viewModel = factory.makeViewModel(router: containerRouter)
                     }
                 }
-                .task(id: _viewModel != nil) {
+                .task(id: _viewModel != nil, name: "VISOR.InnerView.lazyViewModel.observe") {
                     guard let vm = _viewModel else {
                         return
                     }
@@ -529,7 +529,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -590,7 +590,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: scenePhase != .background && _viewModel != nil) {
+              .task(id: scenePhase != .background && _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel, scenePhase != .background else {
                       return
                   }
@@ -651,7 +651,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: scenePhase == .active && _viewModel != nil) {
+              .task(id: scenePhase == .active && _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel, scenePhase == .active else {
                       return
                   }
@@ -712,7 +712,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: scenePhase != .background && _viewModel != nil) {
+              .task(id: scenePhase != .background && _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel, scenePhase != .background else {
                       return
                   }
@@ -771,7 +771,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }
@@ -831,7 +831,7 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
+              .task(id: _viewModel != nil, name: "VISOR.MyView.lazyViewModel.observe") {
                   guard let vm = _viewModel else {
                       return
                   }

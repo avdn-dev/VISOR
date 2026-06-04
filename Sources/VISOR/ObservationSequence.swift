@@ -23,9 +23,12 @@ package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
   package typealias AsyncIterator = AsyncStream<Element>.AsyncIterator
   package let stream: AsyncStream<Element>
 
-  package init(_ emit: @MainActor @Sendable @escaping () -> Element) {
+  package init(
+    name: String? = nil,
+    _ emit: @MainActor @Sendable @escaping () -> Element
+  ) {
     self.stream = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-      let task = Task { @MainActor in
+      let task = Task(name: name) { @MainActor in
         // Signal channel: onChange yields Void, for-await wakes the loop.
         // When the inner task is cancelled, `for await` returns nil promptly.
         let (signal, signalContinuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
@@ -57,10 +60,11 @@ package struct ObservationSequence<Element: Sendable>: AsyncSequence, Sendable {
   /// Eliminates the extra AsyncStream + Task wrapper that the Equatable `valuesOf()` overload
   /// would otherwise need for pre-iOS 26.
   package init(
+    name: String? = nil,
     deduplicating emit: @MainActor @Sendable @escaping () -> Element
   ) where Element: Equatable {
     self.stream = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-      let task = Task { @MainActor in
+      let task = Task(name: name) { @MainActor in
         let (signal, signalContinuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
 
         let initial = withObservationTracking { emit() } onChange: {

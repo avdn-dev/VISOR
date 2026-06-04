@@ -477,7 +477,7 @@ struct ViewModelMacroTests {
           public typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.service.isLoading
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.isLoading.values", { self.service.isLoading
                   }) {
                   self.updateState(\\.isLoading, to: value)
               }
@@ -873,7 +873,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeIsCameraDenied() async {
-              for await value in VISOR.valuesOf({ self.permissionService.isCameraDenied
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.isCameraDenied.values", { self.permissionService.isCameraDenied
                   }) {
                   self.updateState(\\.isCameraDenied, to: value)
               }
@@ -955,7 +955,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeCount() async {
-              for await value in VISOR.valuesOf({ self.service.count
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.count.values", { self.service.count
                   }) {
                   self.updateState(\\.count, to: value)
               }
@@ -1035,21 +1035,21 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeIsAuthenticated() async {
-              for await value in VISOR.valuesOf({ self.connectionService.isAuthenticated
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.isAuthenticated.values", { self.connectionService.isAuthenticated
                   }) {
                   self.updateState(\\.isAuthenticated, to: value)
               }
           }
       
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.connectionService.isLoading
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.isLoading.values", { self.connectionService.isLoading
                   }) {
                   self.updateState(\\.isLoading, to: value)
               }
           }
       
           func observeConnections() async {
-              for await value in VISOR.valuesOf({ self.connectionService.connections
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.connections.values", { self.connectionService.connections
                   }) {
                   self.updateState(\\.connections, to: value)
               }
@@ -1057,13 +1057,13 @@ struct ViewModelMacroTests {
       
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                      group.addTask {
+                      group.addTask(name: "VISOR.MyViewModel.bound.isAuthenticated") {
                           await self.observeIsAuthenticated()
                       }
-                      group.addTask {
+                      group.addTask(name: "VISOR.MyViewModel.bound.isLoading") {
                           await self.observeIsLoading()
                       }
-                      group.addTask {
+                      group.addTask(name: "VISOR.MyViewModel.bound.connections") {
                           await self.observeConnections()
                       }
               }
@@ -1420,7 +1420,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeHandleDeepLink() async {
-              for await destination in VISOR.valuesOf({ self.router.pendingDestination
+              for await destination in VISOR.valuesOf(name: "VISOR.MyViewModel.reaction.handleDeepLink.values", { self.router.pendingDestination
                   }) {
                   self.handleDeepLink(destination: destination)
               }
@@ -1492,7 +1492,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeSaveQuery() async {
-              for await query in VISOR.debouncedValuesOf({ self.state.query
+              for await query in VISOR.debouncedValuesOf(name: "VISOR.MyViewModel.reaction.saveQuery.debounce", { self.state.query
                   }, for: .milliseconds(300)) {
                   self.saveQuery(query: query)
               }
@@ -1574,14 +1574,14 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeIsLoading() async {
-              for await value in VISOR.valuesOf({ self.service.isLoading
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.bound.isLoading.values", { self.service.isLoading
                   }) {
                   self.updateState(\\.isLoading, to: value)
               }
           }
       
           func observeHandleDeepLink() async {
-              for await destination in VISOR.valuesOf({ self.router.pendingDestination
+              for await destination in VISOR.valuesOf(name: "VISOR.MyViewModel.reaction.handleDeepLink.values", { self.router.pendingDestination
                   }) {
                   self.handleDeepLink(destination: destination)
               }
@@ -1589,10 +1589,10 @@ struct ViewModelMacroTests {
       
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                      group.addTask {
+                      group.addTask(name: "VISOR.MyViewModel.bound.isLoading") {
                           await self.observeIsLoading()
                       }
-                      group.addTask {
+                      group.addTask(name: "VISOR.MyViewModel.reaction.handleDeepLink") {
                           await self.observeHandleDeepLink()
                       }
               }
@@ -1753,14 +1753,14 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MixedVM>
       
           func observeName() async {
-              for await value in VISOR.valuesOf({ self.service.name
+              for await value in VISOR.valuesOf(name: "VISOR.MixedVM.bound.name.values", { self.service.name
                   }) {
                   self.updateState(\\.name, to: value)
               }
           }
       
           func observeCount() async {
-              for await value in VISOR.valuesOf({ self.service.count
+              for await value in VISOR.valuesOf(name: "VISOR.MixedVM.bound.count.values", { self.service.count
                   }) {
                   self.updateState(\\.count, to: value)
               }
@@ -1779,13 +1779,13 @@ struct ViewModelMacroTests {
       
           func startObserving() async {
               await withDiscardingTaskGroup { group in
-                      group.addTask {
+                      group.addTask(name: "VISOR.MixedVM.bound.name") {
                           await self.observeName()
                       }
-                      group.addTask {
+                      group.addTask(name: "VISOR.MixedVM.bound.count") {
                           await self.observeCount()
                       }
-                      group.addTask {
+                      group.addTask(name: "VISOR.MixedVM.polled.level") {
                           await self.observeLevel()
                       }
               }
@@ -1859,7 +1859,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<HeadVM>
       
           func observePosture() async {
-              for await value in VISOR.valuesOf({ self.tracker.posture
+              for await value in VISOR.valuesOf(name: "VISOR.HeadVM.bound.posture.values", { self.tracker.posture
                   }) {
                   self.updateState(\\.posture, to: value)
                   do {
@@ -2107,7 +2107,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<ItemsViewModel>
       
           func observeItems() async {
-              for await value in VISOR.valuesOf({ self.service.items
+              for await value in VISOR.valuesOf(name: "VISOR.ItemsViewModel.bound.items.values", { self.service.items
                   }) {
                   self.updateState(\\.items, to: value)
               }
@@ -2184,7 +2184,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeOnDestinationChanged() async {
-              for await value in VISOR.valuesOf({ self.router.pendingDestination
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.reaction.onDestinationChanged.values", { self.router.pendingDestination
                   }) {
                   self.onDestinationChanged(value)
               }
@@ -2262,7 +2262,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
       
           func observeOnDestinationChanged() async {
-              for await value in VISOR.valuesOf({ self.router.pendingDestination
+              for await value in VISOR.valuesOf(name: "VISOR.MyViewModel.reaction.onDestinationChanged.values", { self.router.pendingDestination
                   }) {
                   await self.onDestinationChanged(value)
               }
@@ -2340,7 +2340,7 @@ struct ViewModelMacroTests {
           typealias Factory = ViewModelFactory<MyViewModel>
 
           func observeOnDestinationChanged() async {
-              for await label in VISOR.valuesOf({ self.router.pendingDestination
+              for await label in VISOR.valuesOf(name: "VISOR.MyViewModel.reaction.onDestinationChanged.values", { self.router.pendingDestination
                   }) {
                   self.onDestinationChanged(label: label)
               }

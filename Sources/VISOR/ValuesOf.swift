@@ -26,12 +26,13 @@ import AsyncAlgorithms
 /// consumer is slower than the producer. When the observing task is cancelled, the stream
 /// finishes cooperatively.
 public func valuesOf<T: Sendable>(
+  name: String? = nil,
   _ emit: @MainActor @Sendable @escaping () -> T
 ) -> AsyncStream<T> {
   if #available(iOS 26, macOS 26, tvOS 26, watchOS 26, macCatalyst 26, *) {
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let observations = Observations { emit() }
-      let task = Task { @MainActor in
+      let task = Task(name: name) { @MainActor in
         for await value in observations {
           guard !Task.isCancelled else { break }
           continuation.yield(value)
@@ -41,7 +42,7 @@ public func valuesOf<T: Sendable>(
       continuation.onTermination = { _ in task.cancel() }
     }
   } else {
-    ObservationSequence { emit() }.stream
+    ObservationSequence(name: name) { emit() }.stream
   }
 }
 
@@ -51,12 +52,13 @@ public func valuesOf<T: Sendable>(
 /// conforms to `Equatable`. Skips emissions when the new value equals the previous one,
 /// which is common when the `emit` closure tracks multiple properties but only one changed.
 public func valuesOf<T: Sendable & Equatable>(
+  name: String? = nil,
   _ emit: @MainActor @Sendable @escaping () -> T
 ) -> AsyncStream<T> {
   if #available(iOS 26, macOS 26, tvOS 26, watchOS 26, macCatalyst 26, *) {
     AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
       let observations = Observations { emit() }
-      let task = Task { @MainActor in
+      let task = Task(name: name) { @MainActor in
         var previous: T?
         for await value in observations {
           guard !Task.isCancelled else { break }
@@ -70,7 +72,7 @@ public func valuesOf<T: Sendable & Equatable>(
       continuation.onTermination = { _ in task.cancel() }
     }
   } else {
-    ObservationSequence(deduplicating: emit).stream
+    ObservationSequence(name: name, deduplicating: emit).stream
   }
 }
 
@@ -85,13 +87,14 @@ public func valuesOf<T: Sendable & Equatable>(
 ///   generates), since the group cancels all child tasks on exit.
 @MainActor
 public func latestValuesOf<T: Sendable>(
+  name: String? = nil,
   _ emit: @MainActor @Sendable @escaping () -> T,
   handler: @MainActor @Sendable @escaping (T) async -> Void
 ) async {
   var handlerTask: Task<Void, Never>?
-  for await value in valuesOf(emit) {
+  for await value in valuesOf(name: name.map { "\($0).values" }, emit) {
     handlerTask?.cancel()
-    handlerTask = Task { await handler(value) }
+    handlerTask = Task(name: name.map { "\($0).handler" }) { await handler(value) }
   }
   handlerTask?.cancel()
 }
@@ -103,12 +106,13 @@ public func latestValuesOf<T: Sendable>(
 /// import `AsyncAlgorithms` directly.
 @MainActor
 public func debouncedValuesOf<T: Sendable>(
+  name: String? = nil,
   _ emit: @MainActor @Sendable @escaping () -> T,
   for interval: Duration
 ) -> AsyncStream<T> {
   AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-    let task = Task { @MainActor in
-      for await value in valuesOf(emit).debounce(for: interval) {
+    let task = Task(name: name) { @MainActor in
+      for await value in valuesOf(name: name.map { "\($0).values" }, emit).debounce(for: interval) {
         guard !Task.isCancelled else { break }
         continuation.yield(value)
       }

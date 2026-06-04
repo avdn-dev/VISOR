@@ -259,18 +259,19 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     members.append(typealiasDecl)
 
     // 8. Generate observe methods from @Bound properties inside State
-    var allObserveMethodNames: [String] = []
-    allObserveMethodNames.reserveCapacity(validBounds.count + validPolled.count + analysis.reactionMethods.count)
+    var allObserveMethods: [(methodName: String, taskName: String)] = []
+    allObserveMethods.reserveCapacity(validBounds.count + validPolled.count + analysis.reactionMethods.count)
 
     for prop in validBounds {
       let methodName = "observe\(prop.propertyName.capitalisedFirst)"
-      allObserveMethodNames.append(methodName)
+      let taskName = "VISOR.\(className).bound.\(prop.propertyName)"
+      allObserveMethods.append((methodName: methodName, taskName: taskName))
       let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax
       if let throttleExpr = prop.throttleExpression {
         observeMethod = """
           func \(raw: methodName)() async {
-              for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
+              for await value in VISOR.valuesOf(name: "\(raw: taskName).values", { self.\(raw: prop.sourceExpression) }) {
                   self.updateState(\(raw: keyPath), to: value)
                   do {
                       try await Task.sleep(for: \(raw: throttleExpr))
@@ -281,7 +282,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
       } else {
         observeMethod = """
           func \(raw: methodName)() async {
-              for await value in VISOR.valuesOf({ self.\(raw: prop.sourceExpression) }) {
+              for await value in VISOR.valuesOf(name: "\(raw: taskName).values", { self.\(raw: prop.sourceExpression) }) {
                   self.updateState(\(raw: keyPath), to: value)
               }
           }
@@ -293,7 +294,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     // 8b. Generate observe methods from @Polled properties inside State
     for prop in validPolled {
       let methodName = "observe\(prop.propertyName.capitalisedFirst)"
-      allObserveMethodNames.append(methodName)
+      let taskName = "VISOR.\(className).polled.\(prop.propertyName)"
+      allObserveMethods.append((methodName: methodName, taskName: taskName))
       let keyPath = "\\." + prop.propertyName
       let observeMethod: DeclSyntax = """
         func \(raw: methodName)() async {
@@ -332,7 +334,8 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     // Generate observe wrappers for @Reaction methods
     for reaction in analysis.reactionMethods {
       let methodName = "observe\(reaction.methodName.capitalisedFirst)"
-      allObserveMethodNames.append(methodName)
+      let taskName = "VISOR.\(className).reaction.\(reaction.methodName)"
+      allObserveMethods.append((methodName: methodName, taskName: taskName))
       let callArg: String
       if let label = reaction.callLabel {
         callArg = "\(label): \(reaction.valueName)"
@@ -344,7 +347,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         if let debounceExpr = reaction.debounceExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf({ \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
+                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf(name: "\(raw: taskName).debounce", { \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
                     await self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
@@ -352,7 +355,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
                     await self.\(raw: reaction.methodName)(\(raw: callArg))
                     do {
                         try await Task.sleep(for: \(raw: throttleExpr))
@@ -363,7 +366,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
                     await self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
@@ -375,7 +378,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         if let debounceExpr = reaction.debounceExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf({ \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
+                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf(name: "\(raw: taskName).debounce", { \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
                     self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
@@ -383,7 +386,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else if let throttleExpr = reaction.throttleExpression {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
                     self.\(raw: reaction.methodName)(\(raw: callArg))
                     do {
                         try await Task.sleep(for: \(raw: throttleExpr))
@@ -394,7 +397,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
         } else {
           observeMethod = """
             func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf({ \(raw: reaction.observeExpression) }) {
+                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
                     self.\(raw: reaction.methodName)(\(raw: callArg))
                 }
             }
@@ -405,27 +408,27 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     }
 
     // 9. Generate startObserving() or warn about missing calls in manual implementation
-    if !allObserveMethodNames.isEmpty {
+    if !allObserveMethods.isEmpty {
       if analysis.hasStartObserving {
         let body = analysis.startObservingBodyText ?? ""
-        for methodName in allObserveMethodNames {
+        for methodName in allObserveMethods.map(\.methodName) {
           if !body.contains(methodName) {
             context.diagnose(Diagnostic(
               node: Syntax(declaration),
               message: VISORDiagnostic.manualStartObservingMissingMethod(methodName: methodName)))
           }
         }
-      } else if allObserveMethodNames.count == 1 {
+      } else if allObserveMethods.count == 1 {
         let observingDecl: DeclSyntax = """
           \(raw: prefix)func startObserving() async {
-              await \(raw: allObserveMethodNames[0])()
+              await \(raw: allObserveMethods[0].methodName)()
           }
           """
         members.append(observingDecl)
       } else {
-        let tasks = allObserveMethodNames.map { name in
+        let tasks = allObserveMethods.map { method in
           return """
-                      group.addTask { await self.\(name)() }
+                      group.addTask(name: "\(method.taskName)") { await self.\(method.methodName)() }
           """
         }.joined(separator: "\n")
         let observingDecl: DeclSyntax = """
