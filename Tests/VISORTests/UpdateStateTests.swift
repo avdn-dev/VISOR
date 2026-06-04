@@ -112,27 +112,27 @@ struct UpdateStateTests {
     // MARK: - Basic Observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `updateState propagates source changes via valuesOf`() async {
+    func `updateState propagates source changes via valuesOf`() async throws {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             source.count = 5
-            await expect(\.state.count, equals: 5)
+            try await expect(\.state.count, becomes: 5)
         }
     }
 
     // MARK: - Rapid Mutations
 
     @Test(.timeLimit(.minutes(1)))
-    func `Rapid source mutations converge to final value`() async {
+    func `Rapid source mutations converge to final value`() async throws {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             // Rapidly change the source multiple times
             source.count = 1
@@ -141,7 +141,7 @@ struct UpdateStateTests {
             source.count = 100
 
             // Should settle to the final value
-            await expect(\.state.count, equals: 100)
+            try await expect(\.state.count, eventually: 100)
         }
     }
 
@@ -220,19 +220,19 @@ struct UpdateStateTests {
     // MARK: - Multiple Service Dependencies
 
     @Test(.timeLimit(.minutes(1)))
-    func `Multiple service dependencies feeding state`() async {
+    func `Multiple service dependencies feeding state`() async throws {
         let counter = TestSource()
         let flag = TestSource()
         let vm = MultiSourceViewModel(counterSource: counter, flagSource: flag)
 
-        await observing(vm) { expect in
-            await expect(\.state.isEnabled, equals: false)
+        try await observing(vm) { expect in
+            #expect(vm.state.isEnabled == false)
 
             flag.isEnabled = true
-            await expect(\.state.isEnabled, equals: true)
+            try await expect(\.state.isEnabled, becomes: true)
 
             counter.count = 5
-            await expect(\.state.count, equals: 5)
+            try await expect(\.state.count, becomes: 5)
         }
     }
 
@@ -297,29 +297,29 @@ struct UpdateStateTests {
         try await Task.sleep(for: .milliseconds(100))
 
         // Second observation
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 3)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 3)
 
             source.count = 10
-            await expect(\.state.count, equals: 10)
+            try await expect(\.state.count, becomes: 10)
         }
     }
 
     // MARK: - High-Throughput Stress
 
     @Test(.timeLimit(.minutes(1)))
-    func `High-throughput mutations converge to final value`() async {
+    func `High-throughput mutations converge to final value`() async throws {
         let source = TestSource()
         let vm = CounterViewModel(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             for i in 1...500 {
                 source.count = i
             }
 
-            await expect(\.state.count, equals: 500)
+            try await expect(\.state.count, eventually: 500)
         }
     }
 

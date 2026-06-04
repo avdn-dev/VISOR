@@ -53,23 +53,23 @@ struct IntegrationTests {
     // MARK: - Factory -> VM -> observing
 
     @Test(.timeLimit(.minutes(1)))
-    func `Factory creates VM that works with observing DSL`() async {
+    func `Factory creates VM that works with observing DSL`() async throws {
         let source = TestSource()
         let factory = ViewModelFactory { IntegrationVM(source: source) }
         let vm = factory.makeViewModel()
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             source.count = 42
-            await expect(\.state.count, equals: 42)
+            try await expect(\.state.count, becomes: 42)
         }
     }
 
     // MARK: - Two VMs sharing same service
 
     @Test(.timeLimit(.minutes(1)))
-    func `Two VMs sharing same service both reflect changes`() async {
+    func `Two VMs sharing same service both reflect changes`() async throws {
         let source = TestSource()
         let vm1 = IntegrationVM(source: source)
         let vm2 = IntegrationVM(source: source)
@@ -77,13 +77,15 @@ struct IntegrationTests {
         let task2 = Task { await vm2.startObserving() }
         defer { task2.cancel() }
 
-        await observing(vm1) { expect in
+        try await observing(vm1) { expect in
             source.count = 7
-            await expect(\.state.count, equals: 7)
+            try await expect(\.state.count, becomes: 7)
 
             // Wait for vm2 to also converge
             for await count in valuesOf({ vm2.state.count }) {
-                if count == 7 { break }
+                if count == 0 { continue }
+                #expect(count == 7)
+                break
             }
         }
     }
@@ -91,19 +93,19 @@ struct IntegrationTests {
     // MARK: - Router navigation does not interfere with VM observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `Router navigation does not interfere with VM observation`() async {
+    func `Router navigation does not interfere with VM observation`() async throws {
         let source = TestSource()
         let vm = IntegrationVM(source: source)
         let router = Router<TestScene>()
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             router.push(.detail(id: "1"))
             router.present(sheet: .preferences)
 
             source.count = 10
-            await expect(\.state.count, equals: 10)
+            try await expect(\.state.count, becomes: 10)
 
             #expect(router.navigationPath.count == 1)
             #expect(router.presentingSheet == .preferences)
@@ -133,7 +135,7 @@ struct IntegrationTests {
     // MARK: - Deep link URL handling does not interfere with observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `Deep link URL handling does not interfere with VM observation`() async {
+    func `Deep link URL handling does not interfere with VM observation`() async throws {
         let source = TestSource()
         let vm = IntegrationVM(source: source)
         let root = Router<TestScene>()
@@ -141,8 +143,8 @@ struct IntegrationTests {
             .equal(to: ["settings"], destination: .tab(.settings)),
         ])
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             // Deep link while observing
             if let dest = root.deepLinkHandler?(URL(string: "test://settings")!) {
@@ -150,7 +152,7 @@ struct IntegrationTests {
             }
 
             source.count = 42
-            await expect(\.state.count, equals: 42)
+            try await expect(\.state.count, becomes: 42)
 
             #expect(root.selectedTab == .settings)
         }

@@ -345,37 +345,37 @@ struct ObserveLatestTests {
 struct ExpectationDSLTests {
 
   @Test(.timeLimit(.minutes(1)))
-  func `equals waits for matching value`() async {
+  func `becomes waits for matching value`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
+    try await observing(vm) { expect in
       Task { @MainActor in source.count = 42 }
-      await expect(\.state.count, equals: 42)
+      try await expect(\.state.count, becomes: 42)
     }
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `isNot waits until value differs`() async {
+  func `becomes waits until derived value changes`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
-      await expect(\.state.isActive, equals: false)
+    try await observing(vm) { expect in
+      #expect(vm.state.isActive == false)
 
       Task { @MainActor in source.count = 1 }
-      await expect(\.state.isActive, isNot: false)
+      try await expect(\.state.isActive, becomes: true)
     }
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `satisfies waits for predicate`() async {
+  func `becomes waits for expected value`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
+    try await observing(vm) { expect in
       Task { @MainActor in source.count = 15 }
-      await expect(\.state.count, satisfies: { $0 > 10 })
+      try await expect(\.state.count, becomes: 15)
     }
   }
 
@@ -384,9 +384,9 @@ struct ExpectationDSLTests {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
+    try await observing(vm) { expect in
       Task { @MainActor in source.count = 1 }
-      await expect(\.state.count, equals: 1)
+      try await expect(\.state.count, becomes: 1)
     }
 
     // After observing returns, further changes should NOT propagate
@@ -396,53 +396,43 @@ struct ExpectationDSLTests {
     #expect(vm.state.count == countBefore)
   }
 
-  // MARK: - equals returns immediately when already correct
+  // MARK: - Snapshot checks
 
   @Test(.timeLimit(.minutes(1)))
-  func `equals returns immediately when value already correct`() async {
+  func `snapshot check passes when value already correct`() {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
     // count starts at 0
 
-    await observing(vm) { expect in
-      await expect(\.state.count, equals: 0)
-    }
+    #expect(vm.state.count == 0)
   }
 
-  // MARK: - isNot returns immediately when already different
-
   @Test(.timeLimit(.minutes(1)))
-  func `isNot returns immediately when initial value already differs`() async {
+  func `snapshot check passes when initial value already differs`() {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
     // isActive starts as false
 
-    await observing(vm) { expect in
-      await expect(\.state.isActive, isNot: true)
-    }
+    #expect(vm.state.isActive != true)
   }
 
-  // MARK: - satisfies returns immediately when already matching
-
   @Test(.timeLimit(.minutes(1)))
-  func `satisfies returns immediately when predicate already matches`() async {
+  func `snapshot check supports predicates`() {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
     // count starts at 0
 
-    await observing(vm) { expect in
-      await expect(\.state.count, satisfies: { $0 >= 0 })
-    }
+    #expect(vm.state.count >= 0)
   }
 
-  // MARK: - satisfies with intermediate non-matching values
+  // MARK: - eventually with intermediate non-matching values
 
   @Test(.timeLimit(.minutes(1)))
-  func `satisfies keeps waiting through non-matching intermediate values`() async {
+  func `eventually keeps waiting through non-matching intermediate values`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
+    try await observing(vm) { expect in
       // Mutations happen after valuesOf starts waiting
       Task { @MainActor in
         // Non-matching values first
@@ -452,25 +442,25 @@ struct ExpectationDSLTests {
         // Now one that satisfies the predicate
         source.count = 20
       }
-      await expect(\.state.count, satisfies: { $0 > 10 })
+      try await expect(\.state.count, eventually: 20)
     }
   }
 
   // MARK: - Multiple expect calls in sequence
 
   @Test(.timeLimit(.minutes(1)))
-  func `Multiple expect calls in sequence`() async {
+  func `Multiple expect calls in sequence`() async throws {
     let source = TestSource()
     let vm = BoundViewModel(source: source)
 
-    await observing(vm) { expect in
-      await expect(\.state.count, equals: 0)
+    try await observing(vm) { expect in
+      #expect(vm.state.count == 0)
 
       Task { @MainActor in source.count = 1 }
-      await expect(\.state.count, equals: 1)
+      try await expect(\.state.count, becomes: 1)
 
       Task { @MainActor in source.count = 10 }
-      await expect(\.state.count, equals: 10)
+      try await expect(\.state.count, becomes: 10)
     }
   }
 
@@ -485,7 +475,7 @@ struct ExpectationDSLTests {
     do {
       try await observing(vm) { expect in
         Task { @MainActor in source.count = 1 }
-        await expect(\.state.count, equals: 1)
+        try await expect(\.state.count, becomes: 1)
         throw TestError()
       }
     } catch {

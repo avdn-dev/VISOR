@@ -125,9 +125,9 @@ struct MemoryLeakTests {
         var vm: ManualLeakVM? = ManualLeakVM(source: source)
         weak let weakVM = vm
 
-        await observing(vm!) { expect in
+        try await observing(vm!) { expect in
             source.count = 1
-            await expect(\.state.count, equals: 1)
+            try await expect(\.state.count, becomes: 1)
         }
 
         vm = nil
@@ -319,9 +319,9 @@ struct MemoryLeakTests {
 
         // Run observing multiple times
         for i in 1...3 {
-            await observing(vm!) { expect in
+            try await observing(vm!) { expect in
                 source.count = i
-                await expect(\.state.count, equals: i)
+                try await expect(\.state.count, becomes: i)
             }
         }
 

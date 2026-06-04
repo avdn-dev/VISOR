@@ -124,37 +124,6 @@ public struct Expectation<O: Observable> {
         }
     }
 
-    // MARK: - Deprecated
-
-    @available(*, deprecated, message: "Use #expect for snapshot checks, or becomes for strict streaming assertions.")
-    public func callAsFunction<T: Equatable & Sendable>(
-        _ keyPath: KeyPath<O, T>,
-        equals expected: T
-    ) async {
-        for await value in valuesOf({ self.observable[keyPath: keyPath] }) {
-            if value == expected { return }
-        }
-    }
-
-    @available(*, deprecated, message: "Use #expect(… != …) for snapshot checks.")
-    public func callAsFunction<T: Equatable & Sendable>(
-        _ keyPath: KeyPath<O, T>,
-        isNot expected: T
-    ) async {
-        for await value in valuesOf({ self.observable[keyPath: keyPath] }) {
-            if value != expected { return }
-        }
-    }
-
-    @available(*, deprecated, message: "Use eventually(_:) for lenient value waiting, or a valuesOf loop for predicate-based waiting.")
-    public func callAsFunction<T: Sendable>(
-        _ keyPath: KeyPath<O, T>,
-        satisfies predicate: @escaping @Sendable (T) -> Bool
-    ) async {
-        for await value in valuesOf({ self.observable[keyPath: keyPath] }) {
-            if predicate(value) { return }
-        }
-    }
 }
 
 // MARK: - Timeout helper

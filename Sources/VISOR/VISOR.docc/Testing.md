@@ -17,13 +17,13 @@ VISOR provides two categories of testing support:
 
 ```swift
 @Test(.timeLimit(.minutes(1)))
-func updatesOnServiceChange() async {
+func updatesOnServiceChange() async throws {
   let spy = SpyProfileService()
   let vm = ProfileViewModel(profileService: spy)
 
-  await observing(vm) { expect in
+  try await observing(vm) { expect in
     spy.name = "Alice"
-    await expect(\.state.name, equals: "Alice")
+    try await expect(\.state.name, becomes: "Alice")
   }
 }
 ```
@@ -32,29 +32,28 @@ func updatesOnServiceChange() async {
 
 ### Assertion Methods
 
-``Expectation`` provides three assertion methods, all called via `callAsFunction`:
+``Expectation`` provides streaming assertions via `callAsFunction`:
 
 | Method | Description |
 |--------|-------------|
-| `expect(\.prop, equals: value)` | Awaits until the property equals the expected value |
-| `expect(\.prop, isNot: value)` | Awaits until the property does NOT equal the value |
-| `expect(\.prop, satisfies: { ... })` | Awaits until the predicate returns `true` |
+| `try expect(\.prop, becomes: value)` | Awaits the next change and fails on any non-matching intermediate value |
+| `try expect(\.prop, eventually: value)` | Awaits until the property reaches the expected value, tolerating intermediate values |
 
-Each method observes the ViewModel property and returns as soon as the condition is met. Use Swift Testing's `@Test(.timeLimit(...))` to bound the wait — the DSL itself does not impose a timeout.
+Each method observes the ViewModel property after the current value. Use `#expect` for snapshot assertions against the current state.
 
 ```swift
-await observing(vm) { expect in
-  // Exact match
+try await observing(vm) { expect in
+  // Snapshot
+  #expect(vm.state.count == 0)
+
+  // Strict next change
   service.count = 42
-  await expect(\.state.count, equals: 42)
+  try await expect(\.state.count, becomes: 42)
 
-  // Negation
-  service.isLoading = false
-  await expect(\.state.isLoading, isNot: true)
-
-  // Predicate
-  service.items = ["a", "b", "c"]
-  await expect(\.state.items, satisfies: { $0.value?.count == 3 })
+  // Lenient wait through intermediate values
+  service.count = 50
+  service.count = 100
+  try await expect(\.state.count, eventually: 100)
 }
 ```
 

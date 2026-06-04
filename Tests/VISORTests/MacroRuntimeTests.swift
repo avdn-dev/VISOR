@@ -20,29 +20,29 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `Macro-generated state var tracks observation changes`() async {
+    func `Macro-generated state var tracks observation changes`() async throws {
         let vm = AutoStateVM()
         #expect(vm.state.value == 0)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             Task { @MainActor in vm.updateState(\.value, to: 1) }
-            await expect(\.state.value, equals: 1)
+            try await expect(\.state.value, becomes: 1)
 
             Task { @MainActor in vm.updateState(\.value, to: 2) }
-            await expect(\.state.value, equals: 2)
+            try await expect(\.state.value, becomes: 2)
         }
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Reaction on non-@Bound state property fires on mutation`() async {
+    func `@Reaction on non-@Bound state property fires on mutation`() async throws {
         let vm = ReactionOnStateVM()
         #expect(vm.state.doubled == 0)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             Task { @MainActor in
                 vm.updateState(\.counter, to: 5)
             }
-            await expect(\.state.doubled, equals: 10)
+            try await expect(\.state.doubled, becomes: 10)
         }
     }
 
@@ -74,57 +74,57 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - Single @Bound auto-generated observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `Single @Bound generates working startObserving`() async {
+    func `Single @Bound generates working startObserving`() async throws {
         let source = RuntimeSource()
         let vm = AutoObserveSingleVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
             source.count = 10
-            await expect(\.state.count, equals: 10)
+            try await expect(\.state.count, becomes: 10)
         }
     }
 
     // MARK: - Multiple @Bound with task group observation
 
     @Test(.timeLimit(.minutes(1)))
-    func `Multiple @Bound generates task group startObserving`() async {
+    func `Multiple @Bound generates task group startObserving`() async throws {
         let source = RuntimeSource()
         let vm = AutoObserveMultiVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
-            await expect(\.state.label, equals: "initial")
-            await expect(\.state.isEnabled, equals: false)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
+            #expect(vm.state.label == "initial")
+            #expect(vm.state.isEnabled == false)
 
             source.count = 5
-            await expect(\.state.count, equals: 5)
+            try await expect(\.state.count, becomes: 5)
 
             source.label = "changed"
-            await expect(\.state.label, equals: "changed")
+            try await expect(\.state.label, becomes: "changed")
 
             source.isEnabled = true
-            await expect(\.state.isEnabled, equals: true)
+            try await expect(\.state.isEnabled, becomes: true)
         }
     }
 
     // MARK: - @Bound from multiple different dependencies
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Bound from different dependencies observes both`() async {
+    func `@Bound from different dependencies observes both`() async throws {
         let source = RuntimeSource()
         let second = SecondSource()
         let vm = MultiDepVM(source: source, second: second)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
-            await expect(\.state.name, equals: "")
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
+            #expect(vm.state.name == "")
 
             source.count = 7
-            await expect(\.state.count, equals: 7)
+            try await expect(\.state.count, becomes: 7)
 
             second.name = "hello"
-            await expect(\.state.name, equals: "hello")
+            try await expect(\.state.name, becomes: "hello")
         }
     }
 
@@ -166,12 +166,12 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - @Bound + sync Action
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Bound coexists with sync action`() async {
+    func `@Bound coexists with sync action`() async throws {
         let source = RuntimeSource()
         let vm = BoundWithSyncActionVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
             #expect(vm.state.selectedIndex == 0)
 
             // Action mutation
@@ -180,7 +180,7 @@ struct ViewModelMacroRuntimeTests {
 
             // @Bound still works
             source.count = 42
-            await expect(\.state.count, equals: 42)
+            try await expect(\.state.count, becomes: 42)
 
             // Both states coexist
             #expect(vm.state.selectedIndex == 3)
@@ -194,12 +194,12 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - @Bound + async Action
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Bound coexists with async action and Loadable`() async {
+    func `@Bound coexists with async action and Loadable`() async throws {
         let source = RuntimeSource()
         let vm = BoundWithAsyncActionVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
             #expect(vm.state.detail == .loading)
 
             // Async action
@@ -208,7 +208,7 @@ struct ViewModelMacroRuntimeTests {
 
             // @Bound still works after async action
             source.count = 99
-            await expect(\.state.count, equals: 99)
+            try await expect(\.state.count, becomes: 99)
 
             // Clear
             await vm.handle(.clearDetail)
@@ -217,17 +217,17 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Bound updates during async action`() async {
+    func `@Bound updates during async action`() async throws {
         let source = RuntimeSource()
         let vm = BoundWithAsyncActionVM(source: source)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             // Start async action
             let actionTask = Task { await vm.handle(.loadDetail) }
 
             // @Bound update while action is in-flight
             source.count = 50
-            await expect(\.state.count, equals: 50)
+            try await expect(\.state.count, becomes: 50)
 
             await actionTask.value
             #expect(vm.state.detail == .loaded("fetched"))
@@ -237,25 +237,27 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - @Reaction (sync)
 
     @Test(.timeLimit(.minutes(1)))
-    func `Sync @Reaction fires on every value change`() async {
+    func `Sync @Reaction fires on every value change`() async throws {
         let nav = RuntimeSource()
         let vm = SyncReactionVM(nav: nav)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             // Initial emission fires with nil, so reactionCount starts at 1
-            await expect(\.state.reactionCount, satisfies: { $0 >= 1 })
+            for await count in valuesOf({ vm.state.reactionCount }) {
+                if count >= 1 { break }
+            }
             let baseline = vm.state.reactionCount
 
             nav.destination = "home"
-            await expect(\.state.lastDestination, equals: "home")
+            try await expect(\.state.lastDestination, becomes: "home")
             #expect(vm.state.reactionCount == baseline + 1)
 
             nav.destination = "settings"
-            await expect(\.state.lastDestination, equals: "settings")
+            try await expect(\.state.lastDestination, becomes: "settings")
             #expect(vm.state.reactionCount == baseline + 2)
 
             nav.destination = nil
-            await expect(\.state.lastDestination, equals: nil)
+            try await expect(\.state.lastDestination, becomes: nil)
             #expect(vm.state.reactionCount == baseline + 3)
         }
     }
@@ -267,56 +269,56 @@ struct ViewModelMacroRuntimeTests {
         let nav = RuntimeSource()
         let vm = AsyncReactionVM(nav: nav)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             nav.destination = "first"
-            await expect(\.state.processedValue, equals: "first")
+            try await expect(\.state.processedValue, becomes: "first")
 
             nav.destination = "second"
-            await expect(\.state.processedValue, equals: "second")
+            try await expect(\.state.processedValue, becomes: "second")
 
             nav.destination = "final"
-            await expect(\.state.processedValue, equals: "final")
+            try await expect(\.state.processedValue, becomes: "final")
         }
     }
 
     // MARK: - @Bound + @Reaction combined
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Bound and @Reaction both active concurrently`() async {
+    func `@Bound and @Reaction both active concurrently`() async throws {
         let source = RuntimeSource()
         let nav = RuntimeSource()
         let vm = BoundAndReactionVM(source: source, nav: nav)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             // @Bound update
             source.count = 10
-            await expect(\.state.count, equals: 10)
+            try await expect(\.state.count, becomes: 10)
 
             // @Reaction update
             nav.destination = "detail"
-            await expect(\.state.lastNav, equals: "detail")
+            try await expect(\.state.lastNav, becomes: "detail")
 
             // Both continue to work
             source.count = 20
-            await expect(\.state.count, equals: 20)
+            try await expect(\.state.count, becomes: 20)
 
             nav.destination = nil
-            await expect(\.state.lastNav, equals: nil)
+            try await expect(\.state.lastNav, becomes: nil)
         }
     }
 
     // MARK: - Action == Never
 
     @Test(.timeLimit(.minutes(1)))
-    func `VM with no Action enum still observes via @Bound`() async {
+    func `VM with no Action enum still observes via @Bound`() async throws {
         let source = RuntimeSource()
         let vm = NoActionVM(source: source)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             source.count = 77
-            await expect(\.state.count, equals: 77)
+            try await expect(\.state.count, becomes: 77)
         }
     }
 
@@ -331,14 +333,14 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `@Polled updates state after poll interval`() async {
+    func `@Polled updates state after poll interval`() async throws {
         let monitor = BatteryMonitor()
         monitor.level = 0.5
         let vm = PolledSingleVM(monitor: monitor)
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             monitor.level = 0.8
-            await expect(\.state.level, equals: 0.8)
+            try await expect(\.state.level, becomes: 0.8)
         }
     }
 
@@ -352,9 +354,9 @@ struct ViewModelMacroRuntimeTests {
         // Value changes AFTER init but BEFORE startObserving
         monitor.level = 0.9
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             // The initial updateState in the generated observe method should catch this
-            await expect(\.state.level, equals: 0.9)
+            try await expect(\.state.level, becomes: 0.9)
         }
     }
 
@@ -416,7 +418,7 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `Push-based @Bound and pull-based @Polled update independently`() async {
+    func `Push-based @Bound and pull-based @Polled update independently`() async throws {
         let source = RuntimeSource()
         let monitor = BatteryMonitor()
         monitor.level = 0.3
@@ -427,18 +429,18 @@ struct ViewModelMacroRuntimeTests {
         #expect(vm.state.level == 0.3)
         #expect(vm.state.label == "initial")
 
-        await observing(vm) { expect in
+        try await observing(vm) { expect in
             // @Bound update (push-based — immediate)
             source.count = 10
-            await expect(\.state.count, equals: 10)
+            try await expect(\.state.count, becomes: 10)
 
             // @Polled update (pull-based — next poll cycle)
             monitor.level = 0.9
-            await expect(\.state.level, equals: 0.9)
+            try await expect(\.state.level, becomes: 0.9)
 
             // @Bound still works after @Polled update
             source.label = "changed"
-            await expect(\.state.label, equals: "changed")
+            try await expect(\.state.label, becomes: "changed")
         }
     }
 
@@ -482,15 +484,15 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func `ThrottledBy @Bound eventually delivers single change`() async {
+    func `ThrottledBy @Bound eventually delivers single change`() async throws {
         let source = RuntimeSource()
         let vm = ThrottledByBoundVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.count == 0)
 
             source.count = 42
-            await expect(\.state.count, equals: 42)
+            try await expect(\.state.count, becomes: 42)
         }
     }
 
@@ -562,7 +564,7 @@ struct ViewModelMacroRuntimeTests {
                 source.count = i
             }
 
-            try await expect(\.state.latestCount, eventually: 10)
+            try await expect(\.state.latestCount, becomes: 10)
             #expect(vm.state.reactionCount == 1, "Debounced reaction should fire once for a rapid burst")
         }
     }
@@ -579,7 +581,7 @@ struct ViewModelMacroRuntimeTests {
                 source.count = i
             }
 
-            try await expect(\.state.processedCount, eventually: 10)
+            try await expect(\.state.processedCount, becomes: 10)
             #expect(vm.state.completedHandlers == 1, "Debounced async reaction should complete once for a rapid burst")
         }
     }
@@ -587,21 +589,21 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - Mixed throttledBy + unthrottledBy @Bound
 
     @Test(.timeLimit(.minutes(1)))
-    func `Mixed throttled and unthrottled @Bound in same State`() async {
+    func `Mixed throttled and unthrottled @Bound in same State`() async throws {
         let source = RuntimeSource()
         let vm = MixedThrottledByVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.label, equals: "initial")
-            await expect(\.state.count, equals: 0)
+        try await observing(vm) { expect in
+            #expect(vm.state.label == "initial")
+            #expect(vm.state.count == 0)
 
             // UnthrottledBy @Bound updates promptly
             source.label = "changed"
-            await expect(\.state.label, equals: "changed")
+            try await expect(\.state.label, becomes: "changed")
 
             // ThrottledBy @Bound also delivers (after buffer)
             source.count = 42
-            await expect(\.state.count, equals: 42)
+            try await expect(\.state.count, becomes: 42)
         }
     }
 
@@ -642,10 +644,12 @@ struct ViewModelMacroRuntimeTests {
         let vm = SyncReactionVM(nav: nav)
 
         try await observing(vm) { expect in
-            await expect(\.state.reactionCount, satisfies: { $0 >= 1 })
+            for await count in valuesOf({ vm.state.reactionCount }) {
+                if count >= 1 { break }
+            }
 
             nav.destination = "same"
-            await expect(\.state.lastDestination, equals: "same")
+            try await expect(\.state.lastDestination, becomes: "same")
             let countAfterFirst = vm.state.reactionCount
 
             // Set to the same value again — valuesOf deduplicates Equatable types
@@ -658,7 +662,7 @@ struct ViewModelMacroRuntimeTests {
 
             // A different value DOES fire
             nav.destination = "other"
-            await expect(\.state.lastDestination, equals: "other")
+            try await expect(\.state.lastDestination, becomes: "other")
             #expect(vm.state.reactionCount == countAfterFirst + 1)
         }
     }
@@ -666,15 +670,17 @@ struct ViewModelMacroRuntimeTests {
     // MARK: - @Reaction with non-optional observed property
 
     @Test(.timeLimit(.minutes(1)))
-    func `Sync @Reaction fires for non-optional property changes`() async {
+    func `Sync @Reaction fires for non-optional property changes`() async throws {
         let source = RuntimeSource()
         let vm = ThrottledBySyncReactionVM(source: source)
 
-        await observing(vm) { expect in
-            await expect(\.state.reactionCount, satisfies: { $0 >= 1 })
+        try await observing(vm) { expect in
+            for await count in valuesOf({ vm.state.reactionCount }) {
+                if count >= 1 { break }
+            }
 
             source.count = 42
-            await expect(\.state.latestCount, equals: 42)
+            try await expect(\.state.latestCount, becomes: 42)
         }
     }
 
