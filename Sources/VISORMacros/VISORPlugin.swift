@@ -18,8 +18,8 @@ struct VISORPlugin: CompilerPlugin {
     PolledMacro.self,
     ReactionMacro.self,
     ViewModelMacro.self,
-    StubbableDefaultMacro.self,
-    StubbableMacro.self,
-    SpyableMacro.self,
+    DefaultValueMacro.self,
+    GenerateStubMacro.self,
+    GenerateSpyMacro.self,
   ]
 }

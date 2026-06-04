@@ -704,15 +704,15 @@ struct ViewModelMacroRuntimeTests {
     }
 }
 
-// MARK: - @Stubbable Runtime Tests
+// MARK: - @GenerateStub Runtime Tests
 
 
-@Suite("Macro Runtime — @Stubbable")
+@Suite("Macro Runtime — @GenerateStub")
 @MainActor
-struct StubbableMacroRuntimeTests {
+struct GenerateStubMacroRuntimeTests {
 
     @Test
-    func `@Stubbable generates class conforming to protocol`() {
+    func `@GenerateStub generates class conforming to protocol`() {
         let stub: any ItemService = StubItemService()
         #expect(stub.items.isEmpty)
         #expect(stub.count == 0)
@@ -775,15 +775,15 @@ struct StubbableMacroRuntimeTests {
     }
 }
 
-// MARK: - @Spyable Runtime Tests
+// MARK: - @GenerateSpy Runtime Tests
 
 
-@Suite("Macro Runtime — @Spyable")
+@Suite("Macro Runtime — @GenerateSpy")
 @MainActor
-struct SpyableMacroRuntimeTests {
+struct GenerateSpyMacroRuntimeTests {
 
     @Test
-    func `@Spyable generates class conforming to protocol`() {
+    func `@GenerateSpy generates class conforming to protocol`() {
         let spy: any AnalyticsService = SpyAnalyticsService()
         spy.trackEvent("test")
     }

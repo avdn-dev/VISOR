@@ -7,7 +7,7 @@ The observation assertion DSL and generated test doubles.
 VISOR provides two categories of testing support:
 
 1. **Observation assertions** — `observing()` and ``Expectation`` for awaiting ViewModel state changes.
-2. **Generated test doubles** — `@Stubbable` for preview stubs and `@Spyable` for test spies.
+2. **Generated test doubles** — `@GenerateStub` for preview stubs and `@GenerateSpy` for test spies.
 
 ## Observation Assertions
 
@@ -58,12 +58,12 @@ await observing(vm) { expect in
 }
 ```
 
-## @Stubbable
+## @GenerateStub
 
 Apply to a protocol to generate a `Stub<Name>` class for previews and tests:
 
 ```swift
-@Stubbable
+@GenerateStub
 protocol ProfileService {
   var name: String { get }
   var isLoggedIn: Bool { get }
@@ -96,24 +96,24 @@ When a property type is a custom type without a known default (not `Bool`, `Stri
 
 When a method return type is a custom type, the generated stub uses an `Optional` variable guarded by `fatalError` with a descriptive message. This crashes fast with clear guidance if you forget to configure the return value.
 
-A compiler note is emitted whenever either pattern is generated. To silence it and provide an explicit default, use `@StubbableDefault`:
+A compiler note is emitted whenever either pattern is generated. For properties, use `@DefaultValue` to provide an explicit default:
 
 ```swift
-@Stubbable
+@GenerateStub
 protocol AnimationService {
-  @StubbableDefault(AnimationState.idle) var state: AnimationState { get }
+  @DefaultValue(AnimationState.idle) var state: AnimationState { get }
   func currentTheme() -> Theme  // ← generates optional + fatalError guard
 }
 ```
 
 > Protocols with associated types are not supported (compile-time error). Subscripts and static members are skipped with a warning.
 
-## @Spyable
+## @GenerateSpy
 
 Apply to a protocol to generate a `Spy<Name>` test double with call recording:
 
 ```swift
-@Spyable
+@GenerateSpy
 protocol ProfileService {
   func load() async throws -> [String]
   func save(_ name: String) async throws
@@ -141,18 +141,18 @@ let names = try await spy.load()
 #expect(spy.calls == [.load])
 ```
 
-Properties use the same default value logic as `@Stubbable`, including `@StubbableDefault` support.
+Properties use the same default value logic as `@GenerateStub`, including `@DefaultValue` support.
 
-> Limitations: Same as `@Stubbable` — no associated types, subscripts/statics skipped.
+> Limitations: Same as `@GenerateStub` — no associated types, subscripts/statics skipped.
 
-## @StubbableDefault
+## @DefaultValue
 
-Provides a custom default value for a protocol property or return value in generated stubs and spies. Use this when the type has no auto-detected default:
+Provides a custom default value for a protocol property in generated stubs and spies. Use this when the property type has no auto-detected default:
 
 ```swift
-@Stubbable @Spyable
+@GenerateStub @GenerateSpy
 protocol ContentLoading: AnyObject {
-  @StubbableDefault(LoadStatus.idle)
+  @DefaultValue(LoadStatus.idle)
   var status: LoadStatus { get }
 }
 // StubContentLoading.status defaults to .idle

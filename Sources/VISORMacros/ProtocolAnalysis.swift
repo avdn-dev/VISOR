@@ -16,7 +16,7 @@ struct ProtocolPropertyInfo {
   let name: String
   var type: String
   let hasSetter: Bool
-  let stubbableDefault: String?
+  let defaultValueExpression: String?
 }
 
 // MARK: - ParameterInfo
@@ -117,11 +117,11 @@ struct ProtocolAnalysis {
           hasSetter = false
         }
         
-        let stubbableDefault: String? = {
+        let defaultValueExpression: String? = {
           for attr in varDecl.attributes {
             guard
               let attrSyntax = attr.as(AttributeSyntax.self),
-              attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.stubbableDefault,
+              attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.defaultValue,
               let arguments = attrSyntax.arguments?.as(LabeledExprListSyntax.self),
               let firstArg = arguments.first
             else {
@@ -136,7 +136,7 @@ struct ProtocolAnalysis {
           name: identifier.identifier.text,
           type: taHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
           hasSetter: hasSetter,
-          stubbableDefault: stubbableDefault))
+          defaultValueExpression: defaultValueExpression))
         continue
       }
       
@@ -361,7 +361,7 @@ private struct TypeAliasHandler {
 
 // MARK: - Shared Protocol Validation for Test Double Macros
 
-/// Validates a protocol analysis for test double generation (Stubbable/Spyable).
+/// Validates a protocol analysis for test double generation (GenerateStub/GenerateSpy).
 /// Returns `false` if the protocol has associated types (emits error).
 /// Emits warnings for subscripts and static members.
 func validateProtocolForTestDouble(

@@ -22,7 +22,7 @@ In practice, VISOR gives you a consistent feature shape:
 - **`@LazyViewModel`** separates view ownership from rendering. The `@LazyViewModel` view gets its ViewModel from a Factory; child views receive state as plain parameters, trivially previewable and testable.
 - **Interactors** are optional plain Swift use-case objects for workflows that coordinate multiple services, keeping ViewModels focused on state and user intent.
 - **`Router`** centralises navigation behind a type-safe API with deep linking, modal hierarchies, and tab management built in.
-- **`@Stubbable` / `@Spyable`** generate test doubles from protocol declarations — stubs with sensible defaults, spies with call recording.
+- **`@GenerateStub` / `@GenerateSpy`** generate test doubles from protocol declarations — stubs with sensible defaults, spies with call recording.
 
 ## Requirements
 
@@ -141,7 +141,7 @@ When `profileService.name` or `.email` changes, the view updates automatically. 
 | `Loadable<Value>` | Enum for per-field loading/empty/error states within `State` |
 | Interactors | Optional use-case layer for coordinating multiple services |
 | `Router` | Type-safe navigation with deep linking, externalised view resolution, and modal hierarchies |
-| `@Stubbable` / `@Spyable` | Generate test doubles from protocol declarations |
+| `@GenerateStub` / `@GenerateSpy` | Generate test doubles from protocol declarations |
 | `observing()` / `Expectation` | Testing DSL for asserting on observable ViewModel state |
 
 All observation macros support `throttledBy:` for rate-limiting rapid-fire updates.
@@ -153,7 +153,7 @@ Full API documentation is available at [**avdn-dev.github.io/VISOR**](https://av
 - **Architecture** — VISOR layers, View/Content pattern, Interactors, Factory injection
 - **Observation** — `@Bound`, `@Polled`, `@Reaction`, rate limiting, `valuesOf()`
 - **Navigation** — Router, NavigationScene, content-based view resolution, deep linking, NavigationContainer
-- **Testing** — `observing()` DSL, `@Stubbable`, `@Spyable`
+- **Testing** — `observing()` DSL, `@GenerateStub`, `@GenerateSpy`
 
 ## License
 

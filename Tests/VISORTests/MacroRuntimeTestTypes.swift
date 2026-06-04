@@ -498,10 +498,10 @@ final class NonEquatableVM: ViewModel {
     }
 }
 
-// MARK: - @Stubbable / @Spyable Macro Test Protocols
+// MARK: - @GenerateStub / @GenerateSpy Macro Test Protocols
 
 
-@Stubbable
+@GenerateStub
 protocol ItemService {
     var items: [String] { get }
     var count: Int { get }
@@ -509,30 +509,30 @@ protocol ItemService {
     func save(_ item: String) async throws
 }
 
-@Spyable
+@GenerateSpy
 protocol AnalyticsService {
     func trackEvent(_ name: String)
     func trackScreen(name: String, category: String)
     func fetchReport() async throws -> String
 }
 
-@Spyable
+@GenerateSpy
 protocol GreeterService {
     func greet(_ name: String) -> String
     func reset()
 }
 
-@Spyable
+@GenerateSpy
 protocol CallbackService {
     func register(_ callback: @escaping (String) -> Void)
 }
 
-@Spyable
+@GenerateSpy
 protocol InoutService {
     func update(value: inout Int)
 }
 
-@Spyable
+@GenerateSpy
 protocol MixedInoutService {
     func process(name: String, output: inout String)
 }

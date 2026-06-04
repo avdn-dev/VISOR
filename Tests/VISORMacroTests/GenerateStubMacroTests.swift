@@ -1,5 +1,5 @@
 //
-//  StubbableMacroTests.swift
+//  GenerateStubMacroTests.swift
 //  VISOR
 //
 //  Created by Anh Nguyen on 18/2/2026.
@@ -12,19 +12,19 @@ import Testing
 import VISORMacros
 
 private let testMacros: [String: Macro.Type] = [
-  "Stubbable": StubbableMacro.self,
-  "StubbableDefault": StubbableDefaultMacro.self,
+  "GenerateStub": GenerateStubMacro.self,
+  "DefaultValue": DefaultValueMacro.self,
 ]
 
-private let stubbableDefaultWarning = """
-  @Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
-  Use @StubbableDefault to provide explicit defaults.
+private let defaultValueWarning = """
+  @GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
+  Use @DefaultValue to provide explicit property defaults.
   """
 
-// MARK: - StubbableMacroTests
+// MARK: - GenerateStubMacroTests
 
-@Suite("Stubbable Macro")
-struct StubbableMacroTests {
+@Suite("GenerateStub Macro")
+struct GenerateStubMacroTests {
 
   // MARK: - Protocol Stub Generation
 
@@ -32,7 +32,7 @@ struct StubbableMacroTests {
   func `Generates stub with properties and methods`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol DataService {
         var items: [Item] { get }
         var isLoading: Bool { get set }
@@ -69,7 +69,7 @@ struct StubbableMacroTests {
   func `Generates stub with default values for known types`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ConfigService {
         var name: String { get }
         var count: Int { get }
@@ -112,7 +112,7 @@ struct StubbableMacroTests {
   func `Uses optional with fatalError for unknown custom return types`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ThemeService {
         func currentTheme() -> Theme
       }
@@ -134,7 +134,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -143,7 +143,7 @@ struct StubbableMacroTests {
   func `Generates stub for empty protocol`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol EmptyService {
       }
       """,
@@ -163,7 +163,7 @@ struct StubbableMacroTests {
   func `Generates stub with labelled parameters`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol SearchService {
         func search(query: String, limit: Int) async throws -> [Result]
       }
@@ -188,7 +188,7 @@ struct StubbableMacroTests {
   func `Generates stub with optional return type`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol CacheService {
         func get(key: String) -> Data?
       }
@@ -215,7 +215,7 @@ struct StubbableMacroTests {
   func `Public protocol generates public stub`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       public protocol DataService {
         var items: [Item] { get }
         func fetch() async throws -> [Item]
@@ -251,7 +251,7 @@ struct StubbableMacroTests {
   func `Package protocol generates package stub`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       package protocol DataService {
         var items: [Item] { get }
         func fetch() async throws -> [Item]
@@ -279,7 +279,7 @@ struct StubbableMacroTests {
   func `Fileprivate protocol generates fileprivate stub`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       fileprivate protocol DataService {
         var items: [Item] { get }
         func fetch() async throws -> [Item]
@@ -307,7 +307,7 @@ struct StubbableMacroTests {
   func `Private protocol generates private stub`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       private protocol DataService {
         var items: [Item] { get }
         func fetch() async throws -> [Item]
@@ -331,15 +331,15 @@ struct StubbableMacroTests {
       macros: testMacros)
   }
 
-  // MARK: - @StubbableDefault
+  // MARK: - @DefaultValue
 
   @Test
-  func `Property with StubbableDefault uses custom default`() {
+  func `Property with DefaultValue uses custom default`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ExtractionService {
-        @StubbableDefault(ExtractionStatus.idle) var status: ExtractionStatus { get }
+        @DefaultValue(ExtractionStatus.idle) var status: ExtractionStatus { get }
       }
       """,
       expandedSource: """
@@ -356,10 +356,10 @@ struct StubbableMacroTests {
   }
 
   @Test
-  func `Property without StubbableDefault uses defaultValue as before`() {
+  func `Property without DefaultValue uses defaultValue as before`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ExtractionService {
         var count: Int { get }
         var theme: Theme { get }
@@ -378,18 +378,18 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `Mixed properties with and without StubbableDefault`() {
+  func `Mixed properties with and without DefaultValue`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ExtractionService {
-        @StubbableDefault(ExtractionStatus.idle) var status: ExtractionStatus { get }
+        @DefaultValue(ExtractionStatus.idle) var status: ExtractionStatus { get }
         var count: Int { get }
         var name: String { get }
       }
@@ -415,7 +415,7 @@ struct StubbableMacroTests {
   func `AsyncStream property gets default`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol StreamService {
         var updates: AsyncStream<Int> { get }
       }
@@ -439,7 +439,7 @@ struct StubbableMacroTests {
   func `Set property gets empty default`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol TagService {
         var tags: Set<String> { get }
       }
@@ -461,7 +461,7 @@ struct StubbableMacroTests {
   func `Method with external label different from internal name`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ItemService {
         func perform(with item: Item) async throws
       }
@@ -488,7 +488,7 @@ struct StubbableMacroTests {
   func `Disambiguates methods with same name but different labels`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol LoadService {
         func load(byId id: String) -> Item
         func load(matching query: String) -> [Item]
@@ -516,7 +516,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -525,7 +525,7 @@ struct StubbableMacroTests {
   func `Disambiguates void overloads`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol EventService {
         func send(event: String)
         func send(error: any Error)
@@ -552,7 +552,7 @@ struct StubbableMacroTests {
   func `Disambiguates overload with underscore label using type name`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol Finder {
         func find(_ expected: Item) -> Bool
         func find(byID id: String) -> Bool
@@ -583,7 +583,7 @@ struct StubbableMacroTests {
   func `Disambiguates overloads with same labels but different return types`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol Converter {
         func convert(from value: String) -> Int
         func convert(from value: String) -> Double
@@ -614,7 +614,7 @@ struct StubbableMacroTests {
   func `Non-colliding methods keep simple names`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol MixedService {
         func fetch() -> [Item]
         func save(_ item: Item)
@@ -649,7 +649,7 @@ struct StubbableMacroTests {
   func `Generates stub with generic return type`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol ResultService {
         func execute() -> Result<String, any Error>
       }
@@ -671,7 +671,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -680,7 +680,7 @@ struct StubbableMacroTests {
   func `Generates stub with generic parameter type`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol StorageService {
         func store(_ value: Set<String>)
         func retrieve() -> [String: [Int]]
@@ -709,7 +709,7 @@ struct StubbableMacroTests {
   func `Disambiguates overloads with generic underscore parameter types`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol Processor {
         func process(_ items: Set<String>) -> Int
         func process(_ items: Array<Int>) -> Int
@@ -740,7 +740,7 @@ struct StubbableMacroTests {
   func `Generic property types use correct defaults`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol CacheService {
         var entries: Dictionary<String, Int> { get }
         var pending: Set<String> { get }
@@ -762,7 +762,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@Stubbable: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @StubbableDefault to provide explicit defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -773,7 +773,7 @@ struct StubbableMacroTests {
   func `Error when applied to struct`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       struct NotValid {
       }
       """,
@@ -782,7 +782,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@Stubbable can only be applied to protocols", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@GenerateStub can only be applied to protocols", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
@@ -791,7 +791,7 @@ struct StubbableMacroTests {
   func `Error on protocol with associated types`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol HasAssoc {
         associatedtype Item
         func fetch() -> [Item]
@@ -804,7 +804,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@Stubbable does not support protocols with associated types", line: 1, column: 1, severity: .error),
+        DiagnosticSpec(message: "@GenerateStub does not support protocols with associated types", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
@@ -813,7 +813,7 @@ struct StubbableMacroTests {
   func `Warning on protocol with static members`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol HasStatic {
         static var shared: String { get }
         func doWork()
@@ -832,7 +832,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@Stubbable skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateStub skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -841,7 +841,7 @@ struct StubbableMacroTests {
   func `Warning on protocol with subscripts`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol HasSubscript {
         var name: String { get }
         subscript(index: Int) -> String { get }
@@ -859,7 +859,7 @@ struct StubbableMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@Stubbable skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateStub skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)
   }
@@ -870,7 +870,7 @@ struct StubbableMacroTests {
   func `Single typealias used in function`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol FooService {
         typealias Foo = String
         func processFoo(_ foo: Foo) -> Foo
@@ -895,7 +895,7 @@ struct StubbableMacroTests {
       """,
       diagnostics: [
         .init(
-          message: stubbableDefaultWarning,
+          message: defaultValueWarning,
           line: 1,
           column: 1,
           severity: .note)
@@ -909,10 +909,10 @@ struct StubbableMacroTests {
 func `Single typealias used in property`() {
   assertMacroExpansionSwiftTesting(
     """
-    @Stubbable
+    @GenerateStub
     protocol BarService {
       typealias Bar = Int
-      @StubbableDefault(0)
+      @DefaultValue(0)
       var bar: Bar { get }
     }
     """,
@@ -936,7 +936,7 @@ func `Generic typealias used in property`() {
     """
     enum FooError: Swift.Error { }
     
-    @Stubbable
+    @GenerateStub
     protocol BazService {
       typealias Value = Int
       typealias ErrorType = FooError
@@ -959,7 +959,7 @@ func `Generic typealias used in property`() {
     }
     """,
     diagnostics: [
-      .init(message: stubbableDefaultWarning, line: 3, column: 1, severity: .note)
+      .init(message: defaultValueWarning, line: 3, column: 1, severity: .note)
     ],
     macros: testMacros)
 }
@@ -968,7 +968,7 @@ func `Generic typealias used in property`() {
 func `Multiple typealiases used in method signature`() {
   assertMacroExpansionSwiftTesting(
     """
-    @Stubbable
+    @GenerateStub
     protocol SpamService {
       typealias Foo = Int
       typealias Bar = String
@@ -998,7 +998,7 @@ func `Multiple typealiases used in method signature`() {
     }
     """,
     diagnostics: [
-      .init(message: stubbableDefaultWarning, line: 1, column: 1, severity: .note)
+      .init(message: defaultValueWarning, line: 1, column: 1, severity: .note)
     ],
     macros: testMacros)
 }
@@ -1007,7 +1007,7 @@ func `Multiple typealiases used in method signature`() {
 func `Handle nested typealiases`() {
   assertMacroExpansionSwiftTesting(
     """
-    @Stubbable
+    @GenerateStub
     protocol EggsService {
       typealias Foo = String
       typealias Bar = Int
@@ -1040,7 +1040,7 @@ func `Handle nested typealiases`() {
     }
     """,
     diagnostics: [
-      .init(message: stubbableDefaultWarning, line: 1, column: 1, severity: .note)
+      .init(message: defaultValueWarning, line: 1, column: 1, severity: .note)
     ],
     macros: testMacros)
 }
@@ -1049,12 +1049,12 @@ func `Handle nested typealiases`() {
 func `Handle function property typealiases`() {
   assertMacroExpansionSwiftTesting(
     """
-    @Stubbable
+    @GenerateStub
     protocol FooFactoryProvider {
       typealias Foo = Int
       typealias Bar = Int
     
-      @StubbableDefault({ (_: FooFactoryProvider.Foo) -> FooFactoryProvider.Bar in 0 })
+      @DefaultValue({ (_: FooFactoryProvider.Foo) -> FooFactoryProvider.Bar in 0 })
       var fooFactory: (Foo) -> Bar { get }
     }
     """,
@@ -1079,7 +1079,7 @@ func `Handle function property typealiases`() {
 func `Handle typealias in attributed use site`() {
   assertMacroExpansionSwiftTesting(
     """
-    @Stubbable
+    @GenerateStub
     protocol BarService {
       typealias Bar = String
       func bar(_ bar: sending Bar)
@@ -1106,7 +1106,7 @@ func `Handle typealias in attributed use site`() {
   func `Preserves escaping in method signature for stub`() {
     assertMacroExpansionSwiftTesting(
       """
-      @Stubbable
+      @GenerateStub
       protocol CallbackService {
         func register(_ callback: @escaping (String) -> Void)
       }

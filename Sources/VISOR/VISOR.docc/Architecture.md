@@ -129,7 +129,7 @@ final class SignInViewModel {
 }
 ```
 
-Interactors pair well with `@Stubbable` and `@Spyable`: define the Interactor as a protocol, use a live implementation in production, and generate test doubles for ViewModel tests.
+Interactors pair well with `@GenerateStub` and `@GenerateSpy`: define the Interactor as a protocol, use a live implementation in production, and generate test doubles for ViewModel tests.
 
 ## @ViewModel Macro
 

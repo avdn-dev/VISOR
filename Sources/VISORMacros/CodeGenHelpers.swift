@@ -13,7 +13,7 @@ enum AttributeName {
   static let bound = "Bound"
   static let polled = "Polled"
   static let reaction = "Reaction"
-  static let stubbableDefault = "StubbableDefault"
+  static let defaultValue = "DefaultValue"
   static let observable = "Observable"
 }
 
@@ -24,7 +24,7 @@ enum AttributeName {
 func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: String = "") -> [String] {
   let prefix = access.isEmpty ? "" : "\(access) "
   return properties.map { prop in
-    if let customDefault = prop.stubbableDefault {
+    if let customDefault = prop.defaultValueExpression {
       return "  \(prefix)var \(prop.name): \(prop.type) = \(customDefault)"
     } else {
       let defaultVal = defaultValue(for: prop.type) ?? "nil"
@@ -39,7 +39,7 @@ func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: 
 // MARK: - Default Value Helper
 
 /// Returns a sensible default literal for known Swift types, or `nil` for custom types.
-/// Used by `@Stubbable` and `@Spyable` to initialise generated stub/spy properties.
+/// Used by generated stubs and spies to initialise generated properties.
 func defaultValue(for type: String) -> String? {
   let trimmed = type.trimmingWhitespace
 
@@ -90,7 +90,7 @@ func defaultValue(for type: String) -> String? {
 /// Returns `true` when any property or method return type has no known default and would
 /// produce an IUO property or an optional return-value variable.
 func hasUnknownTypeDefaults(properties: [ProtocolPropertyInfo], methods: [ProtocolMethodInfo]) -> Bool {
-  for prop in properties where prop.stubbableDefault == nil {
+  for prop in properties where prop.defaultValueExpression == nil {
     if defaultValue(for: prop.type) == nil { return true }
   }
   for method in methods {
@@ -147,7 +147,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
 /// - Non-throwing methods with a return type get a `ReturnValue` variable.
 /// - Void non-throwing methods produce no declarations.
 ///
-/// Used by both `@Stubbable` and `@Spyable` to avoid duplicated codegen logic.
+/// Used by generated stubs and spies to avoid duplicated codegen logic.
 func generateReturnStorage(
   method: ProtocolMethodInfo,
   methodPrefix: String,
@@ -177,6 +177,60 @@ func generateReturnStorage(
   }
 
   return lines
+}
+
+// MARK: - Method Fallback Helper
+
+enum MethodFallbackStyle {
+  case expression
+  case explicitReturn
+}
+
+func generateFallbackBodyLines(
+  method: ProtocolMethodInfo,
+  methodPrefix: String,
+  style: MethodFallbackStyle)
+  -> [String]
+{
+  if method.isThrowing {
+    if let returnType = method.returnType {
+      let needsGuard = defaultValue(for: returnType) == nil
+      if needsGuard {
+        return [
+          "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }",
+          "    return try result.get()"
+        ]
+      }
+
+      switch style {
+      case .expression:
+        return ["    try \(methodPrefix)Result.get()"]
+      case .explicitReturn:
+        return ["    return try \(methodPrefix)Result.get()"]
+      }
+    }
+
+    return ["    try \(methodPrefix)Result.get()"]
+  }
+
+  if let returnType = method.returnType {
+    let needsGuard = defaultValue(for: returnType) == nil
+    if needsGuard {
+      return [
+        "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }",
+        "    return value"
+      ]
+    }
+
+    switch style {
+    case .expression:
+      return ["    \(methodPrefix)ReturnValue"]
+    case .explicitReturn:
+      return ["    return \(methodPrefix)ReturnValue"]
+    }
+  }
+
+  return []
 }
 
 // MARK: - Implementation Closure Helpers
