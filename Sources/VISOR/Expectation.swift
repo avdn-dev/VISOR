@@ -59,7 +59,7 @@ public struct Expectation<O: Observable> {
     public func callAsFunction<T: Equatable & Sendable>(
         _ keyPath: KeyPath<O, T>,
         becomes expected: T,
-        timeout: Duration = .seconds(2)
+        timeout: Duration = .seconds(1)
     ) async throws {
         let initial = observable[keyPath: keyPath]
         guard initial != expected else {
@@ -102,7 +102,7 @@ public struct Expectation<O: Observable> {
     public func callAsFunction<T: Equatable & Sendable>(
         _ keyPath: KeyPath<O, T>,
         eventually expected: T,
-        timeout: Duration = .seconds(2)
+        timeout: Duration = .seconds(1)
     ) async throws {
         let initial = observable[keyPath: keyPath]
         guard initial != expected else {
