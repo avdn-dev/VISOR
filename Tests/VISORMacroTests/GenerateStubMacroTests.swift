@@ -14,11 +14,12 @@ import VISORMacros
 private let testMacros: [String: Macro.Type] = [
   "GenerateStub": GenerateStubMacro.self,
   "DefaultValue": DefaultValueMacro.self,
+  "DefaultReturn": DefaultValueMacro.self,
 ]
 
 private let defaultValueWarning = """
   @GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
-  Use @DefaultValue to provide explicit property defaults.
+  Use @DefaultValue for properties or @DefaultReturn for method returns.
   """
 
 // MARK: - GenerateStubMacroTests
@@ -115,11 +116,15 @@ struct GenerateStubMacroTests {
       @GenerateStub
       protocol ThemeService {
         func currentTheme() -> Theme
+        @DefaultReturn(Theme.system) func preferredTheme() -> Theme
+        @DefaultReturn(User.guest) func loadUser() throws -> User
       }
       """,
       expandedSource: """
       protocol ThemeService {
         func currentTheme() -> Theme
+        func preferredTheme() -> Theme
+        func loadUser() throws -> User
       }
 
       @Observable
@@ -131,10 +136,18 @@ struct GenerateStubMacroTests {
           }
           return value
         }
+        var preferredThemeReturnValue: Theme = Theme.system
+        func preferredTheme() -> Theme {
+            preferredThemeReturnValue
+        }
+        var loadUserResult: Result<User, any Error> = .success(User.guest)
+        func loadUser() throws -> User {
+            try loadUserResult.get()
+        }
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -378,7 +391,7 @@ struct GenerateStubMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -516,7 +529,7 @@ struct GenerateStubMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -671,7 +684,7 @@ struct GenerateStubMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -762,7 +775,7 @@ struct GenerateStubMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateStub: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }

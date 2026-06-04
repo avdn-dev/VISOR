@@ -7,7 +7,8 @@
 
 /// Provides a custom default value for a protocol property in generated stub and spy classes.
 ///
-/// Use this when the property type has no auto-detectable default (e.g. custom enums).
+/// Use this when the property type has no auto-detectable default (e.g. custom enums),
+/// or when you want to override the generated default.
 /// The expression must be fully qualified — `.idle` alone can't infer the type in attribute context.
 ///
 /// ```swift

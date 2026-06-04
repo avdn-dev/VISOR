@@ -500,11 +500,11 @@ final class NonEquatableVM: ViewModel {
 
 // MARK: - @GenerateStub / @GenerateSpy Macro Test Protocols
 
-
 @GenerateStub
 protocol ItemService {
     var items: [String] { get }
     var count: Int { get }
+    @DefaultReturn(["default"])
     func fetchItems() async throws -> [String]
     func save(_ item: String) async throws
 }
@@ -513,6 +513,7 @@ protocol ItemService {
 protocol AnalyticsService {
     func trackEvent(_ name: String)
     func trackScreen(name: String, category: String)
+    @DefaultReturn("default report")
     func fetchReport() async throws -> String
 }
 

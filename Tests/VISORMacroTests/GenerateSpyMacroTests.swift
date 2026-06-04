@@ -14,6 +14,7 @@ import VISORMacros
 private let testMacros: [String: Macro.Type] = [
   "GenerateSpy": GenerateSpyMacro.self,
   "DefaultValue": DefaultValueMacro.self,
+  "DefaultReturn": DefaultValueMacro.self,
 ]
 
 // MARK: - GenerateSpyMacroTests
@@ -184,11 +185,15 @@ struct GenerateSpyMacroTests {
       @GenerateSpy
       protocol ThemeService {
         func currentTheme() -> Theme
+        @DefaultReturn(Theme.system) func preferredTheme() -> Theme
+        @DefaultReturn(User.guest) func loadUser() throws -> User
       }
       """,
       expandedSource: """
       protocol ThemeService {
         func currentTheme() -> Theme
+        func preferredTheme() -> Theme
+        func loadUser() throws -> User
       }
 
       @Observable
@@ -209,14 +214,42 @@ struct GenerateSpyMacroTests {
           }
           return value
         }
+        // -- preferredTheme --
+        var preferredThemeCallCount = 0
+        var preferredThemeReturnValue: Theme = Theme.system
+        @ObservationIgnored
+        var preferredThemeImplementation: (() -> Theme)?
+        func preferredTheme() -> Theme {
+          preferredThemeCallCount += 1
+          calls.append(.preferredTheme)
+          if let preferredThemeImplementation {
+            return preferredThemeImplementation()
+          }
+          return preferredThemeReturnValue
+        }
+        // -- loadUser --
+        var loadUserCallCount = 0
+        var loadUserResult: Result<User, any Error> = .success(User.guest)
+        @ObservationIgnored
+        var loadUserImplementation: (() throws -> User)?
+        func loadUser() throws -> User {
+          loadUserCallCount += 1
+          calls.append(.loadUser)
+          if let loadUserImplementation {
+            return try loadUserImplementation()
+          }
+          return try loadUserResult.get()
+        }
         enum Call {
           case currentTheme
+          case preferredTheme
+          case loadUser
         }
         var calls: [Call] = []
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -261,7 +294,7 @@ struct GenerateSpyMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -374,7 +407,7 @@ struct GenerateSpyMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -727,7 +760,7 @@ struct GenerateSpyMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
       ],
       macros: testMacros)
   }
@@ -947,7 +980,7 @@ struct GenerateSpyMacroTests {
           message:
             """
             @GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. \
-            Use @DefaultValue to provide explicit property defaults.
+            Use @DefaultValue for properties or @DefaultReturn for method returns.
             """,
           line: 1,
           column: 1,
@@ -1166,7 +1199,7 @@ struct GenerateSpyMacroTests {
       }
       """,
       diagnostics: [
-        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."#, line: 1, column: 1, severity: .note),
+        DiagnosticSpec(message: #"@GenerateSpy: Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."#, line: 1, column: 1, severity: .note),
         DiagnosticSpec(message: "@GenerateSpy: 'fetchImplementation' collides with an existing protocol member; using 'fetchImplementationClosure' for the generated implementation closure for 'fetch()'.", line: 1, column: 1, severity: .warning),
       ],
       macros: testMacros)

@@ -736,6 +736,9 @@ struct GenerateStubMacroRuntimeTests {
     @Test
     func `Stub method returns configured return value`() async throws {
         let stub = StubItemService()
+        let defaultResult = try await stub.fetchItems()
+        #expect(defaultResult == ["default"])
+
         stub.fetchItemsResult = .success(["x", "y"])
         let result = try await stub.fetchItems()
         #expect(result == ["x", "y"])
@@ -845,11 +848,15 @@ struct GenerateSpyMacroRuntimeTests {
     @Test
     func `Spy returns configured return value`() async throws {
         let spy = SpyAnalyticsService()
+        let defaultResult = try await spy.fetchReport()
+        #expect(defaultResult == "default report")
+        #expect(spy.fetchReportCallCount == 1)
+
         spy.fetchReportResult = .success("report data")
 
         let result = try await spy.fetchReport()
         #expect(result == "report data")
-        #expect(spy.fetchReportCallCount == 1)
+        #expect(spy.fetchReportCallCount == 2)
     }
 
     @Test

@@ -12,8 +12,8 @@
 /// Known Swift types (`Bool`, `Int`, `String`, collections, optionals, etc.) receive sensible defaults.
 /// Properties with custom types that have no known default use implicitly unwrapped optionals;
 /// methods with custom return types use optionals guarded by `fatalError`. Both crash with a
-/// descriptive message if accessed before configuration. Use ``DefaultValue(_:)`` to supply
-/// explicit property defaults and silence the compiler note.
+/// descriptive message if accessed before configuration. Use ``DefaultValue(_:)`` for properties
+/// or ``DefaultReturn(_:)`` for method returns to silence the compiler note.
 ///
 /// ```swift
 /// @GenerateStub

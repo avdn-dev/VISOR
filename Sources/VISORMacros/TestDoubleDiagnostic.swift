@@ -30,7 +30,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
     case .staticMembersSkipped(let macroName):
       "@\(macroName) skips static members (not yet supported)"
     case .unknownTypeDefaults(let macroName):
-      "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue to provide explicit property defaults."
+      "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."
     case .implementationNameCollision(let methodName, let preferredName, let generatedName, let macroName):
       "@\(macroName): '\(preferredName)' collides with an existing protocol member; using '\(generatedName)' for the generated implementation closure for '\(methodName)()'."
     }

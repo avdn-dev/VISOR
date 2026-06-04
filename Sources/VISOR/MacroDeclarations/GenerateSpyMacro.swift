@@ -11,8 +11,8 @@
 ///
 /// Known Swift types receive sensible defaults. Custom property types use implicitly unwrapped
 /// optionals; custom method return types use optionals guarded by `fatalError`. Both crash with
-/// a descriptive message if accessed before configuration. Use ``DefaultValue(_:)`` for
-/// explicit property defaults.
+/// a descriptive message if accessed before configuration. Use ``DefaultValue(_:)`` for properties
+/// or ``DefaultReturn(_:)`` for method returns.
 ///
 /// ```swift
 /// @GenerateSpy

@@ -36,6 +36,7 @@ struct ProtocolMethodInfo {
   let isAsync: Bool
   let isThrowing: Bool
   var returnType: String? // nil means Void
+  let defaultReturnExpression: String?
 }
 
 // MARK: - ProtocolTypeAliasInfo
@@ -117,20 +118,9 @@ struct ProtocolAnalysis {
           hasSetter = false
         }
         
-        let defaultValueExpression: String? = {
-          for attr in varDecl.attributes {
-            guard
-              let attrSyntax = attr.as(AttributeSyntax.self),
-              attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.defaultValue,
-              let arguments = attrSyntax.arguments?.as(LabeledExprListSyntax.self),
-              let firstArg = arguments.first
-            else {
-              continue
-            }
-            return firstArg.expression.trimmedDescription
-          }
-          return nil
-        }()
+        let defaultValueExpression = extractAttributeExpression(
+          named: AttributeName.defaultValue,
+          in: varDecl.attributes)
         
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
@@ -158,8 +148,7 @@ struct ProtocolAnalysis {
         
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let isThrowing = funcDecl.signature.effectSpecifiers?.throwsClause != nil
-        
-        
+
         let returnType: String?
         if let returnClause = funcDecl.signature.returnClause {
           returnType = taHandler.protocolQualifiedTypeName(for: returnClause.type)
@@ -172,10 +161,28 @@ struct ProtocolAnalysis {
           parameters: params,
           isAsync: isAsync,
           isThrowing: isThrowing,
-          returnType: returnType))
+          returnType: returnType,
+          defaultReturnExpression: extractAttributeExpression(
+            named: AttributeName.defaultReturn,
+            in: funcDecl.attributes)))
       }
     }
   }
+}
+
+private func extractAttributeExpression(named attributeName: String, in attributes: AttributeListSyntax) -> String? {
+  for attr in attributes {
+    guard
+      let attrSyntax = attr.as(AttributeSyntax.self),
+      attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == attributeName,
+      let arguments = attrSyntax.arguments?.as(LabeledExprListSyntax.self),
+      let firstArg = arguments.first
+    else {
+      continue
+    }
+    return firstArg.expression.trimmedDescription
+  }
+  return nil
 }
 
 // MARK: - Typealias Handling

@@ -14,6 +14,7 @@ enum AttributeName {
   static let polled = "Polled"
   static let reaction = "Reaction"
   static let defaultValue = "DefaultValue"
+  static let defaultReturn = "DefaultReturn"
   static let observable = "Observable"
 }
 
@@ -85,6 +86,11 @@ func defaultValue(for type: String) -> String? {
   return nil
 }
 
+func returnDefaultValue(for method: ProtocolMethodInfo) -> String? {
+  guard let returnType = method.returnType else { return nil }
+  return method.defaultReturnExpression ?? defaultValue(for: returnType)
+}
+
 // MARK: - Unknown Type Detection
 
 /// Returns `true` when any property or method return type has no known default and would
@@ -93,7 +99,7 @@ func hasUnknownTypeDefaults(properties: [ProtocolPropertyInfo], methods: [Protoc
   for prop in properties where prop.defaultValueExpression == nil {
     if defaultValue(for: prop.type) == nil { return true }
   }
-  for method in methods {
+  for method in methods where method.defaultReturnExpression == nil {
     if let rt = method.returnType, defaultValue(for: rt) == nil { return true }
   }
   return false
@@ -159,7 +165,7 @@ func generateReturnStorage(
   if method.isThrowing {
     let resultVarName = "\(methodPrefix)Result"
     if let returnType = method.returnType {
-      if let innerDefault = defaultValue(for: returnType) {
+      if let innerDefault = returnDefaultValue(for: method) {
         lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
       } else {
         lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>?")
@@ -169,7 +175,7 @@ func generateReturnStorage(
     }
   } else if let returnType = method.returnType {
     let retVarName = "\(methodPrefix)ReturnValue"
-    if let defaultVal = defaultValue(for: returnType) {
+    if let defaultVal = returnDefaultValue(for: method) {
       lines.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
     } else {
       lines.append("  \(prefix)var \(retVarName): \(returnType)?")
@@ -193,8 +199,8 @@ func generateFallbackBodyLines(
   -> [String]
 {
   if method.isThrowing {
-    if let returnType = method.returnType {
-      let needsGuard = defaultValue(for: returnType) == nil
+    if method.returnType != nil {
+      let needsGuard = returnDefaultValue(for: method) == nil
       if needsGuard {
         return [
           "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }",
@@ -213,8 +219,8 @@ func generateFallbackBodyLines(
     return ["    try \(methodPrefix)Result.get()"]
   }
 
-  if let returnType = method.returnType {
-    let needsGuard = defaultValue(for: returnType) == nil
+  if method.returnType != nil {
+    let needsGuard = returnDefaultValue(for: method) == nil
     if needsGuard {
       return [
         "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }",

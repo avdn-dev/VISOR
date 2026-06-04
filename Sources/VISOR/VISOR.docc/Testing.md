@@ -95,13 +95,13 @@ When a property type is a custom type without a known default (not `Bool`, `Stri
 
 When a method return type is a custom type, the generated stub uses an `Optional` variable guarded by `fatalError` with a descriptive message. This crashes fast with clear guidance if you forget to configure the return value.
 
-A compiler note is emitted whenever either pattern is generated. For properties, use `@DefaultValue` to provide an explicit default:
+A compiler note is emitted whenever either pattern is generated. Use `@DefaultValue` for properties and `@DefaultReturn` for method returns:
 
 ```swift
 @GenerateStub
 protocol AnimationService {
   @DefaultValue(AnimationState.idle) var state: AnimationState { get }
-  func currentTheme() -> Theme  // ← generates optional + fatalError guard
+  @DefaultReturn(Theme.system) func currentTheme() -> Theme
 }
 ```
 
@@ -140,7 +140,7 @@ let names = try await spy.load()
 #expect(spy.calls == [.load])
 ```
 
-Properties use the same default value logic as `@GenerateStub`, including `@DefaultValue` support.
+Properties and method return values use the same default value logic as `@GenerateStub`, including `@DefaultValue` and `@DefaultReturn` support.
 
 > Limitations: Same as `@GenerateStub` — no associated types, subscripts/statics skipped.
 
@@ -159,6 +159,22 @@ protocol ContentLoading: AnyObject {
 ```
 
 > The expression must be fully qualified — `.idle` alone can't infer the type in attribute context. Use `LoadStatus.idle`, not `.idle`.
+
+## @DefaultReturn
+
+Provides a custom default return value for a protocol method in generated stubs and spies. Use this when the return type has no auto-detected default:
+
+```swift
+@GenerateStub @GenerateSpy
+protocol ContentLoading: AnyObject {
+  @DefaultReturn(ContentSnapshot.empty)
+  func snapshot() -> ContentSnapshot
+}
+// StubContentLoading.snapshotReturnValue defaults to .empty
+// SpyContentLoading.snapshotReturnValue defaults to .empty
+```
+
+> The expression must be fully qualified — `.empty` alone can't infer the type in attribute context. Use `ContentSnapshot.empty`, not `.empty`.
 
 ## Previewing with Content Views
 
