@@ -222,7 +222,7 @@ public struct ViewModelMacro: MemberMacro, ExtensionMacro {
     // 6. Generate memberwise init (if none exists)
     if !analysis.hasInitializer {
       if !properties.isEmpty || hasServiceInitProps {
-        let params = properties.map { "\($0.name): \($0.type)" }.joined(separator: ", ")
+        let params = properties.map { "\($0.name): \($0.initParameterType)" }.joined(separator: ", ")
         var assignments = properties.map { "self.\($0.name) = \($0.name)" }
 
         if hasServiceInitProps {

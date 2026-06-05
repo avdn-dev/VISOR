@@ -161,6 +161,75 @@ struct ViewModelMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Adds escaping to generated initialiser closure dependencies`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @Observable
+      @ViewModel
+      final class ActionViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let onAppear: () -> Void
+        private let openURL: @MainActor @Sendable (URL) -> Bool
+        private let onDismiss: (() -> Void)
+      }
+      """,
+      expandedSource: """
+      @Observable
+      final class ActionViewModel {
+        @Observable
+        final class State {
+          var count = 0
+          nonisolated init() {}
+        }
+        private let onAppear: () -> Void
+        private let openURL: @MainActor @Sendable (URL) -> Bool
+        private let onDismiss: (() -> Void)
+
+          @ObservationIgnored private var _state: State = State()
+
+          var state: State {
+              get {
+                  access(keyPath: \\.state);
+                  return _state
+              }
+              set {
+                  withMutation(keyPath: \\.state) {
+                      _state = newValue
+                  }
+              }
+          }
+
+          func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              guard _state[keyPath: keyPath] != value else {
+                  return
+              }
+              _state[keyPath: keyPath] = value
+          }
+
+          func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
+              _state[keyPath: keyPath] = value
+          }
+
+          init(onAppear: @escaping () -> Void, openURL: @escaping @MainActor @Sendable (URL) -> Bool, onDismiss: @escaping (() -> Void)) {
+              self.onAppear = onAppear
+                  self.openURL = openURL
+                  self.onDismiss = onDismiss
+          }
+
+          typealias Factory = ViewModelFactory<ActionViewModel>
+      }
+
+      extension ActionViewModel: @MainActor ViewModel {
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Property Filtering
 
   @Test

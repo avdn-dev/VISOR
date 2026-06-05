@@ -79,6 +79,22 @@ final class MultiDepVM {
     let second: SecondSource
 }
 
+@Observable
+@ViewModel
+final class ClosureDependencyVM {
+    @Observable
+    final class State {
+        var value = 0
+        nonisolated init() {}
+    }
+
+    private let onValue: (Int) -> Void
+
+    func send(_ value: Int) {
+        onValue(value)
+    }
+}
+
 // MARK: 3. Single @Bound (auto-generated startObserving)
 
 @Observable

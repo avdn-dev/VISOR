@@ -65,6 +65,16 @@ struct ViewModelMacroRuntimeTests {
     }
 
     @Test
+    func `@ViewModel generated initialiser accepts stored closure dependency`() {
+        var received: Int?
+        let vm = ClosureDependencyVM { received = $0 }
+
+        vm.send(7)
+
+        #expect(received == 7)
+    }
+
+    @Test
     func `@ViewModel skips init generation when user provides one`() {
         let source = RuntimeSource()
         let vm = CustomInitVM(customSource: source)

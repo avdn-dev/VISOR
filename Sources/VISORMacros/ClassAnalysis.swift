@@ -42,7 +42,7 @@ extension StructDeclSyntax {
 
 struct StoredProperty {
   let name: String
-  let type: String
+  let initParameterType: String
 }
 
 // MARK: - BoundPropertyInfo
@@ -206,7 +206,7 @@ struct ClassAnalysis {
             }
             storedLetProperties.append(StoredProperty(
               name: identifier.identifier.text,
-              type: typeAnnotation.type.trimmedDescription))
+              initParameterType: initParameterType(for: typeAnnotation.type)))
           }
         } else if bindingKind == "var" {
           guard
