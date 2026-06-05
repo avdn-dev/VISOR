@@ -28,15 +28,45 @@ struct ParameterInfo {
   var isInout: Bool
 }
 
+// MARK: - ThrowsEffect
+
+enum ThrowsEffect {
+  case none
+  case `throws`
+  case `rethrows`
+
+  var keyword: String? {
+    switch self {
+    case .none:
+      return nil
+    case .throws:
+      return "throws"
+    case .rethrows:
+      return "rethrows"
+    }
+  }
+}
+
 // MARK: - ProtocolMethodInfo
 
 struct ProtocolMethodInfo {
   let name: String
+  let genericParameterClause: String
+  let genericWhereClause: String?
+  let genericParameterNames: [String]
   var parameters: [ParameterInfo]
   let isAsync: Bool
-  let isThrowing: Bool
+  let throwsEffect: ThrowsEffect
   var returnType: String? // nil means Void
   let defaultReturnExpression: String?
+
+  var isThrowing: Bool {
+    throwsEffect != .none
+  }
+
+  var isRethrowing: Bool {
+    throwsEffect == .rethrows
+  }
 }
 
 // MARK: - ProtocolTypeAliasInfo
@@ -137,6 +167,10 @@ struct ProtocolAnalysis {
           staticMembers.append(funcDecl.name.text)
           continue
         }
+
+        let genericParameterClause = funcDecl.genericParameterClause?.trimmedDescription ?? ""
+        let genericWhereClause = funcDecl.genericWhereClause?.trimmedDescription
+        let genericParameterNames = funcDecl.genericParameterClause?.parameters.map(\.name.text) ?? []
         
         let params = funcDecl.signature.parameterClause.parameters.map { param in
           let externalLabel = param.firstName.tokenKind == .wildcard ? nil : param.firstName.text
@@ -147,7 +181,12 @@ struct ProtocolAnalysis {
         }
         
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrowing = funcDecl.signature.effectSpecifiers?.throwsClause != nil
+        let throwsEffect: ThrowsEffect
+        if let throwsClause = funcDecl.signature.effectSpecifiers?.throwsClause {
+          throwsEffect = throwsClause.throwsSpecifier.tokenKind == .keyword(.rethrows) ? .rethrows : .throws
+        } else {
+          throwsEffect = .none
+        }
 
         let returnType: String?
         if let returnClause = funcDecl.signature.returnClause {
@@ -158,9 +197,12 @@ struct ProtocolAnalysis {
         
         methods.append(ProtocolMethodInfo(
           name: funcDecl.name.text,
+          genericParameterClause: genericParameterClause,
+          genericWhereClause: genericWhereClause,
+          genericParameterNames: genericParameterNames,
           parameters: params,
           isAsync: isAsync,
-          isThrowing: isThrowing,
+          throwsEffect: throwsEffect,
           returnType: returnType,
           defaultReturnExpression: extractAttributeExpression(
             named: AttributeName.defaultReturn,

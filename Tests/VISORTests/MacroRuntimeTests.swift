@@ -782,6 +782,29 @@ struct GenerateStubMacroRuntimeTests {
             try await stub.save("item")
         }
     }
+
+    @Test
+    func `Generic rethrowing stub keeps non-throwing calls non-throwing`() async {
+        let stub = StubRuntimeStubWorkRunner()
+
+        let value = await stub.run("job.stub") {
+            "stubbed"
+        }
+
+        #expect(value == "stubbed")
+    }
+
+    @Test
+    func `Generic rethrowing stub propagates body errors`() async {
+        struct StubWorkError: Error, Equatable {}
+        let stub = StubRuntimeStubWorkRunner()
+
+        await #expect(throws: StubWorkError.self) {
+            let _: String = try await stub.run("job.stub.fail") {
+                throw StubWorkError()
+            }
+        }
+    }
 }
 
 // MARK: - @GenerateSpy Runtime Tests
@@ -884,6 +907,81 @@ struct GenerateSpyMacroRuntimeTests {
             try await spy.fetchReport()
         }
         #expect(spy.fetchReportCallCount == 1)
+    }
+
+    @Test
+    func `Generic rethrowing spy keeps non-throwing calls non-throwing`() async {
+        let spy = SpyRuntimeWorkRunner()
+
+        let value = await spy.run("job.one") {
+            "finished"
+        }
+
+        #expect(value == "finished")
+        #expect(spy.runCallCount == 1)
+        #expect(spy.runReceivedName == "job.one")
+        #expect(spy.runReceivedInvocations == ["job.one"])
+    }
+
+    @Test
+    func `Generic rethrowing spy propagates body errors`() async {
+        struct WorkError: Error, Equatable {}
+        let spy = SpyRuntimeWorkRunner()
+
+        await #expect(throws: WorkError.self) {
+            let _: String = try await spy.run("job.fail") {
+                throw WorkError()
+            }
+        }
+
+        #expect(spy.runCallCount == 1)
+        #expect(spy.runReceivedName == "job.fail")
+    }
+
+    @Test
+    func `Spy stores method generic arguments as Any`() {
+        let spy = SpyRuntimeGenericSink()
+
+        spy.consume(42, tag: "number")
+        spy.consume("hello", tag: "text")
+
+        #expect(spy.consumeCallCount == 2)
+        #expect(spy.consumeReceivedArguments?.value as? String == "hello")
+        #expect(spy.consumeReceivedArguments?.tag == "text")
+
+        let firstInvocation = spy.consumeReceivedInvocations[0]
+        let secondInvocation = spy.consumeReceivedInvocations[1]
+        #expect(firstInvocation.value as? Int == 42)
+        #expect(firstInvocation.tag == "number")
+        #expect(secondInvocation.value as? String == "hello")
+        #expect(secondInvocation.tag == "text")
+    }
+
+    @Test
+    func `Rethrowing void spy forwards body and preserves rethrows`() {
+        let spy = SpyRuntimeVoidRunner()
+        var didRun = false
+
+        spy.run {
+            didRun = true
+        }
+
+        #expect(didRun)
+        #expect(spy.runCallCount == 1)
+    }
+
+    @Test
+    func `Rethrowing void spy propagates body errors`() {
+        struct VoidWorkError: Error, Equatable {}
+        let spy = SpyRuntimeVoidRunner()
+
+        #expect(throws: VoidWorkError.self) {
+            try spy.run {
+                throw VoidWorkError()
+            }
+        }
+
+        #expect(spy.runCallCount == 1)
     }
 
     @Test

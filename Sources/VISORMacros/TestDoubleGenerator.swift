@@ -152,8 +152,9 @@ struct TestDoubleGenerator {
 
     for ((method, methodPrefix), implementationName) in zip(zip(methods, methodPrefixes), implementationNames) {
       let preferredImplementationName = "\(methodPrefix)Implementation"
+      let supportsImplementation = supportsImplementationClosure(for: method)
 
-      if implementationName != preferredImplementationName {
+      if supportsImplementation && implementationName != preferredImplementationName {
         context.diagnose(Diagnostic(
           node: Syntax(protocolDecl),
           message: TestDoubleDiagnostic.implementationNameCollision(
@@ -166,14 +167,18 @@ struct TestDoubleGenerator {
       members.append("  // -- \(methodPrefix) --")
       members.append("  \(prefix)var \(methodPrefix)CallCount = 0")
 
-      let storableParams = method.parameters.filter { !$0.isInout }
+      let receivedParams = method.parameters.filter { !$0.isInout }
+      let storableParams = receivedParams.filter { spyStorageType(for: $0, method: method) != nil }
       members.append(contentsOf: generateReceivedArgumentStorage(
+        method: method,
         methodPrefix: methodPrefix,
         storableParams: storableParams,
         access: access))
 
       members.append(contentsOf: generateReturnStorage(method: method, methodPrefix: methodPrefix, access: access))
-      members.append(contentsOf: generateImplementationStorage(method: method, implementationName: implementationName, access: access))
+      if supportsImplementation {
+        members.append(contentsOf: generateImplementationStorage(method: method, implementationName: implementationName, access: access))
+      }
 
       let sig = buildMethodSignature(method, access: access)
       var bodyLines = generateSpyRecordingBodyLines(
@@ -185,7 +190,7 @@ struct TestDoubleGenerator {
       bodyLines.append(contentsOf: generateSpyImplementationBodyLines(
         method: method,
         methodPrefix: methodPrefix,
-        implementationName: implementationName))
+        implementationName: supportsImplementation ? implementationName : nil))
 
       let body = bodyLines.joined(separator: "\n")
       members.append("  \(sig) {")
@@ -206,6 +211,7 @@ struct TestDoubleGenerator {
   }
 
   private func generateReceivedArgumentStorage(
+    method: ProtocolMethodInfo,
     methodPrefix: String,
     storableParams: [ParameterInfo],
     access: String)
@@ -216,7 +222,7 @@ struct TestDoubleGenerator {
     if storableParams.count == 1 {
       let param = storableParams[0]
       let capName = param.internalName.capitalisedFirst
-      let strippedType = stripEscaping(from: param.type)
+      guard let strippedType = spyStorageType(for: param, method: method) else { return [] }
       // Wrap function types in parens so ? applies to the whole function, not just the return type.
       let wrappedType = isFunctionType(strippedType) ? "(\(strippedType))" : strippedType
       let fnIgnored = isFunctionType(strippedType) ? "  @ObservationIgnored\n" : ""
@@ -227,7 +233,7 @@ struct TestDoubleGenerator {
     }
 
     if storableParams.count > 1 {
-      let innerTypes = storableParams.map { stripEscaping(from: $0.type) }
+      let innerTypes = storableParams.compactMap { spyStorageType(for: $0, method: method) }
       let anyFn = innerTypes.contains(where: isFunctionType)
       let tupleType = "(" + zip(storableParams, innerTypes).map { "\($0.0.internalName): \($0.1)" }.joined(separator: ", ") + ")"
       let wrappedType = anyFn ? "(\(tupleType))" : tupleType
@@ -262,16 +268,21 @@ struct TestDoubleGenerator {
       bodyLines.append("    \(methodPrefix)ReceivedInvocations.append(\(tupleVal))")
     }
 
-    if method.parameters.isEmpty {
+    let callParams = method.parameters.filter { spyStorageType(for: $0, method: method) != nil }
+
+    if callParams.isEmpty {
       callCases.append("    case \(method.name)")
       bodyLines.append("    calls.append(.\(method.name))")
     } else {
-      let caseParams = method.parameters
-        .map { "\($0.internalName): \(stripInout(from: stripEscaping(from: $0.type)))" }
+      let caseParams = callParams
+        .compactMap { param -> String? in
+          guard let storageType = spyStorageType(for: param, method: method) else { return nil }
+          return "\(param.internalName): \(storageType)"
+        }
         .joined(separator: ", ")
       callCases.append("    case \(method.name)(\(caseParams))")
 
-      let callArgs = method.parameters
+      let callArgs = callParams
         .map { "\($0.internalName): \($0.internalName)" }
         .joined(separator: ", ")
       bodyLines.append("    calls.append(.\(method.name)(\(callArgs)))")
@@ -283,9 +294,13 @@ struct TestDoubleGenerator {
   private func generateSpyImplementationBodyLines(
     method: ProtocolMethodInfo,
     methodPrefix: String,
-    implementationName: String)
+    implementationName: String?)
     -> [String]
   {
+    guard let implementationName else {
+      return generateFallbackBodyLines(method: method, methodPrefix: methodPrefix, style: .explicitReturn)
+    }
+
     let implArgs = implementationInvocationArguments(for: method)
 
     guard method.returnType != nil || method.isAsync || method.isThrowing else {

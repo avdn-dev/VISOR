@@ -780,6 +780,78 @@ struct GenerateStubMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Generates stub for generic rethrowing method`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub
+      protocol WorkRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T
+      }
+      """,
+      expandedSource: """
+      protocol WorkRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T
+      }
+
+      @Observable
+      final class StubWorkRunner: WorkRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T {
+            return try await body()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates stub for generic rethrowing method with where clause`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub
+      protocol ConstrainedRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
+      }
+      """,
+      expandedSource: """
+      protocol ConstrainedRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
+      }
+
+      @Observable
+      final class StubConstrainedRunner: ConstrainedRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable {
+            return try await body()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates stub for rethrowing void method`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub
+      protocol VoidRunner {
+        func run(_ body: () throws -> Void) rethrows
+      }
+      """,
+      expandedSource: """
+      protocol VoidRunner {
+        func run(_ body: () throws -> Void) rethrows
+      }
+
+      @Observable
+      final class StubVoidRunner: VoidRunner {
+        func run(_ body: () throws -> Void) rethrows {
+            try body()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test

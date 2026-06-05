@@ -91,6 +91,18 @@ func returnDefaultValue(for method: ProtocolMethodInfo) -> String? {
   return method.defaultReturnExpression ?? defaultValue(for: returnType)
 }
 
+func methodReferencesGenericParameters(_ method: ProtocolMethodInfo, in type: String?) -> Bool {
+  guard let type, !method.genericParameterNames.isEmpty else { return false }
+  return method.genericParameterNames.contains { genericName in
+    type.containsTypeIdentifier(genericName)
+  }
+}
+
+func methodSignatureReferencesGenericParameters(_ method: ProtocolMethodInfo) -> Bool {
+  if methodReferencesGenericParameters(method, in: method.returnType) { return true }
+  return method.parameters.contains { methodReferencesGenericParameters(method, in: $0.type) }
+}
+
 // MARK: - Unknown Type Detection
 
 /// Returns `true` when any property or method return type has no known default and would
@@ -100,6 +112,7 @@ func hasUnknownTypeDefaults(properties: [ProtocolPropertyInfo], methods: [Protoc
     if defaultValue(for: prop.type) == nil { return true }
   }
   for method in methods where method.defaultReturnExpression == nil {
+    if method.canForwardRethrowingBodyResult { continue }
     if let rt = method.returnType, defaultValue(for: rt) == nil { return true }
   }
   return false
@@ -159,6 +172,9 @@ func generateReturnStorage(
   methodPrefix: String,
   access: String
 ) -> [String] {
+  guard !method.isRethrowing else { return [] }
+  guard !methodReferencesGenericParameters(method, in: method.returnType) else { return [] }
+
   let prefix = access.isEmpty ? "" : "\(access) "
   var lines: [String] = []
 
@@ -198,6 +214,25 @@ func generateFallbackBodyLines(
   style: MethodFallbackStyle)
   -> [String]
 {
+  if method.isRethrowing {
+    if let forwardingCall = method.rethrowingBodyForwardingCall {
+      if method.returnType != nil {
+        return ["    return \(forwardingCall)"]
+      }
+      return ["    \(forwardingCall)"]
+    }
+
+    if method.returnType != nil {
+      return ["    fatalError(\"Configure an implementation before calling \(method.name)()\")"]
+    }
+
+    return []
+  }
+
+  if methodReferencesGenericParameters(method, in: method.returnType) {
+    return ["    fatalError(\"Configure an implementation before calling \(method.name)()\")"]
+  }
+
   if method.isThrowing {
     if method.returnType != nil {
       let needsGuard = returnDefaultValue(for: method) == nil
@@ -259,6 +294,10 @@ func implementationClosureType(for method: ProtocolMethodInfo) -> String {
   return "((\(paramsStr))\(effects) -> \(returnStr))?"
 }
 
+func supportsImplementationClosure(for method: ProtocolMethodInfo) -> Bool {
+  !method.isRethrowing && !methodSignatureReferencesGenericParameters(method)
+}
+
 /// Strips the `@escaping` attribute from a function type string.
 /// Used when a parameter's type is placed inside a nested function type
 /// or enum associated value where `@escaping` is not valid.
@@ -282,6 +321,20 @@ func stripInout(from typeString: String) -> String {
 /// Returns `true` when `typeString` represents a function type (contains `->`).
 func isFunctionType(_ typeString: String) -> Bool {
   typeString.contains("->")
+}
+
+func isEscapingFunctionType(_ typeString: String) -> Bool {
+  isFunctionType(typeString) && typeString.contains("@escaping")
+}
+
+func isNonEscapingFunctionType(_ typeString: String) -> Bool {
+  isFunctionType(typeString) && !isEscapingFunctionType(typeString)
+}
+
+func spyStorageType(for param: ParameterInfo, method: ProtocolMethodInfo) -> String? {
+  let strippedType = stripEscaping(from: stripInout(from: param.type))
+  guard !isNonEscapingFunctionType(param.type) else { return nil }
+  return methodReferencesGenericParameters(method, in: strippedType) ? "Any" : strippedType
 }
 
 /// Returns the invocation arguments for an implementation closure — internal
@@ -354,9 +407,10 @@ func buildMethodSignature(_ method: ProtocolMethodInfo, access: String = "") -> 
 
   let prefix = access.isEmpty ? "" : "\(access) "
   let asyncSuffix = method.isAsync ? " async" : ""
-  let throwsSuffix = method.isThrowing ? " throws" : ""
+  let throwsSuffix = method.throwsEffect.keyword.map { " \($0)" } ?? ""
   let returnSuffix = method.returnType.map { " -> \($0)" } ?? ""
-  return "\(prefix)func \(method.name)(\(params))\(asyncSuffix)\(throwsSuffix)\(returnSuffix)"
+  let whereSuffix = method.genericWhereClause.map { " \($0)" } ?? ""
+  return "\(prefix)func \(method.name)\(method.genericParameterClause)(\(params))\(asyncSuffix)\(throwsSuffix)\(returnSuffix)\(whereSuffix)"
 }
 
 // MARK: - Access Level Helper
@@ -409,4 +463,90 @@ extension String {
     if start == startIndex && end == endIndex { return self }
     return String(self[start..<end])
   }
+
+  func containsTypeIdentifier(_ identifier: String) -> Bool {
+    var current = startIndex
+    while current < endIndex {
+      guard self[current...].hasPrefix(identifier) else {
+        formIndex(after: &current)
+        continue
+      }
+
+      let range = current..<index(current, offsetBy: identifier.count)
+      let before = range.lowerBound == startIndex ? nil : self[index(before: range.lowerBound)]
+      let after = range.upperBound == endIndex ? nil : self[range.upperBound]
+      let hasIdentifierBoundaryBefore = before.map { !$0.isIdentifierCharacter } ?? true
+      let hasIdentifierBoundaryAfter = after.map { !$0.isIdentifierCharacter } ?? true
+      if hasIdentifierBoundaryBefore && hasIdentifierBoundaryAfter {
+        return true
+      }
+
+      formIndex(after: &current)
+    }
+
+    return false
+  }
+
+  func firstRange(of needle: String) -> Range<String.Index>? {
+    var current = startIndex
+    while current < endIndex {
+      if self[current...].hasPrefix(needle) {
+        return current..<index(current, offsetBy: needle.count)
+      }
+      formIndex(after: &current)
+    }
+    return nil
+  }
+}
+
+private extension Character {
+  var isIdentifierCharacter: Bool {
+    isLetter || isNumber || self == "_"
+  }
+}
+
+private extension ProtocolMethodInfo {
+  var rethrowingBodyForwardingCall: String? {
+    guard isRethrowing else { return nil }
+
+    for parameter in parameters {
+      let type = stripEscaping(from: parameter.type).trimmingWhitespace
+      guard isZeroArgumentFunction(type),
+            canForwardFunctionReturnType(functionReturnType(in: type), for: returnType)
+      else {
+        continue
+      }
+
+      let tryPrefix = type.contains("throws") ? "try " : ""
+      let awaitPrefix = type.contains("async") ? "await " : ""
+      return "\(tryPrefix)\(awaitPrefix)\(parameter.internalName)()"
+    }
+
+    return nil
+  }
+
+  var canForwardRethrowingBodyResult: Bool {
+    rethrowingBodyForwardingCall != nil
+  }
+}
+
+private func isZeroArgumentFunction(_ type: String) -> Bool {
+  guard let arrowRange = type.firstRange(of: "->") else { return false }
+  let leftSide = String(type[..<arrowRange.lowerBound]).trimmingWhitespace
+  return leftSide.hasPrefix("()")
+}
+
+private func functionReturnType(in type: String) -> String? {
+  guard let arrowRange = type.firstRange(of: "->") else { return nil }
+  return String(type[arrowRange.upperBound...]).trimmingWhitespace
+}
+
+private func canForwardFunctionReturnType(_ functionReturnType: String?, for methodReturnType: String?) -> Bool {
+  guard let functionReturnType else { return false }
+
+  if let methodReturnType {
+    return functionReturnType == methodReturnType
+  }
+
+  return functionReturnType == "Void" || functionReturnType == "()"
 }

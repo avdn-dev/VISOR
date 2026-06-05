@@ -509,6 +509,11 @@ protocol ItemService {
     func save(_ item: String) async throws
 }
 
+@GenerateStub
+protocol RuntimeStubWorkRunner {
+    func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
+}
+
 @GenerateSpy
 protocol AnalyticsService {
     func trackEvent(_ name: String)
@@ -536,4 +541,19 @@ protocol InoutService {
 @GenerateSpy
 protocol MixedInoutService {
     func process(name: String, output: inout String)
+}
+
+@GenerateSpy
+protocol RuntimeWorkRunner {
+    func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T
+}
+
+@GenerateSpy
+protocol RuntimeGenericSink {
+    func consume<T>(_ value: T, tag: String)
+}
+
+@GenerateSpy
+protocol RuntimeVoidRunner {
+    func run(_ body: () throws -> Void) rethrows
 }

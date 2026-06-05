@@ -803,6 +803,145 @@ struct GenerateSpyMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Generates spy for generic rethrowing method`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol WorkRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T
+      }
+      """,
+      expandedSource: """
+      protocol WorkRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T
+      }
+
+      @Observable
+      final class SpyWorkRunner: WorkRunner {
+        // -- run --
+        var runCallCount = 0
+        var runReceivedName: String?
+        var runReceivedInvocations: [String] = []
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T {
+          runCallCount += 1
+          runReceivedName = name
+          runReceivedInvocations.append(name)
+          calls.append(.run(name: name))
+          return try await body()
+        }
+        enum Call {
+          case run(name: String)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy for generic rethrowing method with where clause`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol ConstrainedRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
+      }
+      """,
+      expandedSource: """
+      protocol ConstrainedRunner {
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
+      }
+
+      @Observable
+      final class SpyConstrainedRunner: ConstrainedRunner {
+        // -- run --
+        var runCallCount = 0
+        var runReceivedName: String?
+        var runReceivedInvocations: [String] = []
+        func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable {
+          runCallCount += 1
+          runReceivedName = name
+          runReceivedInvocations.append(name)
+          calls.append(.run(name: name))
+          return try await body()
+        }
+        enum Call {
+          case run(name: String)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy for method generic argument storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol GenericSink {
+        func consume<T>(_ value: T, tag: String)
+      }
+      """,
+      expandedSource: """
+      protocol GenericSink {
+        func consume<T>(_ value: T, tag: String)
+      }
+
+      @Observable
+      final class SpyGenericSink: GenericSink {
+        // -- consume --
+        var consumeCallCount = 0
+        var consumeReceivedArguments: (value: Any, tag: String)?
+        var consumeReceivedInvocations: [(value: Any, tag: String)] = []
+        func consume<T>(_ value: T, tag: String) {
+          consumeCallCount += 1
+          consumeReceivedArguments = (value, tag)
+          consumeReceivedInvocations.append((value, tag))
+          calls.append(.consume(value: value, tag: tag))
+        }
+        enum Call {
+          case consume(value: Any, tag: String)
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Generates spy for rethrowing void method`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol VoidRunner {
+        func run(_ body: () throws -> Void) rethrows
+      }
+      """,
+      expandedSource: """
+      protocol VoidRunner {
+        func run(_ body: () throws -> Void) rethrows
+      }
+
+      @Observable
+      final class SpyVoidRunner: VoidRunner {
+        // -- run --
+        var runCallCount = 0
+        func run(_ body: () throws -> Void) rethrows {
+          runCallCount += 1
+          calls.append(.run)
+          try body()
+        }
+        enum Call {
+          case run
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Diagnostics
 
   @Test
