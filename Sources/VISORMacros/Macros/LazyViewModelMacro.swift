@@ -47,8 +47,6 @@ public struct LazyViewModelMacro: MemberMacro {
     // (internal, package, fileprivate, private) are inherited from the type,
     // avoiding "more accessible than enclosing type" build errors.
     let prefix = (access == "public" || access == "open") ? "\(access) " : ""
-    let observeTaskName = "VISOR.\(structDecl.name.text).lazyViewModel.observe"
-
     let (taskIdExpression, guardCondition) = switch observationPolicy {
     case "pauseInBackground":
       ("scenePhase != .background && _viewModel != nil",
@@ -103,7 +101,7 @@ public struct LazyViewModelMacro: MemberMacro {
                   _viewModel = factory.makeViewModel(router: containerRouter)
               }
           }
-          .task(id: \(raw: taskIdExpression), name: "\(raw: observeTaskName)") {
+          .task(id: \(raw: taskIdExpression)) {
               \(raw: guardCondition)
               await vm.startObserving()
           }
