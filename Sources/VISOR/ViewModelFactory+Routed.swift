@@ -21,7 +21,10 @@ extension ViewModelFactory {
     ViewModelFactory(routed: { router in
       guard let router = router as? Router<Scene> else {
         preconditionFailure(
-          "ViewModelFactory expected Router<\(Scene.self)> but received \(type(of: router)). Ensure the view is inside a NavigationContainer<\(Scene.self)>.")
+          ViewModelFactoryDiagnostics.routerTypeMismatchMessage(
+            for: VM.self,
+            expected: Router<Scene>.self,
+            received: router))
       }
       return make(router)
     })

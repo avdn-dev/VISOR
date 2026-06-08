@@ -223,14 +223,14 @@ func generateFallbackBodyLines(
     }
 
     if method.returnType != nil {
-      return ["    fatalError(\"Configure an implementation before calling \(method.name)()\")"]
+      return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
     }
 
     return []
   }
 
   if methodReferencesGenericParameters(method, in: method.returnType) {
-    return ["    fatalError(\"Configure an implementation before calling \(method.name)()\")"]
+    return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
   }
 
   if method.isThrowing {
@@ -238,7 +238,7 @@ func generateFallbackBodyLines(
       let needsGuard = returnDefaultValue(for: method) == nil
       if needsGuard {
         return [
-          "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \\(String(describing: \(methodPrefix)Result)) before calling \(method.name)()\") }",
+          "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \(methodPrefix)Result before calling \(method.name)()\") }",
           "    return try result.get()"
         ]
       }
@@ -258,7 +258,7 @@ func generateFallbackBodyLines(
     let needsGuard = returnDefaultValue(for: method) == nil
     if needsGuard {
       return [
-        "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \\(String(describing: \(methodPrefix)ReturnValue)) before calling \(method.name)()\") }",
+        "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \(methodPrefix)ReturnValue before calling \(method.name)()\") }",
         "    return value"
       ]
     }

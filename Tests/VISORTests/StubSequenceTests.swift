@@ -54,6 +54,14 @@ struct StubSequenceTests {
       #expect(sequence.isEmpty)
       #expect(sequence.remainingCount == 0)
    }
+
+   @Test func `exhausted diagnostic names value type`() {
+      let message = StubSequenceDiagnostics.exhaustedMessage(for: Int.self)
+
+      #expect(message.contains("StubSequence<"))
+      #expect(message.contains("Int"))
+      #expect(message.contains("next()"))
+   }
 }
 
 private nonisolated func consumeFromNonisolatedContext() -> [Int] {

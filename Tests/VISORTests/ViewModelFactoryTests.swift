@@ -100,4 +100,26 @@ struct ViewModelFactoryTests {
     #expect(result.routerID == ObjectIdentifier(router))
   }
 
+  @Test
+  func `Missing router diagnostic names ViewModel and environment value`() {
+    let message = ViewModelFactoryDiagnostics.missingRouterMessage(for: RoutedTestVM.self)
+
+    #expect(message.contains("RoutedTestVM"))
+    #expect(message.contains("EnvironmentValues.router was nil"))
+    #expect(message.contains("NavigationContainer"))
+  }
+
+  @Test
+  func `Router mismatch diagnostic names ViewModel expected scene and received type`() {
+    let message = ViewModelFactoryDiagnostics.routerTypeMismatchMessage(
+      for: RoutedTestVM.self,
+      expected: Router<TestScene>.self,
+      received: NSObject())
+
+    #expect(message.contains("RoutedTestVM"))
+    #expect(message.contains("Router"))
+    #expect(message.contains("TestScene"))
+    #expect(message.contains("NSObject"))
+  }
+
 }

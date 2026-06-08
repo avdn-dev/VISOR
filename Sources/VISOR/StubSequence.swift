@@ -1,3 +1,9 @@
+package nonisolated enum StubSequenceDiagnostics {
+   package static func exhaustedMessage<Value>(for valueType: Value.Type) -> String {
+      "StubSequence<\(String(reflecting: valueType))> exhausted. Add another value before calling next()."
+   }
+}
+
 public nonisolated struct StubSequence<Value> {
    private var values: [Value]
 
@@ -23,7 +29,7 @@ public nonisolated struct StubSequence<Value> {
       -> Value
    {
       guard !values.isEmpty else {
-         fatalError("StubSequence exhausted", file: (file), line: line)
+         fatalError(StubSequenceDiagnostics.exhaustedMessage(for: Value.self), file: (file), line: line)
       }
       return values.removeFirst()
    }

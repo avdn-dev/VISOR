@@ -210,7 +210,7 @@ struct GenerateSpyMacroTests {
             return currentThemeImplementation()
           }
           guard let value = currentThemeReturnValue else {
-              fatalError("Configure \\(String(describing: currentThemeReturnValue)) before calling currentTheme()")
+              fatalError("Configure currentThemeReturnValue before calling currentTheme()")
           }
           return value
         }
@@ -378,7 +378,7 @@ struct GenerateSpyMacroTests {
             return loadByIdImplementation(id)
           }
           guard let value = loadByIdReturnValue else {
-              fatalError("Configure \\(String(describing: loadByIdReturnValue)) before calling load()")
+              fatalError("Configure loadByIdReturnValue before calling load()")
           }
           return value
         }
@@ -749,7 +749,7 @@ struct GenerateSpyMacroTests {
             return executeImplementation()
           }
           guard let value = executeReturnValue else {
-              fatalError("Configure \\(String(describing: executeReturnValue)) before calling execute()")
+              fatalError("Configure executeReturnValue before calling execute()")
           }
           return value
         }
@@ -1104,7 +1104,7 @@ struct GenerateSpyMacroTests {
             return processFooImplementation(foo)
           }
           guard let value = processFooReturnValue else {
-              fatalError("Configure \\(String(describing: processFooReturnValue)) before calling processFoo()")
+              fatalError("Configure processFooReturnValue before calling processFoo()")
           }
           return value
         }
@@ -1327,7 +1327,7 @@ struct GenerateSpyMacroTests {
             return fetchImplementationClosure()
           }
           guard let value = fetchReturnValue else {
-              fatalError("Configure \\(String(describing: fetchReturnValue)) before calling fetch()")
+              fatalError("Configure fetchReturnValue before calling fetch()")
           }
           return value
         }

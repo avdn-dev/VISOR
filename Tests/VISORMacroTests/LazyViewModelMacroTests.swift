@@ -41,7 +41,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -102,7 +102,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -163,7 +163,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -222,7 +222,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -281,7 +281,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -343,7 +343,7 @@ struct LazyViewModelMacroTests {
 
             var viewModel: MyVM {
                 guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
                 }
                 return vm
             }
@@ -503,7 +503,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -564,7 +564,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -625,7 +625,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -686,7 +686,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -749,7 +749,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
@@ -809,7 +809,7 @@ struct LazyViewModelMacroTests {
 
           var viewModel: MyVM {
               guard let vm = _viewModel else {
-                  preconditionFailure("@LazyViewModel internal error: viewModel accessed while _viewModel is nil — this should never happen because content is only rendered after initialisation.")
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
               }
               return vm
           }
