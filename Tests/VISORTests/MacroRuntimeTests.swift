@@ -815,6 +815,26 @@ struct GenerateStubMacroRuntimeTests {
             }
         }
     }
+
+    @Test
+    func `Typed throwing stub conforms and throws configured errors`() async throws {
+        let stub = StubRuntimeTypedThrowingService()
+        let service: any RuntimeTypedThrowingService = stub
+
+        try service.perform()
+        let defaultResult = try await service.fetchValue()
+        #expect(defaultResult == "default value")
+
+        stub.performResult = .failure(.failed)
+        #expect(throws: RuntimeOperationError.self) {
+            try service.perform()
+        }
+
+        stub.fetchValueResult = .failure(.failed)
+        await #expect(throws: RuntimeFetchError.self) {
+            try await service.fetchValue()
+        }
+    }
 }
 
 // MARK: - @GenerateSpy Runtime Tests
@@ -901,7 +921,7 @@ struct GenerateSpyMacroRuntimeTests {
         spy.trackEvent("tap")
 
         #expect(spy.calls.count == 3)
-        // Verify order and content via call counts and received values
+        // Check order and content via call counts and received values
         #expect(spy.trackEventReceivedInvocations == ["launch", "tap"])
         #expect(spy.trackScreenReceivedInvocations.count == 1)
         #expect(spy.trackScreenReceivedInvocations[0].name == "Home")
@@ -992,6 +1012,32 @@ struct GenerateSpyMacroRuntimeTests {
         }
 
         #expect(spy.runCallCount == 1)
+    }
+
+    @Test
+    func `Typed throwing spy conforms and preserves typed implementation closures`() async throws {
+        let spy = SpyRuntimeTypedThrowingService()
+        let service: any RuntimeTypedThrowingService = spy
+
+        try service.perform()
+        #expect(spy.performCallCount == 1)
+
+        spy.performResult = .failure(.failed)
+        #expect(throws: RuntimeOperationError.self) {
+            try service.perform()
+        }
+        #expect(spy.performCallCount == 2)
+
+        let defaultResult = try await service.fetchValue()
+        #expect(defaultResult == "default value")
+
+        spy.fetchValueImplementation = { () async throws(RuntimeFetchError) -> String in
+            throw RuntimeFetchError.failed
+        }
+        await #expect(throws: RuntimeFetchError.self) {
+            try await service.fetchValue()
+        }
+        #expect(spy.fetchValueCallCount == 2)
     }
 
     @Test

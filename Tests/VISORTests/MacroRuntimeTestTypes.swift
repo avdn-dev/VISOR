@@ -573,3 +573,19 @@ protocol RuntimeGenericSink {
 protocol RuntimeVoidRunner {
     func run(_ body: () throws -> Void) rethrows
 }
+
+enum RuntimeOperationError: Error, Equatable {
+    case failed
+}
+
+enum RuntimeFetchError: Error, Equatable {
+    case failed
+}
+
+@GenerateStub
+@GenerateSpy
+protocol RuntimeTypedThrowingService {
+    func perform() throws(RuntimeOperationError)
+    @DefaultReturn("default value")
+    func fetchValue() async throws(RuntimeFetchError) -> String
+}

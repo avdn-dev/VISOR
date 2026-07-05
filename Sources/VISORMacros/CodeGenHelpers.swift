@@ -100,6 +100,7 @@ func methodReferencesGenericParameters(_ method: ProtocolMethodInfo, in type: St
 
 func methodSignatureReferencesGenericParameters(_ method: ProtocolMethodInfo) -> Bool {
   if methodReferencesGenericParameters(method, in: method.returnType) { return true }
+  if methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) { return true }
   return method.parameters.contains { methodReferencesGenericParameters(method, in: $0.type) }
 }
 
@@ -162,7 +163,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
 
 /// Generates `var` declarations for a method's return value or `Result` storage.
 ///
-/// - Throwing methods get a `Result<ReturnType, any Error>` variable.
+/// - Throwing methods get a `Result<ReturnType, Failure>` variable.
 /// - Non-throwing methods with a return type get a `ReturnValue` variable.
 /// - Void non-throwing methods produce no declarations.
 ///
@@ -174,20 +175,22 @@ func generateReturnStorage(
 ) -> [String] {
   guard !method.isRethrowing else { return [] }
   guard !methodReferencesGenericParameters(method, in: method.returnType) else { return [] }
+  guard !methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) else { return [] }
 
   let prefix = access.isEmpty ? "" : "\(access) "
   var lines: [String] = []
 
   if method.isThrowing {
+    guard let failureType = method.throwsEffect.resultFailureType else { return [] }
     let resultVarName = "\(methodPrefix)Result"
     if let returnType = method.returnType {
       if let innerDefault = returnDefaultValue(for: method) {
-        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error> = .success(\(innerDefault))")
+        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), \(failureType)> = .success(\(innerDefault))")
       } else {
-        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), any Error>?")
+        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), \(failureType)>?")
       }
     } else {
-      lines.append("  \(prefix)var \(resultVarName): Result<Void, any Error> = .success(())")
+      lines.append("  \(prefix)var \(resultVarName): Result<Void, \(failureType)> = .success(())")
     }
   } else if let returnType = method.returnType {
     let retVarName = "\(methodPrefix)ReturnValue"
@@ -229,7 +232,9 @@ func generateFallbackBodyLines(
     return []
   }
 
-  if methodReferencesGenericParameters(method, in: method.returnType) {
+  if methodReferencesGenericParameters(method, in: method.returnType)
+    || methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType)
+  {
     return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
   }
 
@@ -287,7 +292,9 @@ func implementationClosureType(for method: ProtocolMethodInfo) -> String {
 
   var effects = ""
   if method.isAsync { effects += " async" }
-  if method.isThrowing { effects += " throws" }
+  if let throwsKeyword = method.throwsEffect.keyword {
+    effects += " \(throwsKeyword)"
+  }
 
   let returnStr = method.returnType ?? "Void"
 

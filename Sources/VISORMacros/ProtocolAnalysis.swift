@@ -32,17 +32,35 @@ struct ParameterInfo {
 
 enum ThrowsEffect {
   case none
-  case `throws`
+  case `throws`(errorType: String?)
   case `rethrows`
 
   var keyword: String? {
     switch self {
     case .none:
       return nil
-    case .throws:
-      return "throws"
+    case .throws(let errorType):
+      return errorType.map { "throws(\($0))" } ?? "throws"
     case .rethrows:
       return "rethrows"
+    }
+  }
+
+  var resultFailureType: String? {
+    switch self {
+    case .none, .rethrows:
+      return nil
+    case .throws(let errorType):
+      return errorType ?? "any Error"
+    }
+  }
+
+  var explicitErrorType: String? {
+    switch self {
+    case .none, .rethrows:
+      return nil
+    case .throws(let errorType):
+      return errorType
     }
   }
 }
@@ -61,11 +79,13 @@ struct ProtocolMethodInfo {
   let defaultReturnExpression: String?
 
   var isThrowing: Bool {
-    throwsEffect != .none
+    if case .none = throwsEffect { return false }
+    return true
   }
 
   var isRethrowing: Bool {
-    throwsEffect == .rethrows
+    if case .rethrows = throwsEffect { return true }
+    return false
   }
 }
 
@@ -183,7 +203,12 @@ struct ProtocolAnalysis {
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
         let throwsEffect: ThrowsEffect
         if let throwsClause = funcDecl.signature.effectSpecifiers?.throwsClause {
-          throwsEffect = throwsClause.throwsSpecifier.tokenKind == .keyword(.rethrows) ? .rethrows : .throws
+          if throwsClause.throwsSpecifier.tokenKind == .keyword(.rethrows) {
+            throwsEffect = .rethrows
+          } else {
+            let errorType = throwsClause.type.map { taHandler.protocolQualifiedTypeName(for: $0) }
+            throwsEffect = .throws(errorType: errorType)
+          }
         } else {
           throwsEffect = .none
         }

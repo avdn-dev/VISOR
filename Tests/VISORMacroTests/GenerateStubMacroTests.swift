@@ -67,6 +67,50 @@ struct GenerateStubMacroTests {
   }
 
   @Test
+  func `Preserves typed throws in generated stub`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      enum OperationError: Error {
+        case failed
+      }
+      enum FetchError: Error {
+        case failed
+      }
+
+      @GenerateStub
+      protocol TypedThrowingService {
+        func perform() throws(OperationError)
+        @DefaultReturn("value") func fetchValue() async throws(FetchError) -> String
+      }
+      """,
+      expandedSource: """
+      enum OperationError: Error {
+        case failed
+      }
+      enum FetchError: Error {
+        case failed
+      }
+      protocol TypedThrowingService {
+        func perform() throws(OperationError)
+        func fetchValue() async throws(FetchError) -> String
+      }
+
+      @Observable
+      final class StubTypedThrowingService: TypedThrowingService {
+        var performResult: Result<Void, OperationError> = .success(())
+        func perform() throws(OperationError) {
+            try performResult.get()
+        }
+        var fetchValueResult: Result<String, FetchError> = .success("value")
+        func fetchValue() async throws(FetchError) -> String {
+            try fetchValueResult.get()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
   func `Generates stub with default values for known types`() {
     assertMacroExpansionSwiftTesting(
       """

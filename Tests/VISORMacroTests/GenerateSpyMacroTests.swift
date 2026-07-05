@@ -87,6 +87,74 @@ struct GenerateSpyMacroTests {
   }
 
   @Test
+  func `Preserves typed throws in generated spy`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      enum OperationError: Error {
+        case failed
+      }
+      enum FetchError: Error {
+        case failed
+      }
+
+      @GenerateSpy
+      protocol TypedThrowingService {
+        func perform() throws(OperationError)
+        @DefaultReturn("value") func fetchValue() async throws(FetchError) -> String
+      }
+      """,
+      expandedSource: """
+      enum OperationError: Error {
+        case failed
+      }
+      enum FetchError: Error {
+        case failed
+      }
+      protocol TypedThrowingService {
+        func perform() throws(OperationError)
+        func fetchValue() async throws(FetchError) -> String
+      }
+
+      @Observable
+      final class SpyTypedThrowingService: TypedThrowingService {
+        // -- perform --
+        var performCallCount = 0
+        var performResult: Result<Void, OperationError> = .success(())
+        @ObservationIgnored
+        var performImplementation: (() throws(OperationError) -> Void)?
+        func perform() throws(OperationError) {
+          performCallCount += 1
+          calls.append(.perform)
+          if let performImplementation {
+            try performImplementation()
+            return
+          }
+          try performResult.get()
+        }
+        // -- fetchValue --
+        var fetchValueCallCount = 0
+        var fetchValueResult: Result<String, FetchError> = .success("value")
+        @ObservationIgnored
+        var fetchValueImplementation: (() async throws(FetchError) -> String)?
+        func fetchValue() async throws(FetchError) -> String {
+          fetchValueCallCount += 1
+          calls.append(.fetchValue)
+          if let fetchValueImplementation {
+            return try await fetchValueImplementation()
+          }
+          return try fetchValueResult.get()
+        }
+        enum Call {
+          case perform
+          case fetchValue
+        }
+        var calls: [Call] = []
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
   func `Generates spy for void methods`() {
     assertMacroExpansionSwiftTesting(
       """
