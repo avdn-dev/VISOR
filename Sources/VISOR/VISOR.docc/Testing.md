@@ -144,6 +144,66 @@ Properties and method return values use the same default value logic as `@Genera
 
 > Limitations: Same as `@GenerateStub` — no associated types, subscripts/statics skipped.
 
+## Sendable Generated Doubles
+
+Use the opt-in `.sendable` trait when a stub or spy must be shared across isolation domains:
+
+```swift
+@GenerateSpy(.sendable)
+nonisolated protocol AnalyticsService: Sendable {
+  @concurrent
+  func load(period: DateInterval) async throws -> Snapshot
+}
+
+let spy = SpyAnalyticsService()
+// SpyAnalyticsService is nonisolated, @Observable, and Sendable.
+```
+
+Sendable generation places every mutable field in one synchronised storage value. Reads,
+configuration changes, call counts, received arguments, invocation histories, ordered calls, and
+implementation snapshots are protected by the same lock. User implementation closures are invoked
+after the lock is released, so they can suspend or re-enter the test double without deadlocking.
+
+The generated conformance is checked rather than `@unchecked`. Consequently, every value retained
+by the double must be `Sendable`:
+
+- Protocol properties and configured return and error values must be `Sendable`.
+- Spy method arguments recorded in received values and the `Call` enum must be `Sendable`.
+- Function values retained by the double must use `@Sendable` closure types.
+- Generic spy arguments explicitly constrained to `Sendable` are recorded as `any Sendable`.
+  Unconstrained generic values are rejected only when the spy would need to retain them. Generic
+  methods that retain no generic values remain supported.
+- Sendable stubs can retain generic methods when no generic value is stored.
+
+Method-scoped generic types cannot appear in generated stored-property declarations. Constraining
+the generic value to `Sendable` lets VISOR retain it through checked existential erasure:
+
+```swift
+@GenerateSpy(.sendable)
+nonisolated protocol EventRecorder: Sendable {
+  func record<Value: Sendable>(_ value: Value)
+}
+
+let spy = SpyEventRecorder()
+spy.record("opened")
+#expect(spy.recordReceivedValue as? String == "opened")
+```
+
+An unconstrained generic remains valid when the spy does not retain it, such as a generic used only
+within a non-escaping closure parameter.
+
+These concurrency concepts remain independent:
+
+| Concept | Meaning |
+|---------|---------|
+| `.sendable` | Makes generated mutable state synchronised and gives the double checked `Sendable` conformance |
+| `nonisolated` | Keeps a declaration independent of the consuming target's default actor isolation |
+| `@concurrent` | Runs an eligible async function away from the caller's actor; declare it on the protocol when that execution behaviour is required |
+
+The `.sendable` trait does not infer protocol isolation or add `@concurrent`. The generated double
+preserves the protocol's method annotations. Unqualified `@GenerateStub` and `@GenerateSpy`
+generation is unchanged.
+
 ## @DefaultValue
 
 Provides a custom default value for a protocol property in generated stubs and spies. Use this when the property type has no auto-detected default:

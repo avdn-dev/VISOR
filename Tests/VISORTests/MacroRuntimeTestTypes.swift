@@ -530,6 +530,24 @@ protocol RuntimeStubWorkRunner {
     func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable
 }
 
+@GenerateStub(.sendable)
+nonisolated protocol RuntimeSendableStubService: Sendable {
+    var value: Int { get set }
+    @DefaultReturn(0)
+    func load() -> Int
+}
+
+@GenerateStub(.sendable)
+nonisolated protocol RuntimeSendableWorkRunner: Sendable {
+    @concurrent
+    func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T
+}
+
+@GenerateStub(.sendable)
+nonisolated protocol RuntimeSendingReturnService: Sendable {
+    func message() -> sending String
+}
+
 @GenerateSpy
 protocol AnalyticsService {
     func trackEvent(_ name: String)
@@ -567,6 +585,27 @@ protocol RuntimeWorkRunner {
 @GenerateSpy
 protocol RuntimeGenericSink {
     func consume<T>(_ value: T, tag: String)
+}
+
+@GenerateSpy(.sendable)
+nonisolated protocol RuntimeSendableSpyService: Sendable {
+    @DefaultReturn(0)
+    @concurrent
+    func record(_ value: Int) async -> Int
+}
+
+@GenerateSpy(.sendable)
+nonisolated protocol RuntimeSendableGenericSpyService: Sendable {
+    func consume<T: Sendable & Equatable>(_ value: T, tag: String)
+    func consumeWhere<T>(_ value: T) where T: Sendable
+    func perform<T>(_ operation: () -> T)
+}
+
+@GenerateSpy(.sendable)
+nonisolated protocol RuntimeOwnershipSpyService: Sendable {
+    func receiveSending(_ value: sending String)
+    func receiveConsuming(_ value: consuming String)
+    func receiveBorrowing(_ value: borrowing String)
 }
 
 @GenerateSpy

@@ -23,7 +23,11 @@
 /// }
 /// // Generates: StubDataService with canned defaults
 /// ```
+///
+/// Pass ``TestDoubleTrait/sendable`` to generate a nonisolated, synchronised stub with checked
+/// `Sendable` conformance. All generated stored values must be `Sendable`. Generic methods remain
+/// supported when generation does not need to store a value containing their generic parameters.
 @attached(peer, names: prefixed(Stub))
-public macro GenerateStub() = #externalMacro(
+public macro GenerateStub(_ traits: TestDoubleTrait...) = #externalMacro(
   module: "VISORMacros",
   type: "GenerateStubMacro")

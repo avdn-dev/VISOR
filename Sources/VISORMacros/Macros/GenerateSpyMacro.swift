@@ -12,11 +12,11 @@ import SwiftSyntaxMacros
 
 public struct GenerateSpyMacro: PeerMacro {
   public static func expansion(
-    of _: AttributeSyntax,
+    of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
-    try TestDoubleGenerator(kind: .spy).expand(declaration, in: context)
+    try TestDoubleGenerator(kind: .spy).expand(node, declaration: declaration, in: context)
   }
 }

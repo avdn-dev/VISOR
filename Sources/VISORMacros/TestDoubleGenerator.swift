@@ -40,7 +40,8 @@ struct TestDoubleGenerator {
   let kind: TestDoubleKind
 
   func expand(
-    _ declaration: some DeclSyntaxProtocol,
+    _ node: AttributeSyntax,
+    declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
@@ -51,11 +52,22 @@ struct TestDoubleGenerator {
       return []
     }
 
+    guard let traits = TestDoubleTraits.parse(from: node, macroName: kind.macroName, in: context) else {
+      return []
+    }
+
     let protocolName = protocolDecl.name.trimmedDescription
     let analysis = ProtocolAnalysis(protocolDecl)
 
     guard validateProtocolForTestDouble(analysis, protocolDecl: protocolDecl, macroName: kind.macroName, context: context) else {
       return []
+    }
+
+    if traits.isSendable {
+      return try SendableTestDoubleGenerator(kind: kind).expand(
+        protocolDecl,
+        analysis: analysis,
+        in: context)
     }
 
     let properties = analysis.properties

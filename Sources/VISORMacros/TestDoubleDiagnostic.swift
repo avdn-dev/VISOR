@@ -16,6 +16,9 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
   case staticMembersSkipped(macroName: String)
   case unknownTypeDefaults(macroName: String)
   case implementationNameCollision(methodName: String, preferredName: String, generatedName: String, macroName: String)
+  case duplicateTrait(trait: String, macroName: String)
+  case unsupportedTrait(trait: String, macroName: String)
+  case sendableSpyUnconstrainedGenericValues(methodName: String, genericNames: [String])
 
   // MARK: Internal
 
@@ -33,6 +36,14 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."
     case .implementationNameCollision(let methodName, let preferredName, let generatedName, let macroName):
       "@\(macroName): '\(preferredName)' collides with an existing protocol member; using '\(generatedName)' for the generated implementation closure for '\(methodName)()'."
+    case .duplicateTrait(let trait, let macroName):
+      "@\(macroName) received duplicate '.\(trait)' traits"
+    case .unsupportedTrait(let trait, let macroName):
+      "@\(macroName) does not support the '\(trait)' trait"
+    case .sendableSpyUnconstrainedGenericValues(let methodName, let genericNames):
+      sendableSpyUnconstrainedGenericValuesMessage(
+        methodName: methodName,
+        genericNames: genericNames)
     }
   }
 
@@ -50,12 +61,19 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       MessageID(domain: "VISOR", id: "unknownTypeDefaults")
     case .implementationNameCollision:
       MessageID(domain: "VISOR", id: "implementationNameCollision")
+    case .duplicateTrait:
+      MessageID(domain: "VISOR", id: "duplicateTestDoubleTrait")
+    case .unsupportedTrait:
+      MessageID(domain: "VISOR", id: "unsupportedTestDoubleTrait")
+    case .sendableSpyUnconstrainedGenericValues:
+      MessageID(domain: "VISOR", id: "sendableSpyUnconstrainedGenericValues")
     }
   }
 
   var severity: DiagnosticSeverity {
     switch self {
-    case .notAProtocol, .associatedTypesNotSupported:
+    case .notAProtocol, .associatedTypesNotSupported, .duplicateTrait, .unsupportedTrait,
+         .sendableSpyUnconstrainedGenericValues:
       .error
     case .subscriptsSkipped, .staticMembersSkipped:
       .warning
@@ -65,4 +83,16 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       .warning
     }
   }
+}
+
+private func sendableSpyUnconstrainedGenericValuesMessage(
+  methodName: String,
+  genericNames: [String])
+  -> String
+{
+  let formattedNames = genericNames.map { "'\($0)'" }.joined(separator: ", ")
+  if genericNames.count == 1 {
+    return "@GenerateSpy(.sendable) cannot record unconstrained generic value \(formattedNames) in '\(methodName)()'; constrain it to Sendable"
+  }
+  return "@GenerateSpy(.sendable) cannot record unconstrained generic values \(formattedNames) in '\(methodName)()'; constrain them to Sendable"
 }

@@ -1254,4 +1254,206 @@ func `Handle typealias in attributed use site`() {
       macros: testMacros)
   }
 
+  // MARK: - Sendable Generation
+
+  @Test
+  func `Generates lock-backed public Sendable stub with typed throws`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      enum LoadError: Error {
+        case failed
+      }
+
+      @GenerateStub(.sendable)
+      public protocol Loader: Sendable {
+        var isEnabled: Bool { get set }
+        @DefaultReturn("loaded")
+        func load() throws(LoadError) -> String
+      }
+      """,
+      expandedSource: """
+      enum LoadError: Error {
+        case failed
+      }
+      public protocol Loader: Sendable {
+        var isEnabled: Bool { get set }
+        func load() throws(LoadError) -> String
+      }
+
+      @Observable
+      nonisolated public final class StubLoader: Loader, Sendable {
+        private struct _Storage: Sendable {
+          var isEnabled: Bool = false
+          var loadResult: Result<String, LoadError> = .success("loaded")
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        public var isEnabled: Bool {
+          get {
+            access(keyPath: \\.isEnabled)
+            return _testDoubleStorage.withValue {
+                $0.isEnabled
+            }
+          }
+          set {
+            withMutation(keyPath: \\.isEnabled) {
+              _testDoubleStorage.withValue {
+                  $0.isEnabled = newValue
+              }
+            }
+          }
+        }
+        public var loadResult: Result<String, LoadError> {
+          get {
+            access(keyPath: \\.loadResult)
+            return _testDoubleStorage.withValue {
+                $0.loadResult
+            }
+          }
+          set {
+            withMutation(keyPath: \\.loadResult) {
+              _testDoubleStorage.withValue {
+                  $0.loadResult = newValue
+              }
+            }
+          }
+        }
+        public func load() throws(LoadError) -> String {
+          let loadResult = _testDoubleStorage.withValue {
+              $0.loadResult
+          }
+          return try loadResult.get()
+        }
+        public init() {
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sendable stubs retain generic rethrowing methods without generic storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub(.sendable)
+      protocol WorkRunner: Sendable {
+        @concurrent
+        func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T
+      }
+      """,
+      expandedSource: """
+      protocol WorkRunner: Sendable {
+        @concurrent
+        func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T
+      }
+
+      @Observable
+      nonisolated final class StubWorkRunner: WorkRunner, Sendable {
+        private struct _Storage: Sendable {
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        @concurrent
+        func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T {
+          return try await operation()
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sendable stubs disambiguate overloaded return storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub(.sendable)
+      protocol Converter: Sendable {
+        func convert(text: String) -> Int
+        func convert(number: Int) -> String
+      }
+      """,
+      expandedSource: """
+      protocol Converter: Sendable {
+        func convert(text: String) -> Int
+        func convert(number: Int) -> String
+      }
+
+      @Observable
+      nonisolated final class StubConverter: Converter, Sendable {
+        private struct _Storage: Sendable {
+          var convertTextReturnValue: Int = 0
+          var convertNumberReturnValue: String = ""
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        var convertTextReturnValue: Int {
+          get {
+            access(keyPath: \\.convertTextReturnValue)
+            return _testDoubleStorage.withValue {
+                $0.convertTextReturnValue
+            }
+          }
+          set {
+            withMutation(keyPath: \\.convertTextReturnValue) {
+              _testDoubleStorage.withValue {
+                  $0.convertTextReturnValue = newValue
+              }
+            }
+          }
+        }
+        var convertNumberReturnValue: String {
+          get {
+            access(keyPath: \\.convertNumberReturnValue)
+            return _testDoubleStorage.withValue {
+                $0.convertNumberReturnValue
+            }
+          }
+          set {
+            withMutation(keyPath: \\.convertNumberReturnValue) {
+              _testDoubleStorage.withValue {
+                  $0.convertNumberReturnValue = newValue
+              }
+            }
+          }
+        }
+        func convert(text: String) -> Int {
+          let convertTextReturnValue = _testDoubleStorage.withValue {
+              $0.convertTextReturnValue
+          }
+          return convertTextReturnValue
+        }
+        func convert(number: Int) -> String {
+          let convertNumberReturnValue = _testDoubleStorage.withValue {
+              $0.convertNumberReturnValue
+          }
+          return convertNumberReturnValue
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sendable package stubs expose a package initialiser`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub(.sendable)
+      package nonisolated protocol PackageService: Sendable {}
+      """,
+      expandedSource: """
+      package nonisolated protocol PackageService: Sendable {}
+
+      @Observable
+      nonisolated package final class StubPackageService: PackageService, Sendable {
+        private struct _Storage: Sendable {
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        package init() {
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
 #endif

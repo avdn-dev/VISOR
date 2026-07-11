@@ -835,6 +835,44 @@ struct GenerateStubMacroRuntimeTests {
             try await service.fetchValue()
         }
     }
+
+    @Test
+    func `Sendable stub satisfies Sendable and remains observable across isolation`() async {
+        let stub = StubRuntimeSendableStubService()
+        requireSendable(stub)
+
+        var iterator = valuesOf { stub.value }.makeAsyncIterator()
+        #expect(await iterator.next() == 0)
+
+        await Task { @concurrent in
+            stub.value = 42
+        }.value
+
+        #expect(await iterator.next() == 42)
+        #expect(stub.load() == 0)
+    }
+
+    @Test
+    func `Sendable stub retains generic rethrowing support`() async {
+        let stub = StubRuntimeSendableWorkRunner()
+        requireSendable(stub)
+
+        let value = await stub.run { "complete" }
+
+        #expect(value == "complete")
+    }
+
+    @Test
+    func `Sendable stub stores a sending return value without its specifier`() {
+        let stub = StubRuntimeSendingReturnService()
+        requireSendable(stub)
+
+        #expect(stub.message() == "")
+
+        stub.messageReturnValue = "configured"
+
+        #expect(stub.message() == "configured")
+    }
 }
 
 // MARK: - @GenerateSpy Runtime Tests
@@ -1054,6 +1092,82 @@ struct GenerateSpyMacroRuntimeTests {
         #expect(after == 1, "Expected valuesOf to emit 1 after spy property mutation")
     }
 
+    @Test
+    func `Sendable spy records concurrent calls without losing updates`() async {
+        let spy = SpyRuntimeSendableSpyService()
+        requireSendable(spy)
+
+        await withTaskGroup(of: Void.self) { group in
+            for value in 0..<1_000 {
+                group.addTask {
+                    _ = await spy.record(value)
+                }
+                group.addTask {
+                    spy.recordReturnValue = value
+                    _ = spy.recordReturnValue
+                }
+            }
+        }
+
+        #expect(spy.recordCallCount == 1_000)
+        #expect(spy.recordReceivedInvocations.count == 1_000)
+        #expect(Set(spy.recordReceivedInvocations) == Set(0..<1_000))
+        #expect(spy.calls.count == 1_000)
+        #expect((0..<1_000).contains(spy.recordReturnValue))
+    }
+
+    @Test
+    func `Sendable spy invokes re-entrant implementation outside storage lock`() async {
+        let spy = SpyRuntimeSendableSpyService()
+        spy.recordImplementation = { value in
+            spy.recordReturnValue = value
+            return spy.calls.count
+        }
+
+        let result = await spy.record(7)
+
+        #expect(result == 1)
+        #expect(spy.recordReturnValue == 7)
+        #expect(spy.recordCallCount == 1)
+    }
+
+    @Test
+    func `Sendable spy records constrained generics and permits non-retained generics`() {
+        let spy = SpyRuntimeSendableGenericSpyService()
+        requireSendable(spy)
+
+        spy.consume("inline", tag: "event")
+        spy.consumeWhere(42)
+        spy.perform { NSObject() }
+
+        #expect(spy.consumeReceivedArguments?.value as? String == "inline")
+        #expect(spy.consumeReceivedArguments?.tag == "event")
+        #expect(spy.consumeReceivedInvocations.first?.value as? String == "inline")
+        #expect(spy.consumeReceivedInvocations.first?.tag == "event")
+        #expect(spy.consumeWhereReceivedValue as? Int == 42)
+        #expect(spy.consumeWhereReceivedInvocations.first as? Int == 42)
+        #expect(spy.performCallCount == 1)
+        #expect(spy.calls.count == 3)
+    }
+
+    @Test
+    func `Sendable spy records ownership-qualified parameters`() {
+        let spy = SpyRuntimeOwnershipSpyService()
+        requireSendable(spy)
+
+        spy.receiveSendingImplementation = { _ in }
+        spy.receiveConsumingImplementation = { _ in }
+
+        spy.receiveSending("sent")
+        spy.receiveConsuming("consumed")
+        spy.receiveBorrowing("borrowed")
+
+        #expect(spy.receiveSendingReceivedValue == "sent")
+        #expect(spy.receiveConsumingReceivedValue == "consumed")
+        #expect(spy.receiveBorrowingReceivedValue == "borrowed")
+        #expect(spy.calls.count == 3)
+    }
+
     // MARK: - Implementation closures
 
     @Test
@@ -1233,3 +1347,5 @@ struct GenerateSpyMacroRuntimeTests {
     }
 
 }
+
+nonisolated private func requireSendable<T: Sendable>(_: T) {}

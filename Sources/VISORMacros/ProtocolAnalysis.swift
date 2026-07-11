@@ -72,8 +72,10 @@ struct ProtocolMethodInfo {
   let genericParameterClause: String
   let genericWhereClause: String?
   let genericParameterNames: [String]
+  let explicitlySendableGenericParameterNames: Set<String>
   var parameters: [ParameterInfo]
   let isAsync: Bool
+  let isConcurrent: Bool
   let throwsEffect: ThrowsEffect
   var returnType: String? // nil means Void
   let defaultReturnExpression: String?
@@ -191,6 +193,8 @@ struct ProtocolAnalysis {
         let genericParameterClause = funcDecl.genericParameterClause?.trimmedDescription ?? ""
         let genericWhereClause = funcDecl.genericWhereClause?.trimmedDescription
         let genericParameterNames = funcDecl.genericParameterClause?.parameters.map(\.name.text) ?? []
+        let explicitlySendableGenericParameterNames = explicitlySendableGenericParameterNames(
+          in: funcDecl)
         
         let params = funcDecl.signature.parameterClause.parameters.map { param in
           let externalLabel = param.firstName.tokenKind == .wildcard ? nil : param.firstName.text
@@ -201,6 +205,10 @@ struct ProtocolAnalysis {
         }
         
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+        let isConcurrent = funcDecl.attributes.contains { element in
+          guard let attribute = element.as(AttributeSyntax.self) else { return false }
+          return attribute.attributeName.trimmedDescription == "concurrent"
+        }
         let throwsEffect: ThrowsEffect
         if let throwsClause = funcDecl.signature.effectSpecifiers?.throwsClause {
           if throwsClause.throwsSpecifier.tokenKind == .keyword(.rethrows) {
@@ -225,8 +233,10 @@ struct ProtocolAnalysis {
           genericParameterClause: genericParameterClause,
           genericWhereClause: genericWhereClause,
           genericParameterNames: genericParameterNames,
+          explicitlySendableGenericParameterNames: explicitlySendableGenericParameterNames,
           parameters: params,
           isAsync: isAsync,
+          isConcurrent: isConcurrent,
           throwsEffect: throwsEffect,
           returnType: returnType,
           defaultReturnExpression: extractAttributeExpression(
@@ -235,6 +245,51 @@ struct ProtocolAnalysis {
       }
     }
   }
+}
+
+private func explicitlySendableGenericParameterNames(
+  in function: FunctionDeclSyntax)
+  -> Set<String>
+{
+  let genericParameterNames = Set(
+    function.genericParameterClause?.parameters.map(\.name.text) ?? [])
+  let inlineSendableNames: [String] = function.genericParameterClause.map { clause in
+    clause.parameters.compactMap { parameter -> String? in
+      guard let inheritedType = parameter.inheritedType,
+            typeIncludesSendable(inheritedType)
+      else {
+        return nil
+      }
+      return parameter.name.text
+    }
+  } ?? []
+  var sendableNames = Set(inlineSendableNames)
+
+  for requirement in function.genericWhereClause?.requirements ?? [] {
+    guard case .conformanceRequirement(let conformance) = requirement.requirement,
+          let identifier = conformance.leftType.as(IdentifierTypeSyntax.self),
+          genericParameterNames.contains(identifier.name.text),
+          typeIncludesSendable(conformance.rightType)
+    else {
+      continue
+    }
+    sendableNames.insert(identifier.name.text)
+  }
+
+  return sendableNames
+}
+
+private func typeIncludesSendable(_ type: TypeSyntax) -> Bool {
+  if let identifier = type.as(IdentifierTypeSyntax.self) {
+    return identifier.name.text == "Sendable"
+  }
+  if let member = type.as(MemberTypeSyntax.self) {
+    return member.name.text == "Sendable"
+  }
+  if let composition = type.as(CompositionTypeSyntax.self) {
+    return composition.elements.contains { typeIncludesSendable($0.type) }
+  }
+  return false
 }
 
 private func extractAttributeExpression(named attributeName: String, in attributes: AttributeListSyntax) -> String? {

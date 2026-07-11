@@ -22,7 +22,12 @@
 /// }
 /// // Generates: SpyDataService with callCount, receivedArgs, Call enum
 /// ```
+///
+/// Pass ``TestDoubleTrait/sendable`` to generate a nonisolated, synchronised spy with checked
+/// `Sendable` conformance. All stored property, argument, return, error, and implementation closure
+/// values must be `Sendable`. Generic arguments explicitly constrained to `Sendable` are recorded
+/// as `any Sendable`; unconstrained generic values that require storage are rejected.
 @attached(peer, names: prefixed(Spy))
-public macro GenerateSpy() = #externalMacro(
+public macro GenerateSpy(_ traits: TestDoubleTrait...) = #externalMacro(
   module: "VISORMacros",
   type: "GenerateSpyMacro")

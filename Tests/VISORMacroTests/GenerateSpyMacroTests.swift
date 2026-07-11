@@ -1651,6 +1651,417 @@ struct GenerateSpyMacroTests {
       macros: testMacros)
   }
 
+  // MARK: - Sendable Generation
+
+  @Test
+  func `Generates lock-backed Sendable spy`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy(.sendable)
+      nonisolated protocol EventRecorder: Sendable {
+        func record(_ value: Int)
+      }
+      """,
+      expandedSource: """
+      nonisolated protocol EventRecorder: Sendable {
+        func record(_ value: Int)
+      }
+
+      @Observable
+      nonisolated final class SpyEventRecorder: EventRecorder, Sendable {
+        private struct _Storage: Sendable {
+          var recordCallCount: Int = 0
+          var recordReceivedValue: Int? = nil
+          var recordReceivedInvocations: [Int] = []
+          var recordImplementation: (@Sendable (Int) -> Void)? = nil
+          var calls: [Call] = []
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        var recordCallCount: Int {
+          get {
+            access(keyPath: \\.recordCallCount)
+            return _testDoubleStorage.withValue {
+                $0.recordCallCount
+            }
+          }
+          set {
+            withMutation(keyPath: \\.recordCallCount) {
+              _testDoubleStorage.withValue {
+                  $0.recordCallCount = newValue
+              }
+            }
+          }
+        }
+        var recordReceivedValue: Int? {
+          get {
+            access(keyPath: \\.recordReceivedValue)
+            return _testDoubleStorage.withValue {
+                $0.recordReceivedValue
+            }
+          }
+          set {
+            withMutation(keyPath: \\.recordReceivedValue) {
+              _testDoubleStorage.withValue {
+                  $0.recordReceivedValue = newValue
+              }
+            }
+          }
+        }
+        var recordReceivedInvocations: [Int] {
+          get {
+            access(keyPath: \\.recordReceivedInvocations)
+            return _testDoubleStorage.withValue {
+                $0.recordReceivedInvocations
+            }
+          }
+          set {
+            withMutation(keyPath: \\.recordReceivedInvocations) {
+              _testDoubleStorage.withValue {
+                  $0.recordReceivedInvocations = newValue
+              }
+            }
+          }
+        }
+        var recordImplementation: (@Sendable (Int) -> Void)? {
+          get {
+            return _testDoubleStorage.withValue {
+                $0.recordImplementation
+            }
+          }
+          set {
+            _testDoubleStorage.withValue {
+                $0.recordImplementation = newValue
+            }
+          }
+        }
+        var calls: [Call] {
+          get {
+            access(keyPath: \\.calls)
+            return _testDoubleStorage.withValue {
+                $0.calls
+            }
+          }
+          set {
+            withMutation(keyPath: \\.calls) {
+              _testDoubleStorage.withValue {
+                  $0.calls = newValue
+              }
+            }
+          }
+        }
+        func record(_ value: Int) {
+          let recordImplementation = withMutation(keyPath: \\.recordCallCount) {
+            withMutation(keyPath: \\.recordReceivedValue) {
+              withMutation(keyPath: \\.recordReceivedInvocations) {
+                withMutation(keyPath: \\.calls) {
+                  _testDoubleStorage.withValue { state in
+                    state.recordCallCount += 1
+                    state.recordReceivedValue = value
+                    state.recordReceivedInvocations.append(value)
+                    state.calls.append(.record(value: value))
+                    return state.recordImplementation
+                  }
+                }
+              }
+            }
+          }
+          recordImplementation?(value)
+        }
+        enum Call: Sendable {
+          case record(value: Int)
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sendable spy preserves concurrent typed throws and inout snapshots`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      enum WorkError: Error {
+        case failed
+      }
+
+      @GenerateSpy(.sendable)
+      protocol Worker: Sendable {
+        @DefaultReturn("done")
+        @concurrent func work(value: inout Int) async throws(WorkError) -> String
+      }
+      """,
+      expandedSource: """
+      enum WorkError: Error {
+        case failed
+      }
+      protocol Worker: Sendable {
+        @concurrent func work(value: inout Int) async throws(WorkError) -> String
+      }
+
+      @Observable
+      nonisolated final class SpyWorker: Worker, Sendable {
+        private struct _Storage: Sendable {
+          var workCallCount: Int = 0
+          var workResult: Result<String, WorkError> = .success("done")
+          var workImplementation: (@Sendable (inout Int) async throws(WorkError) -> String)? = nil
+          var calls: [Call] = []
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        var workCallCount: Int {
+          get {
+            access(keyPath: \\.workCallCount)
+            return _testDoubleStorage.withValue {
+                $0.workCallCount
+            }
+          }
+          set {
+            withMutation(keyPath: \\.workCallCount) {
+              _testDoubleStorage.withValue {
+                  $0.workCallCount = newValue
+              }
+            }
+          }
+        }
+        var workResult: Result<String, WorkError> {
+          get {
+            access(keyPath: \\.workResult)
+            return _testDoubleStorage.withValue {
+                $0.workResult
+            }
+          }
+          set {
+            withMutation(keyPath: \\.workResult) {
+              _testDoubleStorage.withValue {
+                  $0.workResult = newValue
+              }
+            }
+          }
+        }
+        var workImplementation: (@Sendable (inout Int) async throws(WorkError) -> String)? {
+          get {
+            return _testDoubleStorage.withValue {
+                $0.workImplementation
+            }
+          }
+          set {
+            _testDoubleStorage.withValue {
+                $0.workImplementation = newValue
+            }
+          }
+        }
+        var calls: [Call] {
+          get {
+            access(keyPath: \\.calls)
+            return _testDoubleStorage.withValue {
+                $0.calls
+            }
+          }
+          set {
+            withMutation(keyPath: \\.calls) {
+              _testDoubleStorage.withValue {
+                  $0.calls = newValue
+              }
+            }
+          }
+        }
+        @concurrent
+        func work(value: inout Int) async throws(WorkError) -> String {
+          let _visorValueSnapshot = value
+          let (workImplementation, workResult) = withMutation(keyPath: \\.workCallCount) {
+            withMutation(keyPath: \\.calls) {
+              _testDoubleStorage.withValue { state in
+                state.workCallCount += 1
+                state.calls.append(.work(value: _visorValueSnapshot))
+                return (state.workImplementation, state.workResult)
+              }
+            }
+          }
+          if let workImplementation {
+            return try await workImplementation(&value)
+          }
+          return try workResult.get()
+        }
+        enum Call: Sendable {
+          case work(value: Int)
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Rejects unconstrained generic values requiring Sendable spy storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy(.sendable)
+      protocol GenericService: Sendable {
+        func consume<T>(_ value: T)
+      }
+      """,
+      expandedSource: """
+      protocol GenericService: Sendable {
+        func consume<T>(_ value: T)
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "@GenerateSpy(.sendable) cannot record unconstrained generic value 'T' in 'consume()'; constrain it to Sendable",
+          line: 1,
+          column: 1,
+          severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Sendable spies erase constrained generic arguments to any Sendable`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy(.sendable)
+      protocol GenericService: Sendable {
+        func consume<T: Sendable>(_ value: T)
+      }
+      """,
+      expandedSource: """
+      protocol GenericService: Sendable {
+        func consume<T: Sendable>(_ value: T)
+      }
+
+      @Observable
+      nonisolated final class SpyGenericService: GenericService, Sendable {
+        private struct _Storage: Sendable {
+          var consumeCallCount: Int = 0
+          var consumeReceivedValue: (any Sendable)? = nil
+          var consumeReceivedInvocations: [(any Sendable)] = []
+          var calls: [Call] = []
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        var consumeCallCount: Int {
+          get {
+            access(keyPath: \\.consumeCallCount)
+            return _testDoubleStorage.withValue {
+                $0.consumeCallCount
+            }
+          }
+          set {
+            withMutation(keyPath: \\.consumeCallCount) {
+              _testDoubleStorage.withValue {
+                  $0.consumeCallCount = newValue
+              }
+            }
+          }
+        }
+        var consumeReceivedValue: (any Sendable)? {
+          get {
+            access(keyPath: \\.consumeReceivedValue)
+            return _testDoubleStorage.withValue {
+                $0.consumeReceivedValue
+            }
+          }
+          set {
+            withMutation(keyPath: \\.consumeReceivedValue) {
+              _testDoubleStorage.withValue {
+                  $0.consumeReceivedValue = newValue
+              }
+            }
+          }
+        }
+        var consumeReceivedInvocations: [(any Sendable)] {
+          get {
+            access(keyPath: \\.consumeReceivedInvocations)
+            return _testDoubleStorage.withValue {
+                $0.consumeReceivedInvocations
+            }
+          }
+          set {
+            withMutation(keyPath: \\.consumeReceivedInvocations) {
+              _testDoubleStorage.withValue {
+                  $0.consumeReceivedInvocations = newValue
+              }
+            }
+          }
+        }
+        var calls: [Call] {
+          get {
+            access(keyPath: \\.calls)
+            return _testDoubleStorage.withValue {
+                $0.calls
+            }
+          }
+          set {
+            withMutation(keyPath: \\.calls) {
+              _testDoubleStorage.withValue {
+                  $0.calls = newValue
+              }
+            }
+          }
+        }
+        func consume<T: Sendable>(_ value: T) {
+          withMutation(keyPath: \\.consumeCallCount) {
+            withMutation(keyPath: \\.consumeReceivedValue) {
+              withMutation(keyPath: \\.consumeReceivedInvocations) {
+                withMutation(keyPath: \\.calls) {
+                  _testDoubleStorage.withValue { state in
+                    state.consumeCallCount += 1
+                    state.consumeReceivedValue = value
+                    state.consumeReceivedInvocations.append(value)
+                    state.calls.append(.consume(value: value))
+                  }
+                }
+              }
+            }
+          }
+        }
+        enum Call: Sendable {
+          case consume(value: any Sendable)
+        }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Rejects duplicate Sendable traits`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy(.sendable, .sendable)
+      protocol Service {}
+      """,
+      expandedSource: """
+      protocol Service {}
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "@GenerateSpy received duplicate '.sendable' traits",
+          line: 1,
+          column: 25,
+          severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Rejects unsupported test double traits`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy(.observable)
+      protocol Service {}
+      """,
+      expandedSource: """
+      protocol Service {}
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "@GenerateSpy does not support the 'observable' trait",
+          line: 1,
+          column: 14,
+          severity: .error),
+      ],
+      macros: testMacros)
+  }
+
 }
 
 #endif

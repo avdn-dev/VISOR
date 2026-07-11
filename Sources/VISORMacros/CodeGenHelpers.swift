@@ -42,7 +42,7 @@ func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: 
 /// Returns a sensible default literal for known Swift types, or `nil` for custom types.
 /// Used by generated stubs and spies to initialise generated properties.
 func defaultValue(for type: String) -> String? {
-  let trimmed = type.trimmingWhitespace
+  let trimmed = storageValueType(from: type)
 
   // Optional
   if trimmed.hasSuffix("?") { return "nil" }
@@ -92,8 +92,16 @@ func returnDefaultValue(for method: ProtocolMethodInfo) -> String? {
 }
 
 func methodReferencesGenericParameters(_ method: ProtocolMethodInfo, in type: String?) -> Bool {
-  guard let type, !method.genericParameterNames.isEmpty else { return false }
-  return method.genericParameterNames.contains { genericName in
+  !genericParameterNamesReferenced(by: method, in: type).isEmpty
+}
+
+func genericParameterNamesReferenced(
+  by method: ProtocolMethodInfo,
+  in type: String?)
+  -> [String]
+{
+  guard let type, !method.genericParameterNames.isEmpty else { return [] }
+  return method.genericParameterNames.filter { genericName in
     type.containsTypeIdentifier(genericName)
   }
 }
@@ -325,6 +333,45 @@ func stripInout(from typeString: String) -> String {
   return result
 }
 
+/// Returns a type spelling that can be used for stored values.
+///
+/// Parameter ownership and isolation specifiers are valid on function parameters or results,
+/// but not on stored properties or enum associated values. Function-type attributes such as
+/// `@Sendable` remain part of the stored type.
+func storageValueType(from typeString: String) -> String {
+  var result = stripEscaping(from: typeString).trimmingWhitespace
+  let leadingSpecifiers = ["inout", "sending", "borrowing", "consuming", "isolated"]
+
+  var removedSpecifier = true
+  while removedSpecifier {
+    removedSpecifier = false
+    for specifier in leadingSpecifiers where result.hasPrefix("\(specifier) ") {
+      result = String(result.dropFirst(specifier.count + 1)).trimmingWhitespace
+      removedSpecifier = true
+      break
+    }
+  }
+
+  return result
+}
+
+enum StorageSnapshotStrategy: Equatable, Sendable {
+  case none
+  case copy
+  case consume
+}
+
+func storageSnapshotStrategy(for typeString: String) -> StorageSnapshotStrategy {
+  let trimmed = typeString.trimmingWhitespace
+  if ["sending", "consuming"].contains(where: { trimmed.hasPrefix("\($0) ") }) {
+    return .consume
+  }
+  if ["borrowing", "isolated"].contains(where: { trimmed.hasPrefix("\($0) ") }) {
+    return .copy
+  }
+  return .none
+}
+
 /// Returns `true` when `typeString` represents a function type (contains `->`).
 func isFunctionType(_ typeString: String) -> Bool {
   typeString.contains("->")
@@ -549,7 +596,7 @@ private extension ProtocolMethodInfo {
     guard isRethrowing else { return nil }
 
     for parameter in parameters {
-      let type = stripEscaping(from: parameter.type).trimmingWhitespace
+      let type = stripInvocationOnlyFunctionAttributes(from: parameter.type)
       guard isZeroArgumentFunction(type),
             canForwardFunctionReturnType(functionReturnType(in: type), for: returnType)
       else {
@@ -567,6 +614,13 @@ private extension ProtocolMethodInfo {
   var canForwardRethrowingBodyResult: Bool {
     rethrowingBodyForwardingCall != nil
   }
+}
+
+private func stripInvocationOnlyFunctionAttributes(from type: String) -> String {
+  type
+    .split(separator: " ", omittingEmptySubsequences: true)
+    .filter { $0 != "@escaping" && $0 != "@Sendable" }
+    .joined(separator: " ")
 }
 
 private func isZeroArgumentFunction(_ type: String) -> Bool {
