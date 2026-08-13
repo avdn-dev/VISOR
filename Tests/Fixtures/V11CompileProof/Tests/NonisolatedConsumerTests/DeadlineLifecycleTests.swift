@@ -197,9 +197,9 @@ private func testingDeadlinePolicy(
 
 @Suite("Testing DSL control-plane deadlines")
 struct DeadlineLifecycleTests {
-  @Test("Readiness deadline reports at observe and withholds the body")
+  @Test
   @MainActor
-  func readinessDeadlineUsesObserveLocation() async throws {
+  func `Readiness deadline reports at observe and withholds the body`() async throws {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -244,9 +244,9 @@ struct DeadlineLifecycleTests {
     reactionGate.open()
   }
 
-  @Test("A suspended user action receives no VISOR deadline")
+  @Test
   @MainActor
-  func userActionHasNoDeadline() async throws {
+  func `A suspended user action receives no VISOR deadline`() async throws {
     let service = SyncingService()
     let sut = SourceBackedViewModel(service: service)
     let sleeper = TestingDeadlineSleeper()
@@ -278,9 +278,9 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.isEmpty)
   }
 
-  @Test("Opening deadline reports at perform and suppresses the action")
+  @Test
   @MainActor
-  func openingDeadlineUsesPerformLocation() async throws {
+  func `Opening deadline reports at perform and suppresses the action`() async throws {
     let service = SyncingService()
     let sut = SourceBackedViewModel(service: service)
     let sleeper = TestingDeadlineSleeper()
@@ -320,9 +320,9 @@ struct DeadlineLifecycleTests {
     openingGate.open()
   }
 
-  @Test("Closing deadline preserves a produced result at perform")
+  @Test
   @MainActor
-  func closingDeadlinePreservesResultAndPerformLocation() async throws {
+  func `Closing deadline preserves a produced result at perform`() async throws {
     let service = SyncingService()
     let sut = SourceBackedViewModel(service: service)
     let sleeper = TestingDeadlineSleeper()
@@ -364,9 +364,9 @@ struct DeadlineLifecycleTests {
     closingGate.open()
   }
 
-  @Test("Closing deadline preserves the exact action error")
+  @Test
   @MainActor
-  func closingDeadlinePreservesActionError() async throws {
+  func `Closing deadline preserves the exact action error`() async throws {
     let service = SyncingService()
     let sut = SourceBackedViewModel(service: service)
     let sleeper = TestingDeadlineSleeper()
@@ -402,9 +402,9 @@ struct DeadlineLifecycleTests {
     closingGate.open()
   }
 
-  @Test("Teardown deadline preserves body error and observe attribution")
+  @Test
   @MainActor
-  func teardownDeadlinePreservesBodyError() async {
+  func `Teardown deadline preserves body error and observe attribution`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -448,9 +448,9 @@ struct DeadlineLifecycleTests {
     reactionGate.open()
   }
 
-  @Test("A timed-out scope reserves State until its old handler truly joins")
+  @Test
   @MainActor
-  func timedOutScopeRetainsStateReservationUntilTrueJoin() async throws {
+  func `A timed-out scope reserves State until its old handler truly joins`() async throws {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()

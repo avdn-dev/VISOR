@@ -80,10 +80,8 @@ private final class IntegrationViewModel {
 @Suite("V11 integration")
 @MainActor
 struct IntegrationTests {
-  @Test(
-    "A factory-created ViewModel projects its source snapshot",
-    .timeLimit(.minutes(1)))
-  func factoryCreatesSourceBackedViewModel() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `A factory-created ViewModel projects its source snapshot`() async throws {
     let service = IntegrationService()
     let event = IntegrationEvent()
     let factory = ViewModelFactory {
@@ -103,10 +101,8 @@ struct IntegrationTests {
     await session._visorStop()
   }
 
-  @Test(
-    "Two ViewModels can independently consume one source",
-    .timeLimit(.minutes(1)))
-  func twoViewModelsShareOneSource() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `Two ViewModels can independently consume one source`() async throws {
     let service = IntegrationService()
     let firstEvent = IntegrationEvent()
     let secondEvent = IntegrationEvent()
@@ -131,10 +127,8 @@ struct IntegrationTests {
     await secondSession._visorStop()
   }
 
-  @Test(
-    "Navigation and source observation remain independent",
-    .timeLimit(.minutes(1)))
-  func navigationDoesNotInterfereWithObservation() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `Navigation and source observation remain independent`() async throws {
     let service = IntegrationService()
     let event = IntegrationEvent()
     let viewModel = IntegrationViewModel(service: service, event: event)
@@ -156,8 +150,8 @@ struct IntegrationTests {
     await session._visorStop()
   }
 
-  @Test("A deep link opened by a child router reaches its push destination")
-  func childRouterDeepLink() {
+  @Test
+  func `A deep link opened by a child router reaches its push destination`() {
     let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .tab(.home)),
@@ -177,8 +171,8 @@ struct IntegrationTests {
     #expect(child.navigationPath == [.detail(id: "deep")])
   }
 
-  @Test("A routed factory receives the concrete Router")
-  func routedFactoryReceivesRouter() {
+  @Test
+  func `A routed factory receives the concrete Router`() {
     let router = Router<TestScene>()
     let factory: ViewModelFactory<RoutedTestVM> = .routed {
       (router: Router<TestScene>) in

@@ -184,9 +184,9 @@ private func testingDeadlinePolicy(
 
 @Suite("VISORTesting control-plane deadlines")
 struct DeadlineLifecycleTests {
-  @Test("Readiness reports at observe and withholds the body")
+  @Test
   @MainActor
-  func readinessDeadlineUsesObserveLocation() async throws {
+  func `Readiness reports at observe and withholds the body`() async throws {
     let service = TestingService(10)
     let reactionGate = TestingGate()
     let sut = TestingViewModel(
@@ -228,9 +228,9 @@ struct DeadlineLifecycleTests {
     reactionGate.open()
   }
 
-  @Test("Opening reports at perform and suppresses the action")
+  @Test
   @MainActor
-  func openingDeadlineUsesPerformLocation() async throws {
+  func `Opening reports at perform and suppresses the action`() async throws {
     let sut = TestingViewModel()
     let sleeper = TestingDeadlineSleeper()
     let openingGate = NthPauseGate(target: 1)
@@ -269,9 +269,9 @@ struct DeadlineLifecycleTests {
     openingGate.open()
   }
 
-  @Test("Closing preserves a produced result and reports at perform")
+  @Test
   @MainActor
-  func closingDeadlinePreservesResultAndPerformLocation() async throws {
+  func `Closing preserves a produced result and reports at perform`() async throws {
     let sut = TestingViewModel()
     let sleeper = TestingDeadlineSleeper()
     let closingGate = NthPauseGate(target: 2)
@@ -312,9 +312,9 @@ struct DeadlineLifecycleTests {
     closingGate.open()
   }
 
-  @Test("Teardown preserves the body error and reports at observe")
+  @Test
   @MainActor
-  func teardownDeadlinePreservesBodyError() async {
+  func `Teardown preserves the body error and reports at observe`() async {
     let service = TestingService()
     let reactionGate = TestingGate()
     let sut = TestingViewModel(
@@ -356,9 +356,9 @@ struct DeadlineLifecycleTests {
     reactionGate.open()
   }
 
-  @Test("A timed-out scope reserves State until its handler truly joins")
+  @Test
   @MainActor
-  func timedOutScopeRetainsStateReservationUntilTrueJoin() async throws {
+  func `A timed-out scope reserves State until its handler truly joins`() async throws {
     let service = TestingService()
     let reactionGate = TestingGate()
     let sut = TestingViewModel(

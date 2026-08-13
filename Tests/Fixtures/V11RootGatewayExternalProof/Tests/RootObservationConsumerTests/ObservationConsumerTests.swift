@@ -3,8 +3,8 @@ import Testing
 
 @Suite("Root observation products from a downstream package")
 struct RootObservationConsumerTests {
-  @Test("Public source and channel operations cross the package boundary")
-  func publicSourceAndChannelOperationsCrossTheBoundary() {
+  @Test
+  func `Public source and channel operations cross the package boundary`() {
     let consumer = RootObservationConsumer(initialValue: 1)
 
     #expect(consumer.snapshot() == 1)

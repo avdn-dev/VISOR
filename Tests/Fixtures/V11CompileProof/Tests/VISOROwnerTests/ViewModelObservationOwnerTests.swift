@@ -143,9 +143,9 @@ private final class OwnerDeadlineSleeper {
 
 @Suite("Structured production ViewModel owner", .serialized)
 struct ViewModelObservationOwnerTests {
-  @Test("Observation policies map every scene phase to the accepted lifetime")
+  @Test
   @MainActor
-  func observationPolicyMapping() {
+  func `Observation policies map every scene phase to the accepted lifetime`() {
     #expect(ObservationPolicy.alwaysObserving._visorIsEnabled(in: .active))
     #expect(ObservationPolicy.alwaysObserving._visorIsEnabled(in: .inactive))
     #expect(ObservationPolicy.alwaysObserving._visorIsEnabled(in: .background))
@@ -159,9 +159,9 @@ struct ViewModelObservationOwnerTests {
     #expect(!ObservationPolicy.pauseWhenInactive._visorIsEnabled(in: .background))
   }
 
-  @Test("An empty generated recipe crosses readiness without deadlock")
+  @Test
   @MainActor
-  func emptyRecipeBecomesReady() async {
+  func `An empty generated recipe crosses readiness without deadlock`() async {
     let viewModel = CompileProofViewModel()
     let ready = OwnerEventCounter()
     let owner = _ViewModelObservationOwner<CompileProofViewModel>(
@@ -186,9 +186,9 @@ struct ViewModelObservationOwnerTests {
       isEnabled: true))
   }
 
-  @Test("Content remains unavailable until complete session readiness")
+  @Test
   @MainActor
-  func readinessPrecedesContentAndTeardownJoins() async {
+  func `Content remains unavailable until complete session readiness`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -246,9 +246,9 @@ struct ViewModelObservationOwnerTests {
     await hostLifetime.value
   }
 
-  @Test("A replacing host waits for joined teardown before claiming the lease")
+  @Test
   @MainActor
-  func cancellationRetainsOwnerThroughJoinedTeardown() async {
+  func `A replacing host waits for joined teardown before claiming the lease`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -305,10 +305,9 @@ struct ViewModelObservationOwnerTests {
     #expect(statusService.activeObservationCountForProof == 0)
   }
 
-  @Test(
-    "A teardown deadline keeps the owner lease releasing until the true join")
+  @Test
   @MainActor
-  func deadlineDoesNotReleaseOwnerBeforeEventualJoin() async {
+  func `A teardown deadline keeps the owner lease releasing until the true join`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -381,10 +380,9 @@ struct ViewModelObservationOwnerTests {
     #expect(statusService.activeObservationCountForProof == 0)
   }
 
-  @Test(
-    "Scene disable reports its deadline and restarts only after the true join")
+  @Test
   @MainActor
-  func sceneDisableWaitsForEventualJoinBeforeRestarting() async {
+  func `Scene disable reports its deadline and restarts only after the true join`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -453,10 +451,9 @@ struct ViewModelObservationOwnerTests {
     #expect(statusService.activeObservationCountForProof == 0)
   }
 
-  @Test(
-    "A cancelled replacement relinquishes a newly claimed lease before the next hand-off")
+  @Test
   @MainActor
-  func cancellationBetweenClaimAndRootSetupCannotStrandTheLease() async {
+  func `A cancelled replacement relinquishes a newly claimed lease before the next hand-off`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()
@@ -536,9 +533,9 @@ struct ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 0)
   }
 
-  @Test("Startup failure never exposes content or retries")
+  @Test
   @MainActor
-  func startupFailureIsFailClosed() async {
+  func `Startup failure never exposes content or retries`() async {
     let service = SyncingService()
     service.terminateObservationForProof()
     let viewModel = SourceBackedViewModel(service: service)
@@ -576,9 +573,9 @@ struct ViewModelObservationOwnerTests {
     await hostLifetime.value
   }
 
-  @Test("A fresh generation reconciles the latest complete snapshots")
+  @Test
   @MainActor
-  func freshGenerationReconcilesBeforeReadiness() async {
+  func `A fresh generation reconciles the latest complete snapshots`() async {
     let service = SyncingService()
     let statusService = StatusService()
     await service.publish(SyncSnapshot(revision: 1))
@@ -620,9 +617,9 @@ struct ViewModelObservationOwnerTests {
     await hostLifetime.value
   }
 
-  @Test("Rapid restart joins the old generation before opening the new one")
+  @Test
   @MainActor
-  func rapidRestartDoesNotOverlapGenerations() async {
+  func `Rapid restart joins the old generation before opening the new one`() async {
     let service = SyncingService()
     let viewModel = SourceBackedViewModel(service: service)
     let ready = OwnerEventCounter()
@@ -652,9 +649,9 @@ struct ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 0)
   }
 
-  @Test("Latest disabled request wins rapid false-true-false churn")
+  @Test
   @MainActor
-  func rapidPolicyChurnRemainsStopped() async {
+  func `Latest disabled request wins rapid false-true-false churn`() async {
     let service = SyncingService()
     let viewModel = SourceBackedViewModel(service: service)
     let ready = OwnerEventCounter()
@@ -685,9 +682,9 @@ struct ViewModelObservationOwnerTests {
     await hostLifetime.value
   }
 
-  @Test("A second owner for one ViewModel identity is rejected")
+  @Test
   @MainActor
-  func duplicateOwnerIsRejected() async {
+  func `A second owner for one ViewModel identity is rejected`() async {
     let service = SyncingService()
     let viewModel = SourceBackedViewModel(service: service)
     let firstReady = OwnerEventCounter()
@@ -720,9 +717,9 @@ struct ViewModelObservationOwnerTests {
     await first.value
   }
 
-  @Test("A new owner can claim the identity after joined hand-off")
+  @Test
   @MainActor
-  func sequentialOwnerHandOff() async {
+  func `A new owner can claim the identity after joined hand-off`() async {
     let service = SyncingService()
     let viewModel = SourceBackedViewModel(service: service)
     let firstReady = OwnerEventCounter()
@@ -761,10 +758,9 @@ struct ViewModelObservationOwnerTests {
     await second.value
   }
 
-  @Test(
-    "Infrastructure failure waits for a later activation edge before retrying")
+  @Test
   @MainActor
-  func infrastructureFailureEndsTheGeneration() async {
+  func `Infrastructure failure waits for a later activation edge before retrying`() async {
     let service = SyncingService()
     let viewModel = SourceBackedViewModel(service: service)
     let ready = OwnerEventCounter()
@@ -811,9 +807,9 @@ struct ViewModelObservationOwnerTests {
     await hostLifetime.value
   }
 
-  @Test("Readiness cannot cross a ViewModel identity boundary")
+  @Test
   @MainActor
-  func readinessIsScopedToViewModelIdentity() async {
+  func `Readiness cannot cross a ViewModel identity boundary`() async {
     let firstViewModel = SourceBackedViewModel(service: SyncingService())
     let secondViewModel = SourceBackedViewModel(service: SyncingService())
     let ready = OwnerEventCounter()

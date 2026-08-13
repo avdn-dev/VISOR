@@ -467,9 +467,9 @@ private func deadlinePolicy(
 
 @Suite("Observation control-plane deadlines", .timeLimit(.minutes(1)))
 struct ObservationDeadlineTests {
-  @Test("A due watchdog wins while MainActor is synchronously occupied")
+  @Test
   @MainActor
-  func watchdogExpiryIsIndependentOfMainActorAvailability() async {
+  func `A due watchdog wins while MainActor is synchronously occupied`() async {
     let channel = ObservationChannel(0)
     let sleeper = ConcurrentDeadlineSleeper()
     let blocker = MainActorDeadlineBlocker()
@@ -518,9 +518,9 @@ struct ObservationDeadlineTests {
     #expect(session._visorIsStopped)
   }
 
-  @Test("A due fence deadline skips its synchronous source checkpoint")
+  @Test
   @MainActor
-  func checkpointCannotOutrunFenceDeadline() async throws {
+  func `A due fence deadline skips its synchronous source checkpoint`() async throws {
     let channel = ObservationChannel(0)
     let sleeper = ArmedWatchdogController()
     let blocker = MainActorDeadlineBlocker()
@@ -576,9 +576,9 @@ struct ObservationDeadlineTests {
     #expect(session._visorIsStopped)
   }
 
-  @Test("An uncancelled sleeper CancellationError fails closed")
+  @Test
   @MainActor
-  func sleeperCancellationErrorIsWatchdogFailure() async {
+  func `An uncancelled sleeper CancellationError fails closed`() async {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let failures = DeadlineFailureLog()
@@ -622,9 +622,9 @@ struct ObservationDeadlineTests {
     await stopped.wait()
   }
 
-  @Test("Readiness deadline fails closed and eventually completes one teardown")
+  @Test
   @MainActor
-  func readinessDeadline() async {
+  func `Readiness deadline fails closed and eventually completes one teardown`() async {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let sleeper = DeadlineSleeper()
@@ -668,9 +668,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Opening fence deadline identifies the opening phase")
+  @Test
   @MainActor
-  func openingFenceDeadline() async throws {
+  func `Opening fence deadline identifies the opening phase`() async throws {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let fenceGate = DeadlineGate()
@@ -721,9 +721,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Closing fence deadline identifies the closing phase")
+  @Test
   @MainActor
-  func closingFenceDeadline() async throws {
+  func `Closing fence deadline identifies the closing phase`() async throws {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let fenceGate = DeadlineGate()
@@ -774,9 +774,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Teardown deadline returns while one supervisor retains the true join")
+  @Test
   @MainActor
-  func teardownDeadline() async throws {
+  func `Teardown deadline returns while one supervisor retains the true join`() async throws {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let handlerGate = DeadlineGate()
@@ -832,9 +832,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Caller cancellation before expiry stays cancellation")
+  @Test
   @MainActor
-  func cancellationPrecedesReadinessDeadline() async {
+  func `Caller cancellation before expiry stays cancellation`() async {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let sleeper = DeadlineSleeper()
@@ -870,9 +870,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("A latched first cause survives re-entrant caller cancellation")
+  @Test
   @MainActor
-  func firstCausePrecedesReentrantCallerCancellation() async {
+  func `A latched first cause survives re-entrant caller cancellation`() async {
     let channel = ObservationChannel(0)
     channel._visorTerminate(with: .failed("first failure"))
     let sleeper = DeadlineSleeper()
@@ -908,9 +908,9 @@ struct ObservationDeadlineTests {
     #expect(session._visorIsStopped)
   }
 
-  @Test("Concurrent and repeated stops share one bounded teardown wait")
+  @Test
   @MainActor
-  func teardownWaitDoesNotAccumulateObservers() async throws {
+  func `Concurrent and repeated stops share one bounded teardown wait`() async throws {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let handlerGate = DeadlineGate()
@@ -967,9 +967,9 @@ struct ObservationDeadlineTests {
     #expect(session._visorIsStopped)
   }
 
-  @Test("Many teardown waiters share one deadline under mixed cancellation")
+  @Test
   @MainActor
-  func teardownCoordinatorHandlesHighFanOutAndMixedCancellation() async throws {
+  func `Many teardown waiters share one deadline under mixed cancellation`() async throws {
     let waiterCount = 64
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
@@ -1039,9 +1039,9 @@ struct ObservationDeadlineTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Cancelling the last teardown waiter before expiry suppresses timeout")
+  @Test
   @MainActor
-  func cancelledTeardownWaiterSuppressesDeadlineFailure() async throws {
+  func `Cancelling the last teardown waiter before expiry suppresses timeout`() async throws {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let handlerGate = DeadlineGate()
@@ -1090,9 +1090,9 @@ struct ObservationDeadlineTests {
     #expect(session._visorIsStopped)
   }
 
-  @Test("A re-entrant callback cannot replace or duplicate the first cause")
+  @Test
   @MainActor
-  func reentrantFailurePreservesFirstCause() async {
+  func `A re-entrant callback cannot replace or duplicate the first cause`() async {
     let channel = ObservationChannel(0)
     let readinessGate = DeadlineGate()
     let sleeper = DeadlineSleeper()
@@ -1133,9 +1133,9 @@ struct ObservationDeadlineTests {
     await stopped.wait()
   }
 
-  @Test("Deadline diagnostics retain a bounded source prefix")
+  @Test
   @MainActor
-  func deadlineDiagnosticsAreBounded() async {
+  func `Deadline diagnostics retain a bounded source prefix`() async {
     let channels = (0..<10).map { ObservationChannel($0) }
     let readinessGate = DeadlineGate()
     let sleeper = DeadlineSleeper()

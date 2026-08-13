@@ -41,8 +41,8 @@ private let sourceEntryMacros: [String: Macro.Type] = [
 
 @Suite("V11 macro diagnostics")
 struct ViewModelMacroDiagnosticTests {
-  @Test("@ViewModel requires explicit main-actor isolation")
-  func viewModelRequiresMainActor() {
+  @Test
+  func `@ViewModel requires explicit main-actor isolation`() {
     assertMacroExpansion(
       """
       @ViewModel
@@ -79,10 +79,8 @@ struct ViewModelMacroDiagnosticTests {
       """)
   }
 
-  @Test(
-    "Nested State must not stack Observation's macro",
-    arguments: ["@Observable", "@Observation.Observable"])
-  func stateMustNotUseObservable(_ observableAttribute: String) {
+  @Test(arguments: ["@Observable", "@Observation.Observable"])
+  func `Nested State must not stack Observation's macro`(_ observableAttribute: String) {
     let source = """
       @MainActor
       @ViewModel
@@ -116,8 +114,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: viewModelMacro)
   }
 
-  @Test("Public State fields require a restricted setter")
-  func publicStateSetterFixIt() {
+  @Test
+  func `Public State fields require a restricted setter`() {
     assertMacroExpansion(
       """
       @StateFieldPolicy
@@ -153,8 +151,8 @@ struct ViewModelMacroDiagnosticTests {
       """)
   }
 
-  @Test("Supported State visibility and ignored declarations remain valid")
-  func supportedStateFieldPolicy() {
+  @Test
+  func `Supported State visibility and ignored declarations remain valid`() {
     assertMacroExpansion(
       """
       @StateFieldPolicy
@@ -206,8 +204,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: stateFieldPolicyMacro)
   }
 
-  @Test("Every unsupported State declaration has a precise diagnostic")
-  func unsupportedStateFields() {
+  @Test
+  func `Every unsupported State declaration has a precise diagnostic`() {
     assertMacroExpansion(
       """
       @StateFieldPolicy
@@ -359,8 +357,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: stateFieldPolicyMacro)
   }
 
-  @Test("A rejected field suppresses actual ViewModel synthesis")
-  func invalidStateSuppressesViewModelSynthesis() {
+  @Test
+  func `A rejected field suppresses actual ViewModel synthesis`() {
     assertMacroExpansion(
       """
       @MainActor
@@ -385,8 +383,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: viewModelMacro)
   }
 
-  @Test("A rejected field emits no partial State conformance")
-  func invalidStateFailsClosed() {
+  @Test
+  func `A rejected field emits no partial State conformance`() {
     assertMacroExpansion(
       """
       @StateShape
@@ -414,8 +412,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: stateShapeMacro)
   }
 
-  @Test("Bound rejects unsupported placement and declaration")
-  func boundPolicy() {
+  @Test
+  func `Bound rejects unsupported placement and declaration`() {
     assertMacroExpansion(
       """
       final class NotAViewModel {
@@ -471,8 +469,8 @@ struct ViewModelMacroDiagnosticTests {
       macros: sourceEntryMacros)
   }
 
-  @Test("Reaction rejects unsupported placement and signature")
-  func reactionPolicy() {
+  @Test
+  func `Reaction rejects unsupported placement and signature`() {
     assertMacroExpansion(
       """
       @ViewModel

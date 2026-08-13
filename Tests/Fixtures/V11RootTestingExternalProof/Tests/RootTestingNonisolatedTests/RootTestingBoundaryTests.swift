@@ -4,9 +4,9 @@ import VISORTesting
 
 @Suite("Root VISORTesting from a nonisolated target")
 struct RootTestingBoundaryTests {
-  @Test("The generated model supports source-fenced public testing APIs")
+  @Test
   @MainActor
-  func generatedModelSupportsSourceFencedPublicTestingAPIs() async throws {
+  func `The generated model supports source-fenced public testing APIs`() async throws {
     let service = RootTestingService(initialValue: 1)
     let sut = NonisolatedRootTestingViewModel(service: service)
 

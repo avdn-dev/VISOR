@@ -44,9 +44,9 @@ nonisolated private enum ObservationFailureWaitOutcome: Equatable, Sendable {
 struct ObservationSessionStressTests {
   private static let waiterCount = 64
 
-  @Test("Many failure waiters preserve cancellation and the first cause")
+  @Test
   @MainActor
-  func failureLatchHandlesHighFanOutAndMixedCancellation() async throws {
+  func `Many failure waiters preserve cancellation and the first cause`() async throws {
     let channel = ObservationChannel(0)
     let session = _ObservationSession(lanes: [
       _ObservationLane(
@@ -118,9 +118,9 @@ struct ObservationSessionStressTests {
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
 
-  @Test("Clean stop cancels every pending failure waiter")
+  @Test
   @MainActor
-  func failureLatchFinishReleasesHighFanOutWaiters() async throws {
+  func `Clean stop cancels every pending failure waiter`() async throws {
     let channel = ObservationChannel(0)
     let session = _ObservationSession(lanes: [
       _ObservationLane(

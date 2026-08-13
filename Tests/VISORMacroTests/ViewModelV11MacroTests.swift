@@ -22,8 +22,8 @@ import Testing
 
   @Suite("V11 ViewModel macro")
   struct ViewModelV11MacroTests {
-    @Test("A plain State cascades the hidden gateway and uses the default recipe hook")
-    func emptyRecipe() {
+    @Test
+    func `A plain State cascades the hidden gateway and uses the default recipe hook`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -62,8 +62,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("Source entries are grouped with projections before reactions")
-    func sourceRecipeGrouping() {
+    @Test
+    func `Source entries are grouped with projections before reactions`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -176,8 +176,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("An explicit source-backed deinitialiser is preserved")
-    func explicitDeinitialiserIsPreserved() {
+    @Test
+    func `An explicit source-backed deinitialiser is preserved`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -211,8 +211,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("A conditional source-backed deinitialiser fails closed")
-    func conditionalDeinitialiserFailsClosed() {
+    @Test
+    func `A conditional source-backed deinitialiser fails closed`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -253,8 +253,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("V11 State ownership must be stable")
-    func mutableStateFailsClosed() {
+    @Test
+    func `V11 State ownership must be stable`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -290,8 +290,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("Source-form Bound validates placement and declaration shape")
-    func sourceBoundValidation() {
+    @Test
+    func `Source-form Bound validates placement and declaration shape`() {
       assertMacroExpansionSwiftTesting(
         """
         final class NotAViewModel {
@@ -348,8 +348,8 @@ import Testing
         macros: sourceEntryV11Macros)
     }
 
-    @Test("Source-form Reaction validates placement and declaration shape")
-    func sourceReactionValidation() {
+    @Test
+    func `Source-form Reaction validates placement and declaration shape`() {
       assertMacroExpansionSwiftTesting(
         """
         extension ExampleViewModel {
@@ -402,8 +402,8 @@ import Testing
         macros: sourceEntryV11Macros)
     }
 
-    @Test("Malformed source arguments fail closed without partial expansion")
-    func malformedSourceArgumentsFailClosed() {
+    @Test
+    func `Malformed source arguments fail closed without partial expansion`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -465,8 +465,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("Malformed source Reaction arguments fail closed")
-    func malformedSourceReactionArgumentsFailClosed() {
+    @Test
+    func `Malformed source Reaction arguments fail closed`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -527,8 +527,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("Private source-bound State fields fail closed")
-    func privateSourceBoundFieldFailsClosed() {
+    @Test
+    func `Private source-bound State fields fail closed`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -568,8 +568,8 @@ import Testing
         macros: viewModelV11Macros)
     }
 
-    @Test("Invalid ViewModel and State shapes fail closed")
-    func invalidDeclarationShapesFailClosed() {
+    @Test
+    func `Invalid ViewModel and State shapes fail closed`() {
       assertMacroExpansionSwiftTesting(
         """
         @ViewModel
@@ -697,8 +697,8 @@ import Testing
         macros: viewModelOnlyV11Macros)
     }
 
-    @Test("ViewModels require explicit MainActor isolation")
-    func missingMainActorFailsClosed() {
+    @Test
+    func `ViewModels require explicit MainActor isolation`() {
       assertMacroExpansionSwiftTesting(
         """
         @Observable
@@ -727,8 +727,8 @@ import Testing
         macros: viewModelOnlyV11Macros)
     }
 
-    @Test("Action handling diagnostics remain enforced")
-    func actionHandlingDiagnostics() {
+    @Test
+    func `Action handling diagnostics remain enforced`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -787,8 +787,8 @@ import Testing
         macros: viewModelOnlyV11Macros)
     }
 
-    @Test("Removed observation marker forms fail closed")
-    func removedObservationMarkerFormsFailClosed() {
+    @Test
+    func `Removed observation marker forms fail closed`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -855,8 +855,8 @@ import Testing
         macros: viewModelOnlyV11Macros)
     }
 
-    @Test("Public V11 ViewModels require public State exposure")
-    func publicStateVisibilityFailsClosed() {
+    @Test
+    func `Public V11 ViewModels require public State exposure`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor

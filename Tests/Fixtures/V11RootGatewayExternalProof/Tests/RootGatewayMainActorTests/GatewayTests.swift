@@ -8,8 +8,8 @@ import VISOR
 
 @Suite("Root State gateway from a MainActor-by-default target")
 struct RootGatewayMainActorTests {
-  @Test("Every supported write spelling uses the generated State")
-  func routesEveryWriteSpelling() {
+  @Test
+  func `Every supported write spelling uses the generated State`() {
     typealias State = MainActorGatewayState
 
     let countSelector:
@@ -35,8 +35,8 @@ struct RootGatewayMainActorTests {
     #expect(state.identifier == "main-actor")
   }
 
-  @Test("Generated accessors remain observable")
-  func generatedAccessorsRemainObservable() {
+  @Test
+  func `Generated accessors remain observable`() {
     let state = MainActorGatewayState()
     let changes = OSAllocatedUnfairLock(initialState: 0)
 
@@ -51,8 +51,8 @@ struct RootGatewayMainActorTests {
     #expect(changes.withLock { $0 } == 1)
   }
 
-  @Test("Root source-backed ViewModel expansion crosses the package boundary")
-  func sourceBackedViewModelExpansionCrossesThePackageBoundary() {
+  @Test
+  func `Root source-backed ViewModel expansion crosses the package boundary`() {
     let consumer = RootObservationConsumer(initialValue: 42)
     let viewModel = MainActorSourceBackedViewModel(consumer: consumer)
 
@@ -68,8 +68,8 @@ struct RootGatewayMainActorTests {
     #expect(consumer.projectedSnapshot().revision == 42)
   }
 
-  @Test("Ordinary LazyViewModel selects source-backed ownership across the package boundary")
-  func ordinaryLazyViewModelSelectsSourceBackedOwnership() {
+  @Test
+  func `Ordinary LazyViewModel selects source-backed ownership across the package boundary`() {
     let view = MainActorSourceBackedView()
 
     requireViewConformance(view)

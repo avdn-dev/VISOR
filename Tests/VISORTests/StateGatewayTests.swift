@@ -119,8 +119,8 @@ private final class GatewayRecorder: _StateMutationRecorder {
 @Suite("V11 State gateway foundation")
 @MainActor
 struct StateGatewayTests {
-  @Test("Routed and direct writes share one generated accessor")
-  func routedAndDirectWrites() {
+  @Test
+  func `Routed and direct writes share one generated accessor`() {
     let state = GatewayState(identifier: "fixture")
     let recorder = GatewayRecorder()
     state._visorMutationRecorder = recorder
@@ -153,8 +153,8 @@ struct StateGatewayTests {
       ])
   }
 
-  @Test("Generated State remains observable without a recorder")
-  func observationWithoutRecorder() {
+  @Test
+  func `Generated State remains observable without a recorder`() {
     let state = GatewayState()
     let changeCount = OSAllocatedUnfairLock(initialState: 0)
 
@@ -169,8 +169,8 @@ struct StateGatewayTests {
     #expect(changeCount.withLock { $0 } == 1)
   }
 
-  @Test("Generated descriptor baselines use untracked backing storage")
-  func untrackedDescriptorReads() {
+  @Test
+  func `Generated descriptor baselines use untracked backing storage`() {
     let state = GatewayState()
     let changeCount = OSAllocatedUnfairLock(initialState: 0)
 
@@ -187,8 +187,8 @@ struct StateGatewayTests {
     #expect(changeCount.withLock { $0 } == 0)
   }
 
-  @Test("Generated setters isolate fields and preserve value semantics")
-  func setterObservationParity() {
+  @Test
+  func `Generated setters isolate fields and preserve value semantics`() {
     let state = GatewayState()
 
     var probe = installGatewayNotificationProbe {
@@ -216,8 +216,8 @@ struct StateGatewayTests {
     #expect(probe.count == 1)
   }
 
-  @Test("Reference setters preserve identity and Equatable semantics")
-  func referenceSetterObservationParity() {
+  @Test
+  func `Reference setters preserve identity and Equatable semantics`() {
     let state = GatewayState()
 
     var probe = installGatewayNotificationProbe {
@@ -245,8 +245,8 @@ struct StateGatewayTests {
     #expect(probe.count == 1)
   }
 
-  @Test("Modify access notifies on normal and throwing completion")
-  func modifyObservationParity() {
+  @Test
+  func `Modify access notifies on normal and throwing completion`() {
     let state = GatewayState()
 
     var probe = installGatewayNotificationProbe {

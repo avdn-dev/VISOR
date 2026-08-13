@@ -14,9 +14,9 @@ private final class ObservationRecipeLog {
 
 @Suite("Observation recipe aggregation")
 struct ObservationRecipeTests {
-  @Test("One source becomes one lane in declaration order")
+  @Test
   @MainActor
-  func oneSourceBecomesOneLane() async throws {
+  func `One source becomes one lane in declaration order`() async throws {
     let channel = ObservationChannel(7)
     let log = ObservationRecipeLog()
     let visitor = _ObservationRecipeVisitor()

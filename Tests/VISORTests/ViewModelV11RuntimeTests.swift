@@ -74,8 +74,8 @@ public final class SourceRecipeViewModel {
 @Suite("V11 ViewModel runtime expansion")
 @MainActor
 struct ViewModelV11RuntimeTests {
-  @Test("Generated recipes merge aliased sources and project before reacting")
-  func sourceRecipeCompilesAndStarts() async throws {
+  @Test
+  func `Generated recipes merge aliased sources and project before reacting`() async throws {
     let service = RecipeService(RecipeSnapshot(count: 7, label: "ready"))
     let viewModel = SourceRecipeViewModel(service: service)
     let recipes = viewModel._visorMakeObservationRecipes()

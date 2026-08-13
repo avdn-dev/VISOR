@@ -9,8 +9,8 @@ import VISOR
 @Suite("Root State gateway from a nonisolated target")
 struct RootGatewayNonisolatedTests {
   @MainActor
-  @Test("Every supported write spelling uses the generated State")
-  func routesEveryWriteSpelling() {
+  @Test
+  func `Every supported write spelling uses the generated State`() {
     typealias State = NonisolatedGatewayState
 
     let countSelector:
@@ -37,8 +37,8 @@ struct RootGatewayNonisolatedTests {
   }
 
   @MainActor
-  @Test("Generated accessors remain observable")
-  func generatedAccessorsRemainObservable() {
+  @Test
+  func `Generated accessors remain observable`() {
     let state = NonisolatedGatewayState()
     let changes = OSAllocatedUnfairLock(initialState: 0)
 
@@ -54,8 +54,8 @@ struct RootGatewayNonisolatedTests {
   }
 
   @MainActor
-  @Test("Root source-backed ViewModel expansion crosses the package boundary")
-  func sourceBackedViewModelExpansionCrossesThePackageBoundary() {
+  @Test
+  func `Root source-backed ViewModel expansion crosses the package boundary`() {
     let consumer = RootObservationConsumer(initialValue: 41)
     let viewModel = NonisolatedSourceBackedViewModel(consumer: consumer)
 
@@ -72,8 +72,8 @@ struct RootGatewayNonisolatedTests {
   }
 
   @MainActor
-  @Test("Ordinary LazyViewModel selects source-backed ownership across the package boundary")
-  func ordinaryLazyViewModelSelectsSourceBackedOwnership() {
+  @Test
+  func `Ordinary LazyViewModel selects source-backed ownership across the package boundary`() {
     let view = NonisolatedSourceBackedView()
 
     requireViewConformance(view)

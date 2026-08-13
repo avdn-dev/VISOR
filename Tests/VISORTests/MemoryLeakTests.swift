@@ -73,10 +73,8 @@ private final class LeakAsyncActionViewModel {
 @Suite("V11 memory ownership")
 @MainActor
 struct MemoryLeakTests {
-  @Test(
-    "A stopped observation session releases its ViewModel",
-    .timeLimit(.minutes(1)))
-  func stoppedSessionReleasesViewModel() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `A stopped observation session releases its ViewModel`() async throws {
     let service = LeakService()
     var viewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
     weak let weakViewModel = viewModel
@@ -93,10 +91,8 @@ struct MemoryLeakTests {
     #expect(service.activeObservationCount == 0)
   }
 
-  @Test(
-    "Observation recipes do not retain their ViewModel",
-    .timeLimit(.minutes(1)))
-  func recipesUseWeakViewModelCaptures() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `Observation recipes do not retain their ViewModel`() async throws {
     let service = LeakService()
     var viewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
     weak let weakViewModel = viewModel
@@ -111,10 +107,8 @@ struct MemoryLeakTests {
     await session._visorStop()
   }
 
-  @Test(
-    "Two sessions sharing a source stop independently",
-    .timeLimit(.minutes(1)))
-  func sharedSourceSessionsStopIndependently() async throws {
+  @Test(.timeLimit(.minutes(1)))
+  func `Two sessions sharing a source stop independently`() async throws {
     let service = LeakService()
     var firstViewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
     var secondViewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
@@ -141,8 +135,8 @@ struct MemoryLeakTests {
     #expect(service.activeObservationCount == 0)
   }
 
-  @Test("A completed async action does not retain its ViewModel")
-  func completedActionReleasesViewModel() async {
+  @Test
+  func `A completed async action does not retain its ViewModel`() async {
     var viewModel: LeakAsyncActionViewModel? = LeakAsyncActionViewModel()
     weak let weakViewModel = viewModel
 
@@ -153,8 +147,8 @@ struct MemoryLeakTests {
     #expect(weakViewModel == nil)
   }
 
-  @Test("A child Router does not retain its parent")
-  func childRouterDoesNotRetainParent() {
+  @Test
+  func `A child Router does not retain its parent`() {
     var root: Router<TestScene>? = Router<TestScene>()
     weak let weakRoot = root
     let child = root!.childRouter(for: .home)

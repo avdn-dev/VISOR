@@ -29,11 +29,9 @@ private final class HostLifecycleEvent {
 private final class HostLeaseCandidate: Sendable {}
 
 extension ViewModelObservationOwnerTests {
-  @Test(
-    "A mounted host gates content and joins observation before release",
-    .timeLimit(.minutes(1)))
+  @Test(.timeLimit(.minutes(1)))
   @MainActor
-  func mountedHostReadinessAndTeardown() async {
+  func `A mounted host gates content and joins observation before release`() async {
     let service = SyncingService()
     let statusService = StatusService()
     let reactionGate = ObservationReactionGate()

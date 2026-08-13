@@ -13,8 +13,8 @@ private let stateMacros: [String: Macro.Type] = [
 
 @Suite("V11 State gateway macros")
 struct ViewModelStateMacroTests {
-  @Test("State macro generates the release-workaround deinitialiser")
-  func generatedDeinitialiser() {
+  @Test
+  func `State macro generates the release-workaround deinitialiser`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
@@ -100,8 +100,8 @@ struct ViewModelStateMacroTests {
       macros: stateMacros)
   }
 
-  @Test("State macro preserves an explicit deinitialiser")
-  func explicitDeinitialiserIsPreserved() {
+  @Test
+  func `State macro preserves an explicit deinitialiser`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
@@ -187,8 +187,8 @@ struct ViewModelStateMacroTests {
       macros: stateMacros)
   }
 
-  @Test("State macro rejects a conditional deinitialiser")
-  func conditionalDeinitialiserFailsClosed() {
+  @Test
+  func `State macro rejects a conditional deinitialiser`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
@@ -218,8 +218,8 @@ struct ViewModelStateMacroTests {
       macros: stateMacros)
   }
 
-  @Test("Field macro owns storage and Observation accessors")
-  func fieldAccessors() {
+  @Test
+  func `Field macro owns storage and Observation accessors`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelStateField
@@ -291,8 +291,8 @@ struct ViewModelStateMacroTests {
       macros: stateMacros)
   }
 
-  @Test("A public setter fails closed with a fix-it")
-  func publicSetterFailsClosed() {
+  @Test
+  func `A public setter fails closed with a fix-it`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
@@ -329,8 +329,8 @@ struct ViewModelStateMacroTests {
       """)
   }
 
-  @Test("An existing setter modifier is replaced by the fix-it")
-  func existingSetterModifierFixIt() {
+  @Test
+  func `An existing setter modifier is replaced by the fix-it`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
@@ -364,8 +364,8 @@ struct ViewModelStateMacroTests {
       """)
   }
 
-  @Test("The generated namespace is reserved and fails closed")
-  func generatedNamespaceFailsClosed() {
+  @Test
+  func `The generated namespace is reserved and fails closed`() {
     assertMacroExpansionSwiftTesting(
       """
       @_ViewModelState
