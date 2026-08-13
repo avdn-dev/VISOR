@@ -11,31 +11,45 @@
 
 /// The base protocol for all ViewModels in the VISOR architecture.
 ///
-/// Conforming types must be `@Observable` classes with a nested `@Observable final class State`
-/// and an optional `Action` enum for user-initiated mutations.
+/// Conforming types are explicitly MainActor-isolated `@Observable` classes
+/// with a stable routed `State` instance and an optional `Action` enum for
+/// user-initiated mutations. `@ViewModel` generates the State gateway,
+/// observation recipe and ownership token.
 ///
-/// - State is an `@Observable` class for per-field SwiftUI granularity.
+/// - ViewModels use a plain nested `final class State` retained by a stored
+///   `let state` property.
 /// - Actions are dispatched via `handle(_:)`. Implement sync or async as needed.
-/// - `updateState(_:to:)` is macro-generated on each VM using `_state` directly.
-///
-/// - Note: Requires Swift 6.2+ with `MainActorByDefault` enabled in the consuming target.
+/// - State changes are routed through generated selectors.
+@MainActor
 public protocol ViewModel: Observable, AnyObject {
-  /// The complete representation of all view state. Must be an `@Observable` class.
-  associatedtype State: Observable, AnyObject
+  /// The complete observable representation of all view state.
+  associatedtype State: Observable & _ViewModelState
   /// The enum of user-initiated mutations. Defaults to `Never` for read-only ViewModels.
   associatedtype Action = Never
 
-  /// The current view state. Mutate via `updateState(_:to:)` for deduplication.
-  var state: State { get set }
+  /// The current stable view state. Conforming models retain this as a stored
+  /// `let state` property.
+  var state: State { get }
+  /// An inert per-instance token used by VISOR's hidden SwiftUI owner to
+  /// serialise observation generations for this ViewModel identity.
+  var _visorObservationOwnership: _ViewModelObservationOwnership { get }
+  /// Describes cooperative observation sources to VISOR's package-owned
+  /// runtime. `@ViewModel` generates this hook.
+  func _visorBuildObservationRecipe(into visitor: _ObservationRecipeVisitor)
   /// Dispatch an action. Implement sync or async as needed; the protocol requires `async`.
   func handle(_ action: Action) async
-  /// Called by the `@LazyViewModel` macro's `.task` modifier to begin observation loops.
-  /// Override to run custom observation; the default implementation is a no-op.
-  func startObserving() async
 }
 
 extension ViewModel {
-  public func startObserving() async {}
+  public func _visorBuildObservationRecipe(
+    into visitor: _ObservationRecipeVisitor
+  ) {}
+
+  package func _visorMakeObservationRecipes() -> [_ObservationRecipe] {
+    let visitor = _ObservationRecipeVisitor()
+    _visorBuildObservationRecipe(into: visitor)
+    return visitor.recipes
+  }
 }
 
 extension ViewModel where Action == Never {

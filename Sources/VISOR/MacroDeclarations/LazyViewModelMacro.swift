@@ -11,9 +11,9 @@
 /// Attach to a View struct to enable lazy view model initialisation.
 /// Auto-generates factory environment, viewModel property, and body.
 ///
-/// The generated `body` includes a `.task(id:)` modifier that calls
-/// `viewModel.startObserving()`. SwiftUI owns the task lifetime —
-/// cancellation happens automatically when the view disappears.
+/// The generated body performs lazy initialisation once, then delegates
+/// observation to VISOR's structured, readiness-gated owner through an opaque
+/// runtime bridge.
 ///
 /// **View/Content pattern:**
 /// ```swift

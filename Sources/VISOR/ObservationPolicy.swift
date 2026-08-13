@@ -3,6 +3,8 @@
 //  VISOR
 //
 
+import SwiftUI
+
 /// Controls whether the `@LazyViewModel` observation loop pauses based on scene phase.
 ///
 /// The default is ``alwaysObserving``, which is correct for most view models.
@@ -13,11 +15,22 @@
 /// Use ``pauseInBackground`` or ``pauseWhenInactive`` only when the observation loop
 /// drives high-frequency work (polling, real-time rendering) that wastes resources
 /// when the UI is not visible.
-public enum ObservationPolicy: Sendable {
+public enum ObservationPolicy: Equatable, Sendable {
   /// Observation runs continuously regardless of scene phase.
   case alwaysObserving
   /// Cancels observation when the scene enters background; restarts on foreground.
   case pauseInBackground
   /// Cancels observation when the scene is not active (background or inactive).
   case pauseWhenInactive
+
+  package func _visorIsEnabled(in scenePhase: ScenePhase) -> Bool {
+    switch self {
+    case .alwaysObserving:
+      true
+    case .pauseInBackground:
+      scenePhase != .background
+    case .pauseWhenInactive:
+      scenePhase == .active
+    }
+  }
 }

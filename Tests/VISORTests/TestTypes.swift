@@ -1,18 +1,6 @@
 import SwiftUI
 import VISOR
 
-// MARK: - Shared Observable Source
-
-/// Shared observable test dependency used across observation test suites.
-/// Replaces per-file duplicates (CounterSource, FlagSource, ObserveSource, etc.)
-@Observable
-@MainActor
-final class TestSource {
-  var count = 0
-  var isEnabled = false
-  var name = "initial"
-}
-
 // MARK: - Navigation Scene Types
 
 nonisolated enum TestTab: Int, TabDestination {
@@ -51,21 +39,13 @@ nonisolated enum TestScene: NavigationScene {
 /// Shared routed VM fixture used across ViewModelFactory and Integration tests.
 @Observable
 @MainActor
-final class RoutedTestVM: ViewModel {
-  @Observable
-  final class State {}
-
-  @ObservationIgnored private var _state = State()
-  var state: State {
-    get { access(keyPath: \.state); return _state }
-    set { withMutation(keyPath: \.state) { _state = newValue } }
+@ViewModel
+final class RoutedTestVM {
+  final class State {
+    init() {}
   }
 
-  func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-    guard _state[keyPath: keyPath] != value else { return }
-    _state[keyPath: keyPath] = value
-  }
-
+  let state = State()
   let routerID: ObjectIdentifier
 
   init(routerID: ObjectIdentifier) {

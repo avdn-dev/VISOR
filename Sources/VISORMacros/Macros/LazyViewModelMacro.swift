@@ -47,25 +47,11 @@ public struct LazyViewModelMacro: MemberMacro {
     // (internal, package, fileprivate, private) are inherited from the type,
     // avoiding "more accessible than enclosing type" build errors.
     let prefix = (access == "public" || access == "open") ? "\(access) " : ""
-    let (taskIdExpression, guardCondition) = switch observationPolicy {
-    case "pauseInBackground":
-      ("scenePhase != .background && _viewModel != nil",
-       "guard let vm = _viewModel, scenePhase != .background else { return }")
-    case "pauseWhenInactive":
-      ("scenePhase == .active && _viewModel != nil",
-       "guard let vm = _viewModel, scenePhase == .active else { return }")
-    default:
-      ("_viewModel != nil", "guard let vm = _viewModel else { return }")
-    }
 
     var members: [DeclSyntax] = [
       "@Environment(\\.router) private var containerRouter",
       "@Environment(\(raw: factoryType).self) private var factory",
     ]
-
-    if observationPolicy != "alwaysObserving" {
-      members.append("@Environment(\\.scenePhase) private var scenePhase")
-    }
 
     members.append(contentsOf: [
       "@State private var _viewModel: \(raw: viewModelType)?",
@@ -90,8 +76,13 @@ public struct LazyViewModelMacro: MemberMacro {
       """
       \(raw: prefix)var body: some View {
           Group {
-              if _viewModel != nil {
-                  content
+              if let viewModel = _viewModel {
+                  VISOR._visorOwnedViewModelContent(
+                      for: viewModel,
+                      observationPolicy: .\(raw: observationPolicy)
+                  ) { _ in
+                      content
+                  }
               } else {
                   Color.clear
               }
@@ -100,10 +91,6 @@ public struct LazyViewModelMacro: MemberMacro {
               if _viewModel == nil {
                   _viewModel = factory.makeViewModel(router: containerRouter)
               }
-          }
-          .task(id: \(raw: taskIdExpression)) {
-              \(raw: guardCondition)
-              await vm.startObserving()
           }
       }
       """,

@@ -21,6 +21,64 @@ private let testMacros: [String: Macro.Type] = [
 struct LazyViewModelMacroTests {
 
   @Test
+  func `Unified mode delegates observation lifetime to runtime bridge`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
+      public struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      public struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(MyVM.Factory.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
+              }
+              return vm
+          }
+
+          var state: MyVM.State {
+              viewModel.state
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          public var body: some View {
+              Group {
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .pauseInBackground
+                      ) { _ in
+                          content
+                      }
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
+  @Test
   func `Content mode generates correct expansion`() {
     assertMacroExpansionSwiftTesting(
       """
@@ -56,8 +114,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -66,12 +129,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -117,8 +174,13 @@ struct LazyViewModelMacroTests {
 
           public var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -127,12 +189,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -178,8 +234,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -188,12 +249,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -237,8 +292,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -247,12 +307,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -296,8 +350,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -306,12 +365,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -358,8 +411,13 @@ struct LazyViewModelMacroTests {
 
             var body: some View {
                 Group {
-                    if _viewModel != nil {
-                        content
+                    if let viewModel = _viewModel {
+                        VISOR._visorOwnedViewModelContent(
+                            for: viewModel,
+                            observationPolicy: .alwaysObserving
+                        ) { _ in
+                            content
+                        }
                     } else {
                         Color.clear
                     }
@@ -368,12 +426,6 @@ struct LazyViewModelMacroTests {
                     if _viewModel == nil {
                         _viewModel = factory.makeViewModel(router: containerRouter)
                     }
-                }
-                .task(id: _viewModel != nil) {
-                    guard let vm = _viewModel else {
-                        return
-                    }
-                    await vm.startObserving()
                 }
             }
         }
@@ -518,8 +570,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -529,12 +586,6 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
-              }
           }
       }
       """,
@@ -542,7 +593,7 @@ struct LazyViewModelMacroTests {
   }
 
   @Test
-  func `pauseInBackground generates scenePhase environment and modified task`() {
+  func `pauseInBackground delegates policy to runtime bridge`() {
     assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
@@ -558,8 +609,6 @@ struct LazyViewModelMacroTests {
 
           @Environment(MyVM.Factory.self) private var factory
 
-          @Environment(\\.scenePhase) private var scenePhase
-
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
@@ -579,8 +628,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .pauseInBackground
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -590,12 +644,6 @@ struct LazyViewModelMacroTests {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
               }
-              .task(id: scenePhase != .background && _viewModel != nil) {
-                  guard let vm = _viewModel, scenePhase != .background else {
-                      return
-                  }
-                  await vm.startObserving()
-              }
           }
       }
       """,
@@ -603,7 +651,7 @@ struct LazyViewModelMacroTests {
   }
 
   @Test
-  func `pauseWhenInactive generates scenePhase environment and modified task`() {
+  func `pauseWhenInactive delegates policy to runtime bridge`() {
     assertMacroExpansionSwiftTesting(
       """
       @LazyViewModel(MyVM.self, observationPolicy: .pauseWhenInactive)
@@ -619,8 +667,6 @@ struct LazyViewModelMacroTests {
 
           @Environment(MyVM.Factory.self) private var factory
 
-          @Environment(\\.scenePhase) private var scenePhase
-
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
@@ -640,8 +686,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .pauseWhenInactive
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -650,12 +701,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: scenePhase == .active && _viewModel != nil) {
-                  guard let vm = _viewModel, scenePhase == .active else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -680,8 +725,6 @@ struct LazyViewModelMacroTests {
 
           @Environment(MyVM.Factory.self) private var factory
 
-          @Environment(\\.scenePhase) private var scenePhase
-
           @State private var _viewModel: MyVM?
 
           var viewModel: MyVM {
@@ -701,8 +744,13 @@ struct LazyViewModelMacroTests {
 
           public var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .pauseInBackground
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -711,12 +759,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: scenePhase != .background && _viewModel != nil) {
-                  guard let vm = _viewModel, scenePhase != .background else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -760,8 +802,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -770,12 +817,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }
@@ -820,8 +861,13 @@ struct LazyViewModelMacroTests {
 
           var body: some View {
               Group {
-                  if _viewModel != nil {
-                      content
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .alwaysObserving
+                      ) { _ in
+                          content
+                      }
                   } else {
                       Color.clear
                   }
@@ -830,12 +876,6 @@ struct LazyViewModelMacroTests {
                   if _viewModel == nil {
                       _viewModel = factory.makeViewModel(router: containerRouter)
                   }
-              }
-              .task(id: _viewModel != nil) {
-                  guard let vm = _viewModel else {
-                      return
-                  }
-                  await vm.startObserving()
               }
           }
       }

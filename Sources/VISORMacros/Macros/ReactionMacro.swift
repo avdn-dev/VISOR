@@ -11,8 +11,7 @@ import SwiftSyntaxMacros
 
 // MARK: - ReactionMacro
 
-/// Marker macro for `@ViewModel` — validates that it's on a method.
-/// Context validation (class-level vs nested type) is handled by `ClassAnalysis`.
+/// Marker macro for source-backed `@ViewModel` reaction methods.
 public struct ReactionMacro: PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
@@ -20,12 +19,25 @@ public struct ReactionMacro: PeerMacro {
     in context: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
-    // @Reaction must be on a function declaration
-    guard declaration.is(FunctionDeclSyntax.self) else {
-      context.diagnose(Diagnostic(node: Syntax(attribute), message: VISORDiagnostic.reactionNotOnMethod))
+    guard context.isDirectViewModelContext else {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.invalidSourceReactionPlacement))
       return []
     }
-
+    guard
+      let function = declaration.as(FunctionDeclSyntax.self),
+      function.signature.parameterClause.parameters.count == 1,
+      function.signature.returnClause == nil,
+      function.signature.effectSpecifiers?.throwsClause == nil,
+      !function.modifiers.hasStateTypeStorageModifier,
+      attribute.sourceObservationSelection != nil
+    else {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.invalidSourceReactionDeclaration))
+      return []
+    }
     return []
   }
 }

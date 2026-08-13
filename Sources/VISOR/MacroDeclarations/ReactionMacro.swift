@@ -1,51 +1,31 @@
-//
-//  ReactionMacro.swift
-//  VISOR
-//
-//  Created by Anh Nguyen on 19/2/2026.
-//
+import VISORObservation
 
-/// Marks a method for automatic observation reaction in `@ViewModel` classes.
+/// Reacts to values from a cooperative observation source in a `@ViewModel`.
 ///
-/// The `@ViewModel` macro reads `@Reaction` annotations and generates an
-/// observation wrapper that calls the annotated method whenever the observed
-/// expression changes.
-///
-/// Both sync and async methods use `for await value in VISOR.valuesOf({ ... })` for
-/// sequential delivery — each handler completes before the next value is processed.
-///
-/// Use `throttledBy:` to limit rapid-fire changes. The observation loop pauses after
-/// each handler completes, dropping intermediate values.
-///
-/// Use `debouncedBy:` to wait until changes have been quiet for the interval before
-/// running the handler. New values cancel the pending handler, so only the latest value
-/// is delivered.
+/// The annotated method must accept exactly one parameter, return `Void`, and
+/// be nonthrowing. Both synchronous and asynchronous methods are supported.
 ///
 /// ```swift
+/// @MainActor
+/// @Observable
 /// @ViewModel
 /// final class ContentViewModel {
-///   @Reaction(\Self.deepLinkRouter.pendingDestination)
-///   func handleDeepLink(destination: Destination?) { ... }
+///   final class State { var title = "" }
+///   let state = State()
 ///
-///   @Reaction(\Self.recorder.audioLevel, throttledBy: .seconds(0.1))
-///   func handleAudioLevel(level: Float) { ... }
-///
-///   @Reaction(\Self.state.searchText, debouncedBy: .milliseconds(300))
-///   func performSearch(query: String) async { ... }
+///   @Reaction(
+///     source: \\ContentViewModel.contentSource,
+///     selecting: \\ContentSnapshot.title)
+///   func recordTitle(_ title: String) { ... }
 /// }
 /// ```
 @attached(peer)
-public macro Reaction<Root, Value>(_ keyPath: KeyPath<Root, Value>) = #externalMacro(
-  module: "VISORMacros", type: "ReactionMacro")
-
-@attached(peer)
-public macro Reaction<Root, Value>(
-  _ keyPath: KeyPath<Root, Value>,
-  throttledBy interval: Duration
+public macro Reaction<Root, Snapshot: Sendable, Value>(
+  source: KeyPath<Root, ObservationSource<Snapshot>>,
+  selecting selection: KeyPath<Snapshot, Value>
 ) = #externalMacro(module: "VISORMacros", type: "ReactionMacro")
 
 @attached(peer)
-public macro Reaction<Root, Value>(
-  _ keyPath: KeyPath<Root, Value>,
-  debouncedBy interval: Duration
+public macro Reaction<Root, Value: Sendable>(
+  source: KeyPath<Root, ObservationSource<Value>>
 ) = #externalMacro(module: "VISORMacros", type: "ReactionMacro")

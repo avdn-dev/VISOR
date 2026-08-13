@@ -1,463 +1,701 @@
-//
-//  ViewModelMacro.swift
-//  VISOR
-//
-//  Created by Anh Nguyen on 17/2/2026.
-//
-
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-// MARK: - ViewModelMacro
+private enum ViewModelFixIt: String, FixItMessage {
+  case addMainActor
 
-public struct ViewModelMacro: MemberMacro, ExtensionMacro {
+  var message: String { "add '@MainActor'" }
 
-  // MARK: - MemberMacro (generates init, Factory typealias, _state, updateState, observe methods)
+  var fixItID: MessageID {
+    MessageID(domain: "VISOR", id: rawValue)
+  }
+}
 
+struct SourceObservationSelection {
+  let source: ExprSyntax
+  let selection: ExprSyntax?
+}
+
+extension AttributeSyntax {
+  var isSourceObservationForm: Bool {
+    guard let arguments = arguments?.as(LabeledExprListSyntax.self) else {
+      return false
+    }
+    return arguments.contains { $0.label?.text == "source" }
+  }
+
+  var sourceObservationSelection: SourceObservationSelection? {
+    guard let arguments = arguments?.as(LabeledExprListSyntax.self) else {
+      return nil
+    }
+    guard
+      arguments.count == 1 || arguments.count == 2,
+      let source = arguments.first,
+      source.label?.text == "source"
+    else {
+      return nil
+    }
+    if arguments.count == 1 {
+      return SourceObservationSelection(
+        source: source.expression,
+        selection: nil)
+    }
+    guard
+      let selection = arguments.dropFirst().first,
+      selection.label?.text == "selecting"
+    else {
+      return nil
+    }
+    return SourceObservationSelection(
+      source: source.expression,
+      selection: selection.expression)
+  }
+}
+
+extension MacroExpansionContext {
+  var isDirectViewModelStateContext: Bool {
+    let classes = lexicalContext.compactMap { $0.as(ClassDeclSyntax.self) }
+    guard classes.count >= 2 else { return false }
+    return classes[0].name.text == "State" &&
+      classes[1].attributes.visorContains(named: "ViewModel")
+  }
+
+  var isDirectViewModelContext: Bool {
+    guard let type = lexicalContext.first?.as(ClassDeclSyntax.self) else {
+      return false
+    }
+    return type.attributes.visorContains(named: "ViewModel")
+  }
+}
+
+private struct SourceBoundRecipe {
+  let source: ExprSyntax
+  let selection: ExprSyntax?
+  let fieldName: String
+}
+
+private struct SourceReactionRecipe {
+  let source: ExprSyntax
+  let selection: ExprSyntax?
+  let methodName: String
+  let argumentLabel: String?
+  let isAsync: Bool
+}
+
+private struct SourceObservationRecipeGroup {
+  let source: ExprSyntax
+  var bounds: [SourceBoundRecipe] = []
+  var reactions: [SourceReactionRecipe] = []
+}
+
+private func observationRoutingAttributes(
+  on declaration: some DeclSyntaxProtocol
+) -> [AttributeSyntax] {
+  let attributes: AttributeListSyntax?
+  if let variable = declaration.as(VariableDeclSyntax.self) {
+    attributes = variable.attributes
+  } else if let function = declaration.as(FunctionDeclSyntax.self) {
+    attributes = function.attributes
+  } else if let type = declaration.as(ClassDeclSyntax.self) {
+    attributes = type.attributes
+  } else if let type = declaration.as(StructDeclSyntax.self) {
+    attributes = type.attributes
+  } else if let type = declaration.as(EnumDeclSyntax.self) {
+    attributes = type.attributes
+  } else {
+    attributes = nil
+  }
+
+  return attributes?.compactMap { $0.as(AttributeSyntax.self) }
+    .filter { attribute in
+      let name = attribute.attributeName.trimmedDescription
+        .split(separator: ".").last
+      return [
+        Substring(AttributeName.bound),
+        Substring(AttributeName.reaction),
+        Substring("Polled"),
+      ].contains(name)
+    } ?? []
+}
+
+private func nestedMemberBlock(
+  of declaration: DeclSyntax
+) -> MemberBlockSyntax? {
+  if let type = declaration.as(ClassDeclSyntax.self) {
+    return type.memberBlock
+  }
+  if let type = declaration.as(StructDeclSyntax.self) {
+    return type.memberBlock
+  }
+  if let type = declaration.as(EnumDeclSyntax.self) {
+    return type.memberBlock
+  }
+  if let type = declaration.as(ActorDeclSyntax.self) {
+    return type.memberBlock
+  }
+  if let declaration = declaration.as(ExtensionDeclSyntax.self) {
+    return declaration.memberBlock
+  }
+  return nil
+}
+
+private func containsObservationRoutingMarker(
+  in block: MemberBlockSyntax
+) -> Bool {
+  for member in block.members {
+    if !observationRoutingAttributes(on: member.decl).isEmpty {
+      return true
+    }
+    if
+      let nested = nestedMemberBlock(of: member.decl),
+      containsObservationRoutingMarker(in: nested)
+    {
+      return true
+    }
+  }
+  return false
+}
+
+private func routingMarkerName(_ attribute: AttributeSyntax) -> String {
+  String(attribute.attributeName.trimmedDescription
+    .split(separator: ".").last ?? "")
+}
+
+extension MemberBlockItemListSyntax {
+  var visorHasUnconditionalDeinitialiser: Bool {
+    contains { $0.decl.is(DeinitializerDeclSyntax.self) }
+  }
+
+  var visorConditionalDeinitialisers: [DeinitializerDeclSyntax] {
+    flatMap { member -> [DeinitializerDeclSyntax] in
+      guard let conditional = member.decl.as(IfConfigDeclSyntax.self) else {
+        return []
+      }
+      return conditional.clauses.flatMap { clause -> [DeinitializerDeclSyntax] in
+        guard case .decls(let members) = clause.elements else { return [] }
+        return members.compactMap {
+          $0.decl.as(DeinitializerDeclSyntax.self)
+        } + members.visorConditionalDeinitialisers
+      }
+    }
+  }
+}
+
+extension ClassDeclSyntax {
+  var hasExplicitDeinitialiser: Bool {
+    memberBlock.members.visorHasUnconditionalDeinitialiser
+  }
+
+  var conditionalDeinitialisers: [DeinitializerDeclSyntax] {
+    memberBlock.members.visorConditionalDeinitialisers
+  }
+}
+
+private extension ClassDeclSyntax {
+  var nestedViewModelState: ClassDeclSyntax? {
+    memberBlock.members.compactMap {
+      $0.decl.as(ClassDeclSyntax.self)
+    }.first { $0.name.text == "State" }
+  }
+
+  var hasExplicitMainActor: Bool {
+    attributes.visorContains(named: "MainActor")
+  }
+
+  var stableViewModelStateProperty: VariableDeclSyntax? {
+    memberBlock.members.compactMap {
+      $0.decl.as(VariableDeclSyntax.self)
+    }.first { variable in
+      variable.bindingSpecifier.text == "let" &&
+        !variable.modifiers.hasStateTypeStorageModifier &&
+        variable.bindings.count == 1 &&
+        variable.bindings.contains { binding in
+          guard
+            binding.accessorBlock == nil,
+            binding.pattern.as(IdentifierPatternSyntax.self)?
+              .identifier.text == "state"
+          else {
+            return false
+          }
+          if binding.typeAnnotation?.type.trimmedDescription == "State" {
+            return true
+          }
+          guard
+            let call = binding.initializer?.value.as(
+              FunctionCallExprSyntax.self)
+          else {
+            return false
+          }
+          return ["State", "Self.State"].contains(
+            call.calledExpression.trimmedDescription)
+        }
+    }
+  }
+
+  var declaredViewModelStateProperty: VariableDeclSyntax? {
+    memberBlock.members.compactMap {
+      $0.decl.as(VariableDeclSyntax.self)
+    }.first { variable in
+      variable.bindings.contains { binding in
+        binding.pattern.as(IdentifierPatternSyntax.self)?
+          .identifier.text == "state"
+      }
+    }
+  }
+
+  var hasConformanceCompatiblePublicState: Bool {
+    let access = accessLevel(of: self)
+    guard access == "public" || access == "open" else { return true }
+    guard
+      let state = nestedViewModelState,
+      let stateProperty = stableViewModelStateProperty
+    else {
+      return false
+    }
+    let stateAccess = accessLevel(of: state)
+    return (stateAccess == "public" || stateAccess == "open") &&
+      stateProperty.modifiers.stateFieldAccessPrefix == "public "
+  }
+
+  var hasRejectedSourceObservationDeclaration: Bool {
+    guard let state = nestedViewModelState else { return false }
+
+    for member in state.memberBlock.members {
+      let attributes = observationRoutingAttributes(on: member.decl)
+      let bounds = attributes.filter {
+        routingMarkerName($0) == AttributeName.bound
+      }
+      let hasOtherRoutingMarker = attributes.contains { attribute in
+        ["Polled", AttributeName.reaction]
+          .contains(routingMarkerName(attribute))
+      }
+      if hasOtherRoutingMarker || bounds.count > 1 {
+        return true
+      }
+      if let attribute = bounds.first {
+        guard
+          let variable = member.decl.as(VariableDeclSyntax.self),
+          let field = stateFieldSpec(from: variable),
+          field.accessPrefix != "private ",
+          attribute.sourceObservationSelection != nil
+        else {
+          return true
+        }
+      }
+      if
+        let nested = nestedMemberBlock(of: member.decl),
+        containsObservationRoutingMarker(in: nested)
+      {
+        return true
+      }
+    }
+
+    for member in memberBlock.members {
+      if member.decl.as(ClassDeclSyntax.self)?.name.text == "State" {
+        continue
+      }
+      let attributes = observationRoutingAttributes(on: member.decl)
+      let reactions = attributes.filter {
+        routingMarkerName($0) == AttributeName.reaction
+      }
+      if attributes.count != reactions.count || reactions.count > 1 {
+        return true
+      }
+      if let reaction = reactions.first {
+        guard
+          reaction.sourceObservationSelection != nil,
+          let function = member.decl.as(FunctionDeclSyntax.self),
+          function.signature.parameterClause.parameters.count == 1,
+          function.signature.returnClause == nil,
+          function.signature.effectSpecifiers?.throwsClause == nil,
+          !function.modifiers.hasStateTypeStorageModifier
+        else {
+          return true
+        }
+      }
+      if
+        let nested = nestedMemberBlock(of: member.decl),
+        containsObservationRoutingMarker(in: nested)
+      {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  func diagnoseRejectedSourceObservationDeclarations(
+    in context: some MacroExpansionContext
+  ) {
+    guard let state = nestedViewModelState else { return }
+
+    for member in state.memberBlock.members {
+      let attributes = observationRoutingAttributes(on: member.decl)
+      let bounds = attributes.filter {
+        routingMarkerName($0) == AttributeName.bound
+      }
+      for attribute in bounds where !attribute.isSourceObservationForm {
+        context.diagnose(Diagnostic(
+          node: Syntax(attribute),
+          message: VISORDiagnostic.sourceBackedBoundRequiresSource))
+      }
+      if bounds.count > 1 {
+        context.diagnose(Diagnostic(
+          node: Syntax(member.decl),
+          message: VISORDiagnostic.invalidSourceBoundDeclaration))
+      }
+      for attribute in attributes where
+        routingMarkerName(attribute) == "Polled"
+      {
+        context.diagnose(Diagnostic(
+          node: Syntax(attribute),
+          message: VISORDiagnostic.sourceBackedPolledUnsupported))
+      }
+      for attribute in attributes where
+        routingMarkerName(attribute) == AttributeName.reaction
+      {
+        context.diagnose(Diagnostic(
+          node: Syntax(attribute),
+          message: VISORDiagnostic.invalidSourceReactionPlacement))
+      }
+    }
+
+    for member in memberBlock.members {
+      if member.decl.as(ClassDeclSyntax.self)?.name.text == "State" {
+        continue
+      }
+      let attributes = observationRoutingAttributes(on: member.decl)
+      let reactions = attributes.filter {
+        routingMarkerName($0) == AttributeName.reaction
+      }
+      for attribute in reactions where !attribute.isSourceObservationForm {
+        context.diagnose(Diagnostic(
+          node: Syntax(attribute),
+          message: VISORDiagnostic.sourceBackedReactionRequiresSource))
+      }
+      if reactions.count > 1 {
+        context.diagnose(Diagnostic(
+          node: Syntax(member.decl),
+          message: VISORDiagnostic.invalidSourceReactionDeclaration))
+      }
+      for attribute in attributes where
+        routingMarkerName(attribute) == AttributeName.bound ||
+        routingMarkerName(attribute) == "Polled"
+      {
+        let message = routingMarkerName(attribute) == AttributeName.bound
+          ? VISORDiagnostic.invalidSourceBoundPlacement
+          : VISORDiagnostic.sourceBackedPolledUnsupported
+        context.diagnose(Diagnostic(
+          node: Syntax(attribute),
+          message: message))
+      }
+    }
+  }
+}
+
+public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro {
   public static func expansion(
     of _: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     conformingTo _: [TypeSyntax],
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
-    guard let classDecl = declaration.as(ClassDeclSyntax.self) else {
-      context.diagnose(Diagnostic(node: Syntax(declaration), message: VISORDiagnostic.notAClass))
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let viewModel = declaration.as(ClassDeclSyntax.self) else {
+      context.diagnose(Diagnostic(
+        node: Syntax(declaration),
+        message: VISORDiagnostic.notAClass))
       return []
     }
-
-    // Error if @Observable is missing — observation code will silently fail without it
-    let hasObservable = classDecl.attributes.contains { attr in
-      attr.as(AttributeSyntax.self)?.attributeName.as(IdentifierTypeSyntax.self)?.name.text == AttributeName.observable
-    }
-    if !hasObservable {
+    guard viewModel.attributes.visorContains(named: AttributeName.observable)
+    else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.missingObservable))
       return []
     }
-
-    let className = classDecl.name.trimmedDescription
-    let access = accessLevel(of: classDecl)
-    // Only propagate public/open to generated members. Other access levels
-    // (internal, package, fileprivate, private) are inherited from the type,
-    // avoiding "more accessible than enclosing type" build errors.
-    let prefix = (access == "public" || access == "open") ? "\(access) " : ""
-    let analysis = ClassAnalysis(classDecl)
-    let properties = analysis.storedLetProperties
-    var members: [DeclSyntax] = []
-
-    // 1. State diagnostics (early — before init generation)
-    if !analysis.hasStateClass {
+    guard let state = viewModel.nestedViewModelState else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
         message: VISORDiagnostic.missingState))
       return []
     }
-
-    if !analysis.stateClassIsFinal {
+    guard state.modifiers.contains(where: { $0.name.text == "final" }) else {
       context.diagnose(Diagnostic(
-        node: Syntax(declaration),
+        node: Syntax(state),
         message: VISORDiagnostic.stateClassNotFinal))
+      return []
+    }
+    guard !state.attributes.visorContains(named: AttributeName.observable) else {
+      context.diagnose(Diagnostic(
+        node: Syntax(state),
+        message: VISORDiagnostic.sourceObservationRequiresPlainState))
+      return []
     }
 
-    if !analysis.stateClassHasObservable {
+    return sourceObservationMembers(
+      for: viewModel,
+      state: state,
+      analysis: ClassAnalysis(viewModel),
+      in: context)
+  }
+
+  private static func sourceObservationMembers(
+    for viewModel: ClassDeclSyntax,
+    state: ClassDeclSyntax,
+    analysis: ClassAnalysis,
+    in context: some MacroExpansionContext
+  ) -> [DeclSyntax] {
+    for deinitialiser in viewModel.conditionalDeinitialisers {
       context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.stateClassMissingObservable))
+        node: Syntax(deinitialiser),
+        message: VISORDiagnostic.conditionalDeinitialiserUnsupported))
+    }
+    for deinitialiser in state.conditionalDeinitialisers {
+      context.diagnose(Diagnostic(
+        node: Syntax(deinitialiser),
+        message: VISORDiagnostic.conditionalDeinitialiserUnsupported))
+    }
+    guard
+      viewModel.conditionalDeinitialisers.isEmpty,
+      state.conditionalDeinitialisers.isEmpty
+    else {
+      return []
     }
 
-    if !analysis.stateClassHasInit {
-      let boundNames = analysis.stateBoundProperties.map(\.propertyName)
-      let polledNames = analysis.statePolledProperties.map(\.propertyName)
-      let paramNames = boundNames + polledNames
-      let sig = paramNames.isEmpty
-        ? "nonisolated init() {}"
-        : "nonisolated init(\(paramNames.map { $0 + ":" }.joined(separator: ", "))) { ... }"
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.stateClassMissingInit(expectedSignature: sig)))
+    if viewModel.hasRejectedSourceObservationDeclaration {
+      viewModel.diagnoseRejectedSourceObservationDeclarations(in: context)
+      return []
     }
 
-    for assignment in analysis.stateInitDirectAssignments {
+    guard viewModel.hasExplicitMainActor, !state.hasRejectedStateField else {
+      return []
+    }
+
+    guard viewModel.stableViewModelStateProperty != nil else {
+      let diagnosticNode = viewModel.declaredViewModelStateProperty
+        .map(Syntax.init) ?? Syntax(viewModel)
       context.diagnose(Diagnostic(
-        node: assignment.node,
-        message: VISORDiagnostic.stateInitAssignsObservableProperty(propertyName: assignment.propertyName)))
+        node: diagnosticNode,
+        message: VISORDiagnostic.viewModelRequiresStableState))
+      return []
+    }
+
+    guard viewModel.hasConformanceCompatiblePublicState else {
+      context.diagnose(Diagnostic(
+        node: Syntax(viewModel),
+        message: VISORDiagnostic.viewModelRequiresVisibleState))
+      return []
     }
 
     if analysis.hasActionEnum && !analysis.hasHandleMethod {
       context.diagnose(Diagnostic(
-        node: Syntax(declaration),
+        node: Syntax(viewModel),
         message: VISORDiagnostic.actionWithoutHandle))
     }
-
     if analysis.handleHasWrongLabel {
       context.diagnose(Diagnostic(
-        node: Syntax(declaration),
+        node: Syntax(viewModel),
         message: VISORDiagnostic.handleWrongLabel))
     }
 
-    // 2. @Bound on let inside State
-    for name in analysis.boundOnLetProperties {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.boundOnLetProperty(propertyName: name)))
-    }
+    var groups: [SourceObservationRecipeGroup] = []
 
-    // 2b. @Polled on let inside State
-    for name in analysis.polledOnLetProperties {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.polledOnLetProperty(propertyName: name)))
-    }
-
-    // 2c. @Bound/@Polled on class-level properties (misplaced)
-    for _ in analysis.boundOutsideState {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.boundOutsideState))
-    }
-    for _ in analysis.polledOutsideState {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.polledOutsideState))
-    }
-
-    // 3. Validate @Bound properties
-    let boundProps = analysis.stateBoundProperties
-    let storedLetNames = Set(properties.map(\.name))
-    var validBounds: [BoundPropertyInfo] = []
-    for prop in boundProps {
-      if storedLetNames.contains(prop.dependencyName) {
-        validBounds.append(prop)
-      } else {
-        context.diagnose(Diagnostic(
-          node: Syntax(declaration),
-          message: VISORDiagnostic.invalidBoundDependency(
-            name: prop.dependencyName,
-            propertyName: prop.propertyName)))
+    func groupIndex(for source: ExprSyntax) -> Int {
+      let spelling = source.trimmedDescription
+      if let index = groups.firstIndex(where: {
+        $0.source.trimmedDescription == spelling
+      }) {
+        return index
       }
+      groups.append(SourceObservationRecipeGroup(source: source))
+      return groups.index(before: groups.endIndex)
     }
 
-    for propertyName in analysis.malformedStateBoundAttributes {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.malformedBoundKeyPath(propertyName: propertyName, className: className)))
-    }
-
-    // 3b. Validate @Polled properties
-    let polledProps = analysis.statePolledProperties
-    var validPolled: [PolledPropertyInfo] = []
-    for prop in polledProps {
-      if storedLetNames.contains(prop.dependencyName) {
-        validPolled.append(prop)
-      } else {
-        context.diagnose(Diagnostic(
-          node: Syntax(declaration),
-          message: VISORDiagnostic.invalidPolledDependency(
-            name: prop.dependencyName,
-            propertyName: prop.propertyName)))
+    for member in state.memberBlock.members {
+      guard
+        let variable = member.decl.as(VariableDeclSyntax.self),
+        stateFieldSpec(from: variable) != nil,
+        let attribute = variable.attributes.visorAttribute(named: "Bound"),
+        let observation = attribute.sourceObservationSelection,
+        let binding = variable.bindings.first,
+        let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
+      else {
+        continue
       }
+      let entry = SourceBoundRecipe(
+        source: observation.source,
+        selection: observation.selection,
+        fieldName: identifier.identifier.text)
+      groups[groupIndex(for: observation.source)].bounds.append(entry)
     }
 
-    for propertyName in analysis.malformedStatePolledAttributes {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.malformedPolledKeyPath(propertyName: propertyName, className: className)))
+    for member in viewModel.memberBlock.members {
+      guard
+        let function = member.decl.as(FunctionDeclSyntax.self),
+        let attribute = function.attributes.visorAttribute(named: "Reaction"),
+        let observation = attribute.sourceObservationSelection,
+        function.signature.parameterClause.parameters.count == 1,
+        let parameter = function.signature.parameterClause.parameters.first
+      else {
+        continue
+      }
+      let entry = SourceReactionRecipe(
+        source: observation.source,
+        selection: observation.selection,
+        methodName: function.name.text,
+        argumentLabel: parameter.firstName.text == "_"
+          ? nil
+          : parameter.firstName.text,
+        isAsync: function.signature.effectSpecifiers?.asyncSpecifier != nil)
+      groups[groupIndex(for: observation.source)].reactions.append(entry)
     }
 
-    for propertyName in analysis.polledMissingInterval {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.polledMissingInterval(propertyName: propertyName)))
+    let access = accessLevel(of: viewModel)
+    let prefix = access == "public" || access == "open" ? "public " : ""
+    var members: [DeclSyntax] = [
+      DeclSyntax(stringLiteral:
+        "\(prefix)typealias Factory = ViewModelFactory<\(viewModel.name.text)>"),
+      DeclSyntax(stringLiteral:
+        "\(prefix)let _visorObservationOwnership = " +
+        "VISOR._ViewModelObservationOwnership()"),
+    ]
+
+    // Swift 6.2.4 can crash in release builds while synthesising destruction
+    // for explicitly MainActor-isolated macro-expanded classes. An explicit
+    // empty deinitialiser avoids that optimiser defect and remains inert at
+    // runtime. Preserve any user-authored deinitialiser unchanged.
+    if !viewModel.hasExplicitDeinitialiser {
+      members.append("deinit {}")
     }
 
-    // 4. Error if any @Bound property has a default value
-    for prop in validBounds where prop.hasDefault {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.boundPropertyHasDefault(propertyName: prop.propertyName)))
-    }
+    guard !groups.isEmpty else { return members }
 
-    // 4b. Error if any @Polled property has a default value
-    for prop in validPolled where prop.hasDefault {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.polledPropertyHasDefault(propertyName: prop.propertyName)))
-    }
+    let recipes = groups.map { group in
+      let projections = group.bounds.map { bound in
+        let value = bound.selection.map {
+          "snapshot[keyPath: \($0.trimmedDescription)]"
+        } ?? "snapshot"
+        return """
+          { [weak self] snapshot in
+            guard let self else { return }
+            self.updateState(\\.\(bound.fieldName), to: \(value))
+          }
+          """
+      }.joined(separator: ",\n")
 
-    let hasServiceInitProps = !validBounds.isEmpty || !validPolled.isEmpty
+      let reactions = group.reactions.map { reaction in
+        let value = reaction.selection.map {
+          "snapshot[keyPath: \($0.trimmedDescription)]"
+        } ?? "snapshot"
+        let argument = reaction.argumentLabel.map {
+          "\($0): \(value)"
+        } ?? value
+        let awaitPrefix = reaction.isAsync ? "await " : ""
+        return """
+          { [weak self] snapshot in
+            guard let self else { return }
+            \(awaitPrefix)self.\(reaction.methodName)(\(argument))
+          }
+          """
+      }.joined(separator: ",\n")
 
-    // 5. Generate @ObservationIgnored _state + computed state (unless user declared var state)
-    if !analysis.hasStateProperty {
-      let backingDecl: DeclSyntax = hasServiceInitProps
-        ? "@ObservationIgnored private var _state: State"
-        : "@ObservationIgnored private var _state: State = State()"
-      let computedDecl: DeclSyntax = """
-        \(raw: prefix)var state: State {
-            get { access(keyPath: \\.state); return _state }
-            set { withMutation(keyPath: \\.state) { _state = newValue } }
-        }
+      return """
+        visitor.add(
+          source: self[keyPath: \(group.source.trimmedDescription)],
+          projections: [
+            \(projections)
+          ],
+          initialReactions: [
+            \(reactions)
+          ])
         """
-      members.append(backingDecl)
-      members.append(computedDecl)
-    }
+    }.joined(separator: "\n")
 
-    // 5. Always generate updateState using _state directly
-    let updateEquatable: DeclSyntax = """
-      func updateState<V: Equatable>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-          guard _state[keyPath: keyPath] != value else { return }
-          _state[keyPath: keyPath] = value
+    members.append(DeclSyntax(stringLiteral: """
+      \(prefix)func _visorBuildObservationRecipe(
+        into visitor: VISOR._ObservationRecipeVisitor
+      ) {
+        \(recipes)
       }
-      """
-    let updateNonEquatable: DeclSyntax = """
-      func updateState<V>(_ keyPath: WritableKeyPath<State, V>, to value: V) {
-          _state[keyPath: keyPath] = value
-      }
-      """
-    members.append(updateEquatable)
-    members.append(updateNonEquatable)
-
-    // 6. Generate memberwise init (if none exists)
-    if !analysis.hasInitializer {
-      if !properties.isEmpty || hasServiceInitProps {
-        let params = properties.map { "\($0.name): \($0.initParameterType)" }.joined(separator: ", ")
-        var assignments = properties.map { "self.\($0.name) = \($0.name)" }
-
-        if hasServiceInitProps {
-          // Merge @Bound and @Polled args, sorted by declaration order.
-          // Calls the user-declared State memberwise init.
-          let boundArgs: [(order: Int, arg: String)] = validBounds.map { prop in
-            (prop.declarationOrder, "\(prop.propertyName): \(prop.sourceExpression)")
-          }
-          let polledArgs: [(order: Int, arg: String)] = validPolled.map { prop in
-            (prop.declarationOrder, "\(prop.propertyName): \(prop.sourceExpression)")
-          }
-          let combinedArgs = (boundArgs + polledArgs)
-            .sorted(by: { $0.order < $1.order })
-            .map(\.arg)
-            .joined(separator: ", ")
-
-          assignments.append("self._state = State(\(combinedArgs))")
-        }
-
-        let body = assignments.joined(separator: "\n        ")
-        let initDecl: DeclSyntax = """
-          \(raw: prefix)init(\(raw: params)) {
-              \(raw: body)
-          }
-          """
-        members.append(initDecl)
-      }
-    }
-
-    // 7. Generate Factory typealias
-    let typealiasDecl: DeclSyntax = """
-      \(raw: prefix)typealias Factory = ViewModelFactory<\(raw: className)>
-      """
-    members.append(typealiasDecl)
-
-    // 8. Generate observe methods from @Bound properties inside State
-    var allObserveMethods: [(methodName: String, taskName: String)] = []
-    allObserveMethods.reserveCapacity(validBounds.count + validPolled.count + analysis.reactionMethods.count)
-
-    for prop in validBounds {
-      let methodName = "observe\(prop.propertyName.capitalisedFirst)"
-      let taskName = "VISOR.\(className).bound.\(prop.propertyName)"
-      allObserveMethods.append((methodName: methodName, taskName: taskName))
-      let keyPath = "\\." + prop.propertyName
-      let observeMethod: DeclSyntax
-      if let throttleExpr = prop.throttleExpression {
-        observeMethod = """
-          func \(raw: methodName)() async {
-              for await value in VISOR.valuesOf(name: "\(raw: taskName).values", { self.\(raw: prop.sourceExpression) }) {
-                  self.updateState(\(raw: keyPath), to: value)
-                  do {
-                      try await Task.sleep(for: \(raw: throttleExpr))
-                  } catch {}
-              }
-          }
-          """
-      } else {
-        observeMethod = """
-          func \(raw: methodName)() async {
-              for await value in VISOR.valuesOf(name: "\(raw: taskName).values", { self.\(raw: prop.sourceExpression) }) {
-                  self.updateState(\(raw: keyPath), to: value)
-              }
-          }
-          """
-      }
-      members.append(observeMethod)
-    }
-
-    // 8b. Generate observe methods from @Polled properties inside State
-    for prop in validPolled {
-      let methodName = "observe\(prop.propertyName.capitalisedFirst)"
-      let taskName = "VISOR.\(className).polled.\(prop.propertyName)"
-      allObserveMethods.append((methodName: methodName, taskName: taskName))
-      let keyPath = "\\." + prop.propertyName
-      let observeMethod: DeclSyntax = """
-        func \(raw: methodName)() async {
-            self.updateState(\(raw: keyPath), to: self.\(raw: prop.sourceExpression))
-            do {
-                while !Task.isCancelled {
-                    try await Task.sleep(for: \(raw: prop.intervalExpression))
-                    self.updateState(\(raw: keyPath), to: self.\(raw: prop.sourceExpression))
-                }
-            } catch {}
-        }
-        """
-      members.append(observeMethod)
-    }
-
-    // 8c. Diagnose @Reaction inside nested types
-    for methodName in analysis.reactionsInsideNestedTypes {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.reactionInsideNestedType(methodName: methodName)))
-    }
-
-    // 8d. Diagnose invalid @Reaction methods
-    for methodName in analysis.invalidReactionMethods {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.invalidReactionParameter(methodName: methodName)))
-    }
-
-    for methodName in analysis.malformedReactionKeyPaths {
-      context.diagnose(Diagnostic(
-        node: Syntax(declaration),
-        message: VISORDiagnostic.malformedReactionKeyPath(methodName: methodName)))
-    }
-
-    // Generate observe wrappers for @Reaction methods
-    for reaction in analysis.reactionMethods {
-      let methodName = "observe\(reaction.methodName.capitalisedFirst)"
-      let taskName = "VISOR.\(className).reaction.\(reaction.methodName)"
-      allObserveMethods.append((methodName: methodName, taskName: taskName))
-      let callArg: String
-      if let label = reaction.callLabel {
-        callArg = "\(label): \(reaction.valueName)"
-      } else {
-        callArg = reaction.valueName
-      }
-      if reaction.isAsync {
-        let observeMethod: DeclSyntax
-        if let debounceExpr = reaction.debounceExpression {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf(name: "\(raw: taskName).debounce", { \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
-                    await self.\(raw: reaction.methodName)(\(raw: callArg))
-                }
-            }
-            """
-        } else if let throttleExpr = reaction.throttleExpression {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
-                    await self.\(raw: reaction.methodName)(\(raw: callArg))
-                    do {
-                        try await Task.sleep(for: \(raw: throttleExpr))
-                    } catch {}
-                }
-            }
-            """
-        } else {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
-                    await self.\(raw: reaction.methodName)(\(raw: callArg))
-                }
-            }
-            """
-        }
-        members.append(observeMethod)
-      } else {
-        let observeMethod: DeclSyntax
-        if let debounceExpr = reaction.debounceExpression {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.debouncedValuesOf(name: "\(raw: taskName).debounce", { \(raw: reaction.observeExpression) }, for: \(raw: debounceExpr)) {
-                    self.\(raw: reaction.methodName)(\(raw: callArg))
-                }
-            }
-            """
-        } else if let throttleExpr = reaction.throttleExpression {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
-                    self.\(raw: reaction.methodName)(\(raw: callArg))
-                    do {
-                        try await Task.sleep(for: \(raw: throttleExpr))
-                    } catch {}
-                }
-            }
-            """
-        } else {
-          observeMethod = """
-            func \(raw: methodName)() async {
-                for await \(raw: reaction.valueName) in VISOR.valuesOf(name: "\(raw: taskName).values", { \(raw: reaction.observeExpression) }) {
-                    self.\(raw: reaction.methodName)(\(raw: callArg))
-                }
-            }
-            """
-        }
-        members.append(observeMethod)
-      }
-    }
-
-    // 9. Generate startObserving() or warn about missing calls in manual implementation
-    if !allObserveMethods.isEmpty {
-      if analysis.hasStartObserving {
-        let body = analysis.startObservingBodyText ?? ""
-        for methodName in allObserveMethods.map(\.methodName) {
-          if !body.contains(methodName) {
-            context.diagnose(Diagnostic(
-              node: Syntax(declaration),
-              message: VISORDiagnostic.manualStartObservingMissingMethod(methodName: methodName)))
-          }
-        }
-      } else if allObserveMethods.count == 1 {
-        let observingDecl: DeclSyntax = """
-          \(raw: prefix)func startObserving() async {
-              await \(raw: allObserveMethods[0].methodName)()
-          }
-          """
-        members.append(observingDecl)
-      } else {
-        let tasks = allObserveMethods.map { method in
-          return """
-                      group.addTask(name: "\(method.taskName)") { await self.\(method.methodName)() }
-          """
-        }.joined(separator: "\n")
-        let observingDecl: DeclSyntax = """
-          \(raw: prefix)func startObserving() async {
-              await withDiscardingTaskGroup { group in
-          \(raw: tasks)
-              }
-          }
-          """
-        members.append(observingDecl)
-      }
-    }
-
+      """))
     return members
   }
 
-  // MARK: - ExtensionMacro (adds ViewModel conformance)
+  public static func expansion(
+    of _: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingAttributesFor member: some DeclSyntaxProtocol,
+    in _: some MacroExpansionContext
+  ) throws -> [AttributeSyntax] {
+    guard
+      let viewModel = declaration.as(ClassDeclSyntax.self),
+      let state = member.as(ClassDeclSyntax.self),
+      state.name.text == "State",
+      !state.attributes.visorContains(named: AttributeName.observable),
+      state.modifiers.contains(where: { $0.name.text == "final" }),
+      viewModel.hasExplicitMainActor,
+      viewModel.attributes.visorContains(named: AttributeName.observable),
+      viewModel.stableViewModelStateProperty != nil,
+      viewModel.hasConformanceCompatiblePublicState,
+      viewModel.conditionalDeinitialisers.isEmpty,
+      state.conditionalDeinitialisers.isEmpty,
+      !viewModel.hasRejectedSourceObservationDeclaration
+    else {
+      return []
+    }
+
+    var attributes: [AttributeSyntax] = ["@VISOR._ViewModelState"]
+    if !state.hasExplicitMainActor {
+      attributes.insert("@MainActor", at: 0)
+    }
+    return attributes
+  }
 
   public static func expansion(
     of _: AttributeSyntax,
     attachedTo declaration: some DeclGroupSyntax,
     providingExtensionsOf type: some TypeSyntaxProtocol,
     conformingTo _: [TypeSyntax],
-    in _: some MacroExpansionContext)
-    throws -> [ExtensionDeclSyntax]
-  {
-    guard declaration.is(ClassDeclSyntax.self) else { return [] }
-    let viewModelExt = makeProtocolExtension(for: type, conformingTo: "ViewModel")
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    guard
+      let viewModel = declaration.as(ClassDeclSyntax.self),
+      let state = viewModel.nestedViewModelState
+    else {
+      return []
+    }
+    guard viewModel.hasExplicitMainActor else {
+      let position = viewModel.positionAfterSkippingLeadingTrivia
+      context.diagnose(Diagnostic(
+        node: Syntax(viewModel.name),
+        message: VISORDiagnostic.viewModelRequiresMainActor,
+        fixIts: [
+          FixIt(
+            message: ViewModelFixIt.addMainActor,
+            changes: [
+              .replaceText(
+                range: position..<position,
+                with: "@MainActor\n",
+                in: Syntax(viewModel)),
+            ])
+        ]))
+      return []
+    }
+    guard
+      viewModel.attributes.visorContains(named: AttributeName.observable),
+      !state.attributes.visorContains(named: AttributeName.observable),
+      state.modifiers.contains(where: { $0.name.text == "final" }),
+      !state.hasRejectedStateField,
+      viewModel.conditionalDeinitialisers.isEmpty,
+      state.conditionalDeinitialisers.isEmpty,
+      viewModel.stableViewModelStateProperty != nil,
+      viewModel.hasConformanceCompatiblePublicState,
+      !viewModel.hasRejectedSourceObservationDeclaration
+    else {
+      return []
+    }
 
-    return [viewModelExt]
+    return [makeProtocolExtension(for: type, conformingTo: "ViewModel")]
   }
 }
