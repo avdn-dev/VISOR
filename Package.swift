@@ -35,6 +35,7 @@ let package = Package(
     .target(
       name: "VISOR",
       dependencies: [
+        "VISORObservation",
         "VISORMacros",
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
       ],
@@ -42,7 +43,7 @@ let package = Package(
 
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR"],
+      dependencies: ["VISOR", "VISORObservation"],
       swiftSettings: [.defaultIsolation(MainActor.self)]),
 
     .testTarget(
