@@ -15,6 +15,9 @@ let package = Package(
     .library(
       name: "VISOR",
       targets: ["VISOR"]),
+    .library(
+      name: "VISORTesting",
+      targets: ["VISORTesting"]),
   ],
   dependencies: [
     .package(url: "https://github.com/swiftlang/swift-syntax.git", "602.0.0"..<"604.0.0"),
@@ -38,6 +41,10 @@ let package = Package(
         "VISORMacros",
       ]),
 
+    .target(
+      name: "VISORTesting",
+      dependencies: ["VISOR"]),
+
     .testTarget(
       name: "VISORTests",
       dependencies: ["VISOR", "VISORObservation"],
@@ -46,6 +53,10 @@ let package = Package(
     .testTarget(
       name: "VISORObservationTests",
       dependencies: ["VISORObservation"]),
+
+    .testTarget(
+      name: "VISORTestingTests",
+      dependencies: ["VISOR", "VISORObservation", "VISORTesting"]),
 
     .testTarget(
       name: "VISORMacroTests",
