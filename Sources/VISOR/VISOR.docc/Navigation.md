@@ -4,7 +4,7 @@ Type-safe navigation with Router, NavigationScene, deep linking, and modal hiera
 
 ## Overview
 
-VISOR's navigation system centralises all navigation state in a ``Router`` object, decoupling views from their destinations. Views never directly present other views — they tell the Router what to show, and ``NavigationContainer`` handles the SwiftUI wiring.
+VISOR's navigation system centralises all navigation state in a ``Router`` object, decoupling views from their destinations. Feature Views dispatch actions to routed ViewModels, which decide what to show and call the Router. ``NavigationContainer`` handles the SwiftUI wiring.
 
 Destination types are identity-only enums — they carry the data needed to identify a screen but don't create the view. View creation is handled by content closures passed to ``NavigationContainer``, which means the destination enums can live in a shared module without importing feature view types.
 
@@ -136,6 +136,9 @@ router.select(tab: .settings)
 router.popToRoot()
 ```
 
+These calls are shown directly to document the Router API. In feature code,
+prefer making them from a routed ViewModel's action handler.
+
 Calls on the root Router target the currently active visible Router: the root
 stack in a single-stack application, the selected tab, or the topmost modal.
 Calls on a non-root Router read from the SwiftUI environment remain local to
@@ -260,7 +263,8 @@ independent navigation tree.
 
 ## NavigationButton
 
-A convenience button that reads the ``Router`` from the environment:
+A convenience button that reads the ``Router`` from the environment and
+dispatches directly:
 
 ```swift
 NavigationButton<AppScene, _>(push: .detail(id: "1")) {
@@ -279,6 +283,10 @@ typealias AppNavButton<Label: View> = NavigationButton<AppScene, Label>
 
 AppNavButton(push: .detail(id: "1")) { Text("Go") }
 ```
+
+`NavigationButton` bypasses ViewModel action handling. Routed ViewModels are the
+preferred navigation architecture for feature flows; use this convenience only
+when deliberately choosing direct View-to-Router dispatch.
 
 ## Deep Linking
 
@@ -305,7 +313,10 @@ Deep link handlers propagate to child routers automatically.
 
 ## Routed Factories
 
-If a ViewModel needs a ``Router``, use a routed factory. ``NavigationContainer`` passes the router automatically:
+Use a routed factory for every ViewModel that can navigate. This is the
+preferred feature-navigation path: the View dispatches an action, the ViewModel
+makes the navigation decision, and ``NavigationContainer`` supplies the local
+Router automatically:
 
 ```swift
 let factory: GalleryViewModel.Factory = .routed { (router: Router<AppScene>) in

@@ -8,14 +8,20 @@ VISOR defines five application roles plus a factory boundary:
 
 | Role | Responsibility | Depends on |
 |---|---|---|
-| **View** | Owns UI integration and renders State | ViewModel, Router |
-| **ViewModel** | Owns stable UI State, dispatches actions, and projects service snapshots | Interactor, Service |
+| **View** | Owns UI integration, renders State, and dispatches actions | ViewModel |
+| **ViewModel** | Owns stable UI State, handles actions, projects service snapshots, and coordinates feature navigation | Interactor, Service, Router when routed |
 | **Interactor** | Coordinates a named use case across services; optional | Service |
 | **Service** | Owns domain or platform state and its natural isolation | Other services |
 | **Router** | Owns typed navigation, presentation, tabs, and deep links | — |
 | **Factory** | Creates a ViewModel with its dependencies without exposing composition to the View | Composition root |
 
 Dependencies point towards domain and platform capabilities. A service is not required to be MainActor or `@Observable`; source-backed state crosses that boundary through `ObservationSource` snapshots.
+
+Feature navigation follows **View → routed ViewModel → Router**. A View
+dispatches an action; its ViewModel decides whether and how to navigate. A
+navigation host View still binds `NavigationContainer`, `TabView`, and Router
+state as composition infrastructure, but it does not move feature navigation
+decisions into rendering code.
 
 ## View and Content
 
@@ -52,6 +58,10 @@ struct DashboardContent: View {
 The `@LazyViewModel` view owns integration. The macro resolves its factory, creates the ViewModel lazily, mounts one structured observation owner, and exposes `content` only after all source baselines and immediate reactions are ready.
 
 The Content view is a pure function of State and action closures. It does not resolve factories, subscribe to services, or construct dependencies. This keeps previews and rendering tests small.
+
+When an action can navigate, prefer a routed ViewModel. This keeps navigation
+decisions beside the rest of the action handling and makes them testable without
+rendering SwiftUI.
 
 Place `@LazyViewModel` at the stable SwiftUI root that should own the ViewModel. If descendants survive a local layout branch, their owner must live above that branch as well.
 
@@ -225,16 +235,43 @@ The view knows that it can request a `ProfileViewModel`; it does not know how th
 
 ### Routed factories
 
-When a ViewModel needs a `Router`, create a routed factory. `NavigationContainer` supplies the router when it creates the destination ViewModel:
+Use a routed factory for every ViewModel that can navigate. `NavigationContainer`
+supplies its local Router when `@LazyViewModel` creates the ViewModel:
 
 ```swift
+@MainActor
+@Observable
+@ViewModel
+final class GalleryViewModel {
+  final class State {}
+
+  enum Action {
+    case openPhoto(id: String)
+  }
+
+  let state = State()
+  private let router: Router<AppScene>
+
+  init(router: Router<AppScene>) {
+    self.router = router
+  }
+
+  func handle(_ action: Action) {
+    switch action {
+    case .openPhoto(let id):
+      router.push(.detail(id: id))
+    }
+  }
+}
+
 let factory: GalleryViewModel.Factory = .routed {
   (router: Router<AppScene>) in
-  GalleryViewModel(
-    router: router,
-    galleryService: galleryService)
+  GalleryViewModel(router: router)
 }
 ```
+
+The View sends `.openPhoto(id:)`; it does not resolve or call the Router itself.
+This is the preferred navigation path for feature code.
 
 ## Scene lifetime
 
