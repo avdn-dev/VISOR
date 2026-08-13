@@ -31,9 +31,13 @@ public protocol FullScreenDestination: PresentableDestination {}
 /// A tab identifier. Tabs define their views in the consumer's TabView, so no view is required here.
 public protocol TabDestination: Hashable, Sendable {}
 
+/// The default tab destination for navigation scenes that do not use a `TabView`.
+public enum NoTabDestination: TabDestination {}
+
 // MARK: - NavigationScene
 
-/// Groups the four destination types into a single generic parameter.
+/// Groups the destination types into a single generic parameter. `Tab` defaults
+/// to ``NoTabDestination`` for single-stack applications.
 ///
 /// Conform an enum to this protocol to define all navigation destinations for your app:
 /// ```swift
@@ -48,5 +52,5 @@ public protocol NavigationScene {
   associatedtype Push: PushDestination
   associatedtype Sheet: SheetDestination
   associatedtype FullScreen: FullScreenDestination
-  associatedtype Tab: TabDestination
+  associatedtype Tab: TabDestination = NoTabDestination
 }

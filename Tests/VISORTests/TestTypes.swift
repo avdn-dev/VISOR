@@ -34,6 +34,12 @@ nonisolated enum TestScene: NavigationScene {
   typealias Tab = TestTab
 }
 
+nonisolated enum SingleStackTestScene: NavigationScene {
+  typealias Push = TestPush
+  typealias Sheet = TestSheet
+  typealias FullScreen = TestFullScreen
+}
+
 // MARK: - Routed ViewModel Fixture
 
 /// Shared routed VM fixture used across ViewModelFactory and Integration tests.

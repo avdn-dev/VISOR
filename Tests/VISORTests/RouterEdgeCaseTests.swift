@@ -65,6 +65,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `Rapid push then popToRoot leaves empty path`() {
     let router = Router<TestScene>()
+    router.activate()
     for i in 0..<10 {
       router.push(.detail(id: "\(i)"))
     }
@@ -79,6 +80,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `Presenting different sheet overwrites previous`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(sheet: .preferences)
     router.present(sheet: .profile)
     #expect(router.presentingSheet == .profile)
@@ -89,6 +91,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `Presenting different fullScreen overwrites previous`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(fullScreen: .onboarding)
     router.present(fullScreen: .tutorial)
     #expect(router.presentingFullScreen == .tutorial)
@@ -102,12 +105,10 @@ struct RouterEdgeCaseTests {
     let child = root.childRouter(for: .home)
     let grandchild = child.childRouter(for: .home)
 
-    // activate only deactivate on direct parent, not grandparent
     child.activate()
     grandchild.activate()
     #expect(grandchild.isActive)
     #expect(!child.isActive)
-    // root was already deactivated when child.activate() was called
     #expect(!root.isActive)
   }
 
@@ -116,6 +117,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `deactivate on root then activate restores`() {
     let root = Router<TestScene>()
+    root.activate()
     #expect(root.isActive)
 
     root.deactivate()
@@ -179,6 +181,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `Simultaneous sheet and fullScreen are independently managed`() {
     let router = Router<TestScene>()
+    router.activate()
 
     router.present(sheet: .preferences)
     router.present(fullScreen: .onboarding)
@@ -199,6 +202,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `popToRoot preserves presented sheet`() {
     let router = Router<TestScene>()
+    router.activate()
     router.push(.detail(id: "1"))
     router.present(sheet: .preferences)
 
@@ -212,6 +216,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `navigate(to: .push) appends to navigation path`() {
     let router = Router<TestScene>()
+    router.activate()
     router.navigate(to: .push(.detail(id: "nav")))
     #expect(router.navigationPath == [.detail(id: "nav")])
   }
@@ -219,6 +224,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `navigate(to: .sheet) presents sheet`() {
     let router = Router<TestScene>()
+    router.activate()
     router.navigate(to: .sheet(.preferences))
     #expect(router.presentingSheet == .preferences)
   }
@@ -226,6 +232,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `navigate(to: .fullScreen) presents fullScreen`() {
     let router = Router<TestScene>()
+    router.activate()
     router.navigate(to: .fullScreen(.onboarding))
     #expect(router.presentingFullScreen == .onboarding)
   }
@@ -269,6 +276,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `popToRoot on empty path is no-op`() {
     let router = Router<TestScene>()
+    router.activate()
     router.popToRoot()
     #expect(router.navigationPath.isEmpty)
   }
@@ -276,6 +284,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `dismissSheet when no sheet presented is no-op`() {
     let router = Router<TestScene>()
+    router.activate()
     router.dismissSheet()
     #expect(router.presentingSheet == nil)
   }
@@ -283,6 +292,7 @@ struct RouterEdgeCaseTests {
   @Test
   func `dismissFullScreen when no fullScreen presented is no-op`() {
     let router = Router<TestScene>()
+    router.activate()
     router.dismissFullScreen()
     #expect(router.presentingFullScreen == nil)
   }
@@ -290,14 +300,14 @@ struct RouterEdgeCaseTests {
   // MARK: - selectAndPush from deep hierarchy
 
   @Test
-  func `selectAndPush from child creates grandchild push`() {
+  func `selectAndPush from child targets the root tab router`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
     child.selectAndPush(tab: .settings, destination: .detail(id: "deep"))
 
-    let grandchild = child.childRouter(for: .settings)
-    #expect(grandchild.navigationPath == [.detail(id: "deep")])
+    let settings = root.childRouter(for: .settings)
+    #expect(settings.navigationPath == [.detail(id: "deep")])
     #expect(root.selectedTab == .settings)
   }
 }

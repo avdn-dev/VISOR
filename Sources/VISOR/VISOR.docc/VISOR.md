@@ -58,6 +58,7 @@ There is no umbrella product. Import and link only the capabilities a target use
 - ``FullScreenDestination``
 - ``PresentableDestination``
 - ``TabDestination``
+- ``NoTabDestination``
 
 ### Testing
 

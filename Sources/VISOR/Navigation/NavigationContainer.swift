@@ -11,7 +11,8 @@ import SwiftUI
 
 /// A container that wires a Router to NavigationStack, sheet, and fullScreenCover.
 ///
-/// Each NavigationContainer creates a child Router from the parent. Sheets and
+/// A root container may bind a Router directly for a single stack. Tab and modal
+/// containers create child Routers with isolated navigation state. Sheets and
 /// full-screen covers get their own child NavigationContainer, enabling push
 /// navigation within modals. Content closures propagate automatically to nested
 /// modal containers.
@@ -34,6 +35,21 @@ public struct NavigationContainer<
 >: View {
 
   // MARK: Lifecycle
+
+  /// Create a root NavigationContainer for a single navigation stack.
+  public init(
+    router: Router<Scene>,
+    @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
+    @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
+    @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
+    @ViewBuilder content: () -> Content)
+  {
+    _router = State(initialValue: router)
+    self.content = content()
+    self.pushContent = pushContent
+    self.sheetContent = sheetContent
+    self.fullScreenContent = fullScreenContent
+  }
 
   /// Create a NavigationContainer for a tab.
   public init(

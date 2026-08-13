@@ -8,6 +8,7 @@
 import VISOR
 import Testing
 import Foundation
+import SwiftUI
 
 // MARK: - Router Tests
 
@@ -16,8 +17,12 @@ import Foundation
 struct RouterTests {
 
   @Test
-  func `Root router is active by default`() {
+  func `Root router becomes active when its container mounts`() {
     let router = Router<TestScene>()
+    #expect(!router.isActive)
+
+    router.activate()
+
     #expect(router.isActive)
   }
 
@@ -36,6 +41,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
+    root.activate()
     child.activate()
     #expect(child.isActive)
     #expect(!root.isActive)
@@ -44,6 +50,7 @@ struct RouterTests {
   @Test
   func `push appends to navigation path`() {
     let router = Router<TestScene>()
+    router.activate()
     router.push(.detail(id: "1"))
     router.push(.nested)
 
@@ -55,6 +62,7 @@ struct RouterTests {
   @Test
   func `present sheet sets presentingSheet`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(sheet: .preferences)
 
     #expect(router.presentingSheet == .preferences)
@@ -63,6 +71,7 @@ struct RouterTests {
   @Test
   func `present fullScreen sets presentingFullScreen`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(fullScreen: .onboarding)
 
     #expect(router.presentingFullScreen == .onboarding)
@@ -71,6 +80,7 @@ struct RouterTests {
   @Test
   func `popToRoot clears navigation path`() {
     let router = Router<TestScene>()
+    router.activate()
     router.push(.detail(id: "1"))
     router.push(.nested)
     router.popToRoot()
@@ -81,6 +91,7 @@ struct RouterTests {
   @Test
   func `dismissSheet clears presentingSheet`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(sheet: .preferences)
     router.dismissSheet()
 
@@ -90,6 +101,7 @@ struct RouterTests {
   @Test
   func `dismissFullScreen clears presentingFullScreen`() {
     let router = Router<TestScene>()
+    router.activate()
     router.present(fullScreen: .onboarding)
     router.dismissFullScreen()
 
@@ -195,6 +207,7 @@ struct RouterTests {
   @Test
   func `Deep link on active root handles all destination types`() {
     let router = Router<TestScene>()
+    router.activate()
 
     router.deepLinkOpen(to: .push(.detail(id: "deep")))
     #expect(router.navigationPath == [.detail(id: "deep")])
@@ -277,6 +290,7 @@ struct RouterTests {
   @Test
   func `Active router processes deep link URL end-to-end`() {
     let root = Router<TestScene>()
+    root.activate()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
@@ -371,6 +385,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     root.selectedTab = .home
     let child = root.childRouter(for: .home)
+    child.activate()
 
     root.present(fullScreen: .tutorial)
 
@@ -384,6 +399,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     root.selectedTab = .settings
     let child = root.childRouter(for: .settings)
+    child.activate()
 
     root.present(sheet: .preferences)
 
@@ -433,6 +449,7 @@ struct RouterTests {
   @Test
   func `dismissFullScreen is no-op when no ancestor holds presentation`() {
     let root = Router<TestScene>()
+    root.activate()
 
     root.dismissFullScreen()
 
@@ -444,6 +461,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     root.selectedTab = .home
     let child = root.childRouter(for: .home)
+    child.activate()
 
     root.navigate(to: .fullScreen(.tutorial))
 
@@ -456,11 +474,95 @@ struct RouterTests {
     let root = Router<TestScene>()
     root.selectedTab = .settings
     let child = root.childRouter(for: .settings)
+    child.activate()
 
     root.navigate(to: .sheet(.profile))
 
     #expect(root.presentingSheet == nil)
     #expect(child.presentingSheet == .profile)
+  }
+
+  // MARK: - Active visible routing
+
+  @Test
+  func `Root actions are rejected until a navigation container mounts`() {
+    let root = Router<TestScene>()
+
+    root.push(.nested)
+    root.present(sheet: .preferences)
+    root.present(fullScreen: .onboarding)
+
+    #expect(root.navigationPath.isEmpty)
+    #expect(root.presentingSheet == nil)
+    #expect(root.presentingFullScreen == nil)
+  }
+
+  @Test
+  func `Root actions target the active modal leaf`() {
+    let root = Router<TestScene>()
+    let tab = root.childRouter(for: .home)
+    let modal = tab.childRouter()
+    tab.activate()
+    modal.activate()
+
+    root.push(.nested)
+    root.present(sheet: .profile)
+
+    #expect(root.navigationPath.isEmpty)
+    #expect(tab.navigationPath.isEmpty)
+    #expect(modal.navigationPath == [.nested])
+    #expect(modal.presentingSheet == .profile)
+  }
+
+  @Test
+  func `Modal disappearance restores its mounted parent`() {
+    let root = Router<TestScene>()
+    let tab = root.childRouter(for: .home)
+    let modal = tab.childRouter()
+    tab.activate()
+    modal.activate()
+
+    modal.deactivate()
+
+    #expect(!modal.isActive)
+    #expect(tab.isActive)
+
+    root.push(.nested)
+    #expect(tab.navigationPath == [.nested])
+  }
+
+  @Test
+  func `Late disappearance cannot deactivate a newer active tab`() {
+    let root = Router<TestScene>()
+    let home = root.childRouter(for: .home)
+    let settings = root.childRouter(for: .settings)
+    home.activate()
+    settings.activate()
+
+    home.deactivate()
+
+    #expect(!home.isActive)
+    #expect(settings.isActive)
+
+    root.push(.detail(id: "current"))
+    #expect(settings.navigationPath == [.detail(id: "current")])
+  }
+
+  @Test
+  func `Single-stack scene and root container require no tab destination`() {
+    let root = Router<SingleStackTestScene>()
+
+    let container = NavigationContainer(
+      router: root,
+      pushContent: { _ in EmptyView() },
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() }
+    ) {
+      EmptyView()
+    }
+
+    _ = container
+    #expect(root.level == 0)
   }
 
 }

@@ -137,6 +137,7 @@ struct IntegrationTests {
       recipes: viewModel._visorMakeObservationRecipes())
 
     try await session._visorStart()
+    router.activate()
     router.push(.detail(id: "1"))
     router.present(sheet: .preferences)
 

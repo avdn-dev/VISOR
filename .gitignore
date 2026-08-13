@@ -2,4 +2,5 @@
 .swiftpm/
 Package.resolved
 RELEASE_NOTES.md
+DESLOPPIFY_CATALOG.md
 .DS_Store

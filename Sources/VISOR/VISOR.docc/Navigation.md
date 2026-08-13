@@ -31,6 +31,7 @@ nonisolated enum AppFullScreen: FullScreenDestination {
   var id: Self { self }
 }
 
+// Declare this only when the application uses a TabView.
 nonisolated enum AppTab: TabDestination {
   case home, search, profile
 }
@@ -49,7 +50,7 @@ nonisolated enum AppTab: TabDestination {
 
 ### NavigationScene
 
-Group all four destination types into a single generic parameter:
+Group the destination types into a single generic parameter:
 
 ```swift
 enum AppScene: NavigationScene {
@@ -57,6 +58,17 @@ enum AppScene: NavigationScene {
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
   typealias Tab = AppTab
+}
+```
+
+`Tab` is optional. A single-stack application omits it and receives
+``NoTabDestination`` as the default:
+
+```swift
+enum SingleStackScene: NavigationScene {
+  typealias Push = AppPush
+  typealias Sheet = AppSheet
+  typealias FullScreen = AppFullScreen
 }
 ```
 
@@ -95,7 +107,8 @@ Place these functions in a target that can see all feature view types (typically
 
 ## Router
 
-``Router`` is an `@Observable` object that manages navigation state. Create a root router and pass it to ``NavigationContainer``:
+``Router`` is an `@Observable` object that manages one navigation tree. Create
+one root Router per window or scene and pass it to ``NavigationContainer``:
 
 ```swift
 let router = Router<AppScene>()
@@ -123,15 +136,29 @@ router.select(tab: .settings)
 router.popToRoot()
 ```
 
+Calls on the root Router target the currently active visible Router: the root
+stack in a single-stack application, the selected tab, or the topmost modal.
+Calls on a non-root Router read from the SwiftUI environment remain local to
+that container. In a single-stack application the environment Router is also
+the root coordinator. `select(tab:)` and `selectAndPush(tab:destination:)`
+explicitly coordinate tabs regardless of the active container.
+
+A Router becomes active when its container appears. Calls made before any
+container is mounted are rejected rather than being retained as invisible
+navigation state. Pass an `os.Logger` to the root initialiser to record those
+diagnostics.
+
 ### Parent-Child Hierarchy
 
 Routers form a tree. Each child tracks its depth (`level`) and the tab it manages (`tab`). The hierarchy enables:
 
+- **Optional tabs**: A root container binds the root Router directly when the application has one stack.
 - **Tab isolation**: Each tab has its own navigation stack via `childRouter(for:)`.
 - **Modal nesting**: Sheets and full-screen covers get their own child router, enabling push navigation within modals.
-- **Deep link routing**: Only the active router processes deep links.
+- **Active-leaf routing**: One visible Router receives root actions and deep links. Dismissing a modal restores its nearest mounted ancestor.
 
-Pass an `os.Logger` to the initialiser for debug-level navigation logging.
+Late disappearance from an old tab or modal cannot deactivate a newer visible
+Router.
 
 ### Previews
 
@@ -143,10 +170,24 @@ Router<AppScene>.preview(tab: .home)
 
 ## NavigationContainer
 
-``NavigationContainer`` wires a ``Router`` to `NavigationStack`, `.sheet`, and `.fullScreenCover`. Pass content closures that map each destination type to its view:
+``NavigationContainer`` wires a ``Router`` to `NavigationStack`, `.sheet`, and `.fullScreenCover`. Pass content closures that map each destination type to its view.
+
+For a single stack, bind the root Router directly:
 
 ```swift
-// For a tab
+NavigationContainer(
+  router: router,
+  pushContent: pushContent(for:),
+  sheetContent: sheetContent(for:),
+  fullScreenContent: fullScreenContent(for:)
+) {
+  HomeScreen()
+}
+```
+
+For a tab, create or reuse that tab's child Router:
+
+```swift
 NavigationContainer(
   parentRouter: router,
   tab: .home,
@@ -156,20 +197,13 @@ NavigationContainer(
 ) {
   HomeScreen()
 }
-
-// For a modal (sheet or full-screen cover)
-NavigationContainer(
-  parentRouter: router,
-  pushContent: pushContent(for:),
-  sheetContent: sheetContent(for:),
-  fullScreenContent: fullScreenContent(for:)
-) {
-  ModalContentScreen()
-}
 ```
 
+Modal containers are created automatically by the sheet and full-screen
+presentation modifiers.
+
 The container:
-- Creates a child Router from the parent.
+- Binds the root Router directly or creates the requested tab/modal child.
 - Manages active state (`onAppear` / `onDisappear`).
 - Routes incoming URLs via `onOpenURL`.
 - Wraps sheets and full-screen covers in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
@@ -181,38 +215,48 @@ The container:
 ```swift
 @main
 struct MyApp: App {
-  let router = Router<AppScene>()
-
   var body: some Scene {
     WindowGroup {
-      TabView(selection: Bindable(router).selectedTab) {
-        Tab("Home", systemImage: "house", value: AppTab.home) {
-          NavigationContainer(
-            parentRouter: router,
-            tab: .home,
-            pushContent: pushContent(for:),
-            sheetContent: sheetContent(for:),
-            fullScreenContent: fullScreenContent(for:)
-          ) {
-            HomeScreen()
-          }
-        }
-        Tab("Profile", systemImage: "person", value: AppTab.profile) {
-          NavigationContainer(
-            parentRouter: router,
-            tab: .profile,
-            pushContent: pushContent(for:),
-            sheetContent: sheetContent(for:),
-            fullScreenContent: fullScreenContent(for:)
-          ) {
-            ProfileScreen()
-          }
-        }
+      AppRoot()
+    }
+  }
+}
+
+struct AppRoot: View {
+  @State private var router = Router<AppScene>()
+
+  var body: some View {
+    TabView(selection: Bindable(router).selectedTab) {
+      NavigationContainer(
+        parentRouter: router,
+        tab: .home,
+        pushContent: pushContent(for:),
+        sheetContent: sheetContent(for:),
+        fullScreenContent: fullScreenContent(for:)
+      ) {
+        HomeScreen()
       }
+      .tabItem { Label("Home", systemImage: "house") }
+      .tag(AppTab.home)
+
+      NavigationContainer(
+        parentRouter: router,
+        tab: .profile,
+        pushContent: pushContent(for:),
+        sheetContent: sheetContent(for:),
+        fullScreenContent: fullScreenContent(for:)
+      ) {
+        ProfileScreen()
+      }
+      .tabItem { Label("Profile", systemImage: "person") }
+      .tag(AppTab.profile)
     }
   }
 }
 ```
+
+Placing the Router in scene-root `@State` gives every `WindowGroup` instance an
+independent navigation tree.
 
 ## NavigationButton
 

@@ -8,12 +8,18 @@
 import Foundation
 import OSLog
 
+@MainActor
+private final class RouterTreeContext<Scene: NavigationScene> {
+  weak var activeRouter: Router<Scene>?
+}
+
 // MARK: - Router
 
 /// Observable router that manages navigation state for a NavigationScene.
 ///
-/// Each NavigationContainer creates a child Router. The root Router is created
-/// at the app level and passed to the first NavigationContainer.
+/// The root Router coordinates one navigation tree. A root NavigationContainer
+/// may bind it directly for a single stack, while tab and modal containers create
+/// child Routers with isolated navigation state.
 @MainActor @Observable
 public final class Router<Scene: NavigationScene> {
 
@@ -33,7 +39,8 @@ public final class Router<Scene: NavigationScene> {
     self.tab = nil
     self.parent = nil
     self.logger = logger
-    isActive = true
+    self.treeContext = RouterTreeContext()
+    isActive = false
   }
 
   /// Creates a router node in the navigation hierarchy.
@@ -53,7 +60,8 @@ public final class Router<Scene: NavigationScene> {
     self.tab = tab
     self.parent = parent
     self.logger = logger
-    isActive = parent == nil // root is active by default
+    self.treeContext = parent?.treeContext ?? RouterTreeContext()
+    isActive = false
   }
 
   // MARK: - Navigation State
@@ -81,45 +89,35 @@ public final class Router<Scene: NavigationScene> {
   /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
   package weak let parent: Router?
 
-  /// Whether this router is the currently active one for deep linking.
+  /// Whether this Router is the active visible target for root navigation
+  /// actions and deep links.
   public private(set) var isActive: Bool
 
   // MARK: - Navigation Actions
 
-  /// Push a destination onto the navigation stack.
+  /// Push a destination onto the navigation stack. Root calls target the
+  /// currently active visible Router; child calls remain local.
   public func push(_ destination: Scene.Push) {
-    log("push: \(destination)")
-    navigationPath.append(destination)
+    guard let target = navigationActionTarget(for: "push") else { return }
+    target.pushLocally(destination)
   }
 
   /// Present a sheet.
   ///
-  /// When called on the root router and a tab is selected, delegates to the
-  /// selected tab's child router so the `.sheet` modifier in the tab's
-  /// NavigationContainer observes the presentation.
+  /// When called on the root Router, delegates to the currently active visible
+  /// Router. Calls on a child Router remain local to that child.
   public func present(sheet: Scene.Sheet) {
-    if let selectedTab, let child = tabChildren[selectedTab] {
-      log("present sheet (delegating to \(selectedTab)): \(sheet)")
-      child.present(sheet: sheet)
-    } else {
-      log("present sheet: \(sheet)")
-      presentingSheet = sheet
-    }
+    guard let target = navigationActionTarget(for: "present sheet") else { return }
+    target.presentSheetLocally(sheet)
   }
 
   /// Present a full-screen cover.
   ///
-  /// When called on the root router and a tab is selected, delegates to the
-  /// selected tab's child router so the `.fullScreenCover` modifier in the
-  /// tab's NavigationContainer observes the presentation.
+  /// When called on the root Router, delegates to the currently active visible
+  /// Router. Calls on a child Router remain local to that child.
   public func present(fullScreen: Scene.FullScreen) {
-    if let selectedTab, let child = tabChildren[selectedTab] {
-      log("present fullScreen (delegating to \(selectedTab)): \(fullScreen)")
-      child.present(fullScreen: fullScreen)
-    } else {
-      log("present fullScreen: \(fullScreen)")
-      presentingFullScreen = fullScreen
-    }
+    guard let target = navigationActionTarget(for: "present fullScreen") else { return }
+    target.presentFullScreenLocally(fullScreen)
   }
 
   /// Select a tab (propagates to parent if this is a child router).
@@ -148,15 +146,17 @@ public final class Router<Scene: NavigationScene> {
 
   /// Switch to a tab and push a destination onto that tab's navigation stack.
   public func selectAndPush(tab: Scene.Tab, destination: Scene.Push) {
-    log("selectAndPush: tab=\(tab), destination=\(destination)")
-    childRouter(for: tab).push(destination)
-    select(tab: tab)
+    let root = rootRouter
+    root.log("selectAndPush: tab=\(tab), destination=\(destination)")
+    root.childRouter(for: tab).pushLocally(destination)
+    root.selectedTab = tab
   }
 
-  /// Pop to the root of the navigation stack.
+  /// Pop to the root of the navigation stack. Root calls target the currently
+  /// active visible Router; child calls remain local.
   public func popToRoot() {
-    log("popToRoot")
-    navigationPath.removeAll()
+    guard let target = navigationActionTarget(for: "popToRoot") else { return }
+    target.popToRootLocally()
   }
 
   /// Dismiss the currently presented sheet.
@@ -164,13 +164,8 @@ public final class Router<Scene: NavigationScene> {
   /// When called on a router that does not itself hold the sheet presentation,
   /// walks up the parent chain to find the ancestor that does and clears it there.
   public func dismissSheet() {
-    if presentingSheet != nil {
-      log("dismissSheet")
-      presentingSheet = nil
-    } else if let parent {
-      log("dismissSheet (walking up)")
-      parent.dismissSheet()
-    }
+    guard let target = navigationActionTarget(for: "dismissSheet") else { return }
+    target.dismissSheetLocally()
   }
 
   /// Dismiss the currently presented full-screen cover.
@@ -179,28 +174,37 @@ public final class Router<Scene: NavigationScene> {
   /// presentation, walks up the parent chain to find the ancestor that does
   /// and clears it there.
   public func dismissFullScreen() {
-    if presentingFullScreen != nil {
-      log("dismissFullScreen")
-      presentingFullScreen = nil
-    } else if let parent {
-      log("dismissFullScreen (walking up)")
-      parent.dismissFullScreen()
-    }
+    guard let target = navigationActionTarget(for: "dismissFullScreen") else { return }
+    target.dismissFullScreenLocally()
   }
 
   // MARK: - Active State
 
-  /// Mark this router as the active one. Deactivates the parent.
+  /// Mark this Router as mounted and make it the active visible node.
   package func activate() {
     log("activate (level \(level))")
+    isMounted = true
+    if let previous = treeContext.activeRouter, previous !== self {
+      previous.isActive = false
+    }
+    treeContext.activeRouter = self
     isActive = true
-    parent?.deactivate()
   }
 
-  /// Mark this router as inactive.
+  /// Mark this Router as unmounted and restore its nearest mounted ancestor.
+  /// A late disappearance cannot deactivate a newer active sibling.
   package func deactivate() {
     log("deactivate (level \(level))")
+    isMounted = false
     isActive = false
+    guard treeContext.activeRouter === self else { return }
+
+    var replacement = parent
+    while let candidate = replacement, !candidate.isMounted {
+      replacement = candidate.parent
+    }
+    treeContext.activeRouter = replacement
+    replacement?.isActive = true
   }
 
   // MARK: - Deep Linking
@@ -291,6 +295,72 @@ public final class Router<Scene: NavigationScene> {
   /// Cached child routers keyed by tab. Bounded by the finite `Scene.Tab` enum;
   /// intentionally never evicted so tab navigation state is preserved across switches.
   @ObservationIgnored private var tabChildren: [Scene.Tab: Router] = [:]
+  @ObservationIgnored private let treeContext: RouterTreeContext<Scene>
+  @ObservationIgnored private var isMounted = false
+
+  private var rootRouter: Router {
+    parent?.rootRouter ?? self
+  }
+
+  private func navigationActionTarget(for action: String) -> Router? {
+    guard parent == nil else { return self }
+
+    if let activeRouter = treeContext.activeRouter, activeRouter.isMounted {
+      return activeRouter
+    }
+    if let selectedTab,
+       let selectedRouter = tabChildren[selectedTab],
+       selectedRouter.isMounted
+    {
+      return selectedRouter
+    }
+    if isMounted {
+      return self
+    }
+
+    log("\(action) rejected: no navigation container is active")
+    return nil
+  }
+
+  private func pushLocally(_ destination: Scene.Push) {
+    log("push: \(destination)")
+    navigationPath.append(destination)
+  }
+
+  private func presentSheetLocally(_ sheet: Scene.Sheet) {
+    log("present sheet: \(sheet)")
+    presentingSheet = sheet
+  }
+
+  private func presentFullScreenLocally(_ fullScreen: Scene.FullScreen) {
+    log("present fullScreen: \(fullScreen)")
+    presentingFullScreen = fullScreen
+  }
+
+  private func popToRootLocally() {
+    log("popToRoot")
+    navigationPath.removeAll()
+  }
+
+  private func dismissSheetLocally() {
+    if presentingSheet != nil {
+      log("dismissSheet")
+      presentingSheet = nil
+    } else if let parent {
+      log("dismissSheet (walking up)")
+      parent.dismissSheetLocally()
+    }
+  }
+
+  private func dismissFullScreenLocally() {
+    if presentingFullScreen != nil {
+      log("dismissFullScreen")
+      presentingFullScreen = nil
+    } else if let parent {
+      log("dismissFullScreen (walking up)")
+      parent.dismissFullScreenLocally()
+    }
+  }
 
   private func log(_ message: String) {
     logger?.debug("Router[\(self.level)]: \(message)")
