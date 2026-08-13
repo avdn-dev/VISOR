@@ -145,20 +145,21 @@ struct RouterEdgeCaseTests {
     #expect(settingsChild.navigationPath == [.detail(id: "settings-1")])
   }
 
-  // MARK: - deepLinkHandler set after child creation
+  // MARK: - Tree-wide deep-link configuration
 
   @Test
-  func `Child created before configureDeepLinks does not get handler`() {
+  func `Existing tab and modal routers receive later configuration`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
+    let modal = child.childRouter()
 
-    // Configure AFTER child creation
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
 
-    // Child was created before handler was set — should NOT have the handler
-    #expect(child.deepLinkHandler == nil)
+    let url = URL(string: "test://settings")!
+    #expect(child.deepLinkHandler?(url) == .tab(.settings))
+    #expect(modal.deepLinkHandler?(url) == .tab(.settings))
   }
 
   @Test
@@ -252,6 +253,8 @@ struct RouterEdgeCaseTests {
   @Test
   func `Multiple configureDeepLinks calls overwrite handler`() {
     let root = Router<TestScene>()
+    let child = root.childRouter(for: .home)
+    let modal = child.childRouter()
 
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .tab(.home)),
@@ -262,11 +265,14 @@ struct RouterEdgeCaseTests {
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
 
-    let homeResult = root.deepLinkHandler?(URL(string: "test://home")!)
-    #expect(homeResult == nil, "First parser should be overwritten")
-
-    let settingsResult = root.deepLinkHandler?(URL(string: "test://settings")!)
-    #expect(settingsResult == .tab(.settings))
+    let homeURL = URL(string: "test://home")!
+    let settingsURL = URL(string: "test://settings")!
+    for router in [root, child, modal] {
+      #expect(
+        router.deepLinkHandler?(homeURL) == nil,
+        "First parser should be overwritten for every existing Router")
+      #expect(router.deepLinkHandler?(settingsURL) == .tab(.settings))
+    }
   }
 
   // MARK: - selectAndPush from deep hierarchy

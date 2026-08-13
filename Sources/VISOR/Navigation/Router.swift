@@ -11,6 +11,7 @@ import OSLog
 @MainActor
 private final class RouterTreeContext<Scene: NavigationScene> {
   weak var activeRouter: Router<Scene>?
+  var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
 }
 
 // MARK: - Router
@@ -231,7 +232,6 @@ public final class Router<Scene: NavigationScene> {
       tab: tab,
       parent: self,
       logger: logger)
-    child.deepLinkHandler = deepLinkHandler
     tabChildren[tab] = child
     log("childRouter created for tab \(tab) at level \(child.level)")
     return child
@@ -244,7 +244,6 @@ public final class Router<Scene: NavigationScene> {
       tab: nil,
       parent: self,
       logger: logger)
-    child.deepLinkHandler = deepLinkHandler
     log("childRouter created (modal) at level \(child.level)")
     return child
   }
@@ -260,17 +259,19 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Deep Link Configuration
 
-  /// Handler that converts a URL into a `Destination`, set by `configureDeepLinks`.
+  /// The tree-wide handler that converts a URL into a `Destination`.
   ///
-  /// This closure is retained for the router's lifetime (often app lifetime) and propagated
-  /// to all child routers. Prefer `configureDeepLinks(scheme:parsers:)` which captures only
-  /// value types. If setting directly, use `[weak self]` to avoid retain cycles.
-  @ObservationIgnored public private(set) var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
+  /// Configure it with `configureDeepLinks(scheme:parsers:)`. Every Router in
+  /// this tree reads the same latest handler, regardless of creation order.
+  public var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)? {
+    treeContext.deepLinkHandler
+  }
 
   /// Configure deep link handling with a URL scheme and an ordered list of parsers.
   ///
-  /// The URL's scheme must match `scheme` (case-insensitive). Parsers are tried
-  /// in order; the first non-nil result wins.
+  /// Configuration applies to this Router's entire tree. The URL's scheme must
+  /// match `scheme` (case-insensitive). Parsers are tried in order; the first
+  /// non-nil result wins.
   ///
   /// ```swift
   /// router.configureDeepLinks(scheme: "myapp", parsers: [
@@ -278,7 +279,7 @@ public final class Router<Scene: NavigationScene> {
   /// ])
   /// ```
   public func configureDeepLinks(scheme: String, parsers: [DeepLinkParser<Scene>]) {
-    deepLinkHandler = { url in
+    treeContext.deepLinkHandler = { url in
       guard url.scheme?.lowercased() == scheme.lowercased() else { return nil }
       for parser in parsers {
         if let destination = parser.parse(url) {

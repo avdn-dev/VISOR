@@ -309,7 +309,10 @@ router.configureDeepLinks(scheme: "myapp", parsers: [
 
 ``DeepLinkParser`` provides `.equal(to:destination:)` for static matches and an init that takes a custom parsing closure. Parsers are tried in order; the first non-nil result wins.
 
-Deep link handlers propagate to child routers automatically.
+Each Router tree stores one current deep-link handler. Configuring the root—or
+any child—updates existing and future tab and modal Routers immediately, so
+configuration order does not affect URL handling. Separate scene-root Routers
+retain independent configurations.
 
 ## Routed Factories
 

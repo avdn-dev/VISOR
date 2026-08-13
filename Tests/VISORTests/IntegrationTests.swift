@@ -154,13 +154,13 @@ struct IntegrationTests {
   @Test
   func `A deep link opened by a child router reaches its push destination`() {
     let root = Router<TestScene>()
+    let child = root.childRouter(for: .home)
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .tab(.home)),
       .equal(
         to: ["settings", "detail"],
         destination: .push(.detail(id: "deep"))),
     ])
-    let child = root.childRouter(for: .home)
     child.activate()
 
     if let destination = child.deepLinkHandler?(

@@ -288,6 +288,42 @@ struct RouterTests {
   }
 
   @Test
+  func `Configuring deep links through a child updates the entire router tree`() {
+    let root = Router<TestScene>()
+    let home = root.childRouter(for: .home)
+    let settings = root.childRouter(for: .settings)
+    let modal = home.childRouter()
+
+    home.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["settings"], destination: .tab(.settings)),
+    ])
+
+    let url = URL(string: "test://settings")!
+    #expect(root.deepLinkHandler?(url) == .tab(.settings))
+    #expect(settings.deepLinkHandler?(url) == .tab(.settings))
+    #expect(modal.deepLinkHandler?(url) == .tab(.settings))
+  }
+
+  @Test
+  func `Separate router trees retain independent deep-link configurations`() {
+    let firstRoot = Router<TestScene>()
+    let secondRoot = Router<TestScene>()
+    firstRoot.configureDeepLinks(scheme: "first", parsers: [
+      .equal(to: ["home"], destination: .tab(.home)),
+    ])
+    secondRoot.configureDeepLinks(scheme: "second", parsers: [
+      .equal(to: ["settings"], destination: .tab(.settings)),
+    ])
+
+    #expect(
+      firstRoot.deepLinkHandler?(URL(string: "first://home")!) == .tab(.home))
+    #expect(firstRoot.deepLinkHandler?(URL(string: "second://settings")!) == nil)
+    #expect(
+      secondRoot.deepLinkHandler?(URL(string: "second://settings")!) == .tab(.settings))
+    #expect(secondRoot.deepLinkHandler?(URL(string: "first://home")!) == nil)
+  }
+
+  @Test
   func `Active router processes deep link URL end-to-end`() {
     let root = Router<TestScene>()
     root.activate()
