@@ -233,6 +233,56 @@ ProfileScreen()
 
 The view knows that it can request a `ProfileViewModel`; it does not know how the service graph is assembled.
 
+### Dependency ownership and lifetime
+
+VISOR manages ViewModel and observation-session lifetime. It does not manage the lifetime of services or
+Interactors. The composition root decides their ownership.
+
+A factory-created dependency normally shares the ViewModel's lifetime:
+
+```swift
+ProfileViewModel.Factory {
+  ProfileViewModel(
+    profileService: LiveProfileService(apiClient: apiClient))
+}
+```
+
+The factory captures `apiClient`, but not a `LiveProfileService` instance. The ViewModel owns the created service,
+which can be released with the ViewModel when nothing else retains it.
+
+A captured dependency shares the factory owner's lifetime:
+
+```swift
+let profileService = LiveProfileService(apiClient: apiClient)
+
+let factory = ProfileViewModel.Factory {
+  ProfileViewModel(profileService: profileService)
+}
+```
+
+The factory closure strongly retains `profileService`. If the factory is installed at the application root, the
+service is effectively application-lived.
+
+Choose ownership according to the state being preserved:
+
+| Required lifetime | Ownership |
+|---|---|
+| One ViewModel | Construct the dependency inside its factory |
+| One multi-screen flow | Retain it with `@State` in the stable flow-owning view |
+| One scene or window | Retain it with `@State` in a scene-root view inside `WindowGroup` |
+| Whole application process | Construct it at the application composition root and capture it in factories |
+
+Use `@State` to preserve an owned reference across reconstruction of an ordinary SwiftUI `View`. It is not
+required for VISOR source observation. An application-root dependency whose identity never changes may be stored
+as `let`.
+
+A service publishing an `ObservationSource` must remain alive for every observation session that consumes that
+source. Sources of truth and producer-owned domain work should therefore have explicit strong ownership for the
+lifetime they require.
+
+Stateless Interactors can normally be constructed inside factories. Do not inject a dependency container into
+ViewModels; resolve dependencies at the composition root and pass them explicitly.
+
 ### Routed factories
 
 Use a routed factory for every ViewModel that can navigate. `NavigationContainer`
