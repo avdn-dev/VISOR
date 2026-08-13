@@ -12,7 +12,7 @@ import Testing
 import VISORMacros
 
 private let testMacros: [String: Macro.Type] = [
-  "GenerateStub": GenerateStubMacro.self,
+  "GenerateStub": GenerateTestDoublesStubMacro.self,
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
 ]
@@ -1287,7 +1287,7 @@ func `Handle typealias in attributed use site`() {
           var loadResult: Result<String, LoadError> = .success("loaded")
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         public var isEnabled: Bool {
           get {
             access(keyPath: \\.isEnabled)
@@ -1352,7 +1352,7 @@ func `Handle typealias in attributed use site`() {
         private struct _Storage: Sendable {
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         @concurrent
         func run<T: Sendable>(_ operation: @Sendable () async throws -> T) async rethrows -> T {
           return try await operation()
@@ -1385,7 +1385,7 @@ func `Handle typealias in attributed use site`() {
           var convertNumberReturnValue: String = ""
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         var convertTextReturnValue: Int {
           get {
             access(keyPath: \\.convertTextReturnValue)
@@ -1448,7 +1448,7 @@ func `Handle typealias in attributed use site`() {
         private struct _Storage: Sendable {
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         package init() {
         }
       }

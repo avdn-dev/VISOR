@@ -18,6 +18,9 @@ let package = Package(
     .library(
       name: "VISORTesting",
       targets: ["VISORTesting"]),
+    .library(
+      name: "VISORTestDoubles",
+      targets: ["VISORTestDoubles"]),
   ],
   dependencies: [
     .package(url: "https://github.com/swiftlang/swift-syntax.git", "602.0.0"..<"604.0.0"),
@@ -45,9 +48,13 @@ let package = Package(
       name: "VISORTesting",
       dependencies: ["VISOR"]),
 
+    .target(
+      name: "VISORTestDoubles",
+      dependencies: ["VISORMacros"]),
+
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR", "VISORObservation"],
+      dependencies: ["VISOR", "VISORObservation", "VISORTestDoubles"],
       swiftSettings: [.defaultIsolation(MainActor.self)]),
 
     .testTarget(
@@ -57,6 +64,10 @@ let package = Package(
     .testTarget(
       name: "VISORTestingTests",
       dependencies: ["VISOR", "VISORObservation", "VISORTesting"]),
+
+    .testTarget(
+      name: "VISORTestDoublesTests",
+      dependencies: ["VISORTestDoubles"]),
 
     .testTarget(
       name: "VISORMacroTests",

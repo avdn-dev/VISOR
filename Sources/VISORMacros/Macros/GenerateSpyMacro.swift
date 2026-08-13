@@ -1,5 +1,5 @@
 //
-//  GenerateSpyMacro.swift
+//  GenerateTestDoublesSpyMacro.swift
 //  VISOR
 //
 //  Created by Anh Nguyen on 18/2/2026.
@@ -8,15 +8,18 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-// MARK: - GenerateSpyMacro
+// MARK: - VISORTestDoubles spy macro
 
-public struct GenerateSpyMacro: PeerMacro {
+public struct GenerateTestDoublesSpyMacro: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
-    try TestDoubleGenerator(kind: .spy).expand(node, declaration: declaration, in: context)
+    try TestDoubleGenerator(kind: .spy).expand(
+      node,
+      declaration: declaration,
+      in: context)
   }
 }

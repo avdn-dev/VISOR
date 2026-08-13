@@ -1,5 +1,5 @@
 import Testing
-import VISOR
+import VISORTestDoubles
 
 @Suite
 struct StubSequenceTests {

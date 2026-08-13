@@ -293,18 +293,14 @@ private func typeIncludesSendable(_ type: TypeSyntax) -> Bool {
 }
 
 private func extractAttributeExpression(named attributeName: String, in attributes: AttributeListSyntax) -> String? {
-  for attr in attributes {
-    guard
-      let attrSyntax = attr.as(AttributeSyntax.self),
-      attrSyntax.attributeName.as(IdentifierTypeSyntax.self)?.name.text == attributeName,
-      let arguments = attrSyntax.arguments?.as(LabeledExprListSyntax.self),
-      let firstArg = arguments.first
-    else {
-      continue
-    }
-    return firstArg.expression.trimmedDescription
+  guard
+    let attribute = attributes.visorAttribute(named: attributeName),
+    let arguments = attribute.arguments?.as(LabeledExprListSyntax.self),
+    let firstArgument = arguments.first
+  else {
+    return nil
   }
-  return nil
+  return firstArgument.expression.trimmedDescription
 }
 
 // MARK: - Typealias Handling

@@ -12,7 +12,7 @@ import Testing
 import VISORMacros
 
 private let testMacros: [String: Macro.Type] = [
-  "GenerateSpy": GenerateSpyMacro.self,
+  "GenerateSpy": GenerateTestDoublesSpyMacro.self,
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
 ]
@@ -1677,7 +1677,7 @@ struct GenerateSpyMacroTests {
           var calls: [Call] = []
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         var recordCallCount: Int {
           get {
             access(keyPath: \\.recordCallCount)
@@ -1807,7 +1807,7 @@ struct GenerateSpyMacroTests {
           var calls: [Call] = []
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         var workCallCount: Int {
           get {
             access(keyPath: \\.workCallCount)
@@ -1937,7 +1937,7 @@ struct GenerateSpyMacroTests {
           var calls: [Call] = []
         }
         @ObservationIgnored
-        private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         var consumeCallCount: Int {
           get {
             access(keyPath: \\.consumeCallCount)

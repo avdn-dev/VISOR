@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import VISOR
+import VISORTestDoubles
 
 // MARK: - @GenerateStub Runtime Tests
 
@@ -412,6 +412,21 @@ struct GenerateSpyMacroRuntimeTests {
         #expect(result == 1)
         #expect(spy.recordReturnValue == 7)
         #expect(spy.recordCallCount == 1)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func `Sendable storage retires replaced references after unlocking`() {
+        let stub = StubRuntimeSendableRetirementService()
+        var value: RuntimeReentrantRetirementValue? = RuntimeReentrantRetirementValue { [weak stub] in
+            _ = stub?.value
+        }
+        weak let retiredValue = value
+
+        stub.value = value
+        value = nil
+        stub.value = nil
+
+        #expect(retiredValue == nil)
     }
 
     @Test

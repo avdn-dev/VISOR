@@ -162,7 +162,8 @@ struct SendableTestDoubleGenerator {
     })
     members.append("  }")
     members.append("  @ObservationIgnored")
-    members.append("  private let _testDoubleStorage = VISOR._TestDoubleStorage(_Storage())")
+    members.append(
+      "  private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())")
     return members
   }
 

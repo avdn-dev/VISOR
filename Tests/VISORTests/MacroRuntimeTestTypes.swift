@@ -1,5 +1,5 @@
 import Foundation
-import VISOR
+import VISORTestDoubles
 
 // MARK: - Test-double macro runtime fixtures
 
@@ -91,6 +91,23 @@ nonisolated protocol RuntimeSendableSpyService: Sendable {
   @DefaultReturn(0)
   @concurrent
   func record(_ value: Int) async -> Int
+}
+
+nonisolated final class RuntimeReentrantRetirementValue: Sendable {
+  let onDeinit: @Sendable () -> Void
+
+  init(onDeinit: @escaping @Sendable () -> Void) {
+    self.onDeinit = onDeinit
+  }
+
+  deinit {
+    onDeinit()
+  }
+}
+
+@GenerateStub(.sendable)
+nonisolated protocol RuntimeSendableRetirementService: Sendable {
+  var value: RuntimeReentrantRetirementValue? { get set }
 }
 
 @GenerateSpy(.sendable)

@@ -20,7 +20,7 @@ struct VISORPlugin: CompilerPlugin {
     ViewModelStateMacro.self,
     ViewModelStateFieldMacro.self,
     DefaultValueMacro.self,
-    GenerateStubMacro.self,
-    GenerateSpyMacro.self,
+    GenerateTestDoublesStubMacro.self,
+    GenerateTestDoublesSpyMacro.self,
   ]
 }
