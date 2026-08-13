@@ -1,243 +1,211 @@
 # Observation
 
-Automatic observation with `@Bound`, pull-based polling with `@Polled`, and method reactions with `@Reaction`.
+Publish stable producer snapshots and project them into readiness-gated ViewModel State.
 
 ## Overview
 
-VISOR provides three attributes for declaring observation intent inside `@ViewModel` classes. The macro reads these annotations and generates the observation code — loops, deduplication, task management, and initial state.
+VISOR 11 observation is source-owned. A producer owns an `ObservationChannel<Value>` and exposes its read-only `ObservationSource<Value>`. A `@ViewModel` consumes that source through `@Bound` State fields or `@Reaction` methods.
 
-All three support `throttledBy:` for rate-limiting rapid-fire updates.
+This explicit capability gives generated production and testing sessions a gap-free baseline, revision ordering, acknowledgements, and finite source fences. A raw `AsyncSequence`, an arbitrary Observation closure, or a hidden task cannot provide that contract by itself.
 
-## @Bound — Push-Based Observation
-
-`@Bound` marks a property inside the ViewModel's `@Observable final class State` for automatic observation from an `@Observable` source. The key path identifies the source property on a dependency:
+Import the architecture and observation products where a module declares both producers and ViewModels:
 
 ```swift
+import VISOR
+import VISORObservation
+```
+
+## Producer-owned channels
+
+`ObservationChannel` is the writable producer capability. Its `source` property is the stable, copyable consumer capability:
+
+```swift
+import VISORObservation
+
+struct SyncSnapshot: Equatable, Sendable {
+  var revision: Int
+  var status: Status
+}
+
+actor SyncService {
+  private let channel: ObservationChannel<SyncSnapshot>
+  nonisolated let source: ObservationSource<SyncSnapshot>
+
+  init(initialSnapshot: SyncSnapshot) {
+    let channel = ObservationChannel(initialSnapshot)
+    self.channel = channel
+    source = channel.source
+  }
+
+  func apply(_ snapshot: SyncSnapshot) {
+    // Update the producer's matching domain state in this same actor turn.
+    channel.publish(snapshot)
+  }
+}
+```
+
+Publication is synchronous, so an actor can change its domain state and publish the matching snapshot without an intervening suspension. `currentSnapshot()` reads the channel's latest snapshot without opening a consumer session.
+
+Published values must be `Sendable` and must retain stable contents after publication. VISOR does not deep-copy a snapshot or detect mutable aliases hidden inside an otherwise `Sendable` value.
+
+Prefer one snapshot per coherent domain revision rather than one source per `@Bound` field. This avoids torn baselines and lets all projections share one subscription.
+
+### Related performance lanes
+
+When one producer needs separate channels for performance, construct later lanes with `groupedWith:`:
+
+```swift
+let lifecycle = ObservationChannel(LifecycleSnapshot.initial)
+let metering = ObservationChannel(
+  MeteringSnapshot.silent,
+  groupedWith: lifecycle)
+```
+
+Grouping makes session opening and checkpoints atomic relative to each individual channel operation. It does not turn sequential `publish` calls into one batch transaction. Use one snapshot when fields must share one publication revision.
+
+## Source-backed ViewModels
+
+A v11 ViewModel has this shape:
+
+```swift
+@MainActor
 @Observable
 @ViewModel
-final class ConnectionsViewModel {
-  @Observable
+final class SyncViewModel {
   final class State {
-    @Bound(\ConnectionsViewModel.connectionService.isAuthenticated) var isAuthenticated: Bool
-    @Bound(\ConnectionsViewModel.connectionService.recentItems) var recentItems: [String]
+    @Bound(
+      source: \SyncViewModel.service.source,
+      selecting: \SyncSnapshot.revision)
+    private(set) var revision = 0
 
-    nonisolated init(isAuthenticated: Bool, recentItems: [String]) {
-      self._isAuthenticated = isAuthenticated
-      self._recentItems = recentItems
-    }
+    @Bound(
+      source: \SyncViewModel.service.source,
+      selecting: \SyncSnapshot.status)
+    private(set) var status = Status.idle
   }
 
-  private let connectionService: ConnectionService
-}
-```
+  let state = State()
+  let service: SyncService
 
-### What Gets Generated
-
-For each `@Bound` property, the macro generates an observe method:
-
-```swift
-// Generated for isAuthenticated:
-func observeIsAuthenticated() async {
-  for await value in VISOR.valuesOf({ self.connectionService.isAuthenticated }) {
-    self.updateState(\.isAuthenticated, to: value)
+  init(service: SyncService) {
+    self.service = service
   }
 }
 ```
 
-When multiple observations exist, `startObserving()` runs them concurrently in a `withDiscardingTaskGroup`.
+The outer class must explicitly spell `@MainActor`, `@Observable`, and `@ViewModel`. Its nested `State` is a plain `final class`, not an `@Observable` class, and is held by a stable stored `let state`. `@ViewModel` supplies State's MainActor Observation accessors, routed selectors, recipe, and factory.
 
-### Key Path Format
+State fields may have declaration defaults or be assigned by a custom State initialiser. Source projections replace those placeholders during startup before a generated SwiftUI owner exposes content or `VISORTesting.observe` enters its body.
 
-The key path must use the full class name as the root and include at least two components — the dependency and the property:
+## Accepted declaration forms
+
+VISOR 11.0 accepts exactly four source-backed forms.
+
+### Bind a complete source value
 
 ```swift
-// Correct — full path: ClassName.dependency.property
-@Bound(\MyViewModel.service.count) var count: Int
-
-// Wrong — \Self refers to State, not the class
-@Bound(\Self.service.count) var count: Int
-
-// Wrong — needs the property component too
-@Bound(\MyViewModel.service) var count: Int
+@Bound(source: \PlayerViewModel.player.currentItemSource)
+private(set) var currentItem = PlayerItem.empty
 ```
 
-### No Default Values
+The State field type matches the source snapshot type.
 
-`@Bound` properties cannot have default values. They're initialised from the service at `init` time:
+### Select a field from a source snapshot
 
 ```swift
-// Correct — initialised from service
-@Bound(\MyViewModel.service.name) var name: String
-
-// Compile error — remove the default
-@Bound(\MyViewModel.service.name) var name = ""
+@Bound(
+  source: \PlayerViewModel.player.snapshotSource,
+  selecting: \PlayerSnapshot.currentItem)
+private(set) var currentItem = PlayerItem.empty
 ```
 
-This ensures state always starts with real data. Since `State` is a class, bound fields need an initializer that assigns the macro-generated backing storage (`_name`, `_count`, etc.). Non-bound properties in the same State class keep their defaults normally.
+Several selections from the same source share its baseline, revision lane, and subscription. All baseline projections run before any initial reaction.
 
-## @Polled — Pull-Based Observation
-
-`@Polled` is the pull-based counterpart to `@Bound`. Use it for non-observable sources that don't participate in `@Observable` — hardware sensors, system APIs, or computed properties:
+### React to a complete source value
 
 ```swift
-@Observable
-@ViewModel
-final class DashboardViewModel {
-  @Observable
-  final class State {
-    @Polled(\DashboardViewModel.batteryMonitor.level, every: .seconds(30)) var batteryLevel: Float
-    @Polled(\DashboardViewModel.locationTracker.heading, every: .seconds(1)) var heading: Double
-
-    nonisolated init(batteryLevel: Float, heading: Double) {
-      self._batteryLevel = batteryLevel
-      self._heading = heading
-    }
-  }
-
-  private let batteryMonitor: BatteryMonitor
-  private let locationTracker: LocationTracker
+@Reaction(source: \PlayerViewModel.player.currentItemSource)
+private func currentItemChanged(_ item: PlayerItem) {
+  updateState(\.title, to: item.title)
 }
 ```
 
-The generated code polls on a timer, using `updateState` for automatic deduplication. Zero CPU cost between polls.
-
-Like `@Bound`, `@Polled` properties cannot have default values — they're initialised from the source at creation time.
-
-## @Reaction — Method-Level Reactions
-
-`@Reaction` calls a method whenever an observed property changes. Use it for side effects that don't map to State properties:
+### React to a selected snapshot field
 
 ```swift
-@Observable
-@ViewModel
-final class HomeViewModel {
-  @Reaction(\Self.deepLinkService.pendingDestination)
-  func handleDeepLink(destination: Destination<AppScene>?) {
-    guard let destination else { return }
-    router.navigate(to: destination)
-  }
-
-  private let deepLinkService: DeepLinkService
-  private let router: Router<AppScene>
+@Reaction(
+  source: \PlayerViewModel.player.snapshotSource,
+  selecting: \PlayerSnapshot.currentItem)
+private func currentItemChanged(_ item: PlayerItem) async {
+  await prepareArtwork(for: item)
 }
 ```
 
-### Requirements
+A reaction takes exactly one parameter matching the complete or selected value. Sync and async reactions are supported. Handlers within one coherent source lane run serially in deterministic declaration order; an async handler is awaited before that snapshot is acknowledged. A newer latest-state snapshot does not implicitly cancel an active handler.
 
-- The method must take exactly **one parameter** whose type matches the observed property.
-- The key path uses `\Self` (which refers to the class, not a nested struct).
+`@Reaction` runs during initial reconciliation as well as later publications. Use it for work required to make the ViewModel ready, not as a lossless event listener.
 
-### Delivery Semantics
+## State mutation and bindings
 
-Both sync and async methods use **sequential delivery** via `for await`. Each handler completes before the next value is processed:
+`@ViewModel` routes supported top-level State mutations through one generated gateway. Use `updateState` from the ViewModel:
 
 ```swift
-// Sync — called for every value change
-@Reaction(\Self.service.status)
-func handleStatus(status: Status) { ... }
-
-// Async — also sequential; each handler completes before the next starts
-@Reaction(\Self.service.query)
-func performSearch(query: String) async { ... }
+updateState(\.status, to: .loading)
 ```
 
-If you need cancel-previous semantics (where a new value cancels the in-flight handler), use `latestValuesOf()` directly instead of `@Reaction`.
-
-## Rate Limiting with throttledBy:
-
-All three observation attributes support `throttledBy:` to limit rapid-fire updates. The observation loop pauses after each update, dropping intermediate values:
+Direct State and SwiftUI writes use the generated selector subscript:
 
 ```swift
-@Observable
-final class State {
-  // Limit to ~8 updates/second
-  @Bound(\MyViewModel.headTracker.posture, throttledBy: .seconds(0.125)) var posture: Posture
+state[\.query] = "Swift"
 
-  // Poll heading, but also throttle processing
-  @Polled(\MyViewModel.compass.heading, every: .seconds(0.5)) var heading: Double
-
-  nonisolated init(posture: Posture, heading: Double) {
-    self._posture = posture
-    self._heading = heading
-  }
-}
-
-// Throttle a reaction
-@Reaction(\Self.recorder.audioLevel, throttledBy: .seconds(0.1))
-func handleAudioLevel(level: Float) { ... }
+@Bindable var state = viewModel.state
+TextField("Search", text: $state[\.query])
 ```
 
-When the source is quiet, there's zero CPU cost — throttling only adds a sleep after processing an actual change.
-
-## Debouncing Reactions with debouncedBy:
-
-`@Reaction` also supports `debouncedBy:` for work that should run only after a burst of changes settles. New values cancel the pending handler, and only the latest value is delivered after the quiet interval:
+Inside a `@LazyViewModel` view, the generated convenience has the same shape:
 
 ```swift
-@Reaction(\Self.state.searchText, debouncedBy: .milliseconds(300))
-func performSearch(query: String) async { ... }
+TextField("Search", text: bindableState[\.query])
 ```
 
-Use debouncing for side effects such as saves, searches, or network requests where intermediate values are stale. Use `throttledBy:` when you still want periodic updates during continuous change.
+This keeps production Observation invalidation and test-history capture on the same synchronous route. Selectors are generated only for supported top-level stored fields whose getter is at least `fileprivate`; they do not recursively expose nested members.
 
-## Low-Level: valuesOf() and latestValuesOf()
+## Structured SwiftUI ownership
 
-The macros are built on two public functions you can use directly:
+`@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before exposing `content`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
 
-### valuesOf()
+Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounting two owners for the same ViewModel identity is rejected rather than creating duplicate subscriptions.
 
-Returns an `AsyncStream` that emits the current value and re-emits on every change. The `Equatable`-constrained overload automatically deduplicates:
+### Scene policy
 
-```swift
-for await count in valuesOf({ service.count }) {
-  print(count) // only fires when count actually changes
-}
-```
-
-- On iOS 26+: Backed by `Observations` (SE-0475, transactional did-set semantics).
-- On earlier OS: Backed by `ObservationSequence` using `withObservationTracking`.
-
-### latestValuesOf()
-
-Observes a value and runs an async handler, cancelling any previous in-flight handler when a new value arrives:
+Choose how the generated owner responds to scene phase:
 
 ```swift
-await latestValuesOf({ router.pendingDestination }) { destination in
-  await handleNavigation(destination)
-}
-```
-
-Use this when only the latest value matters and stale work should be abandoned.
-
-## ObservationPolicy
-
-`@LazyViewModel` accepts an `observationPolicy` parameter that controls whether observation pauses based on scene phase:
-
-```swift
-// Default — observation runs continuously
+// Runs through active, inactive, and background phases.
 @LazyViewModel(ProfileViewModel.self)
 
-// Pauses when the app enters background
-@LazyViewModel(DashboardViewModel.self, observationPolicy: .pauseInBackground)
+// Pauses only in the background.
+@LazyViewModel(
+  DashboardViewModel.self,
+  observationPolicy: .pauseInBackground)
 
-// Pauses when the scene is not active (background or inactive)
-@LazyViewModel(SensorViewModel.self, observationPolicy: .pauseWhenInactive)
+// Runs only while active.
+@LazyViewModel(
+  SensorViewModel.self,
+  observationPolicy: .pauseWhenInactive)
 ```
 
-The default `.alwaysObserving` is correct for most ViewModels. Tearing down and re-establishing observation adds overhead that outweighs the near-zero cost of an idle callback. Use `.pauseInBackground` or `.pauseWhenInactive` only when observation drives high-frequency work (polling, real-time rendering) that wastes resources when the UI is not visible.
+The default is `.alwaysObserving`. A pause policy revokes readiness, withdraws gated content, and cancels the generated source session. On reactivation, a fresh generation reconciles the latest snapshots before content returns. Use a pause policy when the gated content owns high-frequency renderer or presentation work that should also stop off-screen.
 
-## stateBinding
+Producer-owned domain work has its own lifetime. VISOR does not infer that a service should stop because one view paused.
 
-`@LazyViewModel` generates a `stateBinding` property for two-way SwiftUI bindings:
+## Deliberate v11.0 boundaries
 
-```swift
-@LazyViewModel(SettingsViewModel.self)
-struct SettingsScreen: View {
-  var content: some View {
-    Toggle("Notifications", isOn: stateBinding.notificationsEnabled)
-    TextField("Display Name", text: stateBinding.displayName)
-  }
-}
-```
+There is no source-backed `@Polled`, `throttledBy:`, or `debouncedBy:` declaration in v11.0.
 
-This is a `Binding<State>` created from `Bindable(viewModel).state`, giving you key-path access to individual state fields.
+- Durable latest domain state belongs in an `ObservationChannel`/`ObservationSource` owned by its producer.
+- Elapsed-time presentation or service work belongs in an explicitly structured task using an injected `Clock`.
+- Operation completion should be awaited directly.
+- Lossless events need an explicitly buffered event sequence or callback with event-specific ownership.
+
+Those forms are not automatically source-fenced. VISOR only guarantees readiness and `perform` fencing for immediate generated `@Bound` and `@Reaction` work over participating sources.

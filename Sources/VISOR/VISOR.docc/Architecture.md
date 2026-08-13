@@ -1,30 +1,27 @@
 # Architecture
 
-The VISOR layers, View/Content pattern, Interactors, and Factory injection.
+Compose source-owning services, MainActor ViewModels, structured SwiftUI owners, and pure Content views.
 
-## The Layers
+## Layers
 
-VISOR defines five roles. Each role has a single responsibility and dependencies only point downward.
+VISOR defines five application roles plus a factory boundary:
 
-| Layer | Responsibility | Depends On |
-|-------|---------------|------------|
-| **View** | Renders UI. No business logic. | ViewModel |
-| **ViewModel** | Owns state, dispatches actions, forwards side effects. | Interactor, Service |
-| **Interactor** | Coordinates multiple services for a use case. Optional. | Service |
-| **Service** | Platform or domain concern (networking, caching, auth). `@Observable`. | Other Services |
-| **Router** | Navigation state, parent-child hierarchy, deep linking. | — |
+| Role | Responsibility | Depends on |
+|---|---|---|
+| **View** | Owns UI integration and renders State | ViewModel, Router |
+| **ViewModel** | Owns stable UI State, dispatches actions, and projects service snapshots | Interactor, Service |
+| **Interactor** | Coordinates a named use case across services; optional | Service |
+| **Service** | Owns domain or platform state and its natural isolation | Other services |
+| **Router** | Owns typed navigation, presentation, tabs, and deep links | — |
+| **Factory** | Creates a ViewModel with its dependencies without exposing composition to the View | Composition root |
 
-The **Factory** (`ViewModelFactory<VM>`) bridges the gap between the View and ViewModel layers. It's injected via `@Environment` so views don't know how their ViewModel is created.
+Dependencies point towards domain and platform capabilities. A service is not required to be MainActor or `@Observable`; source-backed state crosses that boundary through `ObservationSource` snapshots.
 
-## View / Content Pattern
+## View and Content
 
-VISOR splits UI into two roles:
-
-- The **`@LazyViewModel` view** owns the ViewModel. It's the integration point — it wires the factory, starts observation, and passes state to the Content. This can be a full screen, a section of a screen, or any component that needs its own ViewModel.
-- The **Content** is a pure function of state. It takes state and action closures as plain parameters. No factories, no observation, no services. This makes it trivially previewable and testable.
+Split an integration-owning view from its plain rendering component:
 
 ```swift
-// @LazyViewModel view — owns the ViewModel
 @LazyViewModel(DashboardViewModel.self)
 struct DashboardView: View {
   var content: some View {
@@ -34,7 +31,6 @@ struct DashboardView: View {
   }
 }
 
-// Content — pure UI
 struct DashboardContent: View {
   let state: DashboardViewModel.State
   let onAction: (DashboardViewModel.Action) -> Void
@@ -46,26 +42,140 @@ struct DashboardContent: View {
   }
 }
 
-// Previewable with static data — no factory needed
 #Preview {
   DashboardContent(
     state: .init(items: .loaded([Item(name: "Preview")])),
-    onAction: { _ in }
-  )
+    onAction: { _ in })
 }
 ```
 
+The `@LazyViewModel` view owns integration. The macro resolves its factory, creates the ViewModel lazily, mounts one structured observation owner, and exposes `content` only after all source baselines and immediate reactions are ready.
+
+The Content view is a pure function of State and action closures. It does not resolve factories, subscribe to services, or construct dependencies. This keeps previews and rendering tests small.
+
+Place `@LazyViewModel` at the stable SwiftUI root that should own the ViewModel. If descendants survive a local layout branch, their owner must live above that branch as well.
+
+## Source-backed @ViewModel
+
+A VISOR 11 ViewModel is an explicitly MainActor, observable class with a plain nested State:
+
+```swift
+@MainActor
+@Observable
+@ViewModel
+final class CounterViewModel {
+  final class State {
+    private(set) var count = 0
+    private(set) var phase = Phase.idle
+  }
+
+  enum Action {
+    case increment
+  }
+
+  let state = State()
+
+  func handle(_ action: Action) {
+    switch action {
+    case .increment:
+      updateState(\.count, to: state.count + 1)
+    }
+  }
+}
+```
+
+The shape is intentional:
+
+- `@MainActor` is explicit on every ViewModel; consumer targets do not need MainActor-by-default.
+- `@Observable` applies to the ViewModel, not its nested State declaration.
+- State is a plain `final class`. `@ViewModel` attaches its MainActor Observation accessors and routed field selectors.
+- `state` is a stored `let`, preserving one State identity for SwiftUI ownership and scoped testing.
+- An `Action` enum is optional. Read-only ViewModels use the default `Never` action.
+
+For a public ViewModel, nested State and the stored `state` property must also be public enough to satisfy the generated conformance.
+
+### Generated surface
+
+For the source-backed shape, `@ViewModel` generates:
+
+1. `ViewModel` and source-backed runtime conformance;
+2. `typealias Factory = ViewModelFactory<ClassName>`;
+3. State Observation accessors and flat routed selectors;
+4. a grouped internal observation recipe for source-backed `@Bound` and `@Reaction` declarations; and
+5. a per-instance structured-owner identity token.
+
+Swift 6.2.4 can crash in release optimisation while synthesising destruction for these explicitly MainActor macro-expanded classes. VISOR emits inert `deinit {}` declarations for the ViewModel and State when the user has not written an unconditional deinitialiser. A user-authored unconditional `deinit` is preserved. Conditional deinitialiser declarations are diagnosed because the macro cannot safely guarantee the workaround on every build path.
+
+### State initialisation
+
+State fields keep ordinary declaration defaults or values assigned by a custom initialiser:
+
+```swift
+final class State {
+  private(set) var title: String
+  private(set) var items: Loadable<[Item]> = .loading
+
+  init(title: String) {
+    self.title = title
+  }
+}
+
+let state: State
+
+init(title: String, service: ItemService) {
+  state = State(title: title)
+  self.service = service
+}
+```
+
+A source-backed `@Bound` field may also have a placeholder default. The generated owner replaces it from the source baseline before content or an observation test becomes ready.
+
+### Routed mutation
+
+Every supported top-level stored State field is instrumented for normal Observation invalidation and optional test-history capture. ViewModel mutations use the generated selector:
+
+```swift
+updateState(\.phase, to: .loading)
+```
+
+Explicit State and SwiftUI binding writes use the same route:
+
+```swift
+state[\.query] = "Swift"
+
+@Bindable var state = viewModel.state
+TextField("Search", text: $state[\.query])
+```
+
+The gateway guarantees how a write travels; it does not decide which layer is authorised to make it. Use actions for validation, persistence, analytics, async work, or coupled mutations. Direct bindings are appropriate for genuinely local control input.
+
+Selectors are flat. `\.settings` can route replacement or value write-back of the top-level field; VISOR does not generate `\.settings.theme` history. A nested mutable reference should own its own Observation boundary or be represented by a stable domain snapshot.
+
+## Source projection and reactions
+
+Services expose durable latest State through `ObservationSource`. The ViewModel declares complete-value or selected-value bindings and reactions:
+
+```swift
+final class State {
+  @Bound(
+    source: \ProfileViewModel.service.source,
+    selecting: \ProfileSnapshot.name)
+  private(set) var name = ""
+}
+
+@Reaction(
+  source: \ProfileViewModel.service.source,
+  selecting: \ProfileSnapshot.status)
+private func statusChanged(_ status: Status) async {
+  // Runs during initial reconciliation and later delivery.
+}
+```
+
+Declarations selecting the same source share one subscription and coherent revision lane. At startup, all baseline projections run before any immediate reaction. See [Observation](Observation.md) for the full source contract and deliberate polling/delay boundaries.
+
 ## Interactors
 
-Interactors are optional plain Swift objects that model application use cases. Use one when a user action needs to coordinate multiple services, enforce domain sequencing, or perform work that would make the ViewModel more about workflow than state.
-
-Keep the boundaries simple:
-
-- **ViewModel** owns UI state, observes services, and translates user actions into work.
-- **Interactor** coordinates a use case across services and returns a domain result.
-- **Service** owns platform or persistence concerns such as networking, storage, auth, sensors, or caches.
-
-You usually do not need an Interactor when a ViewModel only forwards a single action to a single service. Introduce one when the behavior has a name in the product domain, is shared across screens, or needs focused tests without ViewModel state machinery.
+An Interactor is an optional plain Swift type representing a named application use case. Introduce one when an action coordinates several services, enforces domain sequencing, is shared across screens, or deserves focused tests without ViewModel State machinery.
 
 ```swift
 protocol SessionInteractor {
@@ -88,168 +198,66 @@ final class LiveSessionInteractor: SessionInteractor {
   }
 
   func signIn(email: String, password: String) async throws -> User {
-    let session = try await authService.signIn(email: email, password: password)
+    let session = try await authService.signIn(
+      email: email,
+      password: password)
     let user = try await profileService.loadProfile(for: session.userID)
     analyticsService.track(.signedIn(user.id))
     return user
   }
 }
-
-@Observable
-@ViewModel
-final class SignInViewModel {
-  @Observable
-  final class State {
-    var email = ""
-    var password = ""
-    var user: Loadable<User> = .empty
-  }
-
-  enum Action {
-    case submit
-  }
-
-  private let sessionInteractor: any SessionInteractor
-
-  func handle(_ action: Action) async {
-    switch action {
-    case .submit:
-      updateState(\.user, to: .loading)
-      do {
-        let user = try await sessionInteractor.signIn(
-          email: state.email,
-          password: state.password
-        )
-        updateState(\.user, to: .loaded(user))
-      } catch {
-        updateState(\.user, to: .error(error.localizedDescription))
-      }
-    }
-  }
-}
 ```
 
-Interactors pair well with `@GenerateStub` and `@GenerateSpy`: define the Interactor as a protocol, use a live implementation in production, and generate test doubles for ViewModel tests.
+Do not add an Interactor when the ViewModel merely forwards one action to one service. Interactors pair naturally with protocols and doubles generated by `VISORTestDoubles`.
 
-## @ViewModel Macro
+## Factory injection
 
-Apply `@Observable` and `@ViewModel` to a class to generate:
-
-1. **Memberwise `init`** from stored `let` properties (skipped if you write your own)
-2. **`var state`** with observation tracking (generated when `@Bound` or `@Polled` properties exist)
-3. **`startObserving()`** from `@Bound`, `@Polled`, and `@Reaction` annotations
-4. **`typealias Factory = ViewModelFactory<ClassName>`**
-5. **`ViewModel` protocol conformance** via extension
+`@ViewModel` generates a `Factory` alias. Construct it at the composition root and inject it through the environment:
 
 ```swift
-@Observable
-@ViewModel
-final class CounterViewModel {
-  @Observable
-  final class State {
-    var count = 0
-  }
-
-  enum Action { case increment }
-
-  func handle(_ action: Action) {
-    switch action {
-    case .increment: updateState(\.count, to: state.count + 1)
-    }
-  }
-}
-```
-
-### State and Actions
-
-Every ViewModel requires a nested `@Observable final class State`. Actions are optional — omit the `Action` enum for read-only ViewModels.
-
-Mutate state via `updateState(_:to:)`, which skips the write when the new value equals the current one (preventing unnecessary observation triggers):
-
-```swift
-updateState(\.count, to: newCount) // no-op if count == newCount
-```
-
-The `handle(_:)` method can be sync or async. The protocol requires `async`, but a sync implementation also satisfies it — implement whichever you need.
-
-### Init-from-Service
-
-When `@Bound` or `@Polled` properties exist in State, the generated init reads their initial values from the service:
-
-```swift
-@Observable
-final class State {
-  @Bound(\ProfileViewModel.profileService.name) var name: String
-  @Bound(\ProfileViewModel.profileService.email) var email: String
-  var filter: Filter = .all  // non-bound properties still use defaults
-
-  nonisolated init(name: String, email: String) {
-    self._name = name
-    self._email = email
-  }
-}
-
-private let profileService: ProfileService
-
-// Generated init:
-// init(profileService: ProfileService) {
-//   self.profileService = profileService
-//   self._state = State(name: profileService.name, email: profileService.email)
-// }
-```
-
-`@Bound` properties cannot have default values — they're always initialised from the service so state starts with real data, never stale placeholders. Because `State` is a class, provide a `nonisolated` initializer for bound or polled fields and assign the macro-generated backing storage (`self._name = name`, `self._email = email`, etc.). Do not assign through the observable property setters (`self.name = name`) inside a `nonisolated` initializer; those setters are actor-isolated when using main-actor default isolation. Non-bound properties coexist naturally and keep their defaults.
-
-## Factory Injection
-
-`@ViewModel` generates a `Factory` typealias. Create the factory at your composition root and inject it via `@Environment`:
-
-```swift
-// At the composition root
 ProfileScreen()
   .environment(ProfileViewModel.Factory {
     ProfileViewModel(profileService: profileService)
   })
 ```
 
-### Routed Factories
+The view knows that it can request a `ProfileViewModel`; it does not know how the service graph is assembled.
 
-If a ViewModel needs a ``Router``, use a routed factory. The ``NavigationContainer`` automatically passes the router at creation time:
+### Routed factories
+
+When a ViewModel needs a `Router`, create a routed factory. `NavigationContainer` supplies the router when it creates the destination ViewModel:
 
 ```swift
-let factory: GalleryViewModel.Factory = .routed { (router: Router<AppScene>) in
-  GalleryViewModel(router: router, galleryService: galleryService)
+let factory: GalleryViewModel.Factory = .routed {
+  (router: Router<AppScene>) in
+  GalleryViewModel(
+    router: router,
+    galleryService: galleryService)
 }
 ```
 
-## When to Use @ViewModel vs Protocol
+## Scene lifetime
 
-| Scenario | Use |
-|----------|-----|
-| Standard ViewModel with service dependencies | `@ViewModel` macro |
-| Custom `init` (e.g., `NSObject` subclass) | `@ViewModel` macro (init skipped, factory still generated) |
-| Factory creates interactors or has complex setup | `ViewModel` protocol + manual factory |
+The generated owner normally observes through all scene phases. Use `observationPolicy: .pauseInBackground` or `.pauseWhenInactive` when gated presentation or renderer work should stop with the scene.
+
+Pausing revokes readiness and cancels the source session. A later activation reconciles the latest source snapshots before content becomes actionable again. Producer-owned domain activity is independent and must have its own explicit lifetime.
 
 ## Loadable
 
-`Loadable<Value>` is a standalone enum for per-field loading semantics within State:
+`Loadable<Value>` models per-field loading semantics inside State:
 
 ```swift
-@Observable
 final class State {
-  var items: Loadable<[Item]> = .loading
-  var profile: Loadable<Profile> = .loading
-  var filter: Filter = .all
+  private(set) var items: Loadable<[Item]> = .loading
+  private(set) var profile: Loadable<Profile> = .empty
 }
 ```
 
-| Case | Description |
-|------|-------------|
-| `.loading` | Data is being fetched |
-| `.empty` | Fetch completed, no data |
-| `.loaded(Value)` | Data available |
-| `.error(String)` | Fetch failed with message |
+| Case | Meaning |
+|---|---|
+| `.loading` | Work is in progress |
+| `.empty` | Work completed without a value |
+| `.loaded(Value)` | A value is available |
+| `.error(String)` | Work failed with a displayable message |
 
-Accessors: `value`, `isLoading`, `isEmpty`, `isError`, `error`, `map(_:)`, `flatMap(_:)`.
-
-Conforms to `Equatable`, `Hashable`, and `Sendable` when `Value` does.
+Use `value`, `isLoading`, `isEmpty`, `isError`, `error`, `map(_:)`, and `flatMap(_:)` to work with it. Conditional `Equatable`, `Hashable`, and `Sendable` conformances follow the wrapped value.
