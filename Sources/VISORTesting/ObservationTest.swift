@@ -20,6 +20,9 @@ enum WindowTransition {
   case cancelled
 }
 
+package typealias ObservationTestIssueRecorder =
+  @MainActor (String, SourceLocation) -> Void
+
 /// A scoped handle for fencing one semantic action at a time and matching its
 /// complete State mutation history.
 @MainActor
@@ -30,22 +33,20 @@ public final class ObservationTest<SUT: ViewModel> {
   private var session: _ObservationSession?
   private var phase = ObservationTestPhase.ready
   private var hasReportedInfrastructureFailure = false
-  private let infrastructureIssueRecorder:
-    @MainActor (String, SourceLocation) -> Void
+  private let issueRecorder: ObservationTestIssueRecorder
 
   init(
     sut: SUT,
     state: SUT.State,
     journal: StateJournal,
     session: _ObservationSession,
-    infrastructureIssueRecorder:
-      @escaping @MainActor (String, SourceLocation) -> Void
+    issueRecorder: @escaping ObservationTestIssueRecorder
   ) {
     self.sut = sut
     self.state = state
     self.journal = journal
     self.session = session
-    self.infrastructureIssueRecorder = infrastructureIssueRecorder
+    self.issueRecorder = issueRecorder
   }
 
   // Work around a Swift 6.2.4 release optimiser crash for explicitly
@@ -145,7 +146,7 @@ public final class ObservationTest<SUT: ViewModel> {
     case .ready:
       phase = .performing
     case .performing:
-      Issue.record(
+      recordIssue(
         "A perform window is already active for this State",
         sourceLocation: sourceLocation)
       return .unavailable
@@ -259,9 +260,9 @@ public final class ObservationTest<SUT: ViewModel> {
   ) {
     guard !hasReportedInfrastructureFailure else { return }
     hasReportedInfrastructureFailure = true
-    infrastructureIssueRecorder(
+    recordIssue(
       "VISOR failed while \(phase): \(String(describing: error))",
-      sourceLocation)
+      sourceLocation: sourceLocation)
   }
 
   func journalFailed(
@@ -287,9 +288,16 @@ public final class ObservationTest<SUT: ViewModel> {
   private func recordEndedScopeMisuse(
     sourceLocation: SourceLocation
   ) {
-    Issue.record(
+    recordIssue(
       "This observation scope has ended",
       sourceLocation: sourceLocation)
+  }
+
+  func recordIssue(
+    _ message: String,
+    sourceLocation: SourceLocation
+  ) {
+    issueRecorder(message, sourceLocation)
   }
 
   func end() {
@@ -322,7 +330,7 @@ public final class ObservationTest<SUT: ViewModel> {
       return nil
     }
     guard phase != .performing else {
-      Issue.record(
+      recordIssue(
         "expect requires a completed perform window",
         sourceLocation: sourceLocation)
       return nil
@@ -331,7 +339,7 @@ public final class ObservationTest<SUT: ViewModel> {
       return nil
     }
     guard journal.hasClosedWindow else {
-      Issue.record(
+      recordIssue(
         "expect requires a completed perform window",
         sourceLocation: sourceLocation)
       return nil

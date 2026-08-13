@@ -24,7 +24,7 @@ struct ObservationLifecycleTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 8_192,
-      infrastructureIssueRecorder: { message, location in
+      issueRecorder: { message, location in
         infrastructureIssues.append((message, location))
       }
     ) { test in
@@ -62,24 +62,32 @@ struct ObservationLifecycleTests {
     let service = TestingService()
     service.terminate()
     let sut = TestingViewModel(service: service)
+    var issues: [(message: String, location: SourceLocation)] = []
     var enteredBody = false
+    let observeLocation = SourceLocation(
+      fileID: "ObservationLifecycleTests/startup",
+      filePath: "/ObservationLifecycleTests/startup.swift",
+      line: 404,
+      column: 4)
 
-    try await withKnownIssue(
-      "startup failure is attributed to observe",
-      {
-        try await observe(sut) { _ in
-          enteredBody = true
-        }
-      },
-      matching: { issue in
-        issue.comments.contains { comment in
-          comment.rawValue.hasPrefix(
-            "VISOR failed while starting observation:")
-        }
-      })
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      sourceLocation: observeLocation,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, location in
+        issues.append((message, location))
+      }
+    ) { _ in
+      enteredBody = true
+    }
 
+    #expect(issues.count == 1)
+    #expect(issues.first?.message ==
+      "VISOR failed while starting observation: unexpectedTermination")
+    #expect(issues.first?.location == observeLocation)
     #expect(!enteredBody)
     #expect(service.activeObservationCount == 0)
+    #expect(sut.state._visorMutationRecorder == nil)
   }
 
   @Test
@@ -87,29 +95,45 @@ struct ObservationLifecycleTests {
   func `Runtime source failure poisons the window and suppresses later work`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
+    var issues: [(message: String, location: SourceLocation)] = []
     var laterOperationRan = false
+    let failureLocation = SourceLocation(
+      fileID: "ObservationLifecycleTests/runtime",
+      filePath: "/ObservationLifecycleTests/runtime.swift",
+      line: 505,
+      column: 5)
+    let suppressedExpectationLocation = SourceLocation(
+      fileID: "ObservationLifecycleTests/suppressed-expectation",
+      filePath: "/ObservationLifecycleTests/suppressed-expectation.swift",
+      line: 506,
+      column: 6)
 
-    try await withKnownIssue(
-      "runtime source failure is reported once",
-      {
-        try await observe(sut) { test in
-          await test.perform {
-            service.terminate()
-          }
-          test.expect(\.sourceValue, hasExactChanges: [])
-          await test.perform {
-            laterOperationRan = true
-          }
-        }
-      },
-      matching: { issue in
-        issue.comments.contains { comment in
-          comment.rawValue.hasPrefix("VISOR failed while ")
-        }
-      })
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, location in
+        issues.append((message, location))
+      }
+    ) { test in
+      await test.perform(
+        { service.terminate() },
+        sourceLocation: failureLocation)
+      test.expect(
+        \.sourceValue,
+        hasExactChanges: [],
+        sourceLocation: suppressedExpectationLocation)
+      await test.perform {
+        laterOperationRan = true
+      }
+    }
 
+    #expect(issues.count == 1)
+    #expect(issues.first?.message ==
+      "VISOR failed while closing an action window: unexpectedTermination")
+    #expect(issues.first?.location == failureLocation)
     #expect(!laterOperationRan)
     #expect(service.activeObservationCount == 0)
+    #expect(sut.state._visorMutationRecorder == nil)
   }
 
   @Test
@@ -144,25 +168,38 @@ struct ObservationLifecycleTests {
     var sut: TestingViewModel? = TestingViewModel(service: service)
     let weakSUT = WeakReference(sut)
     var escaped: ObservationTest<TestingViewModel>?
+    var issues: [(message: String, location: SourceLocation)] = []
+    var staleOperationRan = false
+    let staleLocation = SourceLocation(
+      fileID: "ObservationLifecycleTests/stale-handle",
+      filePath: "/ObservationLifecycleTests/stale-handle.swift",
+      line: 606,
+      column: 6)
 
-    try await observe(sut!) { test in
+    try await _observeWithJournalPolicyForProof(
+      sut!,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, location in
+        issues.append((message, location))
+      }
+    ) { test in
       escaped = test
     }
 
     sut = nil
     #expect(weakSUT.value == nil)
     #expect(service.activeObservationCount == 0)
+    #expect(issues.isEmpty)
 
-    await withKnownIssue(
-      "stale handle is diagnosed",
-      {
-        await escaped?.perform {}
-      },
-      matching: { issue in
-        issue.comments.contains { comment in
-          comment.rawValue == "This observation scope has ended"
-        }
-      })
+    await escaped?.perform(
+      { staleOperationRan = true },
+      sourceLocation: staleLocation)
+
+    #expect(issues.count == 1)
+    #expect(issues.first?.message == "This observation scope has ended")
+    #expect(issues.first?.location == staleLocation)
+    #expect(!staleOperationRan)
+    #expect(service.activeObservationCount == 0)
   }
 
   @Test

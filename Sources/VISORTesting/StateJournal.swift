@@ -44,15 +44,18 @@ final class StateJournal: _StateMutationRecorder {
   private var currentActionOrdinal: UInt64?
   private var lastCompletedActionOrdinal: UInt64?
   private var activeSourceLocation: SourceLocation?
+  private let issueRecorder: ObservationTestIssueRecorder
   private var failureHandler:
     (@MainActor (any Error, SourceLocation) -> Void)?
 
   init(
     activeCommitLimit: Int = defaultActiveCommitLimit,
-    outsideWindowCapacity: Int = defaultOutsideWindowCapacity
+    outsideWindowCapacity: Int = defaultOutsideWindowCapacity,
+    issueRecorder: @escaping ObservationTestIssueRecorder
   ) {
     precondition(activeCommitLimit > 0)
     self.activeCommitLimit = activeCommitLimit
+    self.issueRecorder = issueRecorder
     outsideWindowRing = OutsideWindowMutationRing(
       capacity: outsideWindowCapacity)
   }
@@ -72,9 +75,9 @@ final class StateJournal: _StateMutationRecorder {
     sourceLocation: SourceLocation
   ) -> Bool {
     guard windowState == .outside else {
-      Issue.record(
+      issueRecorder(
         "A perform window is already active for this State",
-        sourceLocation: sourceLocation)
+        sourceLocation)
       return false
     }
 

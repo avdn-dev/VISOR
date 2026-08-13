@@ -112,7 +112,7 @@ struct RecorderBoundaryTests {
       try await _observeWithJournalPolicyForProof(
         first,
         logicalCommitLimit: 8,
-        infrastructureIssueRecorder: { message, _ in
+        issueRecorder: { message, _ in
           results.firstInfrastructureIssues.append(message)
         }
       ) { test in
@@ -126,7 +126,7 @@ struct RecorderBoundaryTests {
       try await _observeWithJournalPolicyForProof(
         second,
         logicalCommitLimit: 8,
-        infrastructureIssueRecorder: { message, _ in
+        issueRecorder: { message, _ in
           results.secondInfrastructureIssues.append(message)
         }
       ) { test in
@@ -162,14 +162,14 @@ struct RecorderBoundaryTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 8,
-      infrastructureIssueRecorder: { message, _ in
+      issueRecorder: { message, _ in
         firstInfrastructureIssues.append(message)
       }
     ) { firstTest in
       try await _observeWithJournalPolicyForProof(
         sut,
         logicalCommitLimit: 8,
-        infrastructureIssueRecorder: { message, _ in
+        issueRecorder: { message, _ in
           secondInfrastructureIssues.append(message)
         }
       ) { _ in

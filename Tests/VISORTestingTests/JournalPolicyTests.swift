@@ -12,7 +12,7 @@ struct JournalPolicyTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 4,
-      infrastructureIssueRecorder: { message, _ in
+      issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       }
     ) { test in
@@ -54,7 +54,7 @@ struct JournalPolicyTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 2,
-      infrastructureIssueRecorder: { message, sourceLocation in
+      issueRecorder: { message, sourceLocation in
         infrastructureIssues.append(message)
         issueLocation = sourceLocation
       }
@@ -91,7 +91,7 @@ struct JournalPolicyTests {
       sut,
       logicalCommitLimit: 8,
       outsideWindowCapacity: 3,
-      infrastructureIssueRecorder: { _, _ in }
+      issueRecorder: { _, _ in }
     ) { test in
       sut.state.count = 1
       sut.state.status = "second"

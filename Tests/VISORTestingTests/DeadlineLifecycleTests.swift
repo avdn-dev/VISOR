@@ -206,7 +206,7 @@ struct DeadlineLifecycleTests {
         sut,
         sourceLocation: observeLocation,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        infrastructureIssueRecorder: issues.record
+        issueRecorder: issues.record
       ) { _ in
         enteredBody = true
       }
@@ -247,7 +247,7 @@ struct DeadlineLifecycleTests {
         sut,
         beforePauseDrain: openingGate.visit,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        infrastructureIssueRecorder: issues.record
+        issueRecorder: issues.record
       ) { test in
         await test.perform({ actionRan = true }, sourceLocation: performLocation)
       }
@@ -288,7 +288,7 @@ struct DeadlineLifecycleTests {
         sut,
         beforePauseDrain: closingGate.visit,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        infrastructureIssueRecorder: issues.record
+        issueRecorder: issues.record
       ) { test in
         result = try await test.perform(
           { 42 },
@@ -333,7 +333,7 @@ struct DeadlineLifecycleTests {
         sut,
         sourceLocation: observeLocation,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        infrastructureIssueRecorder: issues.record
+        issueRecorder: issues.record
       ) { _ in
         await service.publish(10)
         await reactionGate.waitUntilStarted()
@@ -374,7 +374,7 @@ struct DeadlineLifecycleTests {
         sut,
         deadlinePolicy: testingDeadlinePolicy(sleeper: firstSleeper),
         _visorDidFinishTeardown: trueJoin.fire,
-        infrastructureIssueRecorder: firstIssues.record
+        issueRecorder: firstIssues.record
       ) { _ in
         firstBodyRan = true
         await service.publish(10)
@@ -399,7 +399,7 @@ struct DeadlineLifecycleTests {
       sut,
       deadlinePolicy: testingDeadlinePolicy(
         sleeper: TestingDeadlineSleeper()),
-      infrastructureIssueRecorder: rejectedIssues.record
+      issueRecorder: rejectedIssues.record
     ) { _ in
       rejectedBodyRan = true
     }
@@ -421,7 +421,7 @@ struct DeadlineLifecycleTests {
       sut,
       deadlinePolicy: testingDeadlinePolicy(
         sleeper: TestingDeadlineSleeper()),
-      infrastructureIssueRecorder: laterIssues.record
+      issueRecorder: laterIssues.record
     ) { test in
       laterBodyRan = true
       await test.perform {}

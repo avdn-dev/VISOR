@@ -20,7 +20,7 @@ public func observe<SUT: ViewModel>(
     beforePauseDrain: {},
     activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
     deadlinePolicy: .production,
-    infrastructureIssueRecorder: { message, sourceLocation in
+    issueRecorder: { message, sourceLocation in
       Issue.record(
         Comment(rawValue: message),
         sourceLocation: sourceLocation)
@@ -41,7 +41,7 @@ package func _observeForProof<SUT: ViewModel>(
     beforePauseDrain: beforePauseDrain,
     activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
     deadlinePolicy: .production,
-    infrastructureIssueRecorder: { message, sourceLocation in
+    issueRecorder: { message, sourceLocation in
       Issue.record(
         Comment(rawValue: message),
         sourceLocation: sourceLocation)
@@ -55,8 +55,7 @@ package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
   sourceLocation: SourceLocation = #_sourceLocation,
   logicalCommitLimit: Int,
   outsideWindowCapacity: Int = StateJournal.defaultOutsideWindowCapacity,
-  infrastructureIssueRecorder:
-    @escaping @MainActor (String, SourceLocation) -> Void,
+  issueRecorder: @escaping ObservationTestIssueRecorder,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
 ) async throws {
   try await observeImplementation(
@@ -66,7 +65,7 @@ package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
     activeJournalCommitLimit: logicalCommitLimit,
     outsideWindowCapacity: outsideWindowCapacity,
     deadlinePolicy: .production,
-    infrastructureIssueRecorder: infrastructureIssueRecorder,
+    issueRecorder: issueRecorder,
     body)
 }
 
@@ -78,8 +77,7 @@ package func _observeWithDeadlinePolicyForProof<SUT: ViewModel>(
   deadlinePolicy: _ObservationDeadlinePolicy,
   _visorDidFinishTeardown:
     @escaping @MainActor @Sendable () -> Void = {},
-  infrastructureIssueRecorder:
-    @escaping @MainActor (String, SourceLocation) -> Void,
+  issueRecorder: @escaping ObservationTestIssueRecorder,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
 ) async throws {
   try await observeImplementation(
@@ -89,7 +87,7 @@ package func _observeWithDeadlinePolicyForProof<SUT: ViewModel>(
     activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
     deadlinePolicy: deadlinePolicy,
     didFinishTeardown: _visorDidFinishTeardown,
-    infrastructureIssueRecorder: infrastructureIssueRecorder,
+    issueRecorder: issueRecorder,
     body)
 }
 
@@ -103,13 +101,12 @@ private func observeImplementation<SUT: ViewModel>(
   deadlinePolicy: _ObservationDeadlinePolicy,
   didFinishTeardown:
     @escaping @MainActor @Sendable () -> Void = {},
-  infrastructureIssueRecorder:
-    @escaping @MainActor (String, SourceLocation) -> Void,
+  issueRecorder: @escaping ObservationTestIssueRecorder,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
 ) async throws {
   let state = sut.state
   guard state._visorMutationRecorder == nil else {
-    infrastructureIssueRecorder(
+    issueRecorder(
       "This State already has an active observation scope",
       sourceLocation)
     return
@@ -117,7 +114,8 @@ private func observeImplementation<SUT: ViewModel>(
 
   let journal = StateJournal(
     activeCommitLimit: activeJournalCommitLimit,
-    outsideWindowCapacity: outsideWindowCapacity)
+    outsideWindowCapacity: outsideWindowCapacity,
+    issueRecorder: issueRecorder)
   // The dormant recorder reserves this State identity before startup's first
   // suspension. It does not capture values until a perform window opens.
   state._visorMutationRecorder = journal
@@ -130,7 +128,7 @@ private func observeImplementation<SUT: ViewModel>(
     state: state,
     journal: journal,
     session: session,
-    infrastructureIssueRecorder: infrastructureIssueRecorder)
+    issueRecorder: issueRecorder)
   journal.installFailureHandler { [weak test] error, sourceLocation in
     test?.journalFailed(error, sourceLocation: sourceLocation)
   }
@@ -156,7 +154,7 @@ private func observeImplementation<SUT: ViewModel>(
     test.end()
     throw CancellationError()
   } catch {
-    infrastructureIssueRecorder(
+    issueRecorder(
       "VISOR failed while starting observation: \(String(describing: error))",
       sourceLocation)
     test.end()
@@ -164,7 +162,7 @@ private func observeImplementation<SUT: ViewModel>(
   }
 
   guard sut.state === state else {
-    infrastructureIssueRecorder(
+    issueRecorder(
       "VISOR failed while starting observation: stateIdentityChanged",
       sourceLocation)
     test.end()

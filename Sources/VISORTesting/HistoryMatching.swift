@@ -23,7 +23,7 @@ extension ObservationTest {
     ) else { return }
 
     guard !containsAdjacentDuplicate(in: expected) else {
-      Issue.record(
+      recordIssue(
         "hasExactChanges cannot contain adjacent duplicate values for '\(field.name)'",
         sourceLocation: sourceLocation)
       return
@@ -40,9 +40,9 @@ extension ObservationTest {
     }
 
     guard actual == expected else {
-      Issue.record(
-        Comment(rawValue: journal.addingOutsideWindowDiagnosticContext(
-          to: "Expected exact changes \(String(describing: expected)) for '\(field.name)', got \(String(describing: actual))")),
+      recordIssue(
+        journal.addingOutsideWindowDiagnosticContext(
+          to: "Expected exact changes \(String(describing: expected)) for '\(field.name)', got \(String(describing: actual))"),
         sourceLocation: sourceLocation)
       return
     }
@@ -69,18 +69,18 @@ extension ObservationTest {
     ) else { return }
 
     guard predicate(history.baseline) else {
-      Issue.record(
-        Comment(rawValue: journal.addingOutsideWindowDiagnosticContext(
-          to: "The baseline for '\(field.name)' did not always satisfy the predicate")),
+      recordIssue(
+        journal.addingOutsideWindowDiagnosticContext(
+          to: "The baseline for '\(field.name)' did not always satisfy the predicate"),
         sourceLocation: sourceLocation)
       return
     }
 
     for value in history.commits {
       guard predicate(value) else {
-        Issue.record(
-          Comment(rawValue: journal.addingOutsideWindowDiagnosticContext(
-            to: "A committed value for '\(field.name)' did not always satisfy the predicate")),
+        recordIssue(
+          journal.addingOutsideWindowDiagnosticContext(
+            to: "A committed value for '\(field.name)' did not always satisfy the predicate"),
           sourceLocation: sourceLocation)
         return
       }
@@ -93,7 +93,7 @@ extension ObservationTest {
     sourceLocation: SourceLocation
   ) -> (baseline: Value, commits: [Value])? {
     guard let erasedBaseline = journal.baseline(for: field.identity) else {
-      Issue.record(
+      recordIssue(
         "VISOR could not recover the typed baseline for '\(field.name)'",
         sourceLocation: sourceLocation)
       return nil
@@ -105,14 +105,14 @@ extension ObservationTest {
       !isOuterReference(erasedBaseline),
       !fieldEntries.contains(where: { isOuterReference($0.newValue) })
     else {
-      Issue.record(
+      recordIssue(
         "Strict State history does not support an outer reference value for field '\(field.name)'",
         sourceLocation: sourceLocation)
       return nil
     }
 
     guard let baseline = erasedBaseline as? Value else {
-      Issue.record(
+      recordIssue(
         "VISOR could not recover the typed baseline for '\(field.name)'",
         sourceLocation: sourceLocation)
       return nil
@@ -123,7 +123,7 @@ extension ObservationTest {
 
     for entry in fieldEntries {
       guard let value = entry.newValue as? Value else {
-        Issue.record(
+        recordIssue(
           "VISOR could not recover a typed commit for '\(field.name)'",
           sourceLocation: sourceLocation)
         return nil
