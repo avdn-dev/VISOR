@@ -5,8 +5,13 @@ import PackageDescription
 
 let package = Package(
   name: "VISOR",
-  platforms: [.macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17), .visionOS(.v2)],
+  platforms: [
+    .macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17), .visionOS(.v2),
+  ],
   products: [
+    .library(
+      name: "VISORObservation",
+      targets: ["VISORObservation"]),
     .library(
       name: "VISOR",
       targets: ["VISOR"]),
@@ -17,6 +22,8 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
   ],
   targets: [
+    .target(name: "VISORObservation"),
+
     .macro(
       name: "VISORMacros",
       dependencies: [
@@ -39,10 +46,14 @@ let package = Package(
       swiftSettings: [.defaultIsolation(MainActor.self)]),
 
     .testTarget(
+      name: "VISORObservationTests",
+      dependencies: ["VISORObservation"]),
+
+    .testTarget(
       name: "VISORMacroTests",
       dependencies: [
         "VISORMacros",
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
       ]),
-    
+
   ])
