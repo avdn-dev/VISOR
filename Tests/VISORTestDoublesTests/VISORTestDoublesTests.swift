@@ -92,13 +92,4 @@ struct VISORTestDoublesTests {
 
     #expect(copyCounter.value == 0)
   }
-
-  @Test
-  func `StubSequence preserves order`() {
-    var sequence = StubSequence("first", "second")
-
-    #expect(sequence.next() == "first")
-    #expect(sequence.next() == "second")
-    #expect(sequence.isEmpty)
-  }
 }

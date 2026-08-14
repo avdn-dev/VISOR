@@ -403,6 +403,13 @@ Add `import VISORTestDoubles` to every declaration and use site that names one
 of these symbols. Do not import both modules expecting the old VISOR-qualified
 declarations; v11 contains only the dedicated product's declarations.
 
+Do not enable MainActor-by-default solely for generated doubles. The macro does
+not impose a global actor: explicitly mark UI-bound protocols `@MainActor`, and
+use `@concurrent` only for requirements that deliberately leave the caller's
+actor. Swift 6.2 targets using approachable concurrency can enable
+`NonisolatedNonsendingByDefault` so ordinary async requirements remain on the
+caller's actor.
+
 ## 10. Type Loadable failures
 
 V10 stored display copy directly in `Loadable` and required only the loaded

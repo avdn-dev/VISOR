@@ -24,6 +24,13 @@ focused tests also pass in both configurations, covering qualified
 ordinary-stub defaults, concurrent Sendable-spy recording and `StubSequence`
 ordering.
 
+The root runtime test target is nonisolated by default and enables
+`NonisolatedNonsendingByDefault`, so ordinary async doubles remain on their
+caller's actor. Requirements that must leave that actor spell `@concurrent`
+explicitly. This fixture's dedicated MainActor-by-default target proves that
+ordinary async generated peers also retain an implicitly isolated protocol's
+execution domain across a module boundary.
+
 Test-double declarations live only in `VISORTestDoubles`. There is no umbrella
 or re-export between products, so production modules do not acquire testing
 support through `VISOR` and test targets import the dedicated product directly.

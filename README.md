@@ -22,7 +22,11 @@ VISOR is aimed at applications with repeated feature modules, service-backed sta
 - Swift 6.2+
 - iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ / visionOS 2+
 
-Consuming targets do not need `MainActorByDefault`. Each `@ViewModel` declaration is explicitly `@MainActor`; services retain their natural isolation.
+Consuming targets do not need `MainActorByDefault`. VISOR's library targets are
+nonisolated by default, each `@ViewModel` declaration is explicitly
+`@MainActor`, and services retain their natural isolation. Generated test
+doubles preserve the declaring protocol and consumer target's isolation rather
+than imposing a global actor.
 
 ## Products
 

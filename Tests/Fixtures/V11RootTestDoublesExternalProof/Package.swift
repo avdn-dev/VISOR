@@ -22,6 +22,16 @@ let package = Package(
       name: "PackageTestDoubleConsumerTests",
       dependencies: ["PackageTestDoubleModels"]),
     .target(
+      name: "MainActorTestDoubleModels",
+      dependencies: [visorTestDoubles],
+      packageAccess: false,
+      swiftSettings: [.defaultIsolation(MainActor.self)]),
+    .testTarget(
+      name: "MainActorTestDoubleBoundaryTests",
+      dependencies: ["MainActorTestDoubleModels"],
+      packageAccess: false,
+      swiftSettings: [.defaultIsolation(MainActor.self)]),
+    .target(
       name: "RootTestDoubleModels",
       dependencies: [visorTestDoubles],
       packageAccess: false),

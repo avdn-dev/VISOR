@@ -196,6 +196,15 @@ Generation fails with an error and emits no peer when the macro cannot produce a
 
 Inherited protocols are unsupported because a peer macro cannot inspect their requirements. `AnyObject` is allowed because the generated peer is a class. `Sendable` inheritance is allowed only with the `.sendable` trait described below.
 
+### Isolation
+
+`VISORTestDoubles` does not impose MainActor-by-default. Generated peers compile
+under the declaring target's concurrency settings and retain the protocol's
+explicit isolation. Mark a UI-bound protocol `@MainActor`. With Swift 6.2's
+`NonisolatedNonsendingByDefault`, an ordinary async requirement stays on its
+caller's actor; add `@concurrent` only when the requirement must always use the
+concurrent executor.
+
 ### Sendable doubles
 
 Opt into synchronised, checked `Sendable` generation when a double crosses isolation domains:

@@ -54,8 +54,7 @@ let package = Package(
 
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR", "VISORObservation", "VISORTestDoubles"],
-      swiftSettings: [.defaultIsolation(MainActor.self)]),
+      dependencies: ["VISOR", "VISORObservation"]),
 
     .testTarget(
       name: "VISORObservationTests",
@@ -67,7 +66,8 @@ let package = Package(
 
     .testTarget(
       name: "VISORTestDoublesTests",
-      dependencies: ["VISORTestDoubles"]),
+      dependencies: ["VISORTestDoubles"],
+      swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]),
 
     .testTarget(
       name: "VISORMacroTests",
