@@ -56,4 +56,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Verify inaccessible APIs remain inaccessible
-        run: sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
+        run: |
+          sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
+          sh Tests/Fixtures/V11RootTestingExternalProof/verify-selector-contracts.sh

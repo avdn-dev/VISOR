@@ -1,13 +1,12 @@
-import ConsumerModelsNonisolated
 import Observation
-import Testing
+import RootTestingModelsNonisolated
 import VISOR
 import VISORTesting
 
 @MainActor
 @Observable
 @ViewModel
-final class SelectorProbeViewModel {
+final class RootSelectorProbeViewModel {
   struct Details: Equatable {
     var count = 0
   }
@@ -26,7 +25,7 @@ final class SelectorProbeViewModel {
 
 @MainActor
 func verifySelectorProbeBaseline(
-  _ test: ObservationTest<SelectorProbeViewModel>
+  _ test: ObservationTest<RootSelectorProbeViewModel>
 ) {
   test.expect(\.details, hasExactChanges: [])
 }
@@ -34,7 +33,7 @@ func verifySelectorProbeBaseline(
 #if VISOR_PROBE_INTERNAL_SELECTOR
 @MainActor
 func probeInternalSelector(
-  _ test: ObservationTest<CompileProofViewModel>
+  _ test: ObservationTest<NonisolatedRootTestingViewModel>
 ) {
   test.expect(\.internalRevision, hasExactChanges: [1])
 }
@@ -43,7 +42,7 @@ func probeInternalSelector(
 #if VISOR_PROBE_FILEPRIVATE_SELECTOR
 @MainActor
 func probeFileprivateSelector(
-  _ test: ObservationTest<CompileProofViewModel>
+  _ test: ObservationTest<NonisolatedRootTestingViewModel>
 ) {
   test.expect(\.fileRevision, hasExactChanges: [1])
 }
@@ -52,7 +51,7 @@ func probeFileprivateSelector(
 #if VISOR_PROBE_PRIVATE_SELECTOR
 @MainActor
 func probePrivateSelector(
-  _ test: ObservationTest<SelectorProbeViewModel>
+  _ test: ObservationTest<RootSelectorProbeViewModel>
 ) {
   test.expect(\.hidden, hasExactChanges: [1])
 }
@@ -61,7 +60,7 @@ func probePrivateSelector(
 #if VISOR_PROBE_COMPUTED_SELECTOR
 @MainActor
 func probeComputedSelector(
-  _ test: ObservationTest<SelectorProbeViewModel>
+  _ test: ObservationTest<RootSelectorProbeViewModel>
 ) {
   test.expect(\.doubledCount, hasExactChanges: [2])
 }
@@ -70,7 +69,7 @@ func probeComputedSelector(
 #if VISOR_PROBE_NESTED_SELECTOR
 @MainActor
 func probeNestedSelector(
-  _ test: ObservationTest<SelectorProbeViewModel>
+  _ test: ObservationTest<RootSelectorProbeViewModel>
 ) {
   test.expect(\.details.count, hasExactChanges: [1])
 }
@@ -79,7 +78,7 @@ func probeNestedSelector(
 #if VISOR_PROBE_PROJECTING_OVERLOAD
 @MainActor
 func probeProjectingOverload(
-  _ test: ObservationTest<SelectorProbeViewModel>
+  _ test: ObservationTest<RootSelectorProbeViewModel>
 ) {
   test.expect(
     \.details,

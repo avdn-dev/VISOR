@@ -3,14 +3,14 @@
 set -eu
 
 proof_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-module_cache=${TMPDIR:-/tmp}/visor-v11-selector-module-cache
+module_cache=${TMPDIR:-/tmp}/visor-v11-root-selector-module-cache
 
 export CLANG_MODULE_CACHE_PATH=$module_cache
 export SWIFTPM_MODULECACHE_OVERRIDE=$module_cache
 
 swift build \
   --package-path "$proof_directory" \
-  --target StageBSelectorProbe
+  --target RootTestingSelectorProbe
 
 verify_rejected() {
   flag=$1
@@ -20,7 +20,7 @@ verify_rejected() {
   set +e
   output=$(swift build \
     --package-path "$proof_directory" \
-    --target StageBSelectorProbe \
+    --target RootTestingSelectorProbe \
     -Xswiftc "-D$flag" 2>&1)
   status=$?
   set -e
@@ -65,4 +65,4 @@ verify_rejected \
   "a projecting history overload" \
   "extra argument 'hasExactChanges' in call"
 
-echo "Stage B selectors remain flat and respect generated field visibility."
+echo "Root selectors remain flat and respect generated field visibility."

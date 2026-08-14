@@ -34,6 +34,14 @@ let package = Package(
       dependencies: ["RootTestingSupport", visor],
       packageAccess: false,
       swiftSettings: [.defaultIsolation(MainActor.self)]),
+    .target(
+      name: "RootTestingSelectorProbe",
+      dependencies: [
+        "RootTestingModelsNonisolated",
+        visor,
+        visorTesting,
+      ],
+      packageAccess: false),
     .testTarget(
       name: "RootTestingNonisolatedTests",
       dependencies: [

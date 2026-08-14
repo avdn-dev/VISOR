@@ -12,6 +12,8 @@ public final class NonisolatedRootTestingViewModel {
 
     public private(set) var reactedValue = -1
     public private(set) var count = 0
+    private(set) var internalRevision = 0
+    fileprivate private(set) var fileRevision = 0
 
     public init() {}
 

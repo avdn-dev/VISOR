@@ -28,9 +28,13 @@ it cannot guarantee that the workaround exists in every configuration. This is
 an implementation-only toolchain workaround, not public API, teardown logic, a
 lifetime guarantee or a v11 semantic requirement.
 
-This fixture does not repeat every root lifecycle/deadline test or the complete
-Stage F/G prototype matrices. It also does not exercise the root production
-SwiftUI owner itself. Mounted root tests separately cover the structured
+The `RootTestingSelectorProbe` target also verifies that the real generated
+selector API remains flat: inaccessible stored fields, computed properties,
+nested key paths and the removed projecting overload must all fail to compile.
+
+This fixture does not repeat every root lifecycle/deadline test. It also does
+not exercise the root production SwiftUI owner itself. Mounted root tests
+separately cover the structured
 `@LazyViewModel(VM.self)` path. A deterministic root
 macOS host additionally injects
 active → background → active → inactive → active for `.pauseWhenInactive`,
@@ -46,4 +50,5 @@ Run it from the repository root:
 ```sh
 swift test --package-path Tests/Fixtures/V11RootTestingExternalProof
 swift test -c release --package-path Tests/Fixtures/V11RootTestingExternalProof
+sh Tests/Fixtures/V11RootTestingExternalProof/verify-selector-contracts.sh
 ```

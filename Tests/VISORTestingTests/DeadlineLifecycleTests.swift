@@ -2,6 +2,7 @@ import Testing
 import VISORTesting
 
 private enum DeadlineLifecycleError: Error {
+  case action
   case body
 }
 
@@ -230,6 +231,39 @@ struct DeadlineLifecycleTests {
 
   @Test
   @MainActor
+  func `A suspended user action receives no VISOR deadline`() async throws {
+    let sut = TestingViewModel()
+    let sleeper = TestingDeadlineSleeper()
+    let actionGate = TestingGate()
+    let issues = DeadlineIssueLog()
+    var actionCompleted = false
+
+    let observation = Task { @MainActor in
+      try await _observeWithDeadlinePolicyForProof(
+        sut,
+        deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
+        issueRecorder: issues.record
+      ) { test in
+        await test.perform {
+          await actionGate.suspend()
+          actionCompleted = true
+        }
+        test.expect(\.count, hasExactChanges: [])
+      }
+    }
+
+    await actionGate.waitUntilStarted()
+    #expect(!actionCompleted)
+    #expect(issues.entries.isEmpty)
+
+    actionGate.open()
+    try await observation.value
+    #expect(actionCompleted)
+    #expect(issues.entries.isEmpty)
+  }
+
+  @Test
+  @MainActor
   func `Opening reports at perform and suppresses the action`() async throws {
     let sut = TestingViewModel()
     let sleeper = TestingDeadlineSleeper()
@@ -306,6 +340,43 @@ struct DeadlineLifecycleTests {
     #expect(result == 42)
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.location == performLocation)
+    #expect(issues.entries.first?.message.hasPrefix(
+      "VISOR failed while closing an action window:") == true)
+
+    closingGate.open()
+  }
+
+  @Test
+  @MainActor
+  func `Closing preserves the exact action error`() async throws {
+    let sut = TestingViewModel()
+    let sleeper = TestingDeadlineSleeper()
+    let closingGate = NthPauseGate(target: 2)
+    let issues = DeadlineIssueLog()
+
+    let observation = Task { @MainActor in
+      try await _observeWithDeadlinePolicyForProof(
+        sut,
+        beforePauseDrain: closingGate.visit,
+        deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
+        issueRecorder: issues.record
+      ) { test in
+        await #expect(throws: DeadlineLifecycleError.action) {
+          try await test.perform {
+            throw DeadlineLifecycleError.action
+          }
+        }
+      }
+    }
+
+    await closingGate.waitUntilStarted()
+    let closingWatchdog = await sleeper.waitUntilArmed(for: .seconds(3))
+    sleeper.fire(closingWatchdog)
+    let teardownWatchdog = await sleeper.waitUntilArmed(for: .seconds(5))
+    sleeper.fire(teardownWatchdog)
+    try await observation.value
+
+    #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.message.hasPrefix(
       "VISOR failed while closing an action window:") == true)
 

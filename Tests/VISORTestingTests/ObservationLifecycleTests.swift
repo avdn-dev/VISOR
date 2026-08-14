@@ -2,6 +2,7 @@ import Testing
 import VISORTesting
 
 private enum LifecycleError: Error {
+  case action
   case body
 }
 
@@ -163,6 +164,46 @@ struct ObservationLifecycleTests {
 
   @Test
   @MainActor
+  func `Concurrent perform is rejected without corrupting the active window`() async throws {
+    let service = TestingService()
+    let sut = TestingViewModel(service: service)
+    let gate = TestingGate()
+    var issues: [String] = []
+    var rejectedOperationRan = false
+
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, _ in
+        issues.append(message)
+      }
+    ) { test in
+      let first = Task { @MainActor in
+        await test.perform {
+          await gate.suspend()
+          await service.publish(1)
+        }
+      }
+
+      await gate.waitUntilStarted()
+      await test.perform {
+        rejectedOperationRan = true
+      }
+
+      #expect(issues == [
+        "A perform window is already active for this State"
+      ])
+      gate.open()
+      await first.value
+      test.expect(\.sourceValue, hasExactChanges: [1])
+    }
+
+    #expect(!rejectedOperationRan)
+    #expect(service.activeObservationCount == 0)
+  }
+
+  @Test
+  @MainActor
   func `Escaped handle releases its graph and diagnoses stale use`() async throws {
     let service = TestingService()
     var sut: TestingViewModel? = TestingViewModel(service: service)
@@ -199,6 +240,68 @@ struct ObservationLifecycleTests {
     #expect(issues.first?.message == "This observation scope has ended")
     #expect(issues.first?.location == staleLocation)
     #expect(!staleOperationRan)
+    #expect(service.activeObservationCount == 0)
+  }
+
+  @Test
+  @MainActor
+  func `Action error remains primary when its closing fence fails`() async throws {
+    let service = TestingService()
+    let sut = TestingViewModel(service: service)
+    var issues: [String] = []
+    var laterOperationRan = false
+
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, _ in
+        issues.append(message)
+      }
+    ) { test in
+      await #expect(throws: LifecycleError.action) {
+        try await test.perform {
+          service.terminate()
+          throw LifecycleError.action
+        }
+      }
+
+      await test.perform {
+        laterOperationRan = true
+      }
+    }
+
+    #expect(issues == [
+      "VISOR failed while closing an action window: unexpectedTermination"
+    ])
+    #expect(!laterOperationRan)
+    #expect(service.activeObservationCount == 0)
+  }
+
+  @Test
+  @MainActor
+  func `Produced result survives when its closing fence fails`() async throws {
+    let service = TestingService()
+    let sut = TestingViewModel(service: service)
+    var issues: [String] = []
+    var result: Int?
+
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      logicalCommitLimit: 8_192,
+      issueRecorder: { message, _ in
+        issues.append(message)
+      }
+    ) { test in
+      result = try await test.perform {
+        service.terminate()
+        return 42
+      }
+    }
+
+    #expect(result == 42)
+    #expect(issues == [
+      "VISOR failed while closing an action window: unexpectedTermination"
+    ])
     #expect(service.activeObservationCount == 0)
   }
 
