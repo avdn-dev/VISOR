@@ -140,6 +140,35 @@ The required changes are:
 
 Consumer targets no longer need MainActor-by-default. Public ViewModels require public nested State and a public stored `let state` so the generated conformance remains visible.
 
+Existing hand-written `ViewModel` conformances must migrate as well. The v11
+protocol is MainActor-isolated and requires routed State conformance, stable
+State identity, structured observation ownership, and a generated recipe hook.
+The supported migration is to add `@Observable` and `@ViewModel`, then adopt the
+State shape above. Do not copy the public underscored requirements into
+application code; they are public so macro expansions in downstream modules can
+name VISOR's generated-code ABI.
+
+### Supported State declarations
+
+Every field that participates in Observation, selector routing, or test history
+must be one ordinary stored `var` with a single identifier. The declaration may
+have `@Bound`, but it cannot have another property wrapper or attribute,
+`willSet`/`didSet`, a writable computed accessor, `nonisolated`, `lazy`, `weak`,
+or `unowned`. Names beginning with `_visor` are reserved. A public field must
+use `public private(set)`.
+
+The following declarations remain outside the routed field set:
+
+- stored `let` constants;
+- `static` and `class` properties;
+- get-only computed properties; and
+- declarations explicitly marked `@ObservationIgnored`.
+
+They receive no generated selector and do not appear in `VISORTesting` history.
+Declare routed fields separately rather than combining several bindings in one
+`var` declaration. `@ObservationIgnored` cannot be combined with
+`nonisolated` or `nonisolated(unsafe)` on a mutable State field.
+
 VISOR synthesises inert `deinit {}` declarations where needed to avoid the Swift 6.2.4 release-optimiser crash affecting explicitly MainActor macro-expanded classes. Existing unconditional deinitialisers are preserved. Move conditional compilation inside one unconditional deinitialiser body; a conditionally declared `deinit` is rejected because it cannot guarantee the workaround.
 
 ## 4. Use only the four source declarations
@@ -207,6 +236,87 @@ The following APIs are removed:
 Do not translate an event stream into `ObservationSource` merely to satisfy the API. A source represents stable latest State and may coalesce obsolete snapshots. Lossless events require buffering and event-specific ownership.
 
 Elapsed-time work does not receive an inferred `VISORTesting.perform` fence. Test it with an injected clock and await the domain operation that defines completion.
+
+### Own scheduling explicitly
+
+When the feature genuinely needs debounce semantics, own one serial worker and
+inject its clock. The newest pending submission wins, an operation that has
+already started is allowed to finish, and cancellation is followed by a join at
+the feature's lifetime boundary:
+
+```swift
+actor SearchDebouncer<C: Clock> where C.Duration == Duration {
+  private let clock: C
+  private let delay: Duration
+  private var pending: (
+    deadline: C.Instant,
+    query: String,
+    load: @Sendable (String) async -> Void
+  )?
+  private var worker: Task<Void, Never>?
+  private var isStopped = false
+
+  init(clock: C, delay: Duration) {
+    self.clock = clock
+    self.delay = delay
+  }
+
+  func submit(
+    _ query: String,
+    load: @escaping @Sendable (String) async -> Void
+  ) {
+    guard !isStopped else { return }
+    pending = (clock.now.advanced(by: delay), query, load)
+    guard worker == nil else { return }
+
+    worker = Task { [weak self] in
+      await self?.run()
+    }
+  }
+
+  func stop() async {
+    isStopped = true
+    pending = nil
+    let worker = worker
+    worker?.cancel()
+    await worker?.value
+    self.worker = nil
+  }
+
+  private func run() async {
+    while !Task.isCancelled {
+      guard let submission = pending else {
+        worker = nil
+        return
+      }
+      pending = nil
+
+      do {
+        try await clock.sleep(
+          until: submission.deadline,
+          tolerance: nil)
+      } catch is CancellationError {
+        break
+      } catch {
+        assertionFailure("Clock sleep failed: \(error)")
+        break
+      }
+
+      guard pending == nil else { continue }
+      await submission.load(submission.query)
+    }
+    worker = nil
+  }
+}
+```
+
+Inject `ContinuousClock` in production and a controllable test clock in tests.
+Call `stop()` from the owning lifetime after preventing new submissions; do not
+invoke it recursively from `load`. A true cancel-previous policy may instead
+cancel the active operation, but its implementation must state that contract
+and require cooperative cancellation. Polling uses the same ownership rule: the
+producer owns the loop and clock, publishes durable snapshots through its
+channel, and cancels and joins the loop when its lifetime ends.
 
 ## 7. Keep @LazyViewModel spelling, adopt its lifetime
 
@@ -281,6 +391,76 @@ nonisolated protocol AnalyticsService: Sendable {
 ```
 
 Import `VISORTesting` as well only when that target also uses the observation test DSL. The products intentionally do not re-export each other.
+
+All test-double declarations moved out of `VISOR`:
+
+- `GenerateStub` and `GenerateSpy`;
+- `DefaultValue` and `DefaultReturn`;
+- `TestDoubleTrait`; and
+- `StubSequence`.
+
+Add `import VISORTestDoubles` to every declaration and use site that names one
+of these symbols. Do not import both modules expecting the old VISOR-qualified
+declarations; v11 contains only the dedicated product's declarations.
+
+## 10. Audit navigation ownership
+
+V11 makes the mounted navigation hierarchy authoritative. A root `Router`
+starts inactive. Calls made on the root to `push`, present, dismiss, or
+`popToRoot` target the currently mounted active Router; if no
+`NavigationContainer` is active, the action is rejected. Calls made directly on
+a child Router remain local to that child.
+
+For an application with one navigation stack, omit the `Tab` associated type
+and bind the root Router directly:
+
+```swift
+enum AppScene: NavigationScene {
+  typealias Push = AppPush
+  typealias Sheet = AppSheet
+  typealias FullScreen = AppFullScreen
+  // Tab defaults to NoTabDestination.
+}
+
+@State private var router = Router<AppScene>()
+
+NavigationContainer(
+  router: router,
+  pushContent: { destination in pushView(for: destination) },
+  sheetContent: { destination in sheetView(for: destination) },
+  fullScreenContent: { destination in fullScreenView(for: destination) }
+) {
+  RootView()
+}
+```
+
+Tab-based applications keep using `NavigationContainer(parentRouter:tab:...)`.
+Audit code and tests that issue root navigation actions before a container is
+mounted; those actions no longer mutate an inactive root Router. Root actions
+issued while a tab or modal is active now route to that visible child rather
+than always mutating root state.
+
+Deep-link configuration is shared by the whole Router tree. Configure it once
+with `configureDeepLinks(scheme:parsers:)`; existing and future child Routers
+read the same latest handler. Code that expected a copied per-child handler
+should remove that assumption.
+
+## 11. Verify the cutover
+
+Before changing the resolved package version, migrate every target in the same
+SwiftPM graph. Then verify all of the following:
+
+- production targets import only the products they directly use;
+- every ViewModel has explicit `@MainActor`, `@Observable`, `@ViewModel`, plain
+  final State, and stable stored `let state` declarations;
+- every producer publishes a stable latest-State snapshot and keeps its channel
+  private;
+- no removed positional marker, observation helper, `startObserving`, or old
+  `VISOR` test-double import remains;
+- root navigation actions are exercised only with the intended container
+  mounted; and
+- debug and release builds and tests pass. Release validation is required for
+  the Swift 6.2.4 macro-expansion workaround.
 
 ## Removed without shims
 
