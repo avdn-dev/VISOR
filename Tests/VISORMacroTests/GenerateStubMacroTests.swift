@@ -1288,8 +1288,10 @@ func `Handle typealias in attributed use site`() {
           }
           set {
             withMutation(keyPath: \\.isEnabled) {
-              _testDoubleStorage.withValue {
-                  $0.isEnabled = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.isEnabled
+                  }) { state in
+                state.isEnabled = newValue
               }
             }
           }
@@ -1303,8 +1305,10 @@ func `Handle typealias in attributed use site`() {
           }
           set {
             withMutation(keyPath: \\.loadResult) {
-              _testDoubleStorage.withValue {
-                  $0.loadResult = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.loadResult
+                  }) { state in
+                state.loadResult = newValue
               }
             }
           }
@@ -1386,8 +1390,10 @@ func `Handle typealias in attributed use site`() {
           }
           set {
             withMutation(keyPath: \\.convertTextReturnValue) {
-              _testDoubleStorage.withValue {
-                  $0.convertTextReturnValue = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.convertTextReturnValue
+                  }) { state in
+                state.convertTextReturnValue = newValue
               }
             }
           }
@@ -1401,8 +1407,10 @@ func `Handle typealias in attributed use site`() {
           }
           set {
             withMutation(keyPath: \\.convertNumberReturnValue) {
-              _testDoubleStorage.withValue {
-                  $0.convertNumberReturnValue = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.convertNumberReturnValue
+                  }) { state in
+                state.convertNumberReturnValue = newValue
               }
             }
           }

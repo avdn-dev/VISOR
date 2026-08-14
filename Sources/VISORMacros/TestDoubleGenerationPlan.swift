@@ -72,6 +72,12 @@ struct TestDoubleMethodGenerationPlan {
     return propertyNames
   }
 
+  var recordingRetirementPropertyName: String? {
+    receivedProperties.first { property in
+      property.name == names.receivedArgument || property.name == names.receivedArguments
+    }?.name
+  }
+
   private var receivedProperties: [TestDoubleStoredPropertyPlan] {
     storedProperties.filter { property in
       property.name == names.receivedArgument

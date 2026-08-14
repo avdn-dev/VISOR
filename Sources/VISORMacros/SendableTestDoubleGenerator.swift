@@ -53,15 +53,28 @@ struct SendableTestDoubleRenderer {
     lines.append("    }")
     lines.append("    set {")
     if property.isObservationIgnored {
-      lines.append("      \(storageName).withValue { $0.\(property.name) = newValue }")
+      lines.append(contentsOf: storageMutationMembers(property, storageName: storageName, indent: "      "))
     } else {
       lines.append("      withMutation(keyPath: \\.\(property.name)) {")
-      lines.append("        \(storageName).withValue { $0.\(property.name) = newValue }")
+      lines.append(contentsOf: storageMutationMembers(property, storageName: storageName, indent: "        "))
       lines.append("      }")
     }
     lines.append("    }")
     lines.append("  }")
     return lines
+  }
+
+  private func storageMutationMembers(
+    _ property: TestDoubleStoredPropertyPlan,
+    storageName: String,
+    indent: String)
+    -> [String]
+  {
+    [
+      "\(indent)\(storageName).withMutation(retiring: { $0.\(property.name) }) { state in",
+      "\(indent)  state.\(property.name) = newValue",
+      "\(indent)}",
+    ]
   }
 
   private func stubMembers(_ plan: TestDoubleGenerationPlan) -> [String] {
@@ -147,6 +160,7 @@ struct SendableTestDoubleRenderer {
 
     return wrapAtomicRecording(
       mutationNames: mutationNames,
+      retirementName: plan.recordingRetirementPropertyName,
       snapshotNames: snapshotNames,
       storageBody: storageBody,
       storageName: storageName)
@@ -154,6 +168,7 @@ struct SendableTestDoubleRenderer {
 
   private func wrapAtomicRecording(
     mutationNames: [String],
+    retirementName: String?,
     snapshotNames: [String],
     storageBody: [String],
     storageName: String)
@@ -175,7 +190,13 @@ struct SendableTestDoubleRenderer {
       lines.append("\(indent)\(assignment)withMutation(keyPath: \\.\(name)) {")
       indent += "  "
     }
-    lines.append("\(indent)\(storageName).withValue { state in")
+    let retirementExpression = if let retirementName {
+      "{ $0.\(retirementName) }"
+    } else {
+      "{ _ in () }"
+    }
+    lines.append(
+      "\(indent)\(storageName).withMutation(retiring: \(retirementExpression)) { state in")
     indent += "  "
     lines.append(contentsOf: storageBody.map { "\(indent)\($0)" })
     if snapshotNames.count == 1 {

@@ -1667,8 +1667,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.recordCallCount) {
-              _testDoubleStorage.withValue {
-                  $0.recordCallCount = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordCallCount
+                  }) { state in
+                state.recordCallCount = newValue
               }
             }
           }
@@ -1682,8 +1684,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.recordReceivedValue) {
-              _testDoubleStorage.withValue {
-                  $0.recordReceivedValue = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordReceivedValue
+                  }) { state in
+                state.recordReceivedValue = newValue
               }
             }
           }
@@ -1697,8 +1701,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.recordReceivedInvocations) {
-              _testDoubleStorage.withValue {
-                  $0.recordReceivedInvocations = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordReceivedInvocations
+                  }) { state in
+                state.recordReceivedInvocations = newValue
               }
             }
           }
@@ -1710,8 +1716,10 @@ struct GenerateSpyMacroTests {
             }
           }
           set {
-            _testDoubleStorage.withValue {
-                $0.recordImplementation = newValue
+            _testDoubleStorage.withMutation(retiring: {
+                    $0.recordImplementation
+                }) { state in
+              state.recordImplementation = newValue
             }
           }
         }
@@ -1724,8 +1732,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.calls) {
-              _testDoubleStorage.withValue {
-                  $0.calls = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
@@ -1735,7 +1745,9 @@ struct GenerateSpyMacroTests {
             withMutation(keyPath: \\.recordReceivedValue) {
               withMutation(keyPath: \\.recordReceivedInvocations) {
                 withMutation(keyPath: \\.calls) {
-                  _testDoubleStorage.withValue { state in
+                  _testDoubleStorage.withMutation(retiring: {
+                          $0.recordReceivedValue
+                      }) { state in
                     state.recordCallCount += 1
                     state.recordReceivedValue = value
                     state.recordReceivedInvocations.append(value)
@@ -1797,8 +1809,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.workCallCount) {
-              _testDoubleStorage.withValue {
-                  $0.workCallCount = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.workCallCount
+                  }) { state in
+                state.workCallCount = newValue
               }
             }
           }
@@ -1812,8 +1826,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.workResult) {
-              _testDoubleStorage.withValue {
-                  $0.workResult = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.workResult
+                  }) { state in
+                state.workResult = newValue
               }
             }
           }
@@ -1825,8 +1841,10 @@ struct GenerateSpyMacroTests {
             }
           }
           set {
-            _testDoubleStorage.withValue {
-                $0.workImplementation = newValue
+            _testDoubleStorage.withMutation(retiring: {
+                    $0.workImplementation
+                }) { state in
+              state.workImplementation = newValue
             }
           }
         }
@@ -1839,8 +1857,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.calls) {
-              _testDoubleStorage.withValue {
-                  $0.calls = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
@@ -1850,7 +1870,9 @@ struct GenerateSpyMacroTests {
           let _visorValueSnapshot = value
           let (workImplementation, workResult) = withMutation(keyPath: \\.workCallCount) {
             withMutation(keyPath: \\.calls) {
-              _testDoubleStorage.withValue { state in
+              _testDoubleStorage.withMutation(retiring: { _ in
+                      ()
+                  }) { state in
                 state.workCallCount += 1
                 state.calls.append(.work(value: _visorValueSnapshot))
                 return (state.workImplementation, state.workResult)
@@ -1927,8 +1949,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.consumeCallCount) {
-              _testDoubleStorage.withValue {
-                  $0.consumeCallCount = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeCallCount
+                  }) { state in
+                state.consumeCallCount = newValue
               }
             }
           }
@@ -1942,8 +1966,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.consumeReceivedValue) {
-              _testDoubleStorage.withValue {
-                  $0.consumeReceivedValue = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeReceivedValue
+                  }) { state in
+                state.consumeReceivedValue = newValue
               }
             }
           }
@@ -1957,8 +1983,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.consumeReceivedInvocations) {
-              _testDoubleStorage.withValue {
-                  $0.consumeReceivedInvocations = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeReceivedInvocations
+                  }) { state in
+                state.consumeReceivedInvocations = newValue
               }
             }
           }
@@ -1972,8 +2000,10 @@ struct GenerateSpyMacroTests {
           }
           set {
             withMutation(keyPath: \\.calls) {
-              _testDoubleStorage.withValue {
-                  $0.calls = newValue
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
@@ -1983,7 +2013,9 @@ struct GenerateSpyMacroTests {
             withMutation(keyPath: \\.consumeReceivedValue) {
               withMutation(keyPath: \\.consumeReceivedInvocations) {
                 withMutation(keyPath: \\.calls) {
-                  _testDoubleStorage.withValue { state in
+                  _testDoubleStorage.withMutation(retiring: {
+                          $0.consumeReceivedValue
+                      }) { state in
                     state.consumeCallCount += 1
                     state.consumeReceivedValue = value
                     state.consumeReceivedInvocations.append(value)

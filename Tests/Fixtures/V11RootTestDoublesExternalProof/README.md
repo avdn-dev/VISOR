@@ -28,12 +28,13 @@ Test-double declarations live only in `VISORTestDoubles`. There is no umbrella
 or re-export between products, so production modules do not acquire testing
 support through `VISOR` and test targets import the dedicated product directly.
 
-The Sendable storage retires its complete pre-mutation State after unlocking,
-preventing a displaced reference's deinitialiser from re-entering the same
-non-recursive lock while it is held. An existing root runtime regression proves
-that narrow retirement behaviour in the dedicated product; neither
-this fixture's concurrent-call test nor that regression claims fairness,
-throughput or safety for arbitrary locking designs.
+The Sendable storage borrows reads and retires only values selected before a
+mutation. Generated setters and call recorders therefore keep displaced
+references alive until after unlocking without internally sharing every call
+history buffer before an append. Root runtime regressions prove both the
+re-entrant deinitialiser boundary and selective copy-on-write behaviour;
+neither this fixture's concurrent-call test nor those regressions claims
+fairness, throughput or safety for arbitrary locking designs.
 
 Run it from the repository root after building the root product:
 
