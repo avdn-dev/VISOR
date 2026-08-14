@@ -227,9 +227,21 @@ The trait does not infer protocol isolation or add `@concurrent`. Unqualified `@
 The View/Content split usually needs no service double at all:
 
 ```swift
+// Declare preview inputs explicitly on the State type; classes do not receive
+// a synthesised memberwise initialiser.
+extension ProfileViewModel.State {
+  convenience init(previewName: String, previewEmail: String) {
+    self.init()
+    self[\.name] = previewName
+    self[\.email] = previewEmail
+  }
+}
+
 #Preview("Loaded") {
   ProfileContent(
-    state: .init(name: "Alice", email: "alice@example.com"),
+    state: ProfileViewModel.State(
+      previewName: "Alice",
+      previewEmail: "alice@example.com"),
     onAction: { _ in })
 }
 ```

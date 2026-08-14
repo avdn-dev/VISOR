@@ -12,16 +12,16 @@ Change the package requirement to `11.0.0` or later and declare products by resp
 .target(
   name: "Feature",
   dependencies: [
-    .product(name: "VISORObservation", package: "VISOR"),
-    .product(name: "VISOR", package: "VISOR"),
+    .product(name: "VISORObservation", package: "visor"),
+    .product(name: "VISOR", package: "visor"),
   ]
 ),
 .testTarget(
   name: "FeatureTests",
   dependencies: [
     "Feature",
-    .product(name: "VISORTesting", package: "VISOR"),
-    .product(name: "VISORTestDoubles", package: "VISOR"),
+    .product(name: "VISORTesting", package: "visor"),
+    .product(name: "VISORTestDoubles", package: "visor"),
   ]
 )
 ```

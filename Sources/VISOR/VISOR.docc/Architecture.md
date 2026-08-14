@@ -28,6 +28,27 @@ decisions into rendering code.
 Split an integration-owning view from its plain rendering component:
 
 ```swift
+@MainActor
+@Observable
+@ViewModel
+final class DashboardViewModel {
+  final class State {
+    private(set) var items: Loadable<[Item]>
+
+    init(items: Loadable<[Item]> = .loading) {
+      self.items = items
+    }
+  }
+
+  enum Action { case refresh }
+
+  let state = State()
+
+  func handle(_ action: Action) async {
+    // Perform the requested work and update State.
+  }
+}
+
 @LazyViewModel(DashboardViewModel.self)
 struct DashboardView: View {
   var content: some View {
@@ -50,7 +71,8 @@ struct DashboardContent: View {
 
 #Preview {
   DashboardContent(
-    state: .init(items: .loaded([Item(name: "Preview")])),
+    state: DashboardViewModel.State(
+      items: .loaded([Item(name: "Preview")])),
     onAction: { _ in })
 }
 ```

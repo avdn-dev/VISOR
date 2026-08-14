@@ -51,16 +51,16 @@ Declare only the products each target imports. A feature that owns a source-back
 .target(
   name: "ProfileFeature",
   dependencies: [
-    .product(name: "VISORObservation", package: "VISOR"),
-    .product(name: "VISOR", package: "VISOR"),
+    .product(name: "VISORObservation", package: "visor"),
+    .product(name: "VISOR", package: "visor"),
   ]
 ),
 .testTarget(
   name: "ProfileFeatureTests",
   dependencies: [
     "ProfileFeature",
-    .product(name: "VISORTesting", package: "VISOR"),
-    .product(name: "VISORTestDoubles", package: "VISOR"),
+    .product(name: "VISORTesting", package: "visor"),
+    .product(name: "VISORTestDoubles", package: "visor"),
   ]
 )
 ```

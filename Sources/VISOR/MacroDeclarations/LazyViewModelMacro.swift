@@ -37,17 +37,17 @@
 ///
 /// **Bindings:** Use the generated `bindableState` property for SwiftUI controls:
 /// ```swift
-/// Toggle("Enabled", isOn: bindableState.isEnabled)
-/// TextField("Name", text: bindableState.name)
+/// Toggle("Enabled", isOn: bindableState[\.isEnabled])
+/// TextField("Name", text: bindableState[\.name])
 /// ```
 ///
 /// - Parameter observationPolicy: Controls whether observation pauses based on scene phase.
 ///   Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
 ///   view models driving high-frequency work that wastes resources when the UI is not visible.
 ///
-/// > The generated `viewModel` property force-unwraps the backing `@State`. This is safe
-/// > because the generated `body` guards with `if _viewModel != nil` before rendering
-/// > `content`, and initialisation is guaranteed by the `.task` modifier.
+/// > The generated `viewModel` property fails with a diagnostic precondition if accessed
+/// > before initialisation. The generated `body` renders `content` only while the backing
+/// > `@State` contains a ViewModel; its task creates that instance when the owner mounts.
 @attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(containerRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
   _: VM.Type,

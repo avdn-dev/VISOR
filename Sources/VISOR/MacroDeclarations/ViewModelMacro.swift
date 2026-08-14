@@ -50,6 +50,10 @@
 ///   }
 ///
 ///   private let service: ItemsService
+///
+///   init(service: ItemsService) {
+///     self.service = service
+///   }
 /// }
 /// ```
 ///

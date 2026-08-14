@@ -12,11 +12,16 @@ import VISORObservation
 /// final class ContentViewModel {
 ///   final class State { var title = "" }
 ///   let state = State()
+///   private let contentService: ContentService
+///
+///   init(contentService: ContentService) {
+///     self.contentService = contentService
+///   }
 ///
 ///   @Reaction(
-///     source: \\ContentViewModel.contentSource,
-///     selecting: \\ContentSnapshot.title)
-///   func recordTitle(_ title: String) { ... }
+///     source: \ContentViewModel.contentService.source,
+///     selecting: \ContentSnapshot.title)
+///   private func recordTitle(_ title: String) { ... }
 /// }
 /// ```
 @attached(peer)

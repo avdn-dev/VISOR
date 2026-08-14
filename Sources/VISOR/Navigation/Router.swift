@@ -344,7 +344,7 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// ```swift
   /// router.configureDeepLinks(scheme: "myapp", parsers: [
-  ///   .equal(to: ["settings"], destination: .tab(.settings)),
+  ///   .equal(to: ["profile"], destination: .tab(.profile)),
   /// ])
   /// ```
   public func configureDeepLinks(scheme: String, parsers: [DeepLinkParser<Scene>]) {

@@ -16,7 +16,7 @@ import Foundation
 ///
 /// ```swift
 /// router.configureDeepLinks(scheme: "myapp", parsers: [
-///   .equal(to: ["settings"], destination: .tab(.settings)),
+///   .equal(to: ["profile"], destination: .tab(.profile)),
 ///   DeepLinkParser { url in
 ///     guard url.deepLinkComponents.first == "item",
 ///           let id = url.deepLinkComponents.dropFirst().first
@@ -49,8 +49,8 @@ extension DeepLinkParser {
   /// Match URLs whose deep link components equal the given path exactly.
   ///
   /// ```swift
-  /// // Matches "myapp://settings" or "myapp:///settings"
-  /// .equal(to: ["settings"], destination: .tab(.settings))
+  /// // Matches "myapp://profile" or "myapp:///profile"
+  /// .equal(to: ["profile"], destination: .tab(.profile))
   /// ```
   public static func equal(
     to components: [String],

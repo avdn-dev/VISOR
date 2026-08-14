@@ -13,13 +13,17 @@ import VISORObservation
 /// final class ConnectionsViewModel {
 ///   final class State {
 ///     @Bound(
-///       source: \\ConnectionsViewModel.connectionSource,
-///       selecting: \\ConnectionSnapshot.isAuthenticated)
+///       source: \ConnectionsViewModel.connectionService.source,
+///       selecting: \ConnectionSnapshot.isAuthenticated)
 ///     var isAuthenticated = false
 ///   }
 ///
 ///   let state = State()
-///   private let connectionSource: ObservationSource<ConnectionSnapshot>
+///   private let connectionService: ConnectionService
+///
+///   init(connectionService: ConnectionService) {
+///     self.connectionService = connectionService
+///   }
 /// }
 /// ```
 @attached(peer)

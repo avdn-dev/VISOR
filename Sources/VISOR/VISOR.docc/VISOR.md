@@ -8,12 +8,13 @@ VISOR (View–Interactor–Service–Observable ViewModel–Router) generates th
 
 ```
 View  →  ViewModel  →  Interactor  →  Service
-  │          │                            │
-  └──────→ Router                 ObservationSource
+             │           ↑               │
+             ↓           └─ ObservationSource
+           Router
 ```
 
 - **View** owns SwiftUI integration. A `@LazyViewModel` view mounts the structured owner; a child Content view renders plain State and action closures.
-- **ViewModel** is explicitly MainActor and owns one stable, macro-instrumented State instance. It projects service snapshots and handles user actions.
+- **ViewModel** is explicitly MainActor and owns one stable, macro-instrumented State instance. It projects service snapshots, handles user actions, and calls its Router when routed.
 - **Interactor** optionally coordinates a named use case across services.
 - **Service** owns domain or platform state under its natural isolation and publishes stable snapshots.
 - **Router** owns typed navigation, presentation, tabs, and deep links.

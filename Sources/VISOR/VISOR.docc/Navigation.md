@@ -165,9 +165,10 @@ let router = Router<AppScene>()
 | `childRouter(for:)` | Get or create a cached child router for a tab |
 
 ```swift
+// Once the root NavigationContainer has appeared:
 router.push(.detail(id: "42"))
 router.present(sheet: .preferences)
-router.select(tab: .settings)
+router.select(tab: .profile)
 router.popToRoot()
 ```
 
@@ -336,8 +337,8 @@ Configure deep link handling with a URL scheme and composable parsers:
 
 ```swift
 router.configureDeepLinks(scheme: "myapp", parsers: [
-  // Static match: myapp://settings
-  .equal(to: ["settings"], destination: .tab(.settings)),
+  // Static match: myapp://profile
+  .equal(to: ["profile"], destination: .tab(.profile)),
 
   // Custom parser: myapp://item/42
   DeepLinkParser { url in

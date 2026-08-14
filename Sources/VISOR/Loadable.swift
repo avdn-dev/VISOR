@@ -9,7 +9,6 @@
 ///
 /// Use inside a ViewModel's `State` class for any field that has loading/empty/error states:
 /// ```swift
-/// @Observable
 /// final class State {
 ///     var items: Loadable<[Item]> = .loading
 ///     var filter: Filter = .all
