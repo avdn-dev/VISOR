@@ -141,7 +141,8 @@ func fullScreenContent(for destination: AppFullScreen) -> some View {
 }
 ```
 
-Place these functions in a target that can see all feature view types (typically the app target). The compiler enforces exhaustive switching, so adding a new destination case immediately flags every call site that needs a view.
+Place these functions in a target that can see all feature view types, typically
+the app target.
 
 ## Router
 
@@ -152,7 +153,7 @@ one root Router per window or scene and pass it to ``NavigationContainer``:
 let router = Router<AppScene>()
 ```
 
-### Navigation Methods
+### Navigation methods
 
 | Method | Description |
 |--------|-------------|
@@ -175,8 +176,8 @@ router.select(tab: .profile)
 router.popToRoot()
 ```
 
-These calls are shown directly to document the Router API. In feature code,
-prefer making them from a routed ViewModel's action handler.
+In feature code, prefer making these calls from a routed ViewModel's action
+handler.
 
 Calls on the root Router target the currently active visible Router: the root
 stack in a single-stack application, the selected tab, or the topmost modal.
@@ -322,14 +323,6 @@ NavigationButton<AppScene, _>(sheet: .preferences) {
 }
 ```
 
-Define a typealias to avoid repeating the Scene parameter:
-
-```swift
-typealias AppNavButton<Label: View> = NavigationButton<AppScene, Label>
-
-AppNavButton(push: .detail(id: "1")) { Text("Go") }
-```
-
 `NavigationButton` bypasses ViewModel action handling. Routed ViewModels are the
 preferred navigation architecture for feature flows; use this convenience only
 when deliberately choosing direct View-to-Router dispatch.
@@ -414,14 +407,14 @@ let factory: GalleryViewModel.Factory = .routed { (router: Router<AppScene>) in
   GalleryViewModel(router: router, galleryService: galleryService)
 }
 
-// Inject as usual
 GalleryScreen()
   .environment(factory)
 ```
 
 ## Destination
 
-``Destination`` is a unified enum for navigation dispatch:
+``Destination`` is the unified navigation value accepted by
+`router.navigate(to:)` and emitted by deep-link parsers:
 
 ```swift
 enum Destination<Scene: NavigationScene> {
@@ -431,6 +424,3 @@ enum Destination<Scene: NavigationScene> {
   case fullScreen(Scene.FullScreen)
 }
 ```
-
-Use it with `router.navigate(to:)` for programmatic navigation, or wrap it in
-``DeepLinkParseResult/destination(_:)`` from a deep-link parser.

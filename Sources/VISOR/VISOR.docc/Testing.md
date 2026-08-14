@@ -4,7 +4,7 @@ Fence structured actions, inspect complete State histories, and generate isolate
 
 ## Products and imports
 
-VISOR 11 separates testing by responsibility:
+VISOR separates testing by responsibility:
 
 - `VISORTesting` integrates the source-backed ViewModel runtime with Swift Testing. It re-exports `VISOR` and Swift Testing.
 - `VISORTestDoubles` provides stub and spy macros without depending on `VISOR`, `VISORObservation`, SwiftUI, or Swift Testing.
@@ -236,8 +236,6 @@ The trait does not infer protocol isolation or add `@concurrent`. Unqualified `@
 The View/Content split usually needs no service double at all:
 
 ```swift
-// Declare preview inputs explicitly on the State type; classes do not receive
-// a synthesised memberwise initialiser.
 extension ProfileViewModel.State {
   convenience init(previewName: String, previewEmail: String) {
     self.init()

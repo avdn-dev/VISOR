@@ -4,7 +4,7 @@ Publish stable producer snapshots and project them into readiness-gated ViewMode
 
 ## Overview
 
-VISOR 11 observation is source-owned. A producer owns an `ObservationChannel<Value>` and exposes its read-only `ObservationSource<Value>`. A `@ViewModel` consumes that source through `@Bound` State fields or `@Reaction` methods.
+VISOR observation is source-owned. A producer owns an `ObservationChannel<Value>` and exposes its read-only `ObservationSource<Value>`. A `@ViewModel` consumes that source through `@Bound` State fields or `@Reaction` methods.
 
 This explicit capability gives generated production and testing sessions a gap-free baseline, revision ordering, acknowledgements, and finite source fences. A raw `AsyncSequence`, an arbitrary Observation closure, or a hidden task cannot provide that contract by itself.
 
@@ -65,7 +65,7 @@ Grouping makes session opening and checkpoints atomic relative to each individua
 
 ## Source-backed ViewModels
 
-A v11 ViewModel has this shape:
+A VISOR ViewModel has this shape:
 
 ```swift
 @MainActor
@@ -99,7 +99,7 @@ State fields may have declaration defaults or be assigned by a custom State init
 
 ## Accepted declaration forms
 
-VISOR 11.0 accepts exactly four source-backed forms.
+VISOR accepts exactly four source-backed forms.
 
 ### Bind a complete source value
 
@@ -207,9 +207,9 @@ The default is `.alwaysObserving`. A pause policy revokes readiness, withdraws g
 
 Producer-owned domain work has its own lifetime. VISOR does not infer that a service should stop because one view paused.
 
-## Deliberate v11.0 boundaries
+## Deliberate boundaries
 
-There is no source-backed `@Polled`, `throttledBy:`, or `debouncedBy:` declaration in v11.0.
+There is no source-backed `@Polled`, `throttledBy:`, or `debouncedBy:` declaration.
 
 - Durable latest domain state belongs in an `ObservationChannel`/`ObservationSource` owned by its producer.
 - Elapsed-time presentation or service work belongs in an explicitly structured task using an injected `Clock`.

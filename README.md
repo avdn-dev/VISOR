@@ -30,7 +30,7 @@ than imposing a global actor.
 
 ## Products
 
-VISOR 11 has four deliberately separate products and no umbrella product:
+VISOR has four deliberately separate products and no umbrella product:
 
 | Product | Use |
 |---|---|
@@ -169,7 +169,7 @@ ProfileScreen()
 
 ## Observation declarations
 
-VISOR 11 accepts exactly four source-backed declaration forms:
+VISOR accepts exactly four source-backed declaration forms:
 
 ```swift
 @Bound(source: \FeatureViewModel.service.valueSource)
@@ -189,7 +189,7 @@ func valueChanged(_ value: Value) { ... }
 func valueChanged(_ value: Value) async { ... }
 ```
 
-Source-backed `@Polled`, debounce, and throttle declarations are deliberately absent from 11.0. Durable latest state belongs in a producer-owned source. Elapsed-time work belongs in an explicitly structured task with an injected `Clock`. Lossless events need an event-specific buffered contract rather than a latest-state source.
+Source-backed `@Polled`, debounce, and throttle declarations are deliberately absent. Durable latest state belongs in a producer-owned source. Elapsed-time work belongs in an explicitly structured task with an injected `Clock`. Lossless events need an event-specific buffered contract rather than a latest-state source.
 
 ## Testing
 
@@ -231,12 +231,8 @@ nonisolated protocol AnalyticsService: Sendable {
 
 ## Documentation
 
-Build the DocC catalogue in Xcode for guides to:
-
-- architecture and source-backed State;
-- observation sources, bindings, reactions, and scene policy;
-- deterministic observation testing and generated doubles; and
-- navigation and deep linking.
+The DocC catalogue covers architecture, observation, testing, navigation, and
+deep linking.
 
 Existing v10 consumers should follow [MIGRATION_V11.md](MIGRATION_V11.md). VISOR 11 removes the v10 observation APIs without compatibility shims.
 

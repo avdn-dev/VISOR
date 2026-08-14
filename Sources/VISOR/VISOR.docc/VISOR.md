@@ -20,7 +20,7 @@ View  →  ViewModel  →  Interactor  →  Service
 - **Router** owns typed navigation, presentation, tabs, and deep links.
 - **Factory** hides ViewModel construction behind SwiftUI environment injection.
 
-VISOR 11 is split into four products:
+VISOR is split into four products:
 
 | Product | Responsibility |
 |---|---|
