@@ -76,7 +76,7 @@ public final class Router<Scene: NavigationScene> {
   /// The currently presented sheet, if any.
   public var presentingSheet: Scene.Sheet?
 
-  /// The currently presented full-screen cover, if any.
+  /// The currently presented destination with full-screen intent, if any.
   public var presentingFullScreen: Scene.FullScreen?
 
   // MARK: - Hierarchy
@@ -112,7 +112,7 @@ public final class Router<Scene: NavigationScene> {
     target.presentSheetLocally(sheet)
   }
 
-  /// Present a full-screen cover.
+  /// Present a destination with full-screen intent.
   ///
   /// When called on the root Router, delegates to the currently active visible
   /// Router. Calls on a child Router remain local to that child.
@@ -169,7 +169,7 @@ public final class Router<Scene: NavigationScene> {
     target.dismissSheetLocally()
   }
 
-  /// Dismiss the currently presented full-screen cover.
+  /// Dismiss the currently presented full-screen destination.
   ///
   /// When called on a router that does not itself hold the full-screen
   /// presentation, walks up the parent chain to find the ancestor that does

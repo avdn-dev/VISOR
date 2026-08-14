@@ -43,7 +43,7 @@ nonisolated enum AppTab: TabDestination {
 |----------|----------|----------|
 | ``PushDestination`` | `Hashable` | `NavigationStack` push |
 | ``SheetDestination`` | `Hashable`, `Identifiable` | `.sheet(item:)` |
-| ``FullScreenDestination`` | `Hashable`, `Identifiable` | `.fullScreenCover(item:)` |
+| ``FullScreenDestination`` | `Hashable`, `Identifiable` | Full-screen intent; adapts to `.sheet(item:)` on macOS |
 | ``TabDestination`` | `Hashable` | Tab selection (no view — defined in your `TabView`) |
 
 ``SheetDestination`` and ``FullScreenDestination`` both inherit from ``PresentableDestination``, which provides the shared `Hashable & Identifiable` requirements.
@@ -120,13 +120,13 @@ let router = Router<AppScene>()
 |--------|-------------|
 | `push(_:)` | Push onto the navigation stack |
 | `present(sheet:)` | Present a sheet |
-| `present(fullScreen:)` | Present a full-screen cover |
+| `present(fullScreen:)` | Present a destination with full-screen intent |
 | `select(tab:)` | Switch tab (propagates to root) |
 | `navigate(to:)` | Unified dispatch via ``Destination`` |
 | `selectAndPush(tab:destination:)` | Switch tab and push in one step |
 | `popToRoot()` | Clear the navigation stack |
 | `dismissSheet()` | Dismiss the current sheet |
-| `dismissFullScreen()` | Dismiss the current full-screen cover |
+| `dismissFullScreen()` | Dismiss the current full-screen destination |
 | `childRouter(for:)` | Get or create a cached child router for a tab |
 
 ```swift
@@ -157,7 +157,7 @@ Routers form a tree. Each child tracks its depth (`level`) and the tab it manage
 
 - **Optional tabs**: A root container binds the root Router directly when the application has one stack.
 - **Tab isolation**: Each tab has its own navigation stack via `childRouter(for:)`.
-- **Modal nesting**: Sheets and full-screen covers get their own child router, enabling push navigation within modals.
+- **Modal nesting**: Sheets and full-screen presentations get their own child router, enabling push navigation within modals.
 - **Active-leaf routing**: One visible Router receives root actions and deep links. Dismissing a modal restores its nearest mounted ancestor.
 
 Late disappearance from an old tab or modal cannot deactivate a newer visible
@@ -173,7 +173,7 @@ Router<AppScene>.preview(tab: .home)
 
 ## NavigationContainer
 
-``NavigationContainer`` wires a ``Router`` to `NavigationStack`, `.sheet`, and `.fullScreenCover`. Pass content closures that map each destination type to its view.
+``NavigationContainer`` wires a ``Router`` to `NavigationStack` and platform-adaptive modal presentation. Pass content closures that map each destination type to its view.
 
 For a single stack, bind the root Router directly:
 
@@ -202,16 +202,20 @@ NavigationContainer(
 }
 ```
 
-Modal containers are created automatically by the sheet and full-screen
-presentation modifiers.
+Modal containers are created automatically by the sheet and adaptive
+full-screen presentation modifiers.
 
 The container:
 - Binds the root Router directly or creates the requested tab/modal child.
 - Manages active state (`onAppear` / `onDisappear`).
 - Routes incoming URLs via `onOpenURL`.
-- Wraps sheets and full-screen covers in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
+- Wraps sheets and full-screen presentations in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
 
-> Note: `fullScreenCover` is only available on iOS (`#if os(iOS)`).
+Full-screen destinations use SwiftUI's native `.fullScreenCover(item:)` on iOS,
+Mac Catalyst, tvOS, watchOS, and visionOS. On macOS, where SwiftUI marks that
+modifier unavailable, ``NavigationContainer`` adapts the route to a
+`.sheet(item:)`. On visionOS this remains a modal presentation; it does not open
+an `ImmersiveSpace`.
 
 ### Example App Structure
 

@@ -30,7 +30,7 @@ public struct NavigationButton<Scene: NavigationScene, Label: View>: View {
     self.label = label()
   }
 
-  /// Create a button that presents a full-screen cover.
+  /// Create a button that presents a destination with full-screen intent.
   public init(
     fullScreen destination: Scene.FullScreen,
     @ViewBuilder label: () -> Label)

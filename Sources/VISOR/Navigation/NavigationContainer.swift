@@ -9,13 +9,16 @@ import SwiftUI
 
 // MARK: - NavigationContainer
 
-/// A container that wires a Router to NavigationStack, sheet, and fullScreenCover.
+/// A container that wires a Router to a NavigationStack and modal presentation.
 ///
 /// A root container may bind a Router directly for a single stack. Tab and modal
 /// containers create child Routers with isolated navigation state. Sheets and
-/// full-screen covers get their own child NavigationContainer, enabling push
+/// full-screen presentations get their own child NavigationContainer, enabling push
 /// navigation within modals. Content closures propagate automatically to nested
 /// modal containers.
+///
+/// Full-screen destinations use SwiftUI's native full-screen cover where it is
+/// available and adapt to a sheet on macOS.
 ///
 /// The container manages the child router's lifecycle automatically:
 /// - `onAppear` marks the router as active (enabling deep link dispatch).
@@ -25,7 +28,7 @@ import SwiftUI
 /// - Parameters:
 ///   - pushContent: Maps a `Scene.Push` value to its view. Called by `navigationDestination(for:)`.
 ///   - sheetContent: Maps a `Scene.Sheet` value to its view. Called by `.sheet(item:)`.
-///   - fullScreenContent: Maps a `Scene.FullScreen` value to its view. Called by `.fullScreenCover(item:)`.
+///   - fullScreenContent: Maps a `Scene.FullScreen` value to its adaptively presented view.
 public struct NavigationContainer<
   Scene: NavigationScene,
   Content: View,
@@ -67,7 +70,7 @@ public struct NavigationContainer<
     self.fullScreenContent = fullScreenContent
   }
 
-  /// Create a NavigationContainer for a modal (sheet or full-screen cover).
+  /// Create a NavigationContainer for a modal presentation.
   public init(
     parentRouter: Router<Scene>,
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
@@ -144,8 +147,7 @@ private struct InnerContainer<
         sheetContent(sheet)
       }
     }
-    #if os(iOS)
-    .fullScreenCover(item: $router.presentingFullScreen) { fullScreen in
+    .adaptiveFullScreenPresentation(item: $router.presentingFullScreen) { fullScreen in
       NavigationContainer(
         parentRouter: router,
         pushContent: pushContent,
@@ -155,6 +157,22 @@ private struct InnerContainer<
         fullScreenContent(fullScreen)
       }
     }
+  }
+}
+
+// MARK: - Platform-Adaptive Presentation
+
+private extension View {
+  @ViewBuilder
+  func adaptiveFullScreenPresentation<Item: Identifiable, PresentedContent: View>(
+    item: Binding<Item?>,
+    @ViewBuilder content: @escaping (Item) -> PresentedContent)
+    -> some View
+  {
+    #if os(macOS)
+    sheet(item: item) { content($0) }
+    #else
+    fullScreenCover(item: item) { content($0) }
     #endif
   }
 }

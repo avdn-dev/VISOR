@@ -13,7 +13,7 @@ public enum Destination<Scene: NavigationScene> {
   case push(Scene.Push)
   /// Present a modal sheet.
   case sheet(Scene.Sheet)
-  /// Present a full-screen cover.
+  /// Present a destination with full-screen intent.
   case fullScreen(Scene.FullScreen)
 }
 

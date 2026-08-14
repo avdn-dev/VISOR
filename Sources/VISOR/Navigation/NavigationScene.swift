@@ -15,17 +15,20 @@
 /// passed to ``NavigationContainer``.
 public protocol PushDestination: Hashable, Sendable {}
 
-/// Shared requirements for modal destinations (sheets, full-screen covers).
+/// Shared requirements for modal destinations (sheets and full-screen presentations).
 ///
 /// Conforming types serve as identity-only route markers. `Identifiable` is required
-/// by SwiftUI's `.sheet(item:)` and `.fullScreenCover(item:)`. View resolution is
-/// handled by the content closures passed to ``NavigationContainer``.
+/// by SwiftUI's item-driven presentation modifiers. View resolution is handled by
+/// the content closures passed to ``NavigationContainer``.
 public protocol PresentableDestination: Hashable, Identifiable, Sendable {}
 
 /// A destination that can be presented as a sheet.
 public protocol SheetDestination: PresentableDestination {}
 
-/// A destination that can be presented as a full-screen cover.
+/// A destination with full-screen presentation intent.
+///
+/// ``NavigationContainer`` uses a native full-screen cover where available and
+/// adapts the presentation to a sheet on macOS.
 public protocol FullScreenDestination: PresentableDestination {}
 
 /// A tab identifier. Tabs define their views in the consumer's TabView, so no view is required here.
