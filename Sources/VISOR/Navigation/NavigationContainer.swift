@@ -118,9 +118,8 @@ public struct NavigationContainer<
       .onAppear { router.activate() }
       .onDisappear { router.deactivate() }
       .onOpenURL { url in
-        if let destination = router.deepLinkHandler?(url) {
-          router.deepLinkOpen(to: destination)
-        }
+        guard router.receivesDeepLinks else { return }
+        router.openDeepLink(url)
       }
       .id(ObjectIdentifier(router))
   }

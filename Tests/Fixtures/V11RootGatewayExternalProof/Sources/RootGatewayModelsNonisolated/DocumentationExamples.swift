@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import RootObservationConsumer
 import SwiftUI
@@ -23,6 +24,25 @@ nonisolated enum DocumentationScene: NavigationScene {
   typealias Push = DocumentationPush
   typealias Sheet = DocumentationSheet
   typealias FullScreen = DocumentationFullScreen
+}
+
+@MainActor
+func openDocumentationDeepLink(
+  _ url: URL,
+  with router: Router<DocumentationScene>)
+  -> DeepLinkOutcome<DocumentationScene>
+{
+  router.configureDeepLinks(scheme: "documentation", parsers: [
+    DeepLinkParser { request in
+      guard request.components.first == "detail" else { return .noMatch }
+      guard request.components.count == 2,
+            let id = request.components[1].removingPercentEncoding,
+            !id.isEmpty
+      else { return .invalid }
+      return .destination(.push(.detail(id: id)))
+    },
+  ])
+  return router.openDeepLink(url)
 }
 
 nonisolated enum DocumentationLoadFailure: Error, Equatable, Hashable, Sendable {

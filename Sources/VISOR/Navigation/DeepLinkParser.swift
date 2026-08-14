@@ -7,6 +7,55 @@
 
 import Foundation
 
+// MARK: - DeepLinkRequest
+
+/// A URL and its route components after Router scheme validation.
+///
+/// Components contain the URL host followed by its path segments and preserve
+/// percent encoding. Custom parsers are responsible for validating component
+/// counts, decoding values exactly once, and rejecting malformed identifiers.
+public struct DeepLinkRequest: Hashable, Sendable {
+  /// Creates a request from an external URL without decoding its route values.
+  public init(url: URL) {
+    self.url = url
+
+    let pathSegments = url.path().split(separator: "/")
+    var components: [String] = []
+    components.reserveCapacity(1 + pathSegments.count)
+    if let host = url.host() {
+      components.append(host)
+    }
+    for segment in pathSegments {
+      components.append(String(segment))
+    }
+    self.components = components
+  }
+
+  /// The original URL. Validate expected hosts and query items before using them.
+  public let url: URL
+
+  /// The host and path segments used for ordered route matching.
+  public let components: [String]
+}
+
+// MARK: - DeepLinkParseResult
+
+/// The result of one parser examining a deep-link request.
+public enum DeepLinkParseResult<Scene: NavigationScene> {
+  /// This parser does not recognise the route; evaluation may continue.
+  case noMatch
+
+  /// This parser recognises the route but its inputs are invalid; evaluation stops.
+  case invalid
+
+  /// The validated route maps to a navigation destination.
+  case destination(Destination<Scene>)
+}
+
+nonisolated extension DeepLinkParseResult: Equatable {}
+nonisolated extension DeepLinkParseResult: Hashable {}
+nonisolated extension DeepLinkParseResult: Sendable {}
+
 // MARK: - DeepLinkParser
 
 /// A composable URL-to-Destination parser.
@@ -17,11 +66,12 @@ import Foundation
 /// ```swift
 /// router.configureDeepLinks(scheme: "myapp", parsers: [
 ///   .equal(to: ["profile"], destination: .tab(.profile)),
-///   DeepLinkParser { url in
-///     guard url.deepLinkComponents.first == "item",
-///           let id = url.deepLinkComponents.dropFirst().first
-///     else { return nil }
-///     return .push(.detail(id: id))
+///   DeepLinkParser { request in
+///     guard request.components.first == "item" else { return .noMatch }
+///     guard request.components.count == 2,
+///           let id = UUID(uuidString: request.components[1])
+///     else { return .invalid }
+///     return .destination(.push(.detail(id: id)))
 ///   }
 /// ])
 /// ```
@@ -29,17 +79,26 @@ public struct DeepLinkParser<Scene: NavigationScene>: Sendable {
 
   // MARK: Lifecycle
 
-  /// Creates a parser from a closure that maps a URL to a destination.
+  /// Creates a parser that distinguishes an unrelated route from invalid input.
   ///
-  /// - Parameter parse: Returns a destination if the URL matches, `nil` otherwise.
-  public init(_ parse: @escaping @MainActor @Sendable (URL) -> Destination<Scene>?) {
-    self.parse = parse
+  /// - Parameter parse: Validates and maps one request.
+  public init(
+    _ parse: @escaping @Sendable (DeepLinkRequest) -> DeepLinkParseResult<Scene>
+  ) {
+    self.parseRequest = parse
   }
 
   // MARK: Public
 
-  /// The parsing closure. Returns a destination if the URL matches, nil otherwise.
-  public let parse: @MainActor @Sendable (URL) -> Destination<Scene>?
+  /// Validate and map one request.
+  public func parse(_ request: DeepLinkRequest) -> DeepLinkParseResult<Scene> {
+    parseRequest(request)
+  }
+
+  // MARK: Private
+
+  private let parseRequest:
+    @Sendable (DeepLinkRequest) -> DeepLinkParseResult<Scene>
 }
 
 // MARK: - Factory Methods
@@ -57,32 +116,8 @@ extension DeepLinkParser {
     destination: Destination<Scene>)
     -> DeepLinkParser
   {
-    DeepLinkParser { url in
-      url.deepLinkComponents == components ? destination : nil
+    DeepLinkParser { request in
+      request.components == components ? .destination(destination) : .noMatch
     }
-  }
-}
-
-// MARK: - URL Extension
-
-extension URL {
-
-  /// Strips the scheme and splits the remaining path into components.
-  ///
-  /// - `myapp://valentine/accept` → `["valentine", "accept"]`
-  /// - `myapp:///settings` → `["settings"]`
-  /// - `myapp://home` → `["home"]`
-  nonisolated package var deepLinkComponents: [String] {
-    // host + path covers both "scheme://host/path" and "scheme:///path" forms.
-    let pathSegments = path().split(separator: "/")
-    var parts: [String] = []
-    parts.reserveCapacity(1 + pathSegments.count)
-    if let host = host() {
-      parts.append(host)
-    }
-    for segment in pathSegments {
-      parts.append(String(segment))
-    }
-    return parts
   }
 }

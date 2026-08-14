@@ -45,14 +45,14 @@ public enum NoTabDestination: TabDestination {}
 ///
 /// Conform an enum to this protocol to define all navigation destinations for your app:
 /// ```swift
-/// enum AppScene: NavigationScene {
+/// nonisolated enum AppScene: NavigationScene {
 ///   typealias Push = AppPush
 ///   typealias Sheet = AppSheet
 ///   typealias FullScreen = AppFullScreen
 ///   typealias Tab = AppTab
 /// }
 /// ```
-public protocol NavigationScene {
+public protocol NavigationScene: SendableMetatype {
   associatedtype Push: PushDestination
   associatedtype Sheet: SheetDestination
   associatedtype FullScreen: FullScreenDestination

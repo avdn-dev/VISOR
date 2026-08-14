@@ -158,23 +158,25 @@ struct RouterEdgeCaseTests {
     ])
 
     let url = URL(string: "test://settings")!
-    #expect(child.deepLinkHandler?(url) == .tab(.settings))
-    #expect(modal.deepLinkHandler?(url) == .tab(.settings))
+    child.activate()
+    #expect(child.openDeepLink(url) == .handled(.tab(.settings)))
+    modal.activate()
+    #expect(modal.openDeepLink(url) == .handled(.tab(.settings)))
   }
 
   @Test
-  func `Child created after configureDeepLinks inherits handler`() {
+  func `Child created after configureDeepLinks inherits configuration`() {
     let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .tab(.settings)),
     ])
 
-    // Child created AFTER handler was set — should inherit it
+    // Child created after configuration should read the shared tree context.
     let child = root.childRouter(for: .settings)
-    #expect(child.deepLinkHandler != nil)
+    child.activate()
 
-    let result = child.deepLinkHandler?(URL(string: "test://settings")!)
-    #expect(result == .tab(.settings))
+    let result = child.openDeepLink(URL(string: "test://settings")!)
+    #expect(result == .handled(.tab(.settings)))
   }
 
   // MARK: - Exclusive modal presentation
@@ -334,10 +336,10 @@ struct RouterEdgeCaseTests {
     #expect(root.selectedTab == .settings)
   }
 
-  // MARK: - Multiple configureDeepLinks calls overwrite handler
+  // MARK: - Multiple configureDeepLinks calls overwrite configuration
 
   @Test
-  func `Multiple configureDeepLinks calls overwrite handler`() {
+  func `Multiple configureDeepLinks calls overwrite configuration`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     let modal = child.childRouter()
@@ -354,10 +356,11 @@ struct RouterEdgeCaseTests {
     let homeURL = URL(string: "test://home")!
     let settingsURL = URL(string: "test://settings")!
     for router in [root, child, modal] {
+      router.activate()
       #expect(
-        router.deepLinkHandler?(homeURL) == nil,
+        router.openDeepLink(homeURL) == .unmatched,
         "First parser should be overwritten for every existing Router")
-      #expect(router.deepLinkHandler?(settingsURL) == .tab(.settings))
+      #expect(router.openDeepLink(settingsURL) == .handled(.tab(.settings)))
     }
   }
 

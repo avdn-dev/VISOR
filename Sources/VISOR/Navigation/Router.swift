@@ -8,10 +8,43 @@
 import Foundation
 import OSLog
 
+// MARK: - DeepLinkOutcome
+
+/// The result of asking a Router tree to open an external URL.
+public enum DeepLinkOutcome<Scene: NavigationScene> {
+  /// The URL was validated and its destination was opened.
+  case handled(Destination<Scene>)
+
+  /// No deep-link configuration has been installed for this Router tree.
+  case unconfigured
+
+  /// The URL scheme does not match the configured scheme.
+  case schemeMismatch
+
+  /// Every parser reported that it did not recognise the route.
+  case unmatched
+
+  /// A parser recognised the route but rejected its inputs.
+  case invalid
+
+  /// The URL resolved, but no navigation container is currently mounted.
+  case inactive
+}
+
+nonisolated extension DeepLinkOutcome: Equatable {}
+nonisolated extension DeepLinkOutcome: Hashable {}
+nonisolated extension DeepLinkOutcome: Sendable {}
+
+@MainActor
+private struct RouterDeepLinkConfiguration<Scene: NavigationScene> {
+  let scheme: String
+  let parsers: [DeepLinkParser<Scene>]
+}
+
 @MainActor
 private final class RouterTreeContext<Scene: NavigationScene> {
   weak var activeRouter: Router<Scene>?
-  var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
+  var deepLinkConfiguration: RouterDeepLinkConfiguration<Scene>?
 }
 
 package struct RouterSheetPresentation<Scene: NavigationScene>: Identifiable {
@@ -251,14 +284,37 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Deep Linking
 
-  /// Open a deep link destination. Only navigates if this router is active.
-  package func deepLinkOpen(to destination: Destination<Scene>) {
-    guard isActive else {
-      log("deepLinkOpen ignored (inactive, level \(level))")
-      return
+  /// Validate and open a deep-link URL in this Router tree.
+  ///
+  /// The first parser to return a destination or invalid result ends parsing.
+  /// A valid destination targets the currently active mounted Router, regardless
+  /// of which Router in the tree receives this call.
+  @discardableResult
+  public func openDeepLink(_ url: URL) -> DeepLinkOutcome<Scene> {
+    guard let configuration = treeContext.deepLinkConfiguration else {
+      return reportDeepLinkOutcome(.unconfigured)
     }
-    log("deepLinkOpen: \(destination)")
-    navigate(to: destination)
+    guard url.scheme?.lowercased() == configuration.scheme else {
+      return reportDeepLinkOutcome(.schemeMismatch)
+    }
+
+    let request = DeepLinkRequest(url: url)
+    for parser in configuration.parsers {
+      switch parser.parse(request) {
+      case .noMatch:
+        continue
+      case .invalid:
+        return reportDeepLinkOutcome(.invalid)
+      case .destination(let destination):
+        guard let target = rootRouter.currentNavigationActionTarget else {
+          return reportDeepLinkOutcome(.inactive)
+        }
+        target.navigate(to: destination)
+        return reportDeepLinkOutcome(.handled(destination))
+      }
+    }
+
+    return reportDeepLinkOutcome(.unmatched)
   }
 
   // MARK: - Child Management
@@ -328,19 +384,11 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Deep Link Configuration
 
-  /// The tree-wide handler that converts a URL into a `Destination`.
-  ///
-  /// Configure it with `configureDeepLinks(scheme:parsers:)`. Every Router in
-  /// this tree reads the same latest handler, regardless of creation order.
-  public var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)? {
-    treeContext.deepLinkHandler
-  }
-
   /// Configure deep link handling with a URL scheme and an ordered list of parsers.
   ///
   /// Configuration applies to this Router's entire tree. The URL's scheme must
-  /// match `scheme` (case-insensitive). Parsers are tried in order; the first
-  /// non-nil result wins.
+  /// match `scheme` (case-insensitive). Parsers are tried in order until one
+  /// returns a destination or reports invalid input.
   ///
   /// ```swift
   /// router.configureDeepLinks(scheme: "myapp", parsers: [
@@ -348,15 +396,9 @@ public final class Router<Scene: NavigationScene> {
   /// ])
   /// ```
   public func configureDeepLinks(scheme: String, parsers: [DeepLinkParser<Scene>]) {
-    treeContext.deepLinkHandler = { url in
-      guard url.scheme?.lowercased() == scheme.lowercased() else { return nil }
-      for parser in parsers {
-        if let destination = parser.parse(url) {
-          return destination
-        }
-      }
-      return nil
-    }
+    treeContext.deepLinkConfiguration = RouterDeepLinkConfiguration(
+      scheme: scheme.lowercased(),
+      parsers: parsers)
   }
 
   // MARK: Private
@@ -373,24 +415,58 @@ public final class Router<Scene: NavigationScene> {
     parent?.rootRouter ?? self
   }
 
-  private func navigationActionTarget(for action: String) -> Router? {
-    guard parent == nil else { return self }
+  /// Only the mounted target handles SwiftUI's tree-wide `onOpenURL` delivery.
+  package var receivesDeepLinks: Bool {
+    rootRouter.currentNavigationActionTarget === self
+  }
 
-    if let activeRouter = treeContext.activeRouter, activeRouter.isMounted {
+  private var currentNavigationActionTarget: Router? {
+    let root = rootRouter
+    if let activeRouter = root.treeContext.activeRouter, activeRouter.isMounted {
       return activeRouter
     }
-    if let selectedTab,
-       let selectedRouter = tabChildren[selectedTab],
+    if let selectedTab = root.selectedTab,
+       let selectedRouter = root.tabChildren[selectedTab],
        selectedRouter.isMounted
     {
       return selectedRouter
     }
-    if isMounted {
-      return self
+    if root.isMounted {
+      return root
+    }
+    return nil
+  }
+
+  private func navigationActionTarget(for action: String) -> Router? {
+    guard parent == nil else { return self }
+
+    if let target = currentNavigationActionTarget {
+      return target
     }
 
     log("\(action) rejected: no navigation container is active")
     return nil
+  }
+
+  private func reportDeepLinkOutcome(
+    _ outcome: DeepLinkOutcome<Scene>)
+    -> DeepLinkOutcome<Scene>
+  {
+    switch outcome {
+    case .handled:
+      log("deep link outcome: handled")
+    case .unconfigured:
+      log("deep link outcome: unconfigured")
+    case .schemeMismatch:
+      log("deep link outcome: scheme mismatch")
+    case .unmatched:
+      log("deep link outcome: unmatched")
+    case .invalid:
+      log("deep link outcome: invalid")
+    case .inactive:
+      log("deep link outcome: inactive")
+    }
+    return outcome
   }
 
   private func pushLocally(_ destination: Scene.Push) {

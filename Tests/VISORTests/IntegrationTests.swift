@@ -163,12 +163,9 @@ struct IntegrationTests {
     ])
     child.activate()
 
-    if let destination = child.deepLinkHandler?(
-      URL(string: "test://settings/detail")!)
-    {
-      child.deepLinkOpen(to: destination)
-    }
+    let outcome = child.openDeepLink(URL(string: "test://settings/detail")!)
 
+    #expect(outcome == .handled(.push(.detail(id: "deep"))))
     #expect(child.navigationPath == [.detail(id: "deep")])
   }
 

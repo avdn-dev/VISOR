@@ -448,7 +448,7 @@ For an application with one navigation stack, omit the `Tab` associated type
 and bind the root Router directly:
 
 ```swift
-enum AppScene: NavigationScene {
+nonisolated enum AppScene: NavigationScene {
   typealias Push = AppPush
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
@@ -467,6 +467,10 @@ NavigationContainer(
 }
 ```
 
+Declare `NavigationScene` conformances `nonisolated`. The protocol requires a
+`SendableMetatype` so typed destinations and deep-link parsers remain usable
+outside MainActor isolation.
+
 Tab-based applications keep using `NavigationContainer(parentRouter:tab:...)`.
 Audit code and tests that issue root navigation actions before a container is
 mounted; those actions no longer mutate an inactive root Router. Root actions
@@ -475,8 +479,17 @@ than always mutating root state.
 
 Deep-link configuration is shared by the whole Router tree. Configure it once
 with `configureDeepLinks(scheme:parsers:)`; existing and future child Routers
-read the same latest handler. Code that expected a copied per-child handler
-should remove that assumption.
+read the same latest configuration. Code that expected a copied per-child
+handler should remove that assumption.
+
+The public parse-only `deepLinkHandler` is removed. Pass a
+`DeepLinkRequest` to custom parsers and return `.noMatch`, `.invalid`, or
+`.destination(...)`. Open URLs through `openDeepLink(_:)`, whose
+`DeepLinkOutcome` distinguishes handled, unconfigured, scheme-mismatched,
+unmatched, invalid, and inactive requests. Validate component counts, decode
+dynamic values exactly once, and reject malformed identifiers. For HTTPS links,
+compare the complete expected host; services must independently enforce
+authentication and authorisation for referenced resources.
 
 ## 12. Verify the cutover
 

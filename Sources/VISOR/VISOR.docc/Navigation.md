@@ -88,7 +88,7 @@ make the path unique. Repeated equal push destinations are appended normally.
 Group the destination types into a single generic parameter:
 
 ```swift
-enum AppScene: NavigationScene {
+nonisolated enum AppScene: NavigationScene {
   typealias Push = AppPush
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
@@ -100,7 +100,7 @@ enum AppScene: NavigationScene {
 ``NoTabDestination`` as the default:
 
 ```swift
-enum SingleStackScene: NavigationScene {
+nonisolated enum SingleStackScene: NavigationScene {
   typealias Push = AppPush
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
@@ -108,6 +108,9 @@ enum SingleStackScene: NavigationScene {
 ```
 
 This is the generic parameter used by ``Router``, ``NavigationContainer``, ``NavigationButton``, and ``Destination``.
+Its conformance is nonisolated so the scene metatype can safely participate in
+`Sendable` navigation values and parsers. Spell `nonisolated` explicitly in
+MainActor-by-default targets, as shown above.
 
 ## Writing Content Closures
 
@@ -340,22 +343,64 @@ router.configureDeepLinks(scheme: "myapp", parsers: [
   // Static match: myapp://profile
   .equal(to: ["profile"], destination: .tab(.profile)),
 
-  // Custom parser: myapp://item/42
-  DeepLinkParser { url in
-    guard url.host() == "item",
-          let id = url.pathComponents.dropFirst().first
-    else { return nil }
-    return .push(.detail(id: String(id)))
+  // Custom parser: myapp://item/550E8400-E29B-41D4-A716-446655440000
+  DeepLinkParser { request in
+    guard request.components.first == "item" else { return .noMatch }
+    guard request.components.count == 2,
+          let decodedID = request.components[1].removingPercentEncoding,
+          let id = UUID(uuidString: decodedID)
+    else { return .invalid }
+    return .destination(.push(.detail(id: id.uuidString)))
   }
 ])
 ```
 
-``DeepLinkParser`` provides `.equal(to:destination:)` for static matches and an init that takes a custom parsing closure. Parsers are tried in order; the first non-nil result wins.
+``DeepLinkRequest`` exposes the original URL and its host-plus-path
+`components`. ``DeepLinkParser`` provides `.equal(to:destination:)` for static
+matches and a custom parsing closure for dynamic routes. Return `.noMatch` when
+the parser does not recognise the route so evaluation can continue. Once a
+parser recognises its route, return `.invalid` for a wrong component count,
+failed decoding, or malformed identifier; this stops evaluation instead of
+letting a later parser reinterpret bad input. Decode a component exactly once.
 
-Each Router tree stores one current deep-link handler. Configuring the root—or
-any child—updates existing and future tab and modal Routers immediately, so
-configuration order does not affect URL handling. Separate scene-root Routers
-retain independent configurations.
+``NavigationContainer`` calls ``Router/openDeepLink(_:)`` automatically for the
+active mounted Router. Call it directly when another application boundary
+receives a URL and use the ``DeepLinkOutcome`` to make failure handling explicit:
+
+```swift
+switch router.openDeepLink(url) {
+case .handled:
+  break
+case .unconfigured, .schemeMismatch, .unmatched, .invalid, .inactive:
+  showUnsupportedLinkMessage()
+}
+```
+
+Each Router tree stores one current deep-link configuration. Configuring the
+root—or any child—updates existing and future tab and modal Routers immediately,
+so configuration order does not affect URL handling. Separate scene-root
+Routers retain independent configurations.
+
+The configured scheme is only the first validation boundary. For HTTPS links,
+validate the complete host with an exact, case-insensitive comparison—never a
+suffix test—and then validate the path and query values:
+
+```swift
+router.configureDeepLinks(scheme: "https", parsers: [
+  DeepLinkParser { request in
+    guard request.url.host()?.caseInsensitiveCompare("links.example.com")
+            == .orderedSame
+    else { return .noMatch }
+    guard request.components == ["links.example.com", "profile"]
+    else { return .noMatch }
+    return .destination(.tab(.profile))
+  }
+])
+```
+
+Parsing proves only that a URL is structurally valid. The service that loads or
+mutates the referenced resource must still enforce authentication and
+authorisation; never treat possession of a deep link as permission.
 
 ## Routed Factories
 
@@ -387,4 +432,5 @@ enum Destination<Scene: NavigationScene> {
 }
 ```
 
-Use it with `router.navigate(to:)` for programmatic navigation, or as the return type of deep link parsers.
+Use it with `router.navigate(to:)` for programmatic navigation, or wrap it in
+``DeepLinkParseResult/destination(_:)`` from a deep-link parser.

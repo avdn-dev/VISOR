@@ -53,7 +53,10 @@ There is no umbrella product. Import and link only the capabilities a target use
 - ``NavigationButton``
 - ``NavigationScene``
 - ``Destination``
+- ``DeepLinkRequest``
 - ``DeepLinkParser``
+- ``DeepLinkParseResult``
+- ``DeepLinkOutcome``
 - ``PushDestination``
 - ``SheetDestination``
 - ``FullScreenDestination``
