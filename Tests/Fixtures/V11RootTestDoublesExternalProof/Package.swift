@@ -16,6 +16,12 @@ let package = Package(
   ],
   targets: [
     .target(
+      name: "PackageTestDoubleModels",
+      dependencies: [visorTestDoubles]),
+    .testTarget(
+      name: "PackageTestDoubleConsumerTests",
+      dependencies: ["PackageTestDoubleModels"]),
+    .target(
       name: "RootTestDoubleModels",
       dependencies: [visorTestDoubles],
       packageAccess: false),

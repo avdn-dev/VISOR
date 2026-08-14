@@ -631,6 +631,8 @@ struct GenerateSpyMacroTests {
           case fetch
         }
         package var calls: [Call] = []
+        package init() {
+        }
       }
       """,
       macros: testMacros)

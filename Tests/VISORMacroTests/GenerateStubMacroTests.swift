@@ -327,6 +327,8 @@ struct GenerateStubMacroTests {
         package func fetch() async throws -> [Item] {
             try fetchResult.get()
         }
+        package init() {
+        }
       }
       """,
       macros: testMacros)

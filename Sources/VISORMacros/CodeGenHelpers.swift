@@ -17,25 +17,6 @@ enum AttributeName {
   static let observable = "Observable"
 }
 
-// MARK: - Property Declaration Helper
-
-/// Generates `var` declarations for each protocol property with appropriate defaults.
-/// Unknown custom types use implicitly unwrapped optionals (IUO) as a placeholder.
-func generatePropertyDeclarations(_ properties: [ProtocolPropertyInfo], access: String = "") -> [String] {
-  let prefix = access.isEmpty ? "" : "\(access) "
-  return properties.map { prop in
-    if let customDefault = prop.defaultValueExpression {
-      return "  \(prefix)var \(prop.name): \(prop.type) = \(customDefault)"
-    } else {
-      let defaultVal = defaultValue(for: prop.type) ?? "nil"
-      let typeStr = defaultVal == "nil" && !prop.type.hasSuffix("?") && !prop.type.hasPrefix("Optional<")
-        ? "\(prop.type)!"
-        : prop.type
-      return "  \(prefix)var \(prop.name): \(typeStr) = \(defaultVal)"
-    }
-  }
-}
-
 // MARK: - Default Value Helper
 
 /// Returns a sensible default literal for known Swift types, or `nil` for custom types.
@@ -189,50 +170,6 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   return prefixes
 }
 
-// MARK: - Return Storage Helper
-
-/// Generates `var` declarations for a method's return value or `Result` storage.
-///
-/// - Throwing methods get a `Result<ReturnType, Failure>` variable.
-/// - Non-throwing methods with a return type get a `ReturnValue` variable.
-/// - Void non-throwing methods produce no declarations.
-///
-/// Used by generated stubs and spies to avoid duplicated codegen logic.
-func generateReturnStorage(
-  method: ProtocolMethodInfo,
-  storageName: String?,
-  access: String
-) -> [String] {
-  guard let storageName else { return [] }
-  guard !method.isRethrowing else { return [] }
-  guard !methodReferencesGenericParameters(method, in: method.returnType) else { return [] }
-  guard !methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) else { return [] }
-
-  let prefix = access.isEmpty ? "" : "\(access) "
-  var lines: [String] = []
-
-  if method.isThrowing {
-    guard let failureType = method.throwsEffect.resultFailureType else { return [] }
-    if let returnType = method.returnType {
-      if let innerDefault = returnDefaultValue(for: method) {
-        lines.append("  \(prefix)var \(storageName): Result<\(returnType), \(failureType)> = .success(\(innerDefault))")
-      } else {
-        lines.append("  \(prefix)var \(storageName): Result<\(returnType), \(failureType)>?")
-      }
-    } else {
-      lines.append("  \(prefix)var \(storageName): Result<Void, \(failureType)> = .success(())")
-    }
-  } else if let returnType = method.returnType {
-    if let defaultVal = returnDefaultValue(for: method) {
-      lines.append("  \(prefix)var \(storageName): \(returnType) = \(defaultVal)")
-    } else {
-      lines.append("  \(prefix)var \(storageName): \(returnType)?")
-    }
-  }
-
-  return lines
-}
-
 // MARK: - Method Fallback Helper
 
 enum MethodFallbackStyle {
@@ -315,26 +252,6 @@ func generateFallbackBodyLines(
 }
 
 // MARK: - Implementation Closure Helpers
-
-/// Builds the closure type string for a method's implementation closure.
-///
-/// Examples:
-/// - `func reset()` → `(() -> Void)?`
-/// - `func save(_ item: Item) throws` → `((Item) throws -> Void)?`
-/// - `func search(query: String, limit: Int) async throws -> [Result]` → `((String, Int) async throws -> [Result])?`
-func implementationClosureType(for method: ProtocolMethodInfo) -> String {
-  let paramsStr = method.parameters.map { stripEscaping(from: $0.type) }.joined(separator: ", ")
-
-  var effects = ""
-  if method.isAsync { effects += " async" }
-  if let throwsKeyword = method.throwsEffect.keyword {
-    effects += " \(throwsKeyword)"
-  }
-
-  let returnStr = method.returnType ?? "Void"
-
-  return "((\(paramsStr))\(effects) -> \(returnStr))?"
-}
 
 func supportsImplementationClosure(for method: ProtocolMethodInfo) -> Bool {
   !method.isRethrowing && !methodSignatureReferencesGenericParameters(method)
@@ -425,28 +342,6 @@ func spyStorageType(for param: ParameterInfo, method: ProtocolMethodInfo) -> Str
   let strippedType = stripEscaping(from: stripInout(from: param.type))
   guard !isNonEscapingFunctionType(param.type) else { return nil }
   return methodReferencesGenericParameters(method, in: strippedType) ? "Any" : strippedType
-}
-
-/// Returns the invocation arguments for an implementation closure — internal
-/// parameter names in source order, comma-separated. Inout parameters are
-/// prefixed with `&` so they compile when forwarded to the closure.
-func implementationInvocationArguments(for method: ProtocolMethodInfo) -> String {
-  method.parameters.map { $0.isInout ? "&\($0.internalName)" : $0.internalName }.joined(separator: ", ")
-}
-
-/// Generates the `@ObservationIgnored` implementation-closure storage property
-/// for a spy method.
-func generateImplementationStorage(
-  method: ProtocolMethodInfo,
-  implementationName: String,
-  access: String
-) -> [String] {
-  let prefix = access.isEmpty ? "" : "\(access) "
-  let closureType = implementationClosureType(for: method)
-  return [
-    "  @ObservationIgnored",
-    "  \(prefix)var \(implementationName): \(closureType)"
-  ]
 }
 
 // MARK: - Method Signature Helper
