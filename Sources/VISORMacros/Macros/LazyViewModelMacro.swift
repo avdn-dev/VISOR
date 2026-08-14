@@ -29,7 +29,7 @@ public struct LazyViewModelMacro: MemberMacro {
       return []
     }
 
-    guard let (viewModelType, factoryType, observationPolicy) = parseArguments(from: node, in: context) else {
+    guard let (viewModelType, observationPolicy) = parseArguments(from: node, in: context) else {
       return []
     }
 
@@ -50,7 +50,7 @@ public struct LazyViewModelMacro: MemberMacro {
 
     var members: [DeclSyntax] = [
       "@Environment(\\.router) private var containerRouter",
-      "@Environment(\(raw: factoryType).self) private var factory",
+      "@Environment(VISOR.ViewModelFactory<\(raw: viewModelType)>.self) private var factory",
     ]
 
     members.append(contentsOf: [
@@ -79,7 +79,7 @@ public struct LazyViewModelMacro: MemberMacro {
               if let viewModel = _viewModel {
                   VISOR._visorOwnedViewModelContent(
                       for: viewModel,
-                      observationPolicy: .\(raw: observationPolicy)
+                      observationPolicy: \(raw: observationPolicy)
                   ) { _ in
                       content
                   }
@@ -101,51 +101,37 @@ public struct LazyViewModelMacro: MemberMacro {
 
   // MARK: Private
 
-  // Must stay in sync with ObservationPolicy cases in Sources/VISOR/ObservationPolicy.swift.
-  // The macro target cannot import the VISOR runtime, so valid values are duplicated here.
-  private static let validPolicies: Set<String> = [
-    "alwaysObserving", "pauseInBackground", "pauseWhenInactive",
-  ]
-
   private static func parseArguments(
     from node: AttributeSyntax,
     in context: some MacroExpansionContext
-  ) -> (viewModelType: String, factoryType: String, observationPolicy: String)? {
+  ) -> (viewModelType: String, observationPolicy: String)? {
     // Stage 1: Must have an argument list
     guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
       return nil
     }
 
-    // Stage 2: First arg must be a member access expression with `.self`
+    // Stage 2: Preserve the complete type expression before `.self`. The macro
+    // declaration's VM.Type constraint remains the source of truth for whether
+    // the expression names a ViewModel type.
     guard
       let memberAccess = firstArg.expression.as(MemberAccessExprSyntax.self),
       memberAccess.declName.baseName.text == "self",
-      let baseType = memberAccess.base?.as(DeclReferenceExprSyntax.self)
+      let baseType = memberAccess.base
     else {
       context.diagnose(Diagnostic(node: Syntax(firstArg), message: VISORDiagnostic.missingSelfSuffix(macroName: "LazyViewModel")))
       return nil
     }
 
-    let vm = baseType.baseName.text
+    let viewModelType = baseType.trimmedDescription
 
-    // Stage 3: Optional observationPolicy parameter
-    var policy = "alwaysObserving"
-    let secondIndex = arguments.index(after: arguments.startIndex)
-    if secondIndex != arguments.endIndex {
-      let secondArg = arguments[secondIndex]
-      if secondArg.label?.text == "observationPolicy",
-         let policyAccess = secondArg.expression.as(MemberAccessExprSyntax.self)
-      {
-        let value = policyAccess.declName.baseName.text
-        guard validPolicies.contains(value) else {
-          context.diagnose(Diagnostic(node: Syntax(secondArg), message: VISORDiagnostic.invalidObservationPolicy))
-          return nil
-        }
-        policy = value
-      }
-    }
+    // Stage 3: Preserve any valid ObservationPolicy expression. Swift type
+    // checks it against the public macro declaration, avoiding a duplicated
+    // case list that can drift when ObservationPolicy evolves.
+    let observationPolicy = arguments.dropFirst().first {
+      $0.label?.text == "observationPolicy"
+    }?.expression.trimmedDescription ?? ".alwaysObserving"
 
-    return (vm, "\(vm).Factory", policy)
+    return (viewModelType, observationPolicy)
   }
 }

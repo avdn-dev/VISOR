@@ -10,7 +10,6 @@ enum VISORDiagnostic: DiagnosticMessage {
   case missingState
   case actionWithoutHandle
   case handleWrongLabel
-  case invalidObservationPolicy
   case stateClassNotFinal
   case lazyViewModelStateAliasCollision
   case viewModelRequiresMainActor
@@ -46,8 +45,6 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel: 'Action' enum declared but no 'handle(_ action: Action)' method found"
     case .handleWrongLabel:
       "@ViewModel: 'handle(action:)' should use an underscore label: 'handle(_ action: Action)'"
-    case .invalidObservationPolicy:
-      "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive"
     case .stateClassNotFinal:
       "State class must be 'final'"
     case .lazyViewModelStateAliasCollision:
@@ -92,7 +89,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .missingState: "missingState"
     case .actionWithoutHandle: "actionWithoutHandle"
     case .handleWrongLabel: "handleWrongLabel"
-    case .invalidObservationPolicy: "invalidObservationPolicy"
     case .stateClassNotFinal: "stateClassNotFinal"
     case .lazyViewModelStateAliasCollision: "lazyViewModelStateAliasCollision"
     case .viewModelRequiresMainActor: "viewModelRequiresMainActor"

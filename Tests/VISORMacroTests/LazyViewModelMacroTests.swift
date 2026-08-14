@@ -35,7 +35,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -93,7 +93,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -153,7 +153,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -213,7 +213,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -271,7 +271,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -329,7 +329,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -390,7 +390,7 @@ struct LazyViewModelMacroTests {
 
             @Environment(\\.router) private var containerRouter
 
-            @Environment(MyVM.Factory.self) private var factory
+            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
             @State private var _viewModel: MyVM?
 
@@ -549,7 +549,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -607,7 +607,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -665,7 +665,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -723,7 +723,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -785,7 +785,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -844,7 +844,7 @@ struct LazyViewModelMacroTests {
 
           @Environment(\\.router) private var containerRouter
 
-          @Environment(MyVM.Factory.self) private var factory
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
           @State private var _viewModel: MyVM?
 
@@ -887,22 +887,62 @@ struct LazyViewModelMacroTests {
   }
 
   @Test
-  func `Invalid observation policy emits diagnostic`() {
+  func `Qualified generic type and policy expression are preserved`() {
     assertMacroExpansionSwiftTesting(
       """
-      @LazyViewModel(MyVM.self, observationPolicy: .never)
-      struct MyView: View {
+      @LazyViewModel(
+        Feature.GenericViewModel<LiveService>.self,
+        observationPolicy: featurePolicy)
+      struct FeatureView: View {
         var content: some View { Text("") }
       }
       """,
       expandedSource: """
-      struct MyView: View {
+      struct FeatureView: View {
         var content: some View { Text("") }
+
+          @Environment(\\.router) private var containerRouter
+
+          @Environment(VISOR.ViewModelFactory<Feature.GenericViewModel<LiveService>>.self) private var factory
+
+          @State private var _viewModel: Feature.GenericViewModel<LiveService>?
+
+          var viewModel: Feature.GenericViewModel<LiveService> {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: Feature.GenericViewModel<LiveService> viewModel accessed while _viewModel is nil — content should only render after initialisation.")
+              }
+              return vm
+          }
+
+          var state: Feature.GenericViewModel<LiveService>.State {
+              viewModel.state
+          }
+
+          var bindableState: Bindable<Feature.GenericViewModel<LiveService>.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: featurePolicy
+                      ) { _ in
+                          content
+                      }
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory.makeViewModel(router: containerRouter)
+                  }
+              }
+          }
       }
       """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel observationPolicy must be .alwaysObserving, .pauseInBackground, or .pauseWhenInactive", line: 1, column: 27, severity: .error),
-      ],
       macros: testMacros)
   }
 

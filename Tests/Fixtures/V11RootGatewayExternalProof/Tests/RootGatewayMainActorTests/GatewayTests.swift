@@ -6,6 +6,17 @@ import SwiftUI
 import Testing
 import VISOR
 
+private let downstreamObservationPolicy: ObservationPolicy = .pauseWhenInactive
+
+@LazyViewModel(
+  RootGatewayModelsMainActor.MainActorSourceBackedViewModel.self,
+  observationPolicy: downstreamObservationPolicy)
+private struct QualifiedLazySourceBackedView: View {
+  var content: some View {
+    Text("Revision \(state.revision)")
+  }
+}
+
 @Suite("Root State gateway from a MainActor-by-default target")
 struct RootGatewayMainActorTests {
   @Test
@@ -71,6 +82,14 @@ struct RootGatewayMainActorTests {
   @Test
   func `Ordinary LazyViewModel selects source-backed ownership across the package boundary`() {
     let view = MainActorSourceBackedView()
+
+    requireViewConformance(view)
+    requireViewConformance(view.body)
+  }
+
+  @Test
+  func `LazyViewModel accepts module-qualified type and policy expressions`() {
+    let view = QualifiedLazySourceBackedView()
 
     requireViewConformance(view)
     requireViewConformance(view.body)
