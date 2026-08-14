@@ -25,8 +25,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
-        run: swift build
+      - name: Test release configuration
+        run: swift test -c release
 
-      - name: Test
-        run: swift test
+  external-boundaries:
+    name: External boundaries (${{ matrix.name }})
+    runs-on: macos-26
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Gateway
+            package: Tests/Fixtures/V11RootGatewayExternalProof
+          - name: Testing
+            package: Tests/Fixtures/V11RootTestingExternalProof
+          - name: Test doubles
+            package: Tests/Fixtures/V11RootTestDoublesExternalProof
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test release boundary
+        run: swift test -c release --package-path "${{ matrix.package }}"
+
+  api-boundaries:
+    name: API boundaries
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify inaccessible APIs remain inaccessible
+        run: sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
