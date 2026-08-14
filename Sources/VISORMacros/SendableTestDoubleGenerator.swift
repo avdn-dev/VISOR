@@ -25,6 +25,8 @@ struct SendableTestDoubleGenerator {
   func expand(
     _ protocolDecl: ProtocolDeclSyntax,
     analysis: ProtocolAnalysis,
+    typeName: String,
+    names: TestDoubleNamePlan,
     in context: some MacroExpansionContext)
     throws -> [DeclSyntax]
   {
@@ -47,55 +49,49 @@ struct SendableTestDoubleGenerator {
         node: Syntax(protocolDecl),
         message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: kind.macroName)))
     }
+    names.diagnose(
+      protocolDecl: protocolDecl,
+      macroName: kind.macroName,
+      context: context)
 
     let protocolName = protocolDecl.name.trimmedDescription
     let access = accessLevel(of: protocolDecl)
     let prefix = access.isEmpty ? "" : "\(access) "
     let methods = analysis.methods
-    let methodPrefixes = uniqueMethodPrefixes(for: methods)
-    let implementationNames = implementationStorageNames(
-      for: methods,
-      methodPrefixes: methodPrefixes,
-      properties: analysis.properties)
+    let storageTypeName = names.storageType ?? "_Storage"
+    let storageName = names.storage ?? "_testDoubleStorage"
 
     var storedProperties = analysis.properties.map(sendableProtocolProperty)
     var callCases: [String] = []
 
-    for ((method, methodPrefix), implementationName) in
-      zip(zip(methods, methodPrefixes), implementationNames)
+    for (method, methodNames) in zip(methods, names.methods)
     {
       switch kind {
       case .stub:
-        if let returnProperty = sendableReturnProperty(method: method, methodPrefix: methodPrefix) {
+        if let returnProperty = sendableReturnProperty(
+          method: method,
+          storageName: methodNames.returnStorage)
+        {
           storedProperties.append(returnProperty)
         }
 
       case .spy:
-        let preferredImplementationName = "\(methodPrefix)Implementation"
-        let supportsImplementation = supportsImplementationClosure(for: method)
-        if supportsImplementation && implementationName != preferredImplementationName {
-          context.diagnose(Diagnostic(
-            node: Syntax(protocolDecl),
-            message: TestDoubleDiagnostic.implementationNameCollision(
-              methodName: method.name,
-              preferredName: preferredImplementationName,
-              generatedName: implementationName,
-              macroName: kind.macroName)))
-        }
-
         storedProperties.append(SendableStoredProperty(
-          name: "\(methodPrefix)CallCount",
+          name: methodNames.callCount ?? "\(methodNames.prefix)CallCount",
           exposedType: "Int",
           storageType: "Int",
           defaultExpression: "0",
           isObservationIgnored: false))
         storedProperties.append(contentsOf: sendableReceivedProperties(
           method: method,
-          methodPrefix: methodPrefix))
-        if let returnProperty = sendableReturnProperty(method: method, methodPrefix: methodPrefix) {
+          names: methodNames))
+        if let returnProperty = sendableReturnProperty(
+          method: method,
+          storageName: methodNames.returnStorage)
+        {
           storedProperties.append(returnProperty)
         }
-        if supportsImplementation {
+        if let implementationName = methodNames.implementation {
           storedProperties.append(SendableStoredProperty(
             name: implementationName,
             exposedType: sendableImplementationClosureType(for: method),
@@ -103,36 +99,48 @@ struct SendableTestDoubleGenerator {
             defaultExpression: "nil",
             isObservationIgnored: true))
         }
-        callCases.append(sendableCallCase(for: method))
+        callCases.append(sendableCallCase(
+          for: method,
+          caseName: methodNames.callCase ?? method.name))
       }
     }
 
-    if kind == .spy, !methods.isEmpty {
+    if kind == .spy, !methods.isEmpty,
+       let callLogName = names.callLog,
+       let callTypeName = names.callType
+    {
       storedProperties.append(SendableStoredProperty(
-        name: "calls",
-        exposedType: "[Call]",
-        storageType: "[Call]",
+        name: callLogName,
+        exposedType: "[\(callTypeName)]",
+        storageType: "[\(callTypeName)]",
         defaultExpression: "[]",
         isObservationIgnored: false))
     }
 
-    var members = generateStorageMembers(storedProperties)
-    members.append(contentsOf: storedProperties.flatMap { generateComputedProperty($0, access: access) })
+    var members = generateStorageMembers(
+      storedProperties,
+      storageTypeName: storageTypeName,
+      storageName: storageName)
+    members.append(contentsOf: storedProperties.flatMap {
+      generateComputedProperty($0, access: access, storageName: storageName)
+    })
 
     switch kind {
     case .stub:
       members.append(contentsOf: generateStubMethods(
         methods,
-        methodPrefixes: methodPrefixes,
+        names: names.methods,
+        storageName: storageName,
         access: access))
     case .spy:
       members.append(contentsOf: generateSpyMethods(
         methods,
-        methodPrefixes: methodPrefixes,
-        implementationNames: implementationNames,
+        names: names.methods,
+        callLogName: names.callLog ?? "calls",
+        storageName: storageName,
         access: access))
-      if !methods.isEmpty {
-        members.append("  \(prefix)enum Call: Sendable {")
+      if !methods.isEmpty, let callTypeName = names.callType {
+        members.append("  \(prefix)enum \(callTypeName): Sendable {")
         members.append(contentsOf: callCases.map { "    \($0)" })
         members.append("  }")
       }
@@ -143,7 +151,6 @@ struct SendableTestDoubleGenerator {
     }
 
     let body = members.joined(separator: "\n")
-    let typeName = "\(kind.generatedTypePrefix)\(protocolName)"
     let result: DeclSyntax = """
       @Observable
       nonisolated \(raw: prefix)final class \(raw: typeName): \(raw: protocolName), Sendable {
@@ -155,21 +162,27 @@ struct SendableTestDoubleGenerator {
 
   // MARK: Storage
 
-  private func generateStorageMembers(_ properties: [SendableStoredProperty]) -> [String] {
-    var members = ["  private struct _Storage: Sendable {"]
+  private func generateStorageMembers(
+    _ properties: [SendableStoredProperty],
+    storageTypeName: String,
+    storageName: String)
+    -> [String]
+  {
+    var members = ["  private struct \(storageTypeName): Sendable {"]
     members.append(contentsOf: properties.map {
       "    var \($0.name): \($0.storageType) = \($0.defaultExpression)"
     })
     members.append("  }")
     members.append("  @ObservationIgnored")
     members.append(
-      "  private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())")
+      "  private let \(storageName) = VISORTestDoubles._TestDoubleStorage(\(storageTypeName)())")
     return members
   }
 
   private func generateComputedProperty(
     _ property: SendableStoredProperty,
-    access: String)
+    access: String,
+    storageName: String)
     -> [String]
   {
     let prefix = access.isEmpty ? "" : "\(access) "
@@ -178,14 +191,14 @@ struct SendableTestDoubleGenerator {
     if !property.isObservationIgnored {
       lines.append("      access(keyPath: \\.\(property.name))")
     }
-    lines.append("      return _testDoubleStorage.withValue { $0.\(property.name) }")
+    lines.append("      return \(storageName).withValue { $0.\(property.name) }")
     lines.append("    }")
     lines.append("    set {")
     if property.isObservationIgnored {
-      lines.append("      _testDoubleStorage.withValue { $0.\(property.name) = newValue }")
+      lines.append("      \(storageName).withValue { $0.\(property.name) = newValue }")
     } else {
       lines.append("      withMutation(keyPath: \\.\(property.name)) {")
-      lines.append("        _testDoubleStorage.withValue { $0.\(property.name) = newValue }")
+      lines.append("        \(storageName).withValue { $0.\(property.name) = newValue }")
       lines.append("      }")
     }
     lines.append("    }")
@@ -197,23 +210,27 @@ struct SendableTestDoubleGenerator {
 
   private func generateStubMethods(
     _ methods: [ProtocolMethodInfo],
-    methodPrefixes: [String],
+    names: [TestDoubleMethodNamePlan],
+    storageName: String,
     access: String)
     -> [String]
   {
     var members: [String] = []
-    for (method, methodPrefix) in zip(methods, methodPrefixes) {
+    for (method, methodNames) in zip(methods, names) {
       if method.isConcurrent {
         members.append("  @concurrent")
       }
       members.append("  \(buildMethodSignature(method, access: access)) {")
-      if let returnProperty = sendableReturnProperty(method: method, methodPrefix: methodPrefix) {
+      if let returnProperty = sendableReturnProperty(
+        method: method,
+        storageName: methodNames.returnStorage)
+      {
         members.append(
-          "    let \(returnProperty.name) = _testDoubleStorage.withValue { $0.\(returnProperty.name) }")
+          "    let \(returnProperty.name) = \(storageName).withValue { $0.\(returnProperty.name) }")
       }
       members.append(contentsOf: generateFallbackBodyLines(
         method: method,
-        methodPrefix: methodPrefix,
+        returnStorageName: methodNames.returnStorage,
         style: .explicitReturn))
       members.append("  }")
     }
@@ -224,14 +241,14 @@ struct SendableTestDoubleGenerator {
 
   private func generateSpyMethods(
     _ methods: [ProtocolMethodInfo],
-    methodPrefixes: [String],
-    implementationNames: [String],
+    names: [TestDoubleMethodNamePlan],
+    callLogName: String,
+    storageName: String,
     access: String)
     -> [String]
   {
     var members: [String] = []
-    for ((method, methodPrefix), implementationName) in
-      zip(zip(methods, methodPrefixes), implementationNames)
+    for (method, methodNames) in zip(methods, names)
     {
       if method.isConcurrent {
         members.append("  @concurrent")
@@ -240,12 +257,13 @@ struct SendableTestDoubleGenerator {
       members.append(contentsOf: generateStorageSnapshots(for: method))
       members.append(contentsOf: generateAtomicRecording(
         method: method,
-        methodPrefix: methodPrefix,
-        implementationName: supportsImplementationClosure(for: method) ? implementationName : nil))
+        names: methodNames,
+        callLogName: callLogName,
+        storageName: storageName))
       members.append(contentsOf: generateImplementationBody(
         method: method,
-        methodPrefix: methodPrefix,
-        implementationName: supportsImplementationClosure(for: method) ? implementationName : nil))
+        returnStorageName: methodNames.returnStorage,
+        implementationName: methodNames.implementation))
       members.append("  }")
     }
     return members
@@ -253,8 +271,9 @@ struct SendableTestDoubleGenerator {
 
   private func generateAtomicRecording(
     method: ProtocolMethodInfo,
-    methodPrefix: String,
-    implementationName: String?)
+    names: TestDoubleMethodNamePlan,
+    callLogName: String,
+    storageName: String)
     -> [String]
   {
     let receivedParams = method.parameters.filter { !$0.isInout }
@@ -265,58 +284,80 @@ struct SendableTestDoubleGenerator {
       sendableSpyStorageType(for: $0, method: method) != nil
     }
 
-    var mutationNames = ["\(methodPrefix)CallCount"]
+    let methodPrefix = names.prefix
+    let callCountName = names.callCount ?? "\(methodPrefix)CallCount"
+    var mutationNames = [callCountName]
     if storableParams.count == 1 {
-      let capName = storableParams[0].internalName.capitalisedFirst
-      mutationNames.append("\(methodPrefix)Received\(capName)")
-      mutationNames.append("\(methodPrefix)ReceivedInvocations")
+      if let receivedArgument = names.receivedArgument {
+        mutationNames.append(receivedArgument)
+      }
+      if let receivedInvocations = names.receivedInvocations {
+        mutationNames.append(receivedInvocations)
+      }
     } else if storableParams.count > 1 {
-      mutationNames.append("\(methodPrefix)ReceivedArguments")
-      mutationNames.append("\(methodPrefix)ReceivedInvocations")
+      if let receivedArguments = names.receivedArguments {
+        mutationNames.append(receivedArguments)
+      }
+      if let receivedInvocations = names.receivedInvocations {
+        mutationNames.append(receivedInvocations)
+      }
     }
-    mutationNames.append("calls")
+    mutationNames.append(callLogName)
 
     var snapshotNames: [String] = []
-    if let implementationName {
+    if let implementationName = names.implementation {
       snapshotNames.append(implementationName)
     }
-    if let returnProperty = sendableReturnProperty(method: method, methodPrefix: methodPrefix) {
+    if let returnProperty = sendableReturnProperty(
+      method: method,
+      storageName: names.returnStorage)
+    {
       snapshotNames.append(returnProperty.name)
     }
 
-    var storageBody = ["state.\(methodPrefix)CallCount += 1"]
+    var storageBody = ["state.\(callCountName) += 1"]
     if storableParams.count == 1 {
       let param = storableParams[0]
-      let capName = param.internalName.capitalisedFirst
       let value = storageValueExpression(for: param)
-      storageBody.append("state.\(methodPrefix)Received\(capName) = \(value)")
-      storageBody.append("state.\(methodPrefix)ReceivedInvocations.append(\(value))")
+      if let receivedArgument = names.receivedArgument {
+        storageBody.append("state.\(receivedArgument) = \(value)")
+      }
+      if let receivedInvocations = names.receivedInvocations {
+        storageBody.append("state.\(receivedInvocations).append(\(value))")
+      }
     } else if storableParams.count > 1 {
       let tuple = "(" + storableParams.map(storageValueExpression).joined(separator: ", ") + ")"
-      storageBody.append("state.\(methodPrefix)ReceivedArguments = \(tuple)")
-      storageBody.append("state.\(methodPrefix)ReceivedInvocations.append(\(tuple))")
+      if let receivedArguments = names.receivedArguments {
+        storageBody.append("state.\(receivedArguments) = \(tuple)")
+      }
+      if let receivedInvocations = names.receivedInvocations {
+        storageBody.append("state.\(receivedInvocations).append(\(tuple))")
+      }
     }
 
+    let callCaseName = names.callCase ?? method.name
     if callParams.isEmpty {
-      storageBody.append("state.calls.append(.\(method.name))")
+      storageBody.append("state.\(callLogName).append(.\(callCaseName))")
     } else {
       let arguments = callParams.map { param in
         let value = storageValueExpression(for: param)
         return "\(param.internalName): \(value)"
       }.joined(separator: ", ")
-      storageBody.append("state.calls.append(.\(method.name)(\(arguments)))")
+      storageBody.append("state.\(callLogName).append(.\(callCaseName)(\(arguments)))")
     }
 
     return wrapAtomicRecording(
       mutationNames: mutationNames,
       snapshotNames: snapshotNames,
-      storageBody: storageBody)
+      storageBody: storageBody,
+      storageName: storageName)
   }
 
   private func wrapAtomicRecording(
     mutationNames: [String],
     snapshotNames: [String],
-    storageBody: [String])
+    storageBody: [String],
+    storageName: String)
     -> [String]
   {
     let binding: String
@@ -336,7 +377,7 @@ struct SendableTestDoubleGenerator {
       lines.append("\(indent)\(assignment)withMutation(keyPath: \\.\(name)) {")
       indent += "  "
     }
-    lines.append("\(indent)_testDoubleStorage.withValue { state in")
+    lines.append("\(indent)\(storageName).withValue { state in")
     indent += "  "
     lines.append(contentsOf: storageBody.map { "\(indent)\($0)" })
     if snapshotNames.count == 1 {
@@ -356,14 +397,14 @@ struct SendableTestDoubleGenerator {
 
   private func generateImplementationBody(
     method: ProtocolMethodInfo,
-    methodPrefix: String,
+    returnStorageName: String?,
     implementationName: String?)
     -> [String]
   {
     guard let implementationName else {
       return generateFallbackBodyLines(
         method: method,
-        methodPrefix: methodPrefix,
+        returnStorageName: returnStorageName,
         style: .explicitReturn)
     }
 
@@ -387,7 +428,7 @@ struct SendableTestDoubleGenerator {
     lines.append("    }")
     lines.append(contentsOf: generateFallbackBodyLines(
       method: method,
-      methodPrefix: methodPrefix,
+      returnStorageName: returnStorageName,
       style: .explicitReturn))
     return lines
   }
@@ -469,9 +510,10 @@ struct SendableTestDoubleGenerator {
 
   private func sendableReturnProperty(
     method: ProtocolMethodInfo,
-    methodPrefix: String)
+    storageName: String?)
     -> SendableStoredProperty?
   {
+    guard let storageName else { return nil }
     guard !method.isRethrowing else { return nil }
     guard !methodReferencesGenericParameters(method, in: method.returnType) else { return nil }
     guard !methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) else {
@@ -480,20 +522,19 @@ struct SendableTestDoubleGenerator {
 
     if method.isThrowing {
       guard let failureType = method.throwsEffect.resultFailureType else { return nil }
-      let name = "\(methodPrefix)Result"
       if let rawReturnType = method.returnType {
         let returnType = storageValueType(from: rawReturnType)
         let resultType = "Result<\(returnType), \(failureType)>"
         if let initialValue = returnDefaultValue(for: method) {
           return SendableStoredProperty(
-            name: name,
+            name: storageName,
             exposedType: resultType,
             storageType: resultType,
             defaultExpression: ".success(\(initialValue))",
             isObservationIgnored: false)
         }
         return SendableStoredProperty(
-          name: name,
+          name: storageName,
           exposedType: "\(resultType)?",
           storageType: "\(resultType)?",
           defaultExpression: "nil",
@@ -502,7 +543,7 @@ struct SendableTestDoubleGenerator {
 
       let resultType = "Result<Void, \(failureType)>"
       return SendableStoredProperty(
-        name: name,
+        name: storageName,
         exposedType: resultType,
         storageType: resultType,
         defaultExpression: ".success(())",
@@ -511,17 +552,16 @@ struct SendableTestDoubleGenerator {
 
     guard let rawReturnType = method.returnType else { return nil }
     let returnType = storageValueType(from: rawReturnType)
-    let name = "\(methodPrefix)ReturnValue"
     if let initialValue = returnDefaultValue(for: method) {
       return SendableStoredProperty(
-        name: name,
+        name: storageName,
         exposedType: returnType,
         storageType: returnType,
         defaultExpression: initialValue,
         isObservationIgnored: isFunctionType(returnType))
     }
     return SendableStoredProperty(
-      name: name,
+      name: storageName,
       exposedType: "\(returnType)?",
       storageType: "\(returnType)?",
       defaultExpression: "nil",
@@ -530,7 +570,7 @@ struct SendableTestDoubleGenerator {
 
   private func sendableReceivedProperties(
     method: ProtocolMethodInfo,
-    methodPrefix: String)
+    names: TestDoubleMethodNamePlan)
     -> [SendableStoredProperty]
   {
     let receivedParams = method.parameters.filter { !$0.isInout }
@@ -543,15 +583,20 @@ struct SendableTestDoubleGenerator {
       guard let type = sendableSpyStorageType(for: parameter, method: method) else { return [] }
       let wrappedType = type.hasPrefix("any ") || isFunctionType(type) ? "(\(type))" : type
       let ignored = isFunctionType(type)
+      guard let receivedArgument = names.receivedArgument,
+            let receivedInvocations = names.receivedInvocations
+      else {
+        return []
+      }
       return [
         SendableStoredProperty(
-          name: "\(methodPrefix)Received\(parameter.internalName.capitalisedFirst)",
+          name: receivedArgument,
           exposedType: "\(wrappedType)?",
           storageType: "\(wrappedType)?",
           defaultExpression: "nil",
           isObservationIgnored: ignored),
         SendableStoredProperty(
-          name: "\(methodPrefix)ReceivedInvocations",
+          name: receivedInvocations,
           exposedType: "[\(wrappedType)]",
           storageType: "[\(wrappedType)]",
           defaultExpression: "[]",
@@ -568,15 +613,20 @@ struct SendableTestDoubleGenerator {
         "\($0.0.internalName): \($0.1)"
       }.joined(separator: ", ") + ")"
       let wrappedType = containsFunction ? "(\(tupleType))" : tupleType
+      guard let receivedArguments = names.receivedArguments,
+            let receivedInvocations = names.receivedInvocations
+      else {
+        return []
+      }
       return [
         SendableStoredProperty(
-          name: "\(methodPrefix)ReceivedArguments",
+          name: receivedArguments,
           exposedType: "\(wrappedType)?",
           storageType: "\(wrappedType)?",
           defaultExpression: "nil",
           isObservationIgnored: containsFunction),
         SendableStoredProperty(
-          name: "\(methodPrefix)ReceivedInvocations",
+          name: receivedInvocations,
           exposedType: "[\(wrappedType)]",
           storageType: "[\(wrappedType)]",
           defaultExpression: "[]",
@@ -597,13 +647,17 @@ struct SendableTestDoubleGenerator {
     return "(@Sendable (\(parameters))\(effects) -> \(method.returnType ?? "Void"))?"
   }
 
-  private func sendableCallCase(for method: ProtocolMethodInfo) -> String {
+  private func sendableCallCase(
+    for method: ProtocolMethodInfo,
+    caseName: String)
+    -> String
+  {
     let parameters = method.parameters.compactMap { parameter -> String? in
       guard let type = sendableSpyStorageType(for: parameter, method: method) else { return nil }
       return "\(parameter.internalName): \(type)"
     }
-    guard !parameters.isEmpty else { return "case \(method.name)" }
-    return "case \(method.name)(\(parameters.joined(separator: ", ")))"
+    guard !parameters.isEmpty else { return "case \(caseName)" }
+    return "case \(caseName)(\(parameters.joined(separator: ", ")))"
   }
 
   private func unconstrainedGenericParameterNamesRequiringStorage(

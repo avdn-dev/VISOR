@@ -1071,7 +1071,7 @@ struct GenerateSpyMacroTests {
   }
 
   @Test
-  func `Warning on protocol with static members`() {
+  func `Error on protocol with static members`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateSpy
@@ -1085,32 +1085,15 @@ struct GenerateSpyMacroTests {
         static var shared: String { get }
         func doWork()
       }
-
-      @Observable
-      final class SpyHasStatic: HasStatic {
-        // -- doWork --
-        var doWorkCallCount = 0
-        @ObservationIgnored
-        var doWorkImplementation: (() -> Void)?
-        func doWork() {
-          doWorkCallCount += 1
-          calls.append(.doWork)
-          doWorkImplementation?()
-        }
-        enum Call {
-          case doWork
-        }
-        var calls: [Call] = []
-      }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@GenerateSpy skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateSpy does not support static or class requirements", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `Warning on protocol with subscripts`() {
+  func `Error on protocol with subscripts`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateSpy
@@ -1124,14 +1107,9 @@ struct GenerateSpyMacroTests {
         var name: String { get }
         subscript(index: Int) -> String { get }
       }
-
-      @Observable
-      final class SpyHasSubscript: HasSubscript {
-        var name: String = ""
-      }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@GenerateSpy skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateSpy does not support subscript requirements", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }

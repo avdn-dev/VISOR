@@ -109,6 +109,8 @@ struct ProtocolAnalysis {
   var typeAliases: [ProtocolTypeAliasInfo] = []
   var hasAssociatedTypes = false
   var hasSubscripts = false
+  var hasInitialiserRequirements = false
+  var unsupportedRequirementKinds: [String] = []
   
   init(_ protocolDecl: ProtocolDeclSyntax) {
     
@@ -140,6 +142,15 @@ struct ProtocolAnalysis {
         hasSubscripts = true
         continue
       }
+
+      if member.decl.is(InitializerDeclSyntax.self) {
+        hasInitialiserRequirements = true
+        continue
+      }
+
+      if member.decl.is(TypeAliasDeclSyntax.self) {
+        continue
+      }
       
       // Variable declarations (properties)
       if let varDecl = member.decl.as(VariableDeclSyntax.self) {
@@ -153,11 +164,21 @@ struct ProtocolAnalysis {
           continue
         }
         
-        guard
+        guard varDecl.bindingSpecifier.tokenKind == .keyword(.var),
+          varDecl.bindings.count == 1,
           let binding = varDecl.bindings.first,
           let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
           let typeAnnotation = binding.typeAnnotation
         else {
+          recordUnsupportedRequirement("property declaration")
+          continue
+        }
+
+        if let accessorBlock = binding.accessorBlock,
+           case .accessors(let accessors) = accessorBlock.accessors,
+           accessors.contains(where: { $0.effectSpecifiers != nil })
+        {
+          recordUnsupportedRequirement("effectful property accessor")
           continue
         }
         
@@ -187,6 +208,11 @@ struct ProtocolAnalysis {
         let isStatic = funcDecl.modifiers.contains { $0.name.text == "static" || $0.name.text == "class" }
         if isStatic {
           staticMembers.append(funcDecl.name.text)
+          continue
+        }
+
+        if funcDecl.signature.parameterClause.parameters.contains(where: { $0.ellipsis != nil }) {
+          recordUnsupportedRequirement("variadic method")
           continue
         }
 
@@ -242,8 +268,26 @@ struct ProtocolAnalysis {
           defaultReturnExpression: extractAttributeExpression(
             named: AttributeName.defaultReturn,
             in: funcDecl.attributes)))
+        continue
       }
+
+
+      // Nested declarations do not add conformance requirements.
+      if member.decl.is(StructDeclSyntax.self)
+        || member.decl.is(ClassDeclSyntax.self)
+        || member.decl.is(EnumDeclSyntax.self)
+        || member.decl.is(ActorDeclSyntax.self)
+      {
+        continue
+      }
+
+      recordUnsupportedRequirement("unrecognised protocol member")
     }
+  }
+
+  private mutating func recordUnsupportedRequirement(_ kind: String) {
+    guard !unsupportedRequirementKinds.contains(kind) else { return }
+    unsupportedRequirementKinds.append(kind)
   }
 }
 
@@ -487,35 +531,76 @@ private struct TypeAliasHandler {
 // MARK: - Shared Protocol Validation for Test Double Macros
 
 /// Validates a protocol analysis for test double generation (GenerateStub/GenerateSpy).
-/// Returns `false` if the protocol has associated types (emits error).
-/// Emits warnings for subscripts and static members.
+/// Returns `false` unless the generator can model every conformance requirement.
 func validateProtocolForTestDouble(
   _ analysis: ProtocolAnalysis,
   protocolDecl: ProtocolDeclSyntax,
+  traits: TestDoubleTraits,
   macroName: String,
   context: some MacroExpansionContext)
   -> Bool
 {
+  var isValid = true
+
   if analysis.hasAssociatedTypes {
     context.diagnose(Diagnostic(
       node: Syntax(protocolDecl),
       message: TestDoubleDiagnostic.associatedTypesNotSupported(macroName: macroName)))
-    return false
+    isValid = false
   }
 
   if analysis.hasSubscripts {
     context.diagnose(Diagnostic(
       node: Syntax(protocolDecl),
-      message: TestDoubleDiagnostic.subscriptsSkipped(macroName: macroName)))
+      message: TestDoubleDiagnostic.subscriptsNotSupported(macroName: macroName)))
+    isValid = false
   }
 
   if !analysis.staticMembers.isEmpty {
     context.diagnose(Diagnostic(
       node: Syntax(protocolDecl),
-      message: TestDoubleDiagnostic.staticMembersSkipped(macroName: macroName)))
+      message: TestDoubleDiagnostic.staticRequirementsNotSupported(macroName: macroName)))
+    isValid = false
   }
 
-  return true
+  if analysis.hasInitialiserRequirements {
+    context.diagnose(Diagnostic(
+      node: Syntax(protocolDecl),
+      message: TestDoubleDiagnostic.initialiserRequirementsNotSupported(macroName: macroName)))
+    isValid = false
+  }
+
+  for kind in analysis.unsupportedRequirementKinds {
+    context.diagnose(Diagnostic(
+      node: Syntax(protocolDecl),
+      message: TestDoubleDiagnostic.unsupportedRequirement(kind: kind, macroName: macroName)))
+    isValid = false
+  }
+
+  for inheritedType in protocolDecl.inheritanceClause?.inheritedTypes ?? [] {
+    let inheritedName = inheritedType.type.trimmedDescription
+    switch inheritedName {
+    case "AnyObject", "Swift.AnyObject":
+      continue
+    case "Sendable", "Swift.Sendable":
+      guard traits.isSendable else {
+        context.diagnose(Diagnostic(
+          node: Syntax(protocolDecl),
+          message: TestDoubleDiagnostic.sendableTraitRequired(macroName: macroName)))
+        isValid = false
+        continue
+      }
+    default:
+      context.diagnose(Diagnostic(
+        node: Syntax(protocolDecl),
+        message: TestDoubleDiagnostic.inheritedProtocolNotSupported(
+          protocolName: inheritedName,
+          macroName: macroName)))
+      isValid = false
+    }
+  }
+
+  return isValid
 }
 
 // accessLevel(of:) — use the generic version from CodeGenHelpers.swift.

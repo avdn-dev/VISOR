@@ -26,4 +26,40 @@ struct RootTestDoubleBoundaryTests {
     #expect(spy.recordCallCount == 100)
     #expect(Set(spy.recordReceivedInvocations) == Set(0..<100))
   }
+
+  @Test
+  func `A public stub avoids protocol return-storage collisions`() {
+    let stub = StubCollidingCatalogueServing()
+
+    stub.currentStatusReturnValue = 7
+    stub.currentStatusReturnValueGenerated = "ready"
+
+    #expect(stub.currentStatusReturnValue == 7)
+    #expect(stub.currentStatus() == "ready")
+  }
+
+  @Test
+  func `A public spy separates same-label overloads and its call log`() {
+    let spy = SpyOverloadedEventRecording()
+
+    spy.record(value: "event")
+    spy.record(value: 9)
+
+    #expect(spy.calls == 0)
+    #expect(spy.recordValueReturningVoidWithStringCallCount == 1)
+    #expect(spy.recordValueReturningVoidWithIntCallCount == 1)
+    #expect(spy.recordedCalls.count == 2)
+  }
+
+  @Test
+  func `A public Sendable spy avoids structural storage collisions`() {
+    let spy = SpyStructuralCollisionRecording()
+
+    spy.record(11)
+
+    #expect(spy._testDoubleStorage == 0)
+    #expect(spy.calls == 0)
+    #expect(spy.recordCallCount == 1)
+    #expect(spy.recordedCalls.count == 1)
+  }
 }

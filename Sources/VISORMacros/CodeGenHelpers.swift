@@ -154,13 +154,36 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
     return suffix.isEmpty ? method.name : "\(method.name)\(suffix)"
   }
 
-  // Phase 2: if prefixes still collide, append return type
+  // Phase 2: if prefixes still collide, append return type.
   var prefixCounts: [String: Int] = [:]
   for p in prefixes { prefixCounts[p, default: 0] += 1 }
 
   for (i, prefix) in prefixes.enumerated() where prefixCounts[prefix, default: 0] > 1 {
     let retSuffix = methods[i].returnType?.filter(\.isLetter) ?? "Void"
     prefixes[i] = "\(prefix)Returning\(retSuffix)"
+  }
+
+  // Phase 3: overloads can share labels and return types while differing by
+  // parameter type. Include every parameter type before using an ordinal.
+  prefixCounts = [:]
+  for p in prefixes { prefixCounts[p, default: 0] += 1 }
+  for (i, prefix) in prefixes.enumerated() where prefixCounts[prefix, default: 0] > 1 {
+    let parameterSuffix = methods[i].parameters
+      .map { $0.type.filter(\.isLetter).capitalisedFirst }
+      .joined()
+    prefixes[i] = "\(prefix)With\(parameterSuffix.isEmpty ? "NoArguments" : parameterSuffix)"
+  }
+
+  // Type spellings can still collapse after punctuation is removed (for
+  // example `Int` and `[Int]`). A source-order ordinal is deterministic and
+  // guarantees a unique final generated API.
+  prefixCounts = [:]
+  for p in prefixes { prefixCounts[p, default: 0] += 1 }
+  var prefixOrdinals: [String: Int] = [:]
+  for index in prefixes.indices where prefixCounts[prefixes[index], default: 0] > 1 {
+    let prefix = prefixes[index]
+    prefixOrdinals[prefix, default: 0] += 1
+    prefixes[index] = "\(prefix)Overload\(prefixOrdinals[prefix, default: 0])"
   }
 
   return prefixes
@@ -177,9 +200,10 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
 /// Used by generated stubs and spies to avoid duplicated codegen logic.
 func generateReturnStorage(
   method: ProtocolMethodInfo,
-  methodPrefix: String,
+  storageName: String?,
   access: String
 ) -> [String] {
+  guard let storageName else { return [] }
   guard !method.isRethrowing else { return [] }
   guard !methodReferencesGenericParameters(method, in: method.returnType) else { return [] }
   guard !methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) else { return [] }
@@ -189,22 +213,20 @@ func generateReturnStorage(
 
   if method.isThrowing {
     guard let failureType = method.throwsEffect.resultFailureType else { return [] }
-    let resultVarName = "\(methodPrefix)Result"
     if let returnType = method.returnType {
       if let innerDefault = returnDefaultValue(for: method) {
-        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), \(failureType)> = .success(\(innerDefault))")
+        lines.append("  \(prefix)var \(storageName): Result<\(returnType), \(failureType)> = .success(\(innerDefault))")
       } else {
-        lines.append("  \(prefix)var \(resultVarName): Result<\(returnType), \(failureType)>?")
+        lines.append("  \(prefix)var \(storageName): Result<\(returnType), \(failureType)>?")
       }
     } else {
-      lines.append("  \(prefix)var \(resultVarName): Result<Void, \(failureType)> = .success(())")
+      lines.append("  \(prefix)var \(storageName): Result<Void, \(failureType)> = .success(())")
     }
   } else if let returnType = method.returnType {
-    let retVarName = "\(methodPrefix)ReturnValue"
     if let defaultVal = returnDefaultValue(for: method) {
-      lines.append("  \(prefix)var \(retVarName): \(returnType) = \(defaultVal)")
+      lines.append("  \(prefix)var \(storageName): \(returnType) = \(defaultVal)")
     } else {
-      lines.append("  \(prefix)var \(retVarName): \(returnType)?")
+      lines.append("  \(prefix)var \(storageName): \(returnType)?")
     }
   }
 
@@ -220,7 +242,7 @@ enum MethodFallbackStyle {
 
 func generateFallbackBodyLines(
   method: ProtocolMethodInfo,
-  methodPrefix: String,
+  returnStorageName: String?,
   style: MethodFallbackStyle)
   -> [String]
 {
@@ -246,40 +268,46 @@ func generateFallbackBodyLines(
   }
 
   if method.isThrowing {
+    guard let returnStorageName else {
+      return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
+    }
     if method.returnType != nil {
       let needsGuard = returnDefaultValue(for: method) == nil
       if needsGuard {
         return [
-          "    guard let result = \(methodPrefix)Result else { fatalError(\"Configure \(methodPrefix)Result before calling \(method.name)()\") }",
+          "    guard let result = \(returnStorageName) else { fatalError(\"Configure \(returnStorageName) before calling \(method.name)()\") }",
           "    return try result.get()"
         ]
       }
 
       switch style {
       case .expression:
-        return ["    try \(methodPrefix)Result.get()"]
+        return ["    try \(returnStorageName).get()"]
       case .explicitReturn:
-        return ["    return try \(methodPrefix)Result.get()"]
+        return ["    return try \(returnStorageName).get()"]
       }
     }
 
-    return ["    try \(methodPrefix)Result.get()"]
+    return ["    try \(returnStorageName).get()"]
   }
 
   if method.returnType != nil {
+    guard let returnStorageName else {
+      return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
+    }
     let needsGuard = returnDefaultValue(for: method) == nil
     if needsGuard {
       return [
-        "    guard let value = \(methodPrefix)ReturnValue else { fatalError(\"Configure \(methodPrefix)ReturnValue before calling \(method.name)()\") }",
+        "    guard let value = \(returnStorageName) else { fatalError(\"Configure \(returnStorageName) before calling \(method.name)()\") }",
         "    return value"
       ]
     }
 
     switch style {
     case .expression:
-      return ["    \(methodPrefix)ReturnValue"]
+      return ["    \(returnStorageName)"]
     case .explicitReturn:
-      return ["    return \(methodPrefix)ReturnValue"]
+      return ["    return \(returnStorageName)"]
     }
   }
 
@@ -404,39 +432,6 @@ func spyStorageType(for param: ParameterInfo, method: ProtocolMethodInfo) -> Str
 /// prefixed with `&` so they compile when forwarded to the closure.
 func implementationInvocationArguments(for method: ProtocolMethodInfo) -> String {
   method.parameters.map { $0.isInout ? "&\($0.internalName)" : $0.internalName }.joined(separator: ", ")
-}
-
-/// Returns collision-free implementation-closure storage names.
-///
-/// The normal API remains `<methodPrefix>Implementation`. If the protocol already
-/// has a property or method with that name, use a predictable fallback so the
-/// generated spy still conforms without redeclarations.
-func implementationStorageNames(
-  for methods: [ProtocolMethodInfo],
-  methodPrefixes: [String],
-  properties: [ProtocolPropertyInfo]
-) -> [String] {
-  var reservedNames = Set(properties.map(\.name))
-  reservedNames.formUnion(methods.map(\.name))
-
-  return methodPrefixes.map { methodPrefix in
-    let preferredName = "\(methodPrefix)Implementation"
-    guard reservedNames.contains(preferredName) else {
-      reservedNames.insert(preferredName)
-      return preferredName
-    }
-
-    let fallbackBase = "\(preferredName)Closure"
-    var candidate = fallbackBase
-    var suffix = 2
-    while reservedNames.contains(candidate) {
-      candidate = "\(fallbackBase)\(suffix)"
-      suffix += 1
-    }
-
-    reservedNames.insert(candidate)
-    return candidate
-  }
 }
 
 /// Generates the `@ObservationIgnored` implementation-closure storage property

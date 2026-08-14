@@ -939,7 +939,7 @@ struct GenerateStubMacroTests {
   }
 
   @Test
-  func `Warning on protocol with static members`() {
+  func `Error on protocol with static members`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateStub
@@ -953,21 +953,15 @@ struct GenerateStubMacroTests {
         static var shared: String { get }
         func doWork()
       }
-
-      @Observable
-      final class StubHasStatic: HasStatic {
-        func doWork() {
-        }
-      }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@GenerateStub skips static members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateStub does not support static or class requirements", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }
 
   @Test
-  func `Warning on protocol with subscripts`() {
+  func `Error on protocol with subscripts`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateStub
@@ -981,14 +975,9 @@ struct GenerateStubMacroTests {
         var name: String { get }
         subscript(index: Int) -> String { get }
       }
-
-      @Observable
-      final class StubHasSubscript: HasSubscript {
-        var name: String = ""
-      }
       """,
       diagnostics: [
-        DiagnosticSpec(message: "@GenerateStub skips subscript members (not yet supported)", line: 1, column: 1, severity: .warning),
+        DiagnosticSpec(message: "@GenerateStub does not support subscript requirements", line: 1, column: 1, severity: .error),
       ],
       macros: testMacros)
   }

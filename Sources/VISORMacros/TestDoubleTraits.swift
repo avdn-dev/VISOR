@@ -22,6 +22,15 @@ struct TestDoubleTraits {
 
     var traits = TestDoubleTraits()
     for argument in arguments {
+      guard argument.label == nil else {
+        context.diagnose(Diagnostic(
+          node: Syntax(argument),
+          message: TestDoubleDiagnostic.unsupportedTrait(
+            trait: argument.expression.trimmedDescription,
+            macroName: macroName)))
+        return nil
+      }
+
       guard let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) else {
         context.diagnose(Diagnostic(
           node: Syntax(argument),

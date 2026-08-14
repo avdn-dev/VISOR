@@ -34,6 +34,57 @@ struct CodeGenHelpersTests {
     #expect(storageSnapshotStrategy(for: "isolated any Actor") == .copy)
     #expect(storageSnapshotStrategy(for: "String") == .none)
   }
+
+  @Test
+  func `Disambiguates same-label overloads by parameter type`() {
+    let prefixes = uniqueMethodPrefixes(for: [
+      testMethod(name: "send", parameterType: "String", returnType: nil),
+      testMethod(name: "send", parameterType: "Int", returnType: nil),
+    ])
+
+    #expect(prefixes == [
+      "sendValueReturningVoidWithString",
+      "sendValueReturningVoidWithInt",
+    ])
+  }
+
+  @Test
+  func `Uses deterministic ordinals when sanitised types still collide`() {
+    let prefixes = uniqueMethodPrefixes(for: [
+      testMethod(name: "consume", parameterType: "Int", returnType: nil, externalLabel: nil),
+      testMethod(name: "consume", parameterType: "[Int]", returnType: nil, externalLabel: nil),
+    ])
+
+    #expect(prefixes == [
+      "consumeIntReturningVoidWithIntOverload1",
+      "consumeIntReturningVoidWithIntOverload2",
+    ])
+  }
+}
+
+private func testMethod(
+  name: String,
+  parameterType: String,
+  returnType: String?,
+  externalLabel: String? = "value")
+  -> ProtocolMethodInfo
+{
+  ProtocolMethodInfo(
+    name: name,
+    genericParameterClause: "",
+    genericWhereClause: nil,
+    genericParameterNames: [],
+    explicitlySendableGenericParameterNames: [],
+    parameters: [ParameterInfo(
+      externalLabel: externalLabel,
+      internalName: "value",
+      type: parameterType,
+      isInout: false)],
+    isAsync: false,
+    isConcurrent: false,
+    throwsEffect: .none,
+    returnType: returnType,
+    defaultReturnExpression: nil)
 }
 
 #endif

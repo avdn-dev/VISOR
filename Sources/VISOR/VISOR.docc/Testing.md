@@ -190,7 +190,11 @@ _ = try await spy.load()
 
 Depending on the protocol declaration, generated members include call counts, last received arguments, invocation histories, configurable return/error values and implementation closures, plus an ordered `Call` enum log.
 
-Protocols with associated types are unsupported. Static members and subscripts are skipped with a diagnostic.
+The generated peer has the fixed name `Stub<Name>` or `Spy<Name>`. Generated member names retain their usual spelling when possible. If a protocol member or overload would make one invalid, the macro emits a warning and uses a deterministic fallback such as `fetchReturnValueGenerated` or `recordedCalls`.
+
+Generation fails with an error and emits no peer when the macro cannot produce a complete conformance. Unsupported requirements include associated types, static or class members, subscripts, initialisers, variadic methods, effectful property accessors and unrecognised protocol members. These are current generated-API boundaries, not limitations of Swift itself.
+
+Inherited protocols are unsupported because a peer macro cannot inspect their requirements. `AnyObject` is allowed because the generated peer is a class. `Sendable` inheritance is allowed only with the `.sendable` trait described below.
 
 ### Sendable doubles
 
