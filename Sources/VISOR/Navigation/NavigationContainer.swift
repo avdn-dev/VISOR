@@ -11,11 +11,11 @@ import SwiftUI
 
 /// A container that wires a Router to a NavigationStack and modal presentation.
 ///
-/// A root container may bind a Router directly for a single stack. Tab and modal
-/// containers create child Routers with isolated navigation state. Sheets and
-/// full-screen presentations get their own child NavigationContainer, enabling push
-/// navigation within modals. Content closures propagate automatically to nested
-/// modal containers.
+/// A root container may bind a Router directly for a single stack. Tab containers
+/// reuse cached child Routers, while modal presentation records own their child
+/// Routers. Sheets and full-screen presentations get their own child
+/// NavigationContainer, enabling push navigation within modals. Content closures
+/// propagate automatically to nested modal containers.
 ///
 /// Full-screen destinations use SwiftUI's native full-screen cover where it is
 /// available and adapt to a sheet on macOS.
@@ -47,7 +47,8 @@ public struct NavigationContainer<
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
     @ViewBuilder content: () -> Content)
   {
-    _router = State(initialValue: router)
+    borrowedRouter = router
+    _ownedRouter = State(initialValue: nil)
     self.content = content()
     self.pushContent = pushContent
     self.sheetContent = sheetContent
@@ -63,7 +64,8 @@ public struct NavigationContainer<
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
     @ViewBuilder content: () -> Content)
   {
-    _router = State(initialValue: parentRouter.childRouter(for: tab))
+    borrowedRouter = parentRouter.childRouter(for: tab)
+    _ownedRouter = State(initialValue: nil)
     self.content = content()
     self.pushContent = pushContent
     self.sheetContent = sheetContent
@@ -78,7 +80,24 @@ public struct NavigationContainer<
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
     @ViewBuilder content: () -> Content)
   {
-    _router = State(initialValue: parentRouter.childRouter())
+    let router = parentRouter.childRouter()
+    borrowedRouter = router
+    _ownedRouter = State(initialValue: router)
+    self.content = content()
+    self.pushContent = pushContent
+    self.sheetContent = sheetContent
+    self.fullScreenContent = fullScreenContent
+  }
+
+  fileprivate init(
+    presentedRouter: Router<Scene>,
+    @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
+    @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
+    @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
+    @ViewBuilder content: () -> Content)
+  {
+    borrowedRouter = presentedRouter
+    _ownedRouter = State(initialValue: nil)
     self.content = content()
     self.pushContent = pushContent
     self.sheetContent = sheetContent
@@ -103,11 +122,14 @@ public struct NavigationContainer<
           router.deepLinkOpen(to: destination)
         }
       }
+      .id(ObjectIdentifier(router))
   }
 
   // MARK: Private
 
-  @State private var router: Router<Scene>
+  private var router: Router<Scene> { ownedRouter ?? borrowedRouter }
+  private let borrowedRouter: Router<Scene>
+  @State private var ownedRouter: Router<Scene>?
   private let content: Content
   private let pushContent: (Scene.Push) -> PushView
   private let sheetContent: (Scene.Sheet) -> SheetView
@@ -137,24 +159,24 @@ private struct InnerContainer<
           pushContent(destination)
         }
     }
-    .sheet(item: $router.presentingSheet) { sheet in
+    .sheet(item: $router.sheetPresentation) { presentation in
       NavigationContainer(
-        parentRouter: router,
+        presentedRouter: presentation.router,
         pushContent: pushContent,
         sheetContent: sheetContent,
         fullScreenContent: fullScreenContent
       ) {
-        sheetContent(sheet)
+        sheetContent(presentation.destination)
       }
     }
-    .adaptiveFullScreenPresentation(item: $router.presentingFullScreen) { fullScreen in
+    .adaptiveFullScreenPresentation(item: $router.fullScreenPresentation) { presentation in
       NavigationContainer(
-        parentRouter: router,
+        presentedRouter: presentation.router,
         pushContent: pushContent,
         sheetContent: sheetContent,
         fullScreenContent: fullScreenContent
       ) {
-        fullScreenContent(fullScreen)
+        fullScreenContent(presentation.destination)
       }
     }
   }

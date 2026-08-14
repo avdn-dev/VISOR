@@ -40,6 +40,32 @@ nonisolated enum SingleStackTestScene: NavigationScene {
   typealias FullScreen = TestFullScreen
 }
 
+nonisolated enum IdentifiedTestSheet: SheetDestination {
+  case editor(documentID: String, revision: Int)
+
+  var id: String {
+    switch self {
+    case .editor(let documentID, _): documentID
+    }
+  }
+}
+
+nonisolated enum IdentifiedTestFullScreen: FullScreenDestination {
+  case reader(documentID: String, revision: Int)
+
+  var id: String {
+    switch self {
+    case .reader(let documentID, _): documentID
+    }
+  }
+}
+
+nonisolated enum IdentifiedPresentationTestScene: NavigationScene {
+  typealias Push = TestPush
+  typealias Sheet = IdentifiedTestSheet
+  typealias FullScreen = IdentifiedTestFullScreen
+}
+
 // MARK: - Routed ViewModel Fixture
 
 /// Shared routed VM fixture used across ViewModelFactory and Integration tests.

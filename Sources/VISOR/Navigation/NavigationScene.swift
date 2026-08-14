@@ -9,17 +9,18 @@
 
 /// A destination that can be pushed onto a NavigationStack.
 ///
-/// Conforming types serve as identity-only route markers — they carry enough information
-/// to identify the destination (typically an enum case with associated data) but do not
-/// create the view themselves. View creation is handled by the content closures
-/// passed to ``NavigationContainer``.
+/// Conforming types serve as route values — they carry stable identifiers and any
+/// lightweight input needed to configure the destination, but do not create the
+/// view themselves. View creation is handled by the content closures passed to
+/// ``NavigationContainer``.
 public protocol PushDestination: Hashable, Sendable {}
 
 /// Shared requirements for modal destinations (sheets and full-screen presentations).
 ///
-/// Conforming types serve as identity-only route markers. `Identifiable` is required
-/// by SwiftUI's item-driven presentation modifiers. View resolution is handled by
-/// the content closures passed to ``NavigationContainer``.
+/// Conforming types serve as route values. `Identifiable` is required by SwiftUI's
+/// item-driven presentation modifiers. The `id` identifies the logical presentation
+/// and may remain stable while other destination payload changes. View resolution is
+/// handled by the content closures passed to ``NavigationContainer``.
 public protocol PresentableDestination: Hashable, Identifiable, Sendable {}
 
 /// A destination that can be presented as a sheet.

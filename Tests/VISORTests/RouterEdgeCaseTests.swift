@@ -177,25 +177,111 @@ struct RouterEdgeCaseTests {
     #expect(result == .tab(.settings))
   }
 
-  // MARK: - Simultaneous sheet and fullScreen
+  // MARK: - Exclusive modal presentation
 
   @Test
-  func `Simultaneous sheet and fullScreen are independently managed`() {
+  func `Full-screen presentation replaces a sheet on the same Router`() {
     let router = Router<TestScene>()
     router.activate()
 
     router.present(sheet: .preferences)
     router.present(fullScreen: .onboarding)
 
-    #expect(router.presentingSheet == .preferences)
-    #expect(router.presentingFullScreen == .onboarding)
-
-    router.dismissSheet()
     #expect(router.presentingSheet == nil)
     #expect(router.presentingFullScreen == .onboarding)
+  }
 
-    router.dismissFullScreen()
+  @Test
+  func `Sheet presentation replaces full screen on the same Router`() {
+    let router = Router<TestScene>()
+    router.activate()
+
+    router.present(fullScreen: .onboarding)
+    router.present(sheet: .preferences)
+
+    #expect(router.presentingSheet == .preferences)
     #expect(router.presentingFullScreen == nil)
+  }
+
+  @Test
+  func `Stale sheet dismissal does not clear its full-screen replacement`() {
+    let router = Router<TestScene>()
+    router.activate()
+
+    router.present(sheet: .preferences)
+    router.present(fullScreen: .onboarding)
+    router.sheetPresentation = nil
+
+    #expect(router.presentingFullScreen == .onboarding)
+  }
+
+  @Test
+  func `Same presentation ID updates payload and preserves modal child`() throws {
+    let router = Router<IdentifiedPresentationTestScene>()
+    router.activate()
+
+    router.present(sheet: .editor(documentID: "document", revision: 1))
+    let firstChild = try #require(router.sheetPresentation?.router)
+
+    router.present(sheet: .editor(documentID: "document", revision: 2))
+
+    #expect(
+      router.presentingSheet == .editor(documentID: "document", revision: 2))
+    #expect(router.sheetPresentation?.router === firstChild)
+    #expect(router.sheetPresentation?.id == "document")
+  }
+
+  @Test
+  func `Different presentation ID creates a fresh modal child`() throws {
+    let router = Router<IdentifiedPresentationTestScene>()
+    router.activate()
+
+    router.present(sheet: .editor(documentID: "first", revision: 1))
+    let firstChild = try #require(router.sheetPresentation?.router)
+
+    router.present(sheet: .editor(documentID: "second", revision: 1))
+
+    let secondChild = try #require(router.sheetPresentation?.router)
+    #expect(secondChild !== firstChild)
+  }
+
+  @Test
+  func `Changing presentation style creates a fresh modal child`() throws {
+    let router = Router<IdentifiedPresentationTestScene>()
+    router.activate()
+
+    router.present(sheet: .editor(documentID: "document", revision: 1))
+    let sheetChild = try #require(router.sheetPresentation?.router)
+
+    router.present(fullScreen: .reader(documentID: "document", revision: 1))
+
+    let fullScreenChild = try #require(router.fullScreenPresentation?.router)
+    #expect(fullScreenChild !== sheetChild)
+  }
+
+  @Test
+  func `Modal child can present a nested modal`() throws {
+    let root = Router<TestScene>()
+    root.activate()
+    root.present(sheet: .preferences)
+    let modal = try #require(root.sheetPresentation?.router)
+    modal.activate()
+
+    modal.present(fullScreen: .onboarding)
+
+    #expect(root.presentingSheet == .preferences)
+    #expect(modal.presentingFullScreen == .onboarding)
+  }
+
+  @Test
+  func `Push permits repeated equal destinations`() {
+    let router = Router<TestScene>()
+    router.activate()
+
+    router.push(.detail(id: "same"))
+    router.push(.detail(id: "same"))
+
+    #expect(router.navigationPath == [.detail(id: "same"), .detail(id: "same")])
   }
 
   // MARK: - popToRoot preserves presented modals

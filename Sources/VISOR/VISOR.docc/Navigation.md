@@ -6,7 +6,12 @@ Type-safe navigation with Router, NavigationScene, deep linking, and modal hiera
 
 VISOR's navigation system centralises all navigation state in a ``Router`` object, decoupling views from their destinations. Feature Views dispatch actions to routed ViewModels, which decide what to show and call the Router. ``NavigationContainer`` handles the SwiftUI wiring.
 
-Destination types are identity-only enums — they carry the data needed to identify a screen but don't create the view. View creation is handled by content closures passed to ``NavigationContainer``, which means the destination enums can live in a shared module without importing feature view types.
+Destination types are route-value enums — they carry stable identifiers and any
+lightweight input needed to configure a screen, but don't create the view. Prefer
+model identifiers over complete model snapshots so a destination resolves current
+data. View creation is handled by content closures passed to
+``NavigationContainer``, which means the destination enums can live in a shared
+module without importing feature view types.
 
 ## Defining Destinations
 
@@ -20,7 +25,7 @@ nonisolated enum AppPush: PushDestination {
 
 nonisolated enum AppSheet: SheetDestination {
   case preferences
-  case share(item: Item)
+  case share(itemID: Item.ID)
 
   var id: Self { self }
 }
@@ -47,6 +52,36 @@ nonisolated enum AppTab: TabDestination {
 | ``TabDestination`` | `Hashable` | Tab selection (no view — defined in your `TabView`) |
 
 ``SheetDestination`` and ``FullScreenDestination`` both inherit from ``PresentableDestination``, which provides the shared `Hashable & Identifiable` requirements.
+
+A presentation's `id` is its logical screen identity; it does not have to be
+the complete destination value. This is useful when the route carries changing
+input for the same screen. Namespace identities by destination case so unrelated
+screens cannot accidentally share one:
+
+```swift
+nonisolated enum EditorSheet: SheetDestination {
+  case editor(documentID: Document.ID, revision: Int)
+
+  enum ID: Hashable {
+    case editor(Document.ID)
+  }
+
+  var id: ID {
+    switch self {
+    case .editor(let documentID, _): .editor(documentID)
+    }
+  }
+}
+```
+
+Presenting updated payload with the same ID preserves that modal's child Router.
+A different ID or presentation style creates a fresh child. Each Router node has
+one direct modal slot, so the latest sheet or full-screen request replaces the
+previous request on that node. Nested presentation remains available from the
+presented modal's child Router.
+
+`Hashable` lets push destinations participate in a navigation path; it does not
+make the path unique. Repeated equal push destinations are appended normally.
 
 ### NavigationScene
 
@@ -91,7 +126,7 @@ func pushContent(for destination: AppPush) -> some View {
 func sheetContent(for destination: AppSheet) -> some View {
   switch destination {
   case .preferences: PreferencesScreen()
-  case .share(let item): ShareScreen(item: item)
+  case .share(let itemID): ShareScreen(itemID: itemID)
   }
 }
 
@@ -206,7 +241,7 @@ Modal containers are created automatically by the sheet and adaptive
 full-screen presentation modifiers.
 
 The container:
-- Binds the root Router directly or creates the requested tab/modal child.
+- Borrows a root Router, reuses a tab child, or owns a manually requested modal child.
 - Manages active state (`onAppear` / `onDisappear`).
 - Routes incoming URLs via `onOpenURL`.
 - Wraps sheets and full-screen presentations in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
@@ -263,7 +298,10 @@ struct AppRoot: View {
 ```
 
 Placing the Router in scene-root `@State` gives every `WindowGroup` instance an
-independent navigation tree.
+independent navigation tree. Move the Router into `App` state only when every
+window should deliberately share one navigation tree. ``NavigationContainer``
+borrows root and tab Routers, so replacing an input Router replaces the tree the
+container observes instead of retaining its first input as local State.
 
 ## NavigationButton
 

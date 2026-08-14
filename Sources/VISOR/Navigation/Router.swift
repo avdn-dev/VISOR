@@ -14,13 +14,30 @@ private final class RouterTreeContext<Scene: NavigationScene> {
   var deepLinkHandler: (@MainActor @Sendable (URL) -> Destination<Scene>?)?
 }
 
+package struct RouterSheetPresentation<Scene: NavigationScene>: Identifiable {
+  package let id: Scene.Sheet.ID
+  package var destination: Scene.Sheet
+  package let router: Router<Scene>
+}
+
+package struct RouterFullScreenPresentation<Scene: NavigationScene>: Identifiable {
+  package let id: Scene.FullScreen.ID
+  package var destination: Scene.FullScreen
+  package let router: Router<Scene>
+}
+
+private enum RouterModalPresentation<Scene: NavigationScene> {
+  case sheet(RouterSheetPresentation<Scene>)
+  case fullScreen(RouterFullScreenPresentation<Scene>)
+}
+
 // MARK: - Router
 
 /// Observable router that manages navigation state for a NavigationScene.
 ///
 /// The root Router coordinates one navigation tree. A root NavigationContainer
-/// may bind it directly for a single stack, while tab and modal containers create
-/// child Routers with isolated navigation state.
+/// may bind it directly for a single stack, while tab containers and modal
+/// presentation records use child Routers with isolated navigation state.
 @MainActor @Observable
 public final class Router<Scene: NavigationScene> {
 
@@ -74,10 +91,34 @@ public final class Router<Scene: NavigationScene> {
   public var navigationPath: [Scene.Push] = []
 
   /// The currently presented sheet, if any.
-  public var presentingSheet: Scene.Sheet?
+  ///
+  /// A Router node has one modal presentation slot. Setting this property
+  /// replaces any full-screen presentation held by the same Router.
+  public var presentingSheet: Scene.Sheet? {
+    get { sheetPresentation?.destination }
+    set {
+      if let newValue {
+        presentSheetLocally(newValue)
+      } else {
+        sheetPresentation = nil
+      }
+    }
+  }
 
   /// The currently presented destination with full-screen intent, if any.
-  public var presentingFullScreen: Scene.FullScreen?
+  ///
+  /// A Router node has one modal presentation slot. Setting this property
+  /// replaces any sheet held by the same Router.
+  public var presentingFullScreen: Scene.FullScreen? {
+    get { fullScreenPresentation?.destination }
+    set {
+      if let newValue {
+        presentFullScreenLocally(newValue)
+      } else {
+        fullScreenPresentation = nil
+      }
+    }
+  }
 
   // MARK: - Hierarchy
 
@@ -248,6 +289,34 @@ public final class Router<Scene: NavigationScene> {
     return child
   }
 
+  package var sheetPresentation: RouterSheetPresentation<Scene>? {
+    get {
+      guard case .sheet(let presentation) = modalPresentation else { return nil }
+      return presentation
+    }
+    set {
+      if let newValue {
+        modalPresentation = .sheet(newValue)
+      } else if case .sheet = modalPresentation {
+        modalPresentation = nil
+      }
+    }
+  }
+
+  package var fullScreenPresentation: RouterFullScreenPresentation<Scene>? {
+    get {
+      guard case .fullScreen(let presentation) = modalPresentation else { return nil }
+      return presentation
+    }
+    set {
+      if let newValue {
+        modalPresentation = .fullScreen(newValue)
+      } else if case .fullScreen = modalPresentation {
+        modalPresentation = nil
+      }
+    }
+  }
+
   // MARK: - Preview
 
   /// Create a preview router with the given tab selected.
@@ -298,6 +367,7 @@ public final class Router<Scene: NavigationScene> {
   @ObservationIgnored private var tabChildren: [Scene.Tab: Router] = [:]
   @ObservationIgnored private let treeContext: RouterTreeContext<Scene>
   @ObservationIgnored private var isMounted = false
+  private var modalPresentation: RouterModalPresentation<Scene>?
 
   private var rootRouter: Router {
     parent?.rootRouter ?? self
@@ -330,12 +400,32 @@ public final class Router<Scene: NavigationScene> {
 
   private func presentSheetLocally(_ sheet: Scene.Sheet) {
     log("present sheet: \(sheet)")
-    presentingSheet = sheet
+    if case .sheet(var presentation) = modalPresentation,
+       presentation.id == sheet.id
+    {
+      presentation.destination = sheet
+      modalPresentation = .sheet(presentation)
+    } else {
+      modalPresentation = .sheet(RouterSheetPresentation(
+        id: sheet.id,
+        destination: sheet,
+        router: childRouter()))
+    }
   }
 
   private func presentFullScreenLocally(_ fullScreen: Scene.FullScreen) {
     log("present fullScreen: \(fullScreen)")
-    presentingFullScreen = fullScreen
+    if case .fullScreen(var presentation) = modalPresentation,
+       presentation.id == fullScreen.id
+    {
+      presentation.destination = fullScreen
+      modalPresentation = .fullScreen(presentation)
+    } else {
+      modalPresentation = .fullScreen(RouterFullScreenPresentation(
+        id: fullScreen.id,
+        destination: fullScreen,
+        router: childRouter()))
+    }
   }
 
   private func popToRootLocally() {
@@ -344,9 +434,9 @@ public final class Router<Scene: NavigationScene> {
   }
 
   private func dismissSheetLocally() {
-    if presentingSheet != nil {
+    if case .sheet = modalPresentation {
       log("dismissSheet")
-      presentingSheet = nil
+      modalPresentation = nil
     } else if let parent {
       log("dismissSheet (walking up)")
       parent.dismissSheetLocally()
@@ -354,9 +444,9 @@ public final class Router<Scene: NavigationScene> {
   }
 
   private func dismissFullScreenLocally() {
-    if presentingFullScreen != nil {
+    if case .fullScreen = modalPresentation {
       log("dismissFullScreen")
-      presentingFullScreen = nil
+      modalPresentation = nil
     } else if let parent {
       log("dismissFullScreen (walking up)")
       parent.dismissFullScreenLocally()

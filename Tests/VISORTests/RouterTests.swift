@@ -10,6 +10,42 @@ import Testing
 import Foundation
 import SwiftUI
 
+#if os(macOS)
+@MainActor
+private final class RouterInputProbe {
+  private(set) var routerIDs: [ObjectIdentifier] = []
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func record(_ routerID: ObjectIdentifier) {
+    routerIDs.append(routerID)
+    let waiters = waiters
+    self.waiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  func wait(for count: Int) async {
+    while routerIDs.count < count {
+      await withCheckedContinuation { waiters.append($0) }
+    }
+  }
+}
+
+@MainActor
+private struct RouterInputReporter: View {
+  @Environment(Router<TestScene>.self) private var router
+  let probe: RouterInputProbe
+
+  var body: some View {
+    Color.clear
+      .onChange(of: ObjectIdentifier(router), initial: true) { _, routerID in
+        probe.record(routerID)
+      }
+  }
+}
+#endif
+
 // MARK: - Router Tests
 
 @Suite("Router")
@@ -600,5 +636,45 @@ struct RouterTests {
     _ = container
     #expect(root.level == 0)
   }
+
+  #if os(macOS)
+  @Test(.timeLimit(.minutes(1)))
+  func `Mounted root container follows a replacement Router input`() async {
+    let first = Router<TestScene>()
+    let second = Router<TestScene>()
+    let probe = RouterInputProbe()
+
+    func root(router: Router<TestScene>) -> AnyView {
+      AnyView(NavigationContainer(
+        router: router,
+        pushContent: { _ in EmptyView() },
+        sheetContent: { _ in EmptyView() },
+        fullScreenContent: { _ in EmptyView() }
+      ) {
+        RouterInputReporter(probe: probe)
+      })
+    }
+
+    let hostingView = NSHostingView(rootView: root(router: first))
+    hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
+    hostingView.layoutSubtreeIfNeeded()
+    await probe.wait(for: 1)
+
+    #expect(probe.routerIDs.last == ObjectIdentifier(first))
+    #expect(first.isActive)
+
+    hostingView.rootView = root(router: second)
+    hostingView.layoutSubtreeIfNeeded()
+    await probe.wait(for: 2)
+
+    #expect(probe.routerIDs.last == ObjectIdentifier(second))
+    #expect(!first.isActive)
+    #expect(second.isActive)
+
+    hostingView.rootView = AnyView(EmptyView())
+    hostingView.layoutSubtreeIfNeeded()
+    #expect(!second.isActive)
+  }
+  #endif
 
 }
