@@ -1,6 +1,7 @@
 import Observation
 import os
 import SwiftUI
+import VISORObservation
 
 /// A coalescing wake-up signal for the owner's latest desired policy state.
 ///
@@ -203,7 +204,7 @@ nonisolated package enum _ViewModelObservationOwnerFailure:
   Sendable
 {
   case duplicateOwner
-  case infrastructure(String)
+  case infrastructure(_ObservationSourceFailure)
 }
 
 nonisolated private let _viewModelObservationOwnerLogger = Logger(
@@ -217,9 +218,9 @@ nonisolated private func reportViewModelObservationOwnerFailure(
   case .duplicateOwner:
     _viewModelObservationOwnerLogger.error(
       "Rejected a duplicate production observation owner")
-  case .infrastructure(let detail):
+  case .infrastructure(let failure):
     _viewModelObservationOwnerLogger.error(
-      "Observation generation failed: \(detail, privacy: .public)")
+      "Observation generation failed: \(String(describing: failure), privacy: .public)")
   }
 }
 
@@ -243,7 +244,6 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 
   package private(set) var _visorIsReady = false
 
-  @ObservationIgnored
   package private(set) var _visorFailure:
     _ViewModelObservationOwnerFailure?
 
@@ -477,7 +477,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
       recipes: viewModel._visorMakeObservationRecipes(),
       _visorOnFailure: { [weak self] failure in
         self?.recordTerminalFailure(
-          .infrastructure(String(describing: failure)),
+          .infrastructure(failure),
           generationID: generationID)
         requests.yield()
       },
@@ -512,14 +512,14 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
       }
       if let failure = session._visorFailure {
         recordTerminalFailure(
-          .infrastructure(String(describing: failure)),
+          .infrastructure(failure),
           generationID: generationID)
       }
     } catch is CancellationError {
       // Cancellation is the ordinary owner and scene-pause path.
     } catch {
       recordTerminalFailure(
-        .infrastructure(String(describing: error)),
+        .infrastructure(.failed(String(describing: error))),
         generationID: generationID)
     }
 
@@ -625,7 +625,9 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 package struct _ViewModelObservationHost<
   VM: ViewModel,
   Content: View,
-  Placeholder: View
+  Suspended: View,
+  Pending: View,
+  Failure: View
 >: View {
   @State private var owner: _ViewModelObservationOwner<VM>?
   @Environment(\.scenePhase) private var scenePhase
@@ -633,30 +635,40 @@ package struct _ViewModelObservationHost<
   private let viewModel: VM
   private let observationPolicy: ObservationPolicy
   private let content: (VM) -> Content
-  private let placeholder: () -> Placeholder
+  private let suspended: () -> Suspended
+  private let pending: () -> Pending
+  private let failure: () -> Failure
 
   package init(
     viewModel: VM,
     observationPolicy: ObservationPolicy,
     @ViewBuilder content: @escaping (VM) -> Content,
-    @ViewBuilder placeholder: @escaping () -> Placeholder
+    @ViewBuilder suspended: @escaping () -> Suspended,
+    @ViewBuilder pending: @escaping () -> Pending,
+    @ViewBuilder failure: @escaping () -> Failure
   ) {
     self.viewModel = viewModel
     self.observationPolicy = observationPolicy
     self.content = content
-    self.placeholder = placeholder
+    self.suspended = suspended
+    self.pending = pending
+    self.failure = failure
   }
 
   package var body: some View {
     Group {
-      if let owner,
+      if !isEnabled {
+        suspended()
+      } else if let owner,
          owner._visorCanExposeContent(
            for: viewModel,
            isEnabled: isEnabled)
       {
         content(viewModel)
+      } else if owner?._visorFailure != nil {
+        failure()
       } else {
-        placeholder()
+        pending()
       }
     }
     .task {
@@ -678,20 +690,6 @@ package struct _ViewModelObservationHost<
   }
 }
 
-extension _ViewModelObservationHost where Placeholder == Color {
-  package init(
-    viewModel: VM,
-    observationPolicy: ObservationPolicy,
-    @ViewBuilder content: @escaping (VM) -> Content
-  ) {
-    self.init(
-      viewModel: viewModel,
-      observationPolicy: observationPolicy,
-      content: content,
-      placeholder: { Color.clear })
-  }
-}
-
 /// The only production-owner bridge named by generated downstream code.
 /// Its opaque result hides the concrete host and all lifecycle capabilities.
 @MainActor
@@ -703,6 +701,14 @@ public func _visorOwnedViewModelContent<VM, Content>(
   _ViewModelObservationHost(
     viewModel: viewModel,
     observationPolicy: observationPolicy,
-    content: content)
+    content: content,
+    suspended: { Color.clear },
+    pending: { ProgressView("Preparing Screen") },
+    failure: {
+      ContentUnavailableView(
+        "Unable to Load",
+        systemImage: "exclamationmark.triangle",
+        description: Text("This screen could not be prepared."))
+    })
     .id(ObjectIdentifier(viewModel._visorObservationOwnership))
 }

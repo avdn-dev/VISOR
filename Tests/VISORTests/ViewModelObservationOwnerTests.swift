@@ -325,6 +325,125 @@ extension ViewModelObservationOwnerTests {
     viewModel._visorObservationOwnership._visorRelease(
       ownerID: ObjectIdentifier(candidate))
   }
+
+  @Test(.timeLimit(.minutes(1)))
+  @MainActor
+  func `A mounted host replaces readiness progress with terminal failure UI`() async {
+    let service = OwnerService()
+    service.terminateObservationForProof()
+    let viewModel = OwnerSourceBackedViewModel(service: service)
+    let pendingAppeared = HostLifecycleEvent()
+    let failureAppeared = HostLifecycleEvent()
+    let contentAppeared = HostLifecycleEvent()
+
+    let root = AnyView(
+      _ViewModelObservationHost(
+        viewModel: viewModel,
+        observationPolicy: .alwaysObserving,
+        content: { _ in
+          Text("Ready")
+            .onAppear { contentAppeared.record() }
+        },
+        suspended: { Color.clear },
+        pending: {
+          ProgressView("Preparing Screen")
+            .onAppear { pendingAppeared.record() }
+        },
+        failure: {
+          ContentUnavailableView(
+            "Unable to Load",
+            systemImage: "exclamationmark.triangle")
+            .onAppear { failureAppeared.record() }
+        }))
+    let hostingView = NSHostingView(rootView: root)
+    hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
+
+    hostingView.layoutSubtreeIfNeeded()
+    await pendingAppeared.wait()
+    await failureAppeared.wait()
+
+    #expect(pendingAppeared.count == 1)
+    #expect(failureAppeared.count == 1)
+    #expect(contentAppeared.count == 0)
+
+    hostingView.rootView = AnyView(EmptyView())
+    hostingView.layoutSubtreeIfNeeded()
+
+    let candidate = HostLeaseCandidate()
+    let claim = await viewModel._visorObservationOwnership
+      ._visorClaim(candidate)
+    guard case .claimed = claim else {
+      Issue.record("The failed host did not release its identity lease")
+      return
+    }
+    viewModel._visorObservationOwnership._visorRelease(
+      ownerID: ObjectIdentifier(candidate))
+  }
+
+  @Test(.timeLimit(.minutes(1)))
+  @MainActor
+  func `A duplicate mounted owner presents failure instead of content`() async {
+    let viewModel = OwnerEmptyViewModel()
+    let contentAppeared = OwnerEventCounter()
+    let failureAppeared = OwnerEventCounter()
+
+    let root = AnyView(
+      VStack {
+        duplicateOwnerProofHost(
+          viewModel: viewModel,
+          contentAppeared: contentAppeared,
+          failureAppeared: failureAppeared)
+        duplicateOwnerProofHost(
+          viewModel: viewModel,
+          contentAppeared: contentAppeared,
+          failureAppeared: failureAppeared)
+      })
+    let hostingView = NSHostingView(rootView: root)
+    hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
+
+    hostingView.layoutSubtreeIfNeeded()
+    await contentAppeared.wait(for: 1)
+    await failureAppeared.wait(for: 1)
+
+    #expect(contentAppeared.count == 1)
+    #expect(failureAppeared.count == 1)
+
+    hostingView.rootView = AnyView(EmptyView())
+    hostingView.layoutSubtreeIfNeeded()
+
+    let candidate = HostLeaseCandidate()
+    let claim = await viewModel._visorObservationOwnership
+      ._visorClaim(candidate)
+    guard case .claimed = claim else {
+      Issue.record("The mounted owner did not release its identity lease")
+      return
+    }
+    viewModel._visorObservationOwnership._visorRelease(
+      ownerID: ObjectIdentifier(candidate))
+  }
+
+  @MainActor
+  private func duplicateOwnerProofHost(
+    viewModel: OwnerEmptyViewModel,
+    contentAppeared: OwnerEventCounter,
+    failureAppeared: OwnerEventCounter
+  ) -> some View {
+    _ViewModelObservationHost(
+      viewModel: viewModel,
+      observationPolicy: .alwaysObserving,
+      content: { _ in
+        Text("Ready")
+          .onAppear { contentAppeared.record() }
+      },
+      suspended: { Color.clear },
+      pending: { ProgressView("Preparing Screen") },
+      failure: {
+        ContentUnavailableView(
+          "Unable to Load",
+          systemImage: "exclamationmark.triangle")
+          .onAppear { failureAppeared.record() }
+      })
+  }
 }
 #endif
 
@@ -1046,10 +1165,7 @@ struct ViewModelObservationOwnerTests {
       isEnabled: true))
     #expect(service.activeObservationCountForProof == 0)
     #expect(owner._visorGenerationCount == 1)
-    guard case .infrastructure = owner._visorFailure else {
-      Issue.record("Expected an infrastructure failure")
-      return
-    }
+    #expect(owner._visorFailure == .infrastructure(.unexpectedTermination))
 
     // Reasserting the current active state is not a lifecycle edge and must
     // not create an immediate retry loop.
@@ -1275,10 +1391,7 @@ struct ViewModelObservationOwnerTests {
       isEnabled: true))
     #expect(service.activeObservationCountForProof == 0)
     #expect(owner._visorGenerationCount == 1)
-    guard case .infrastructure = owner._visorFailure else {
-      Issue.record("Expected an infrastructure failure")
-      return
-    }
+    #expect(owner._visorFailure == .infrastructure(.unexpectedTermination))
 
     owner._visorSetEnabled(true)
     #expect(owner._visorGenerationCount == 1)
