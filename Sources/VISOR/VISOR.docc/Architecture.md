@@ -28,14 +28,19 @@ decisions into rendering code.
 Split an integration-owning view from its plain rendering component:
 
 ```swift
+enum DashboardLoadFailure: Error {
+  case offline
+  case unavailable
+}
+
 @MainActor
 @Observable
 @ViewModel
 final class DashboardViewModel {
   final class State {
-    private(set) var items: Loadable<[Item]>
+    private(set) var items: Loadable<[Item], DashboardLoadFailure>
 
-    init(items: Loadable<[Item]> = .loading) {
+    init(items: Loadable<[Item], DashboardLoadFailure> = .loading) {
       self.items = items
     }
   }
@@ -63,8 +68,32 @@ struct DashboardContent: View {
   let onAction: (DashboardViewModel.Action) -> Void
 
   var body: some View {
-    List(state.items.value ?? []) { item in
-      Text(item.name)
+    switch state.items {
+    case .loading:
+      ProgressView("Loading dashboard")
+    case .empty:
+      ContentUnavailableView("No Items", systemImage: "tray")
+    case .loaded(let items):
+      List(items) { item in
+        Text(item.name)
+      }
+    case .failure(let failure):
+      VStack {
+        switch failure {
+        case .offline:
+          ContentUnavailableView(
+            "You're Offline",
+            systemImage: "wifi.slash")
+        case .unavailable:
+          ContentUnavailableView(
+            "Dashboard Unavailable",
+            systemImage: "exclamationmark.triangle")
+        }
+
+        Button("Try Again") {
+          onAction(.refresh)
+        }
+      }
     }
   }
 }
@@ -145,7 +174,7 @@ State fields keep ordinary declaration defaults or values assigned by a custom i
 ```swift
 final class State {
   private(set) var title: String
-  private(set) var items: Loadable<[Item]> = .loading
+  private(set) var items: Loadable<[Item], ItemLoadFailure> = .loading
 
   init(title: String) {
     self.title = title
@@ -353,12 +382,18 @@ Pausing revokes readiness and cancels the source session. A later activation rec
 
 ## Loadable
 
-`Loadable<Value>` models per-field loading semantics inside State:
+`Loadable<Value, Failure>` models per-field loading semantics inside State while
+preserving a feature-specific `Error`:
 
 ```swift
+enum FeatureLoadFailure: Error, Equatable, Hashable, Sendable {
+  case offline
+  case unauthorised
+}
+
 final class State {
-  private(set) var items: Loadable<[Item]> = .loading
-  private(set) var profile: Loadable<Profile> = .empty
+  private(set) var items: Loadable<[Item], FeatureLoadFailure> = .loading
+  private(set) var profile: Loadable<Profile, FeatureLoadFailure> = .empty
 }
 ```
 
@@ -367,6 +402,14 @@ final class State {
 | `.loading` | Work is in progress |
 | `.empty` | Work completed without a value |
 | `.loaded(Value)` | A value is available |
-| `.error(String)` | Work failed with a displayable message |
+| `.failure(Failure)` | Work failed with a typed feature error |
 
-Use `value`, `isLoading`, `isEmpty`, `isError`, `error`, `map(_:)`, and `flatMap(_:)` to work with it. Conditional `Equatable`, `Hashable`, and `Sendable` conformances follow the wrapped value.
+Use `value`, `failure`, `isLoading`, `isEmpty`, `isFailure`, `map(_:)`,
+`mapFailure(_:)`, and `flatMap(_:)` to work with it. `map` and `flatMap`
+preserve the failure type; `mapFailure` translates a lower-layer error into the
+feature's vocabulary.
+
+Keep localised display copy in the Content view. Switch over the typed failure
+there so the same failure can produce context-appropriate messaging and actions.
+Conditional `Equatable`, `Hashable`, and `Sendable` conformances require both
+the loaded value and failure to provide the corresponding conformance.

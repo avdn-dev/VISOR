@@ -5,20 +5,21 @@
 //  Created by Anh Nguyen on 13/2/2026.
 //
 
-/// A standalone enum for per-field loading semantics within State classes.
+/// A standalone enum for typed per-field loading semantics within State classes.
 ///
-/// Use inside a ViewModel's `State` class for any field that has loading/empty/error states:
+/// Use inside a ViewModel's `State` class for any field that has loading, empty,
+/// loaded, and failure states:
 /// ```swift
 /// final class State {
-///     var items: Loadable<[Item]> = .loading
+///     var items: Loadable<[Item], ItemLoadFailure> = .loading
 ///     var filter: Filter = .all
 /// }
 /// ```
-public enum Loadable<Value> {
+public enum Loadable<Value, Failure: Error> {
   case loading
   case empty
   case loaded(Value)
-  case error(String)
+  case failure(Failure)
 }
 
 nonisolated extension Loadable {
@@ -28,32 +29,46 @@ nonisolated extension Loadable {
   public var isLoading: Bool { if case .loading = self { true } else { false } }
   /// Whether the state is `.empty` (distinct from `.loaded` with an empty collection).
   public var isEmpty: Bool { if case .empty = self { true } else { false } }
-  /// Whether the state is `.error`.
-  public var isError: Bool { if case .error = self { true } else { false } }
-  /// The error message, or `nil` if not in the `.error` state.
-  public var error: String? { if case .error(let msg) = self { msg } else { nil } }
+  /// Whether the state is `.failure`.
+  public var isFailure: Bool { if case .failure = self { true } else { false } }
+  /// The typed failure, or `nil` if not in the `.failure` state.
+  public var failure: Failure? { if case .failure(let failure) = self { failure } else { nil } }
 
-  /// Transform the loaded value, preserving `loading`/`empty`/`error` states.
-  public func map<U>(_ transform: (Value) -> U) -> Loadable<U> {
+  /// Transform the loaded value, preserving `loading`/`empty`/`failure` states.
+  public func map<NewValue>(_ transform: (Value) -> NewValue) -> Loadable<NewValue, Failure> {
     switch self {
     case .loading: .loading
     case .empty: .empty
-    case .loaded(let v): .loaded(transform(v))
-    case .error(let msg): .error(msg)
+    case .loaded(let value): .loaded(transform(value))
+    case .failure(let failure): .failure(failure)
     }
   }
 
-  /// Transform the loaded value into another `Loadable`, preserving `loading`/`empty`/`error` states.
-  public func flatMap<U>(_ transform: (Value) -> Loadable<U>) -> Loadable<U> {
+  /// Transform the failure while preserving the loading state and loaded value.
+  public func mapFailure<NewFailure: Error>(
+    _ transform: (Failure) -> NewFailure
+  ) -> Loadable<Value, NewFailure> {
     switch self {
     case .loading: .loading
     case .empty: .empty
-    case .loaded(let v): transform(v)
-    case .error(let msg): .error(msg)
+    case .loaded(let value): .loaded(value)
+    case .failure(let failure): .failure(transform(failure))
+    }
+  }
+
+  /// Transform the loaded value into another `Loadable`, preserving non-loaded states.
+  public func flatMap<NewValue>(
+    _ transform: (Value) -> Loadable<NewValue, Failure>
+  ) -> Loadable<NewValue, Failure> {
+    switch self {
+    case .loading: .loading
+    case .empty: .empty
+    case .loaded(let value): transform(value)
+    case .failure(let failure): .failure(failure)
     }
   }
 }
 
-nonisolated extension Loadable: Equatable where Value: Equatable {}
-nonisolated extension Loadable: Hashable where Value: Hashable {}
-nonisolated extension Loadable: Sendable where Value: Sendable {}
+nonisolated extension Loadable: Equatable where Value: Equatable, Failure: Equatable {}
+nonisolated extension Loadable: Hashable where Value: Hashable, Failure: Hashable {}
+nonisolated extension Loadable: Sendable where Value: Sendable, Failure: Sendable {}

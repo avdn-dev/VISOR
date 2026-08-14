@@ -1,5 +1,14 @@
-import VISOR
 import Testing
+import VISOR
+
+enum TestFailure: Error, Equatable, Hashable, Sendable {
+  case message(String)
+  case negative
+}
+
+enum MappedFailure: Error, Equatable {
+  case message(String)
+}
 
 @Suite("Loadable")
 struct LoadableTests {
@@ -7,134 +16,181 @@ struct LoadableTests {
   // MARK: - Accessors (parametric)
 
   @Test(arguments: [
-    (Loadable<Int>.loading, true, false, false),
-    (Loadable<Int>.empty, false, true, false),
-    (Loadable<Int>.loaded(42), false, false, false),
-    (Loadable<Int>.error("fail"), false, false, true),
+    (Loadable<Int, TestFailure>.loading, true, false, false),
+    (Loadable<Int, TestFailure>.empty, false, true, false),
+    (Loadable<Int, TestFailure>.loaded(42), false, false, false),
+    (Loadable<Int, TestFailure>.failure(.message("fail")), false, false, true),
   ])
   func `Accessors return correct booleans`(
-    state: Loadable<Int>, isLoading: Bool, isEmpty: Bool, isError: Bool
+    state: Loadable<Int, TestFailure>, isLoading: Bool, isEmpty: Bool, isFailure: Bool
   ) {
     #expect(state.isLoading == isLoading)
     #expect(state.isEmpty == isEmpty)
-    #expect(state.isError == isError)
+    #expect(state.isFailure == isFailure)
   }
 
   @Test
   func `Value returns value when loaded and nil otherwise`() {
-    #expect(Loadable<String>.loaded("hello").value == "hello")
-    #expect(Loadable<String>.loading.value == nil)
-    #expect(Loadable<String>.empty.value == nil)
-    #expect(Loadable<String>.error("fail").value == nil)
+    #expect(Loadable<String, TestFailure>.loaded("hello").value == "hello")
+    #expect(Loadable<String, TestFailure>.loading.value == nil)
+    #expect(Loadable<String, TestFailure>.empty.value == nil)
+    #expect(Loadable<String, TestFailure>.failure(.message("fail")).value == nil)
   }
 
   @Test
-  func `Error returns message when error and nil otherwise`() {
-    #expect(Loadable<String>.error("something went wrong").error == "something went wrong")
-    #expect(Loadable<String>.loading.error == nil)
-    #expect(Loadable<String>.empty.error == nil)
-    #expect(Loadable<String>.loaded("hello").error == nil)
+  func `Failure returns typed failure when failed and nil otherwise`() {
+    #expect(
+      Loadable<String, TestFailure>.failure(.message("something went wrong")).failure
+        == .message("something went wrong"))
+    #expect(Loadable<String, TestFailure>.loading.failure == nil)
+    #expect(Loadable<String, TestFailure>.empty.failure == nil)
+    #expect(Loadable<String, TestFailure>.loaded("hello").failure == nil)
   }
 
   // MARK: - map
 
   @Test
   func `map transforms loaded value`() {
-    let state: Loadable<Int> = .loaded(5)
+    let state: Loadable<Int, TestFailure> = .loaded(5)
     let mapped = state.map { $0 * 2 }
     #expect(mapped == .loaded(10))
   }
 
   @Test
   func `map preserves non-loaded cases`() {
-    #expect(Loadable<Int>.loading.map { $0 * 2 } == .loading)
-    #expect(Loadable<Int>.empty.map { $0 * 2 } == .empty)
-    #expect(Loadable<Int>.error("fail").map { $0 * 2 } == .error("fail"))
+    #expect(Loadable<Int, TestFailure>.loading.map { $0 * 2 } == .loading)
+    #expect(Loadable<Int, TestFailure>.empty.map { $0 * 2 } == .empty)
+    #expect(
+      Loadable<Int, TestFailure>.failure(.message("fail")).map { $0 * 2 }
+        == .failure(.message("fail")))
+  }
+
+  // MARK: - mapFailure
+
+  @Test
+  func `mapFailure transforms typed failure`() {
+    let state: Loadable<Int, TestFailure> = .failure(.message("offline"))
+    let mapped: Loadable<Int, MappedFailure> = state.mapFailure { failure in
+      switch failure {
+      case .message(let message): .message(message)
+      case .negative: .message("negative")
+      }
+    }
+
+    #expect(mapped == Loadable<Int, MappedFailure>.failure(.message("offline")))
+  }
+
+  @Test
+  func `mapFailure preserves non-failure cases`() {
+    let loaded: Loadable<Int, TestFailure> = .loaded(42)
+    let mapped: Loadable<Int, MappedFailure> = loaded.mapFailure { _ in .message("unused") }
+
+    #expect(mapped == .loaded(42))
   }
 
   // MARK: - flatMap
 
   @Test
   func `flatMap transforms loaded value`() {
-    let state: Loadable<Int> = .loaded(5)
+    let state: Loadable<Int, TestFailure> = .loaded(5)
     let result = state.flatMap { .loaded("\($0)") }
     #expect(result == .loaded("5"))
   }
 
   @Test
   func `flatMap can return different case`() {
-    let state: Loadable<Int> = .loaded(0)
+    let state: Loadable<Int, TestFailure> = .loaded(0)
     let result = state.flatMap { $0 == 0 ? .empty : .loaded("\($0)") }
     #expect(result == .empty)
   }
 
   @Test
-  func `flatMap can return error from loaded`() {
-    let state: Loadable<Int> = .loaded(-1)
-    let result = state.flatMap { $0 < 0 ? .error("negative") : .loaded("\($0)") }
-    #expect(result == .error("negative"))
+  func `flatMap can return failure from loaded`() {
+    let state: Loadable<Int, TestFailure> = .loaded(-1)
+    let result = state.flatMap { $0 < 0 ? .failure(.negative) : .loaded("\($0)") }
+    #expect(result == .failure(.negative))
   }
 
   @Test
   func `flatMap preserves non-loaded cases`() {
-    let loading: Loadable<Int> = .loading
-    let result1: Loadable<String> = loading.flatMap { .loaded("\($0)") }
+    let loading: Loadable<Int, TestFailure> = .loading
+    let result1: Loadable<String, TestFailure> = loading.flatMap { .loaded("\($0)") }
     #expect(result1 == .loading)
 
-    let empty: Loadable<Int> = .empty
-    let result2: Loadable<String> = empty.flatMap { .loaded("\($0)") }
+    let empty: Loadable<Int, TestFailure> = .empty
+    let result2: Loadable<String, TestFailure> = empty.flatMap { .loaded("\($0)") }
     #expect(result2 == .empty)
 
-    let error: Loadable<Int> = .error("fail")
-    let result3: Loadable<String> = error.flatMap { .loaded("\($0)") }
-    #expect(result3 == .error("fail"))
+    let failure: Loadable<Int, TestFailure> = .failure(.message("fail"))
+    let result3: Loadable<String, TestFailure> = failure.flatMap { .loaded("\($0)") }
+    #expect(result3 == .failure(.message("fail")))
   }
 
   // MARK: - Equatable
 
   @Test
   func `Equatable same cases are equal`() {
-    #expect(Loadable<Int>.loading == .loading)
-    #expect(Loadable<Int>.empty == .empty)
-    #expect(Loadable<Int>.loaded(42) == .loaded(42))
-    #expect(Loadable<Int>.error("fail") == .error("fail"))
+    #expect(Loadable<Int, TestFailure>.loading == .loading)
+    #expect(Loadable<Int, TestFailure>.empty == .empty)
+    #expect(Loadable<Int, TestFailure>.loaded(42) == .loaded(42))
+    #expect(Loadable<Int, TestFailure>.failure(.message("fail")) == .failure(.message("fail")))
   }
 
   @Test
   func `Equatable different cases are not equal`() {
-    #expect(Loadable<Int>.loading != .empty)
-    #expect(Loadable<Int>.loading != .loaded(0))
-    #expect(Loadable<Int>.loading != .error(""))
-    #expect(Loadable<Int>.empty != .loaded(0))
-    #expect(Loadable<Int>.loaded(1) != .loaded(2))
-    #expect(Loadable<String>.error("a") != .error("b"))
+    #expect(Loadable<Int, TestFailure>.loading != .empty)
+    #expect(Loadable<Int, TestFailure>.loading != .loaded(0))
+    #expect(Loadable<Int, TestFailure>.loading != .failure(.message("")))
+    #expect(Loadable<Int, TestFailure>.empty != .loaded(0))
+    #expect(Loadable<Int, TestFailure>.loaded(1) != .loaded(2))
+    #expect(
+      Loadable<String, TestFailure>.failure(.message("a"))
+        != .failure(.message("b")))
   }
 
   @Test
   func `Hashable consistency with Equatable`() {
-    let a: Loadable<Int> = .loaded(42)
-    let b: Loadable<Int> = .loaded(42)
+    let a: Loadable<Int, TestFailure> = .loaded(42)
+    let b: Loadable<Int, TestFailure> = .loaded(42)
     #expect(a.hashValue == b.hashValue)
 
-    let set: Set<Loadable<Int>> = [.loading, .empty, .loaded(1), .error("e")]
+    let set: Set<Loadable<Int, TestFailure>> = [
+      .loading, .empty, .loaded(1), .failure(.message("e")),
+    ]
     #expect(set.count == 4)
+  }
+
+  @Test
+  func `Sendable conformance includes value and failure`() {
+    let state: Loadable<Int, TestFailure> = .failure(.negative)
+
+    requireSendable(state)
   }
 
   // MARK: - map edge cases
 
   @Test
   func `map transforms value type`() {
-    let state: Loadable<Int> = .loaded(42)
-    let mapped: Loadable<String> = state.map { "\($0)" }
+    let state: Loadable<Int, TestFailure> = .loaded(42)
+    let mapped: Loadable<String, TestFailure> = state.map { "\($0)" }
     #expect(mapped == .loaded("42"))
   }
 
   @Test
   func `map does not invoke closure for non-loaded cases`() {
     var callCount = 0
-    _ = Loadable<Int>.loading.map { callCount += 1; return $0 }
-    _ = Loadable<Int>.empty.map { callCount += 1; return $0 }
-    _ = Loadable<Int>.error("e").map { callCount += 1; return $0 }
+    _ = Loadable<Int, TestFailure>.loading.map {
+      callCount += 1
+      return $0
+    }
+    _ = Loadable<Int, TestFailure>.empty.map {
+      callCount += 1
+      return $0
+    }
+    _ = Loadable<Int, TestFailure>.failure(.message("e")).map {
+      callCount += 1
+      return $0
+    }
     #expect(callCount == 0)
   }
 
@@ -142,7 +198,7 @@ struct LoadableTests {
 
   @Test
   func `flatMap flattens nested Loadable`() {
-    let nested: Loadable<Loadable<Int>> = .loaded(.loaded(42))
+    let nested: Loadable<Loadable<Int, TestFailure>, TestFailure> = .loaded(.loaded(42))
     let flat = nested.flatMap { $0 }
     #expect(flat == .loaded(42))
   }
@@ -151,8 +207,8 @@ struct LoadableTests {
 
   @Test
   func `Loaded empty collection is distinct from empty case`() {
-    let loaded: Loadable<[String]> = .loaded([])
-    let empty: Loadable<[String]> = .empty
+    let loaded: Loadable<[String], TestFailure> = .loaded([])
+    let empty: Loadable<[String], TestFailure> = .empty
 
     #expect(loaded != empty)
     #expect(loaded.value == [])
@@ -165,10 +221,12 @@ struct LoadableTests {
 
   @Test
   func `Loadable supports Void as Value type`() {
-    let loaded: Loadable<Void> = .loaded(())
+    let loaded: Loadable<Void, TestFailure> = .loaded(())
     #expect(loaded.value != nil)
 
-    let loading: Loadable<Void> = .loading
+    let loading: Loadable<Void, TestFailure> = .loading
     #expect(loading.value == nil)
   }
+
+  private func requireSendable<Value: Sendable>(_: Value) {}
 }

@@ -25,6 +25,11 @@ nonisolated enum DocumentationScene: NavigationScene {
   typealias FullScreen = DocumentationFullScreen
 }
 
+nonisolated enum DocumentationLoadFailure: Error, Equatable, Hashable, Sendable {
+  case offline
+  case unavailable
+}
+
 @MainActor
 @Observable
 @ViewModel
@@ -34,10 +39,16 @@ final class DocumentationViewModel {
     private(set) var revision: Int
 
     var draft: String
+    private(set) var items: Loadable<[String], DocumentationLoadFailure>
 
-    init(revision: Int = -1, draft: String = "") {
+    init(
+      revision: Int = -1,
+      draft: String = "",
+      items: Loadable<[String], DocumentationLoadFailure> = .loading
+    ) {
       self.revision = revision
       self.draft = draft
+      self.items = items
     }
   }
 
@@ -67,7 +78,7 @@ final class DocumentationViewModel {
 
 extension DocumentationViewModel.State {
   convenience init(previewRevision: Int, previewDraft: String) {
-    self.init()
+    self.init(items: .loaded(["Preview item"]))
     self[\.revision] = previewRevision
     self[\.draft] = previewDraft
   }
@@ -92,6 +103,27 @@ struct DocumentationContent: View {
     VStack {
       Text("Revision \(state.revision)")
       TextField("Draft", text: $state[\.draft])
+
+      switch state.items {
+      case .loading:
+        ProgressView("Loading items")
+      case .empty:
+        ContentUnavailableView("No Items", systemImage: "tray")
+      case .loaded(let items):
+        ForEach(items, id: \.self) { item in
+          Text(item)
+        }
+      case .failure(let failure):
+        switch failure {
+        case .offline:
+          ContentUnavailableView("You're Offline", systemImage: "wifi.slash")
+        case .unavailable:
+          ContentUnavailableView(
+            "Items Unavailable",
+            systemImage: "exclamationmark.triangle")
+        }
+      }
+
       Button("Show detail") {
         onAction(.showDetail(id: "preview"))
       }

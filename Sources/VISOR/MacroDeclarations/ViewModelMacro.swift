@@ -25,7 +25,7 @@
 /// @ViewModel
 /// final class ItemsViewModel {
 ///   final class State {
-///     var items: Loadable<[Item]> = .loading
+///     var items: Loadable<[Item], ItemLoadFailure> = .loading
 ///     @Bound(
 ///       source: \ItemsViewModel.service.source,
 ///       selecting: \ItemsSnapshot.isAuthenticated)

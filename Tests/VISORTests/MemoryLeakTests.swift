@@ -51,8 +51,12 @@ private final class LeakSourceViewModel {
 @Observable
 @ViewModel
 private final class LeakAsyncActionViewModel {
+  enum LoadFailure: Error {
+    case unavailable
+  }
+
   final class State {
-    private(set) var items: Loadable<[String]> = .loading
+    private(set) var items: Loadable<[String], LoadFailure> = .loading
   }
 
   enum Action {

@@ -403,7 +403,40 @@ Add `import VISORTestDoubles` to every declaration and use site that names one
 of these symbols. Do not import both modules expecting the old VISOR-qualified
 declarations; v11 contains only the dedicated product's declarations.
 
-## 10. Audit navigation ownership
+## 10. Type Loadable failures
+
+V10 stored display copy directly in `Loadable` and required only the loaded
+value generic:
+
+```swift
+private(set) var items: Loadable<[Item]> = .loading
+
+state[\.items] = .error("Unable to load items")
+```
+
+V11 makes the failure a feature-specific `Error`:
+
+```swift
+enum ItemLoadFailure: Error, Equatable, Sendable {
+  case offline
+  case unavailable
+}
+
+private(set) var items: Loadable<[Item], ItemLoadFailure> = .loading
+
+state[\.items] = .failure(.offline)
+```
+
+Swift 6.2 does not support default generic arguments on nominal types, so every
+`Loadable` use must supply its failure type. Rename `error` to `failure` and
+`isError` to `isFailure`. Use `mapFailure(_:)` when translating a service or
+domain error into the feature's failure vocabulary.
+
+Render all four cases explicitly in Content views. Map typed failures to
+localised copy and recovery actions at that UI boundary instead of storing
+display strings in ViewModel State.
+
+## 11. Audit navigation ownership
 
 V11 makes the mounted navigation hierarchy authoritative. A root `Router`
 starts inactive. Calls made on the root to `push`, present, dismiss, or
@@ -445,7 +478,7 @@ with `configureDeepLinks(scheme:parsers:)`; existing and future child Routers
 read the same latest handler. Code that expected a copied per-child handler
 should remove that assumption.
 
-## 11. Verify the cutover
+## 12. Verify the cutover
 
 Before changing the resolved package version, migrate every target in the same
 SwiftPM graph. Then verify all of the following:
@@ -455,6 +488,8 @@ SwiftPM graph. Then verify all of the following:
   final State, and stable stored `let state` declarations;
 - every producer publishes a stable latest-State snapshot and keeps its channel
   private;
+- every `Loadable` supplies a typed failure and its Content view renders each
+  state deliberately;
 - no removed positional marker, observation helper, `startObserving`, or old
   `VISOR` test-double import remains;
 - root navigation actions are exercised only with the intended container

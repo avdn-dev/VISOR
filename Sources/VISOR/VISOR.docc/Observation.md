@@ -182,7 +182,7 @@ While an enabled owner is reconciling its initial source snapshots and immediate
 
 These failures mean VISOR can no longer guarantee a coherent State. Examples include a readiness deadline exceeded by an initial asynchronous reaction, unexpected source termination, duplicate production ownership, or an internal protocol violation. Ordinary cancellation and scene-policy pausing are lifecycle events, not failures.
 
-Domain failures such as an unavailable network request belong in ViewModel State and feature content, for example as `Loadable.error`. VISOR does not expose a manual infrastructure retry. With a pause policy, a later scene reactivation starts a fresh generation as part of the existing lifecycle, but that cannot repair a terminal source or programming error; a duplicate owner remains invalid until the competing mount is removed.
+Domain failures such as an unavailable network request belong in ViewModel State and feature content, for example as a typed `Loadable.failure`. VISOR does not expose a manual infrastructure retry. With a pause policy, a later scene reactivation starts a fresh generation as part of the existing lifecycle, but that cannot repair a terminal source or programming error; a duplicate owner remains invalid until the competing mount is removed.
 
 ### Scene policy
 
