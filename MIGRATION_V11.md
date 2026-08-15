@@ -84,6 +84,38 @@ Keep the channel private and expose the read-only source. Publish the full stabl
 
 Prefer one source per coherent producer snapshot. If separate performance lanes are necessary, construct them with `ObservationChannel(_:groupedWith:)`. Grouping coordinates session opening and checkpoints but does not batch sequential publications.
 
+When a class or actor can make one stored property its canonical snapshot, the
+equivalent producer is considerably smaller with `@ObservationState`:
+
+```swift
+actor ProfileService {
+  @ObservationState
+  nonisolated private(set) var profile: ProfileSnapshot = .empty
+
+  init(snapshot: ProfileSnapshot) {
+    profile = snapshot
+  }
+
+  func apply(_ snapshot: ProfileSnapshot) {
+    profile = snapshot
+  }
+}
+
+let source = service.profileSource
+```
+
+The macro generates the private channel and stable `profileSource`, and every
+assignment or in-place value mutation publishes synchronously. The property
+requires an explicit `Sendable` type and initial value. Source-first producers
+do not need `@Observable`; if a transitional type retains it for other fields,
+place `@ObservationIgnored` immediately below `@ObservationState` on this
+property.
+
+For immutable stub defaults, retain one
+`ObservationSource<Snapshot>.constant(.empty)` rather than repeating
+`ObservationChannel(.empty).source` in computed properties. Each new constant
+source has a distinct identity.
+
 ## 3. Convert the ViewModel and State shape
 
 Before:
@@ -227,13 +259,31 @@ The following APIs are removed:
 | positional `@Bound` | producer `ObservationSource`, then `@Bound(source:)` or `@Bound(source:selecting:)` |
 | positional `@Reaction` | `@Reaction(source:)` or `@Reaction(source:selecting:)` |
 | `@Polled` / `polledValuesOf` | explicit structured injected-Clock activity; publish durable latest State through a producer-owned channel when needed |
-| `valuesOf` | source-backed binding/reaction for durable latest State; an explicit buffered sequence for lossless events |
+| `valuesOf` | source-backed binding/reaction for ViewModel State; direct source iteration for an explicitly owned service task; an explicit buffered sequence for lossless events |
 | `latestValuesOf` | an explicitly owned cancel-previous task where that policy is part of the feature |
 | `debouncedValuesOf` / `debouncedBy:` | an explicitly owned injected-Clock debounce task |
 | `throttledBy:` | an explicitly owned rate policy at the producer or presentation boundary |
 | `startObserving` | generated structured `@LazyViewModel` or `VISORTesting.observe` ownership |
 
 Do not translate an event stream into `ObservationSource` merely to satisfy the API. A source represents stable latest State and may coalesce obsolete snapshots. Lossless events require buffering and event-specific ownership.
+
+For service-to-service observation of durable latest State, consume the
+producer's source from an explicitly owned task:
+
+```swift
+observationTask = Task { @MainActor [weak self, dependency] in
+  for await value in dependency.valueSource {
+    guard !Task.isCancelled else { return }
+    await self?.apply(value)
+  }
+}
+```
+
+It emits the atomic baseline and then the newest pending snapshot, and ends
+cooperatively with the consuming task. It is not part of generated ViewModel
+readiness, revision acknowledgement, or `VISORTesting.perform` fencing. A
+lossless occurrence still requires an explicit event sequence with a buffering
+policy selected by its owner.
 
 Elapsed-time work does not receive an inferred `VISORTesting.perform` fence. Test it with an injected clock and await the domain operation that defines completion.
 

@@ -8,6 +8,44 @@ VISOR observation is source-owned. A producer owns an `ObservationChannel<Value>
 
 This explicit capability gives generated production and testing sessions a gap-free baseline, revision ordering, acknowledgements, and finite source fences. A raw `AsyncSequence`, an arbitrary Observation closure, or a hidden task cannot provide that contract by itself.
 
+## Why VISOR has an observation control plane
+
+Swift Observation is excellent for invalidating UI reads, and Combine is useful
+for transforming publisher pipelines. Neither API defines the lifecycle contract
+VISOR needs when a ViewModel becomes ready:
+
+1. Register every dependency and read its matching baseline without a race.
+2. Apply all initial bindings and await all initial reactions before exposing
+   content.
+3. Process later revisions in order and acknowledge completion.
+4. Let tests establish a finite checkpoint and wait until every affected
+   reaction has crossed it.
+
+VISOR therefore uses a small observation control plane rather than treating
+UI invalidation or publisher delivery as readiness. This is valuable only at
+that boundary; ordinary event pipelines and local UI observation should keep
+using the simpler native tools that fit them.
+
+`ObservationChannel` and `ObservationSource` are two capabilities over the
+same state. The producer retains the channel because it can publish. Consumers
+receive a source because they may read or subscribe but cannot impersonate the
+producer. A source may be opened by several independent owners. Within one
+generated session lane, however, the same source appears only once: all
+`@Bound` projections and `@Reaction` handlers for it share a single baseline,
+revision order, acknowledgement, and checkpoint.
+
+The model deliberately distinguishes state from events:
+
+```text
+durable current value -> ObservationSource -> initial value + latest revisions
+occurrence             -> explicit event sequence -> buffering chosen by owner
+```
+
+Represent a value as observation State only when a new consumer can start from
+the current snapshot and older unprocessed revisions can become obsolete. Do
+not model taps, transactions, audit records, or other lossless occurrences as
+State.
+
 Import the architecture and observation products where a module declares both producers and ViewModels:
 
 ```swift
@@ -50,6 +88,91 @@ Published values must be `Sendable` and must retain stable contents after public
 
 Prefer one snapshot per coherent domain revision rather than one source per `@Bound` field. This avoids torn baselines and lets all projections share one subscription.
 
+### Producer observation State
+
+When one stored property is the producer's canonical snapshot,
+`@ObservationState` generates its channel and a stable `<property>Source`:
+
+```swift
+actor SyncService {
+  @ObservationState
+  nonisolated private(set) var sync: SyncSnapshot = .initial
+
+  func apply(_ snapshot: SyncSnapshot) {
+    sync = snapshot
+  }
+}
+
+let service = SyncService()
+let source = service.syncSource
+```
+
+Assignments and in-place value mutations publish the completed snapshot
+synchronously. Give the property an explicit `Sendable` type and initial value.
+The macro is restricted to classes and actors so copying a value-type producer
+cannot accidentally share one channel.
+
+A source-first producer does not need `@Observable`. During an incremental
+migration, an enclosing `@Observable` type can retain Observation for other
+properties by placing `@ObservationIgnored` immediately below
+`@ObservationState`:
+
+```swift
+@Observable
+final class TransitionalService {
+  @ObservationState
+  @ObservationIgnored
+  private(set) var sync: SyncSnapshot = .initial
+}
+```
+
+Use `ObservationSource.constant(_:)` for one retained immutable fallback,
+such as generated test-double state. Do not recreate a constant source from a
+computed property because each call would create another source identity.
+
+Keep the explicit channel form as an escape hatch when a producer cannot use
+the storage macro. In particular, the current Swift compiler can miscompile
+partial cleanup when a class with macro-owned storage throws before
+initialisation completes:
+
+```swift
+final class ThrowingProducer {
+  private let statusChannel = ObservationChannel(Status.idle)
+
+  private(set) var status: Status = .idle {
+    didSet { statusChannel.publish(status) }
+  }
+
+  var statusSource: ObservationSource<Status> {
+    statusChannel.source
+  }
+
+  init(configuration: Configuration) throws {
+    try configuration.validate()
+  }
+}
+```
+
+When a protocol exposes observation State, declare the read-only source as an
+explicit capability and mark the matching value with `@ObservationState`:
+
+```swift
+@GenerateSpy
+protocol SyncServicing {
+  @ObservationState
+  @DefaultValue(SyncSnapshot.initial)
+  var sync: SyncSnapshot { get }
+  var syncSource: ObservationSource<SyncSnapshot> { get }
+}
+```
+
+The annotation tells generated spies and stubs to publish assignments through
+the source. The source requirement remains explicit because it is part of the
+protocol's public consumer capability, not an implementation detail. Swift
+peer macros also cannot yet add a protocol requirement that is reliable when
+used through an existential. Concrete conformers still get their source from
+the stored-property form of `@ObservationState`.
+
 ### Related performance lanes
 
 When one producer needs separate channels for performance, construct later lanes with `groupedWith:`:
@@ -62,6 +185,26 @@ let metering = ObservationChannel(
 ```
 
 Grouping makes session opening and checkpoints atomic relative to each individual channel operation. It does not turn sequential `publish` calls into one batch transaction. Use one snapshot when fields must share one publication revision.
+
+### Service-to-service observation
+
+An explicitly owned service task can consume another producer's durable State
+through the producer's source. `ObservationSource` is itself an
+`AsyncSequence`, so no intermediate sequence property is required:
+
+```swift
+observationTask = Task { @MainActor [weak self, dependency] in
+  for await status in dependency.statusSource {
+    guard !Task.isCancelled else { return }
+    await self?.apply(status)
+  }
+}
+```
+
+The sequence emits the atomic baseline and then the newest pending snapshot.
+It is intentionally outside generated ViewModel readiness, acknowledgements,
+and `VISORTesting.perform` fences. Use `@Bound` or `@Reaction` inside a
+ViewModel. Keep lossless events on an explicitly buffered event contract.
 
 ## Source-backed ViewModels
 

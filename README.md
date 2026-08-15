@@ -84,20 +84,19 @@ struct ProfileSnapshot: Equatable, Sendable {
 // The producer owns mutation. Consumers receive only its read-only source.
 @MainActor
 final class ProfileService {
-  private let channel: ObservationChannel<ProfileSnapshot>
-  let source: ObservationSource<ProfileSnapshot>
+  @ObservationState
+  private(set) var profile: ProfileSnapshot = ProfileSnapshot(
+    name: "Loading",
+    email: "")
 
   init(snapshot: ProfileSnapshot) {
-    let channel = ObservationChannel(snapshot)
-    self.channel = channel
-    source = channel.source
+    profile = snapshot
   }
 
   func refresh() async {
-    let snapshot = ProfileSnapshot(
+    profile = ProfileSnapshot(
       name: "Alice",
       email: "alice@example.com")
-    channel.publish(snapshot)
   }
 }
 
@@ -107,12 +106,12 @@ final class ProfileService {
 final class ProfileViewModel {
   final class State {
     @Bound(
-      source: \ProfileViewModel.profileService.source,
+      source: \ProfileViewModel.profileService.profileSource,
       selecting: \ProfileSnapshot.name)
     private(set) var name = ""
 
     @Bound(
-      source: \ProfileViewModel.profileService.source,
+      source: \ProfileViewModel.profileService.profileSource,
       selecting: \ProfileSnapshot.email)
     private(set) var email = ""
   }
