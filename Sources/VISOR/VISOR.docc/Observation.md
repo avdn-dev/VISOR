@@ -90,39 +90,56 @@ Prefer one snapshot per coherent domain revision rather than one source per `@Bo
 
 ### Producer observation State
 
-When one stored property is the producer's canonical snapshot,
-`@ObservationState` generates its channel and a stable `<property>Source`:
+For a public service API, declare the consumer capability directly.
+`@ObservationState(initial:)` generates a private channel, a stable source
+getter, and a private `publish<Property>(_)` producer operation:
 
 ```swift
 actor SyncService {
-  @ObservationState
-  nonisolated private(set) var sync: SyncSnapshot = .initial
+  @ObservationState(initial: SyncSnapshot.initial)
+  nonisolated var sync: ObservationSource<SyncSnapshot>
 
   func apply(_ snapshot: SyncSnapshot) {
-    sync = snapshot
+    publishSync(snapshot)
   }
 }
 
 let service = SyncService()
-let source = service.syncSource
+let source = service.sync
 ```
 
-Assignments and in-place value mutations publish the completed snapshot
-synchronously. Give the property an explicit `Sendable` type and initial value.
-The macro is restricted to classes and actors so copying a value-type producer
-cannot accidentally share one channel.
+The authored property is exactly the read-only public contract. The generated
+channel and publisher are private implementation details, and the expansion
+has the same runtime shape as the explicit channel example above: one channel,
+one stable source, and no task or additional subscription. Publication remains
+synchronous. The macro is restricted to classes and actors so copying a
+value-type producer cannot accidentally share one channel.
 
-A source-first producer does not need `@Observable`. During an incremental
-migration, an enclosing `@Observable` type can retain Observation for other
-properties by placing `@ObservationIgnored` immediately below
-`@ObservationState`:
+The value-first spelling remains available for existing implementations whose
+canonical producer state is a directly mutated stored value:
+
+```swift
+@ObservationState
+private(set) var syncSnapshot: SyncSnapshot = .initial
+
+// Generated compatibility projection: syncSnapshotSource
+```
+
+That form publishes assignments and in-place value mutations. Prefer the
+source-first form at module and protocol boundaries so consumer names describe
+domain State rather than the observation mechanism.
+
+A producer does not need `@Observable` merely to expose an observation source.
+When its enclosing type does use `@Observable` for other properties, place
+`@ObservationIgnored` immediately below `@ObservationState`; Swift otherwise
+expands both accessor macros from the same authored declaration:
 
 ```swift
 @Observable
 final class TransitionalService {
-  @ObservationState
+  @ObservationState(initial: SyncSnapshot.initial)
   @ObservationIgnored
-  private(set) var sync: SyncSnapshot = .initial
+  var sync: ObservationSource<SyncSnapshot>
 }
 ```
 
@@ -139,11 +156,11 @@ initialisation completes:
 final class ThrowingProducer {
   private let statusChannel = ObservationChannel(Status.idle)
 
-  private(set) var status: Status = .idle {
-    didSet { statusChannel.publish(status) }
+  private(set) var currentStatus: Status = .idle {
+    didSet { statusChannel.publish(currentStatus) }
   }
 
-  var statusSource: ObservationSource<Status> {
+  var status: ObservationSource<Status> {
     statusChannel.source
   }
 
@@ -153,25 +170,21 @@ final class ThrowingProducer {
 }
 ```
 
-When a protocol exposes observation State, declare the read-only source as an
-explicit capability and mark the matching value with `@ObservationState`:
+Use the same source-first declaration in protocols:
 
 ```swift
 @GenerateSpy
 protocol SyncServicing {
-  @ObservationState
-  @DefaultValue(SyncSnapshot.initial)
-  var sync: SyncSnapshot { get }
-  var syncSource: ObservationSource<SyncSnapshot> { get }
+  @ObservationState(initial: SyncSnapshot.initial)
+  var sync: ObservationSource<SyncSnapshot> { get }
 }
 ```
 
-The annotation tells generated spies and stubs to publish assignments through
-the source. The source requirement remains explicit because it is part of the
-protocol's public consumer capability, not an implementation detail. Swift
-peer macros also cannot yet add a protocol requirement that is reliable when
-used through an existential. Concrete conformers still get their source from
-the stored-property form of `@ObservationState`.
+The source remains explicit because it is the protocol's consumer capability.
+The `initial:` expression supplies generated spies and stubs with a baseline;
+it does not constrain how production conformers acquire their initial domain
+State. Generated doubles expose `publishSync(_:)` so tests can drive later
+snapshots without replacing the stable source.
 
 ### Related performance lanes
 
@@ -194,7 +207,7 @@ through the producer's source. `ObservationSource` is itself an
 
 ```swift
 observationTask = Task { @MainActor [weak self, dependency] in
-  for await status in dependency.statusSource {
+  for await status in dependency.status {
     guard !Task.isCancelled else { return }
     await self?.apply(status)
   }
@@ -247,7 +260,7 @@ VISOR accepts exactly four source-backed forms.
 ### Bind a complete source value
 
 ```swift
-@Bound(source: \PlayerViewModel.player.currentItemSource)
+@Bound(source: \PlayerViewModel.player.currentItem)
 private(set) var currentItem = PlayerItem.empty
 ```
 
@@ -257,7 +270,7 @@ The State field type matches the source snapshot type.
 
 ```swift
 @Bound(
-  source: \PlayerViewModel.player.snapshotSource,
+  source: \PlayerViewModel.player.snapshot,
   selecting: \PlayerSnapshot.currentItem)
 private(set) var currentItem = PlayerItem.empty
 ```
@@ -267,7 +280,7 @@ Several selections from the same source share its baseline, revision lane, and s
 ### React to a complete source value
 
 ```swift
-@Reaction(source: \PlayerViewModel.player.currentItemSource)
+@Reaction(source: \PlayerViewModel.player.currentItem)
 private func currentItemChanged(_ item: PlayerItem) {
   updateState(\.title, to: item.title)
 }
@@ -277,7 +290,7 @@ private func currentItemChanged(_ item: PlayerItem) {
 
 ```swift
 @Reaction(
-  source: \PlayerViewModel.player.snapshotSource,
+  source: \PlayerViewModel.player.snapshot,
   selecting: \PlayerSnapshot.currentItem)
 private func currentItemChanged(_ item: PlayerItem) async {
   await prepareArtwork(for: item)

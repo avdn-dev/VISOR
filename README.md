@@ -84,19 +84,19 @@ struct ProfileSnapshot: Equatable, Sendable {
 // The producer owns mutation. Consumers receive only its read-only source.
 @MainActor
 final class ProfileService {
-  @ObservationState
-  private(set) var profile: ProfileSnapshot = ProfileSnapshot(
+  @ObservationState(initial: ProfileSnapshot(
     name: "Loading",
-    email: "")
+    email: ""))
+  var profile: ObservationSource<ProfileSnapshot>
 
   init(snapshot: ProfileSnapshot) {
-    profile = snapshot
+    publishProfile(snapshot)
   }
 
   func refresh() async {
-    profile = ProfileSnapshot(
+    publishProfile(ProfileSnapshot(
       name: "Alice",
-      email: "alice@example.com")
+      email: "alice@example.com"))
   }
 }
 
@@ -106,12 +106,12 @@ final class ProfileService {
 final class ProfileViewModel {
   final class State {
     @Bound(
-      source: \ProfileViewModel.profileService.profileSource,
+      source: \ProfileViewModel.profileService.profile,
       selecting: \ProfileSnapshot.name)
     private(set) var name = ""
 
     @Bound(
-      source: \ProfileViewModel.profileService.profileSource,
+      source: \ProfileViewModel.profileService.profile,
       selecting: \ProfileSnapshot.email)
     private(set) var email = ""
   }
@@ -171,19 +171,19 @@ ProfileScreen()
 VISOR accepts exactly four source-backed declaration forms:
 
 ```swift
-@Bound(source: \FeatureViewModel.service.valueSource)
+@Bound(source: \FeatureViewModel.service.value)
 private(set) var value = Value.empty
 
 @Bound(
-  source: \FeatureViewModel.service.snapshotSource,
+  source: \FeatureViewModel.service.snapshot,
   selecting: \FeatureSnapshot.value)
 private(set) var value = Value.empty
 
-@Reaction(source: \FeatureViewModel.service.valueSource)
+@Reaction(source: \FeatureViewModel.service.value)
 func valueChanged(_ value: Value) { ... }
 
 @Reaction(
-  source: \FeatureViewModel.service.snapshotSource,
+  source: \FeatureViewModel.service.snapshot,
   selecting: \FeatureSnapshot.value)
 func valueChanged(_ value: Value) async { ... }
 ```
