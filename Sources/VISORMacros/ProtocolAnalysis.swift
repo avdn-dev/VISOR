@@ -14,7 +14,7 @@ import SwiftParser
 
 struct ProtocolPropertyInfo {
   let name: String
-  var type: String
+  let type: String
   let hasSetter: Bool
   let defaultValueExpression: String?
 }
@@ -24,8 +24,8 @@ struct ProtocolPropertyInfo {
 struct ParameterInfo {
   let externalLabel: String? // nil means no external label (e.g., `_ item: Item`)
   let internalName: String
-  var type: String
-  var isInout: Bool
+  let type: String
+  let isInout: Bool
 }
 
 // MARK: - ThrowsEffect
@@ -73,11 +73,11 @@ struct ProtocolMethodInfo {
   let genericWhereClause: String?
   let genericParameterNames: [String]
   let explicitlySendableGenericParameterNames: Set<String>
-  var parameters: [ParameterInfo]
+  let parameters: [ParameterInfo]
   let isAsync: Bool
   let isConcurrent: Bool
   let throwsEffect: ThrowsEffect
-  var returnType: String? // nil means Void
+  let returnType: String? // nil means Void
   let defaultReturnExpression: String?
 
   var isThrowing: Bool {
@@ -91,13 +91,6 @@ struct ProtocolMethodInfo {
   }
 }
 
-// MARK: - ProtocolTypeAliasInfo
-
-struct ProtocolTypeAliasInfo {
-  let name: String
-  let type: TypeSyntax
-}
-
 // MARK: - ProtocolAnalysis
 
 /// Single-pass analysis of a `ProtocolDeclSyntax` member list.
@@ -106,7 +99,7 @@ struct ProtocolAnalysis {
   var properties: [ProtocolPropertyInfo] = []
   var methods: [ProtocolMethodInfo] = []
   var staticMembers: [String] = []
-  var typeAliases: [ProtocolTypeAliasInfo] = []
+  var typeAliasNames: [String] = []
   var hasAssociatedTypes = false
   var hasSubscripts = false
   var hasInitialiserRequirements = false
@@ -114,21 +107,18 @@ struct ProtocolAnalysis {
   
   init(_ protocolDecl: ProtocolDeclSyntax) {
     
-    // We must find typealiases first
+    // We must find type aliases first.
     for member in protocolDecl.memberBlock.members {
       guard let typeAliasDecl = member.decl.as(TypeAliasDeclSyntax.self) else { continue }
-      let name = typeAliasDecl.name.text
-      let typeSyntax = typeAliasDecl.initializer.value
-      typeAliases.append(ProtocolTypeAliasInfo(
-        name: name,
-        type: typeSyntax))
+      typeAliasNames.append(typeAliasDecl.name.text)
     }
     
-    // Keep track of all typealiases
-    let typeAliasNames = Set(typeAliases.map(\.name))
+    let typeAliasNameSet = Set(typeAliasNames)
     let protocolName = protocolDecl.name.text
     
-    let taHandler = TypeAliasHandler(protocolName: protocolName, typeAliasNames: typeAliasNames)
+    let typeAliasHandler = TypeAliasHandler(
+      protocolName: protocolName,
+      typeAliasNames: typeAliasNameSet)
     
     for member in protocolDecl.memberBlock.members {
       // Associated types
@@ -197,7 +187,7 @@ struct ProtocolAnalysis {
         
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
-          type: taHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
+          type: typeAliasHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
           hasSetter: hasSetter,
           defaultValueExpression: defaultValueExpression))
         continue
@@ -225,7 +215,7 @@ struct ProtocolAnalysis {
         let params = funcDecl.signature.parameterClause.parameters.map { param in
           let externalLabel = param.firstName.tokenKind == .wildcard ? nil : param.firstName.text
           let internalName = param.secondName?.text ?? param.firstName.text
-          let type = taHandler.protocolQualifiedTypeName(for: param.type)
+          let type = typeAliasHandler.protocolQualifiedTypeName(for: param.type)
           let isInout = param.type.hasInoutSpecifier
           return ParameterInfo(externalLabel: externalLabel, internalName: internalName, type: type, isInout: isInout)
         }
@@ -240,7 +230,9 @@ struct ProtocolAnalysis {
           if throwsClause.throwsSpecifier.tokenKind == .keyword(.rethrows) {
             throwsEffect = .rethrows
           } else {
-            let errorType = throwsClause.type.map { taHandler.protocolQualifiedTypeName(for: $0) }
+            let errorType = throwsClause.type.map {
+              typeAliasHandler.protocolQualifiedTypeName(for: $0)
+            }
             throwsEffect = .throws(errorType: errorType)
           }
         } else {
@@ -249,7 +241,7 @@ struct ProtocolAnalysis {
 
         let returnType: String?
         if let returnClause = funcDecl.signature.returnClause {
-          returnType = taHandler.protocolQualifiedTypeName(for: returnClause.type)
+          returnType = typeAliasHandler.protocolQualifiedTypeName(for: returnClause.type)
         } else {
           returnType = nil
         }
@@ -350,13 +342,11 @@ private func extractAttributeExpression(named attributeName: String, in attribut
 // MARK: - Typealias Handling
 
 private struct TypeAliasHandler {
-  let protocolName: String
   let typeAliasNames: Set<String>
   
   let protocolTypeSyntax: IdentifierTypeSyntax
   
   init(protocolName: String, typeAliasNames: Set<String>) {
-    self.protocolName = protocolName
     self.typeAliasNames = typeAliasNames
     
     self.protocolTypeSyntax = IdentifierTypeSyntax(name: TokenSyntax(.identifier(protocolName), presence: .present))

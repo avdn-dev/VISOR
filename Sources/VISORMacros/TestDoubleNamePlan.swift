@@ -50,7 +50,7 @@ struct TestDoubleNamePlan {
     let methodPrefixes = uniqueMethodPrefixes(for: analysis.methods)
     var memberAllocator = GeneratedNameAllocator(reserving:
       analysis.properties.map(\.name) + analysis.methods.map(\.name))
-    var typeAllocator = GeneratedNameAllocator(reserving: analysis.typeAliases.map(\.name))
+    var typeAllocator = GeneratedNameAllocator(reserving: analysis.typeAliasNames)
     var renames: [TestDoubleGeneratedNameRename] = []
 
     if isSendable {
