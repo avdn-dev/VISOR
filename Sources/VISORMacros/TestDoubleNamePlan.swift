@@ -14,6 +14,8 @@ enum TestDoubleGeneratedNameRole: String {
   case callCase = "call-log case"
   case storage = "synchronised-storage member"
   case storageType = "synchronised-storage type"
+  case observationChannel = "observation-State channel"
+  case observationPublisher = "observation-State publisher"
 }
 
 struct TestDoubleGeneratedNameRename {
@@ -34,12 +36,18 @@ struct TestDoubleMethodNamePlan {
   let callCase: String?
 }
 
+struct TestDoubleSourceObservationStateNamePlan {
+  let channel: String
+  let publisher: String
+}
+
 struct TestDoubleNamePlan {
   let methods: [TestDoubleMethodNamePlan]
   let callType: String?
   let callLog: String?
   let storageType: String?
   let storage: String?
+  let sourceObservationStates: [TestDoubleSourceObservationStateNamePlan]
   let renames: [TestDoubleGeneratedNameRename]
 
   init(
@@ -52,6 +60,26 @@ struct TestDoubleNamePlan {
       analysis.properties.map(\.name) + analysis.methods.map(\.name))
     var typeAllocator = GeneratedNameAllocator(reserving: analysis.typeAliasNames)
     var renames: [TestDoubleGeneratedNameRename] = []
+
+    sourceObservationStates = analysis.properties.compactMap { property in
+      guard property.sourceObservationState != nil else { return nil }
+      let capitalisedName = property.name.capitalisedFirst
+      return TestDoubleSourceObservationStateNamePlan(
+        channel: Self.allocate(
+          preferred: "_\(property.name)ObservationChannel",
+          fallback: "_generated\(capitalisedName)ObservationChannel",
+          role: .observationChannel,
+          methodName: nil,
+          allocator: &memberAllocator,
+          renames: &renames),
+        publisher: Self.allocate(
+          preferred: "publish\(capitalisedName)",
+          fallback: "publishGenerated\(capitalisedName)",
+          role: .observationPublisher,
+          methodName: nil,
+          allocator: &memberAllocator,
+          renames: &renames))
+    }
 
     if isSendable {
       storageType = Self.allocate(

@@ -90,6 +90,7 @@ struct TestDoubleGenerator {
     })
     let storedProtocolProperties = analysis.properties.filter {
       !observationSourceNames.contains($0.name)
+        && $0.sourceObservationState == nil
     }
     if hasUnknownTypeDefaults(properties: storedProtocolProperties, methods: analysis.methods) {
       context.diagnose(Diagnostic(
@@ -136,9 +137,12 @@ struct TestDoubleGenerator {
 
 private struct OrdinaryTestDoubleRenderer {
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
-    var members = plan.protocolProperties.flatMap {
-      directPropertyMembers($0, access: plan.access)
+    var members = plan.sourceObservationStates.flatMap {
+      sourceObservationStateMembers($0, access: plan.access)
     }
+    members.append(contentsOf: plan.protocolProperties.flatMap {
+      directPropertyMembers($0, access: plan.access)
+    })
 
     switch plan.kind {
     case .stub:
@@ -147,6 +151,25 @@ private struct OrdinaryTestDoubleRenderer {
       members.append(contentsOf: spyMembers(plan))
     }
     return members
+  }
+
+  private func sourceObservationStateMembers(
+    _ state: TestDoubleSourceObservationStatePlan,
+    access: String)
+    -> [String]
+  {
+    let prefix = access.isEmpty ? "" : "\(access) "
+    return [
+      "  @ObservationIgnored",
+      "  private let \(state.channelName) = "
+        + "VISORObservation.ObservationChannel<\(state.valueType)>(\(state.initialValueExpression))",
+      "  \(prefix)var \(state.name): \(state.sourceType) {",
+      "    \(state.channelName).source",
+      "  }",
+      "  \(prefix)func \(state.publisherName)(_ snapshot: sending \(state.valueType)) {",
+      "    \(state.channelName).publish(snapshot)",
+      "  }",
+    ]
   }
 
   private func stubMembers(_ plan: TestDoubleGenerationPlan) -> [String] {

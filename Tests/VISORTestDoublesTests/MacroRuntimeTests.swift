@@ -5,10 +5,14 @@ import VISORTestDoubles
 
 @GenerateSpy
 protocol ObservationStateService {
-    @ObservationState
-    @DefaultValue(0)
-    var count: Int { get }
-    var countSource: ObservationSource<Int> { get }
+    @ObservationState(initial: 0)
+    var count: ObservationSource<Int> { get }
+}
+
+@GenerateSpy(.sendable)
+nonisolated protocol SendableObservationStateService: Sendable {
+    @ObservationState(initial: 0)
+    var count: ObservationSource<Int> { get }
 }
 
 // MARK: - @GenerateStub Runtime Tests
@@ -175,11 +179,23 @@ struct GenerateSpyMacroRuntimeTests {
     func `Observation State properties publish through generated spies`() async {
         let spy = SpyObservationStateService()
         let service: any ObservationStateService = spy
-        let snapshots = service.countSource.snapshots.makeAsyncIterator()
+        let snapshots = service.count.makeAsyncIterator()
 
         #expect(await snapshots.next() == 0)
-        spy.count = 1
+        spy.publishCount(1)
         #expect(await snapshots.next() == 1)
+    }
+
+    @Test
+    func `Sendable Observation State publishers remain safe across isolation`() async {
+        let spy = SpySendableObservationStateService()
+        let snapshots = spy.count.makeAsyncIterator()
+
+        #expect(await snapshots.next() == 0)
+        await Task { @concurrent in
+            spy.publishCount(2)
+        }.value
+        #expect(await snapshots.next() == 2)
     }
 
     @Test

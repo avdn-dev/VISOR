@@ -20,6 +20,15 @@ private final class ObservationStateProducer {
   }
 }
 
+private final class SourceFirstObservationStateProducer {
+  @ObservationState(initial: ObservationStateSnapshot())
+  var snapshot: ObservationSource<ObservationStateSnapshot>
+
+  func update(count: Int, label: String) {
+    publishSnapshot(ObservationStateSnapshot(count: count, label: label))
+  }
+}
+
 @MainActor
 private final class SnapshotConsumer {
   init(source: ObservationSource<Int>) {
@@ -65,8 +74,35 @@ private final class ObservableObservationStateProducer {
   }
 }
 
+@MainActor
+@Observable
+private final class SourceFirstObservableObservationStateProducer {
+  @ObservationState(initial: ObservationStateSnapshot())
+  @ObservationIgnored
+  var snapshot: ObservationSource<ObservationStateSnapshot>
+
+  func update(count: Int) {
+    publishSnapshot(ObservationStateSnapshot(count: count))
+  }
+}
+
 @Suite("Producer observation state")
 struct ObservationStateTests {
+  @Test
+  func `A source-first producer exposes only its read-only State`() async {
+    let producer = SourceFirstObservationStateProducer()
+    let source = producer.snapshot
+    let snapshots = source.makeAsyncIterator()
+
+    #expect(await snapshots.next() == ObservationStateSnapshot())
+
+    producer.update(count: 2, label: "updated")
+
+    #expect(await snapshots.next() == ObservationStateSnapshot(count: 2, label: "updated"))
+    #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 2, label: "updated"))
+    #expect(source._visorIdentity == producer.snapshot._visorIdentity)
+  }
+
   @Test
   func `The generated source has stable identity and the latest snapshot`() {
     let producer = ObservationStateProducer()
@@ -108,6 +144,15 @@ struct ObservationStateTests {
 
     #expect(producer.snapshot.count == 3)
     #expect(producer.snapshotSource.currentSnapshot().count == 3)
+  }
+
+  @Test @MainActor
+  func `Source-first Observation State composes with explicit Observation exclusion`() {
+    let producer = SourceFirstObservableObservationStateProducer()
+
+    producer.update(count: 4)
+
+    #expect(producer.snapshot.currentSnapshot().count == 4)
   }
 
   @Test

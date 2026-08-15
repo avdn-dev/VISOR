@@ -33,6 +33,15 @@ struct TestDoubleStoredPropertyPlan {
   }
 }
 
+struct TestDoubleSourceObservationStatePlan {
+  let name: String
+  let sourceType: String
+  let valueType: String
+  let initialValueExpression: String
+  let channelName: String
+  let publisherName: String
+}
+
 // MARK: - TestDoubleRecordedParameterPlan
 
 struct TestDoubleRecordedParameterPlan {
@@ -116,6 +125,7 @@ struct TestDoubleGenerationPlan {
   let isSendable: Bool
   let names: TestDoubleNamePlan
   let protocolProperties: [TestDoubleStoredPropertyPlan]
+  let sourceObservationStates: [TestDoubleSourceObservationStatePlan]
   let methods: [TestDoubleMethodGenerationPlan]
   let callLogProperty: TestDoubleStoredPropertyPlan?
 
@@ -137,10 +147,27 @@ struct TestDoubleGenerationPlan {
       property.isObservationState ? "\(property.name)Source" : nil
     })
     protocolProperties = analysis.properties
-      .filter { !observationSourceNames.contains($0.name) }
+      .filter {
+        !observationSourceNames.contains($0.name)
+          && $0.sourceObservationState == nil
+      }
       .map {
       Self.protocolProperty($0, isSendable: isSendable)
       }
+    let sourceProperties = analysis.properties.filter {
+      $0.sourceObservationState != nil
+    }
+    sourceObservationStates = zip(sourceProperties, names.sourceObservationStates).compactMap {
+      property, sourceNames in
+      guard let source = property.sourceObservationState else { return nil }
+      return TestDoubleSourceObservationStatePlan(
+        name: property.name,
+        sourceType: property.type,
+        valueType: source.valueType,
+        initialValueExpression: source.initialValueExpression,
+        channelName: sourceNames.channel,
+        publisherName: sourceNames.publisher)
+    }
     methods = zip(analysis.methods, names.methods).map { method, methodNames in
       Self.methodPlan(
         method,

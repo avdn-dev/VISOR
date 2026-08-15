@@ -15,6 +15,7 @@ private let testMacros: [String: Macro.Type] = [
   "GenerateStub": GenerateTestDoublesStubMacro.self,
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
+  "ObservationState": ObservationStateMacro.self,
 ]
 
 private let defaultValueWarning = """
@@ -28,6 +29,40 @@ private let defaultValueWarning = """
 struct GenerateStubMacroTests {
 
   // MARK: - Protocol Stub Generation
+
+  @Test
+  func `Generates a Sendable source-first Observation State control`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateStub(.sendable)
+      nonisolated protocol PlaybackService: Sendable {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+      """,
+      expandedSource: """
+      nonisolated protocol PlaybackService: Sendable {
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+
+      @Observable
+      nonisolated final class StubPlaybackService: PlaybackService, Sendable {
+        private struct _Storage: Sendable {
+        }
+        @ObservationIgnored
+        private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
+        @ObservationIgnored
+        private let _playbackObservationChannel = VISORObservation.ObservationChannel<PlaybackSnapshot>(PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> {
+          _playbackObservationChannel.source
+        }
+        func publishPlayback(_ snapshot: sending PlaybackSnapshot) {
+          _playbackObservationChannel.publish(snapshot)
+        }
+      }
+      """,
+      macros: testMacros)
+  }
 
   @Test
   func `Generates stub with properties and methods`() {

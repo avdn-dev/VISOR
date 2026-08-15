@@ -15,6 +15,7 @@ private let testMacros: [String: Macro.Type] = [
   "GenerateSpy": GenerateTestDoublesSpyMacro.self,
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
+  "ObservationState": ObservationStateMacro.self,
 ]
 
 // MARK: - GenerateSpyMacroTests
@@ -23,6 +24,36 @@ private let testMacros: [String: Macro.Type] = [
 struct GenerateSpyMacroTests {
 
   // MARK: - Spy Generation
+
+  @Test
+  func `Generates a source-first Observation State control`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol PlaybackService {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+      """,
+      expandedSource: """
+      protocol PlaybackService {
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+
+      @Observable
+      final class SpyPlaybackService: PlaybackService {
+        @ObservationIgnored
+        private let _playbackObservationChannel = VISORObservation.ObservationChannel<PlaybackSnapshot>(PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> {
+          _playbackObservationChannel.source
+        }
+        func publishPlayback(_ snapshot: sending PlaybackSnapshot) {
+          _playbackObservationChannel.publish(snapshot)
+        }
+      }
+      """,
+      macros: testMacros)
+  }
 
   @Test
   func `Generates spy with properties and methods`() {

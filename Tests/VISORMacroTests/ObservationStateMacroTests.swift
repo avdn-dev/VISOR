@@ -9,6 +9,76 @@ struct ObservationStateMacroTests {
   ]
 
   @Test
+  func `A source declaration synthesises private producer storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      final class Player {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        public var playback: ObservationSource<PlaybackSnapshot>
+
+        func stop() {
+          publishPlayback(.stopped)
+        }
+      }
+      """,
+      expandedSource: """
+      final class Player {
+        public var playback: ObservationSource<PlaybackSnapshot> {
+            get {
+              _playbackChannel.source
+            }
+        }
+
+        private let _playbackChannel:
+          VISORObservation.ObservationChannel<PlaybackSnapshot> =
+          VISORObservation.ObservationChannel(PlaybackSnapshot.stopped)
+
+        private func publishPlayback(
+          _ snapshot: sending PlaybackSnapshot
+        ) {
+          _playbackChannel.publish(snapshot)
+        }
+
+        func stop() {
+          publishPlayback(.stopped)
+        }
+      }
+      """,
+      macros: macros)
+  }
+
+  @Test
+  func `A nonisolated source synthesises nonisolated producer storage`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      actor Player {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        nonisolated public var playback: VISORObservation.ObservationSource<PlaybackSnapshot>
+      }
+      """,
+      expandedSource: """
+      actor Player {
+        nonisolated public var playback: VISORObservation.ObservationSource<PlaybackSnapshot> {
+            get {
+              _playbackChannel.source
+            }
+        }
+
+        nonisolated private let _playbackChannel:
+          VISORObservation.ObservationChannel<PlaybackSnapshot> =
+          VISORObservation.ObservationChannel(PlaybackSnapshot.stopped)
+
+        private func publishPlayback(
+          _ snapshot: sending PlaybackSnapshot
+        ) {
+          _playbackChannel.publish(snapshot)
+        }
+      }
+      """,
+      macros: macros)
+  }
+
+  @Test
   func `A stored snapshot owns a channel and exposes its source`() {
     assertMacroExpansionSwiftTesting(
       """
@@ -65,6 +135,47 @@ struct ObservationStateMacroTests {
   }
 
   @Test
+  func `A protocol source declaration carries its test-double initial State`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      protocol PlaybackService {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+      """,
+      expandedSource: """
+      protocol PlaybackService {
+        var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+      """,
+      macros: macros)
+  }
+
+  @Test
+  func `A source protocol requirement is read-only`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      protocol PlaybackService {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot> { get set }
+      }
+      """,
+      expandedSource: """
+      protocol PlaybackService {
+        var playback: ObservationSource<PlaybackSnapshot> { get set }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message:
+            "@ObservationState requires either a stored value with an explicit type and initial value, or an ObservationSource property with an explicit initial: argument",
+          line: 2,
+          column: 3),
+      ],
+      macros: macros)
+  }
+
+  @Test
   func `Observation State requires an explicit stored type`() {
     assertMacroExpansionSwiftTesting(
       """
@@ -81,7 +192,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires one non-static protocol property requirement or stored var with an explicit type and initial value inside a class or actor",
+            "@ObservationState requires either a stored value with an explicit type and initial value, or an ObservationSource property with an explicit initial: argument",
           line: 2,
           column: 3),
       ],

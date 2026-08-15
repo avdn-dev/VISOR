@@ -12,6 +12,9 @@
 struct SendableTestDoubleRenderer {
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
     var members = storageMembers(plan)
+    members.append(contentsOf: plan.sourceObservationStates.flatMap {
+      sourceObservationStateMembers($0, access: plan.access)
+    })
     members.append(contentsOf: plan.protocolProperties.flatMap {
       observationStateChannelMembers($0, access: plan.access)
     })
@@ -26,6 +29,25 @@ struct SendableTestDoubleRenderer {
       members.append(contentsOf: spyMembers(plan))
     }
     return members
+  }
+
+  private func sourceObservationStateMembers(
+    _ state: TestDoubleSourceObservationStatePlan,
+    access: String)
+    -> [String]
+  {
+    let prefix = access.isEmpty ? "" : "\(access) "
+    return [
+      "  @ObservationIgnored",
+      "  private let \(state.channelName) = "
+        + "VISORObservation.ObservationChannel<\(state.valueType)>(\(state.initialValueExpression))",
+      "  \(prefix)var \(state.name): \(state.sourceType) {",
+      "    \(state.channelName).source",
+      "  }",
+      "  \(prefix)func \(state.publisherName)(_ snapshot: sending \(state.valueType)) {",
+      "    \(state.channelName).publish(snapshot)",
+      "  }",
+    ]
   }
 
   private func storageMembers(_ plan: TestDoubleGenerationPlan) -> [String] {

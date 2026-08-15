@@ -1,34 +1,35 @@
-/// Makes a stored producer value available as durable latest State.
+/// Declares a producer-owned durable latest-State source.
 ///
-/// Apply `@ObservationState` to one stored `var` with an explicit `Sendable`
-/// type and an initial value. Every assignment publishes the new complete
-/// value synchronously. Consumers receive the stable generated
-/// `<property>Source`.
+/// Prefer the source-first form for public service APIs. The declared property
+/// is the read-only consumer capability; the macro synthesises a private
+/// channel and a private `publish<Property>(_)` operation for publishing
+/// complete snapshots synchronously:
 ///
-/// On a protocol property requirement, use the same annotation to associate
-/// the value with its explicitly named companion source. `@GenerateStub` and
-/// `@GenerateSpy` then keep their generated value and source in sync:
+/// ```swift
+/// @ObservationState(initial: PlaybackSnapshot.stopped)
+/// public var playback: ObservationSource<PlaybackSnapshot>
+///
+/// func stop() {
+///   publishPlayback(.stopped)
+/// }
+/// ```
+///
+/// Protocol requirements use the same declaration. `@GenerateStub` and
+/// `@GenerateSpy` synthesise the source and a `publish<Property>(_)` control
+/// for tests:
 ///
 /// ```swift
 /// @GenerateSpy
 /// protocol PlaybackService {
-///   @ObservationState
-///   @DefaultValue(PlaybackSnapshot.stopped)
-///   var playback: PlaybackSnapshot { get }
-///   var playbackSource: ObservationSource<PlaybackSnapshot> { get }
+///   @ObservationState(initial: PlaybackSnapshot.stopped)
+///   var playback: ObservationSource<PlaybackSnapshot> { get }
 /// }
 /// ```
 ///
-/// ```swift
-/// @MainActor
-/// final class PlaybackService {
-///   @ObservationState
-///   public private(set) var playback: PlaybackSnapshot = .stopped
-/// }
-///
-/// // Generated for consumers:
-/// // public var playbackSource: ObservationSource<PlaybackSnapshot>
-/// ```
+/// The value-first `@ObservationState var playback = ...` spelling remains
+/// available for source compatibility. It generates a `<property>Source`, but
+/// new public APIs should declare the source directly so their names describe
+/// domain State rather than its implementation.
 ///
 /// Prefer one observation State value over several independently published
 /// fields when those fields form one coherent domain revision.
@@ -36,17 +37,27 @@
 /// throw before initialisation completes; current Swift toolchains can
 /// miscompile partial cleanup for macro-owned storage in that case.
 ///
-/// A source-first producer does not need `@Observable`. If its enclosing type
-/// still uses `@Observable` for other properties during a migration, place
-/// `@ObservationIgnored` immediately below `@ObservationState`; both
-/// `@Observable` and `@ObservationState` are accessor macros and cannot own the
-/// same property storage.
+/// If the enclosing type also uses `@Observable`, place
+/// `@ObservationIgnored` immediately below `@ObservationState`. The compiler
+/// expands both macros from the authored declaration, so they would otherwise
+/// both try to provide its accessors.
 ///
 /// ```swift
-/// @ObservationState
+/// @ObservationState(initial: PlaybackSnapshot.stopped)
 /// @ObservationIgnored
-/// public private(set) var playback: PlaybackSnapshot = .stopped
+/// public var playback: ObservationSource<PlaybackSnapshot>
 /// ```
+@attached(
+  accessor,
+  names: named(init), named(get), named(set))
+@attached(peer, names: arbitrary)
+public macro ObservationState<Value: Sendable>(initial: Value) = #externalMacro(
+  module: "VISORMacros",
+  type: "ObservationStateMacro")
+
+/// Compatibility form for a directly mutated producer value.
+///
+/// Prefer ``ObservationState(initial:)`` for new public service APIs.
 @attached(
   accessor,
   names: named(init), named(get), named(set))

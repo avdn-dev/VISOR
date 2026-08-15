@@ -9,6 +9,12 @@ struct ProtocolPropertyInfo {
   let hasSetter: Bool
   let defaultValueExpression: String?
   let isObservationState: Bool
+  let sourceObservationState: ProtocolSourceObservationStateInfo?
+}
+
+struct ProtocolSourceObservationStateInfo {
+  let valueType: String
+  let initialValueExpression: String
 }
 
 struct ParameterInfo {
@@ -164,17 +170,29 @@ struct ProtocolAnalysis {
         let defaultValueExpression = extractAttributeExpression(
           named: AttributeName.defaultValue,
           in: varDecl.attributes)
-        let isObservationState = varDecl.attributes.contains { element in
-          guard let attribute = element.as(AttributeSyntax.self) else { return false }
-          return attribute.attributeName.trimmedDescription == AttributeName.observationState
-        }
+        let observationStateAttribute = varDecl.attributes.visorAttribute(
+          named: AttributeName.observationState)
+        let sourceObservationState: ProtocolSourceObservationStateInfo? =
+          observationStateAttribute.flatMap { attribute in
+            guard
+              let initialValueExpression = extractAttributeExpression(
+                from: attribute),
+              let valueType = observationSourceValueType(from: typeAnnotation.type)
+            else {
+              return nil
+            }
+            return ProtocolSourceObservationStateInfo(
+              valueType: typeAliasHandler.protocolQualifiedTypeName(for: valueType),
+              initialValueExpression: initialValueExpression)
+          }
         
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
           type: typeAliasHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
           hasSetter: hasSetter,
           defaultValueExpression: defaultValueExpression,
-          isObservationState: isObservationState))
+          isObservationState: observationStateAttribute != nil && sourceObservationState == nil,
+          sourceObservationState: sourceObservationState))
         continue
       }
       
@@ -315,12 +333,46 @@ private func typeIncludesSendable(_ type: TypeSyntax) -> Bool {
 private func extractAttributeExpression(named attributeName: String, in attributes: AttributeListSyntax) -> String? {
   guard
     let attribute = attributes.visorAttribute(named: attributeName),
+    let expression = extractAttributeExpression(from: attribute)
+  else {
+    return nil
+  }
+  return expression
+}
+
+private func extractAttributeExpression(from attribute: AttributeSyntax) -> String? {
+  guard
     let arguments = attribute.arguments?.as(LabeledExprListSyntax.self),
     let firstArgument = arguments.first
   else {
     return nil
   }
   return firstArgument.expression.trimmedDescription
+}
+
+private func observationSourceValueType(from type: TypeSyntax) -> TypeSyntax? {
+  let arguments: GenericArgumentListSyntax?
+  if let identifier = type.as(IdentifierTypeSyntax.self),
+     identifier.name.text == "ObservationSource"
+  {
+    arguments = identifier.genericArgumentClause?.arguments
+  } else if let member = type.as(MemberTypeSyntax.self),
+            member.name.text == "ObservationSource"
+  {
+    arguments = member.genericArgumentClause?.arguments
+  } else {
+    return nil
+  }
+
+  guard
+    let arguments,
+    arguments.count == 1,
+    let argument = arguments.first
+  else {
+    return nil
+  }
+  guard case .type(let valueType) = argument.argument else { return nil }
+  return valueType
 }
 
 // MARK: - Typealias Handling
