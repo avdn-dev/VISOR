@@ -1,6 +1,15 @@
 import Foundation
 import Testing
+import VISORObservation
 import VISORTestDoubles
+
+@GenerateSpy
+protocol ObservationStateService {
+    @ObservationState
+    @DefaultValue(0)
+    var count: Int { get }
+    var countSource: ObservationSource<Int> { get }
+}
 
 // MARK: - @GenerateStub Runtime Tests
 
@@ -161,6 +170,17 @@ struct GenerateStubMacroRuntimeTests {
 @Suite("Macro Runtime — @GenerateSpy")
 @MainActor
 struct GenerateSpyMacroRuntimeTests {
+
+    @Test
+    func `Observation State properties publish through generated spies`() async {
+        let spy = SpyObservationStateService()
+        let service: any ObservationStateService = spy
+        let snapshots = service.countSource.snapshots.makeAsyncIterator()
+
+        #expect(await snapshots.next() == 0)
+        spy.count = 1
+        #expect(await snapshots.next() == 1)
+    }
 
     @Test
     func `@GenerateSpy generates class conforming to protocol`() {

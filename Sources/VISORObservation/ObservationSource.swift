@@ -20,7 +20,15 @@ nonisolated fileprivate final class _ObservationGroupCore: Sendable {
 ///
 /// Published snapshots must retain stable contents after publication. The
 /// runtime does not deep-copy values or diagnose transitive mutable aliases.
-nonisolated public struct ObservationSource<Value: Sendable>: Sendable {
+/// Iterate the source directly to receive its baseline and latest revisions;
+/// every iterator owns an independent subscription.
+nonisolated public struct ObservationSource<Value: Sendable>:
+  AsyncSequence,
+  Sendable
+{
+  public typealias Element = Value
+  public typealias AsyncIterator = ObservationSnapshots<Value>.Iterator
+
   fileprivate let core: _ObservationCore<Value>
 
   fileprivate init(core: _ObservationCore<Value>) {
@@ -29,6 +37,39 @@ nonisolated public struct ObservationSource<Value: Sendable>: Sendable {
 
   public func currentSnapshot() -> Value {
     core.currentSnapshot()
+  }
+
+  /// Creates a source whose snapshot never changes.
+  ///
+  /// Retain the returned source as stable producer or test-double state. Do
+  /// not recreate it from a computed source property because each call would
+  /// have a different source identity.
+  public static func constant(_ snapshot: sending Value) -> Self {
+    ObservationChannel(snapshot).source
+  }
+
+  /// An explicit spelling for this source's initial-plus-latest sequence.
+  ///
+  /// Use this sequence from a service-owned task when one producer reacts to
+  /// another producer's durable latest State. Each iterator opens a separate
+  /// subscription, emits the atomic baseline, and then emits the newest
+  /// available snapshot after publications. Intermediate snapshots may be
+  /// coalesced while the consumer is busy.
+  ///
+  /// This sequence is deliberately outside generated ViewModel readiness,
+  /// acknowledgements, and `VISORTesting.perform` fences. ViewModels should use
+  /// `@Bound` and `@Reaction` instead. Lossless occurrences require an explicit
+  /// buffered event sequence.
+  public var snapshots: ObservationSnapshots<Value> {
+    ObservationSnapshots(source: self)
+  }
+
+  /// Opens an independently owned initial-plus-latest snapshot stream.
+  ///
+  /// Direct iteration is equivalent to iterating ``snapshots``. Each iterator
+  /// owns a separate subscription.
+  public func makeAsyncIterator() -> AsyncIterator {
+    snapshots.makeAsyncIterator()
   }
 
   package var _visorIdentity: _ObservationSourceID {
@@ -64,6 +105,67 @@ nonisolated public struct ObservationSource<Value: Sendable>: Sendable {
         _AnyPreparedObservation(
           try core.prepareOpenAssumingGroupLocked())
       })
+  }
+}
+
+/// An independently owned initial-plus-latest sequence from one source.
+nonisolated public struct ObservationSnapshots<Value: Sendable>:
+  AsyncSequence,
+  Sendable
+{
+  public typealias Element = Value
+
+  fileprivate let source: ObservationSource<Value>
+
+  public func makeAsyncIterator() -> Iterator {
+    Iterator(source: source)
+  }
+
+  nonisolated public final class Iterator:
+    AsyncIteratorProtocol,
+    @unchecked Sendable
+  {
+    fileprivate init(source: ObservationSource<Value>) {
+      self.source = source
+    }
+
+    deinit {
+      observation?.subscription._visorCancel()
+    }
+
+    public func next() async -> Value? {
+      guard !isFinished else { return nil }
+
+      do {
+        try Task.checkCancellation()
+        if observation == nil {
+          let observation = try source._visorOpen()
+          self.observation = observation
+          try Task.checkCancellation()
+          return observation.baseline.snapshot
+        }
+
+        guard let envelope = try await observation?.subscription._visorNext() else {
+          finish()
+          return nil
+        }
+        return envelope.snapshot
+      } catch {
+        finish()
+        return nil
+      }
+    }
+
+    private let source: ObservationSource<Value>
+    private var observation: _OpenObservation<Value>?
+    private var isFinished = false
+
+    private func finish() {
+      guard !isFinished else { return }
+      isFinished = true
+      observation?.subscription._visorCancel()
+      observation = nil
+    }
   }
 }
 

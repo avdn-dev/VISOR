@@ -15,6 +15,7 @@ enum AttributeName {
   static let defaultValue = "DefaultValue"
   static let defaultReturn = "DefaultReturn"
   static let observable = "Observable"
+  static let observationState = "ObservationState"
 }
 
 // MARK: - Default Value Helper

@@ -16,6 +16,7 @@ struct VISORPlugin: CompilerPlugin {
     BoundMacro.self,
     LazyViewModelMacro.self,
     ReactionMacro.self,
+    ObservationStateMacro.self,
     ViewModelMacro.self,
     ViewModelStateMacro.self,
     ViewModelStateFieldMacro.self,

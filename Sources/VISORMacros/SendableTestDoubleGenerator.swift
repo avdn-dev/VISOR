@@ -12,6 +12,9 @@
 struct SendableTestDoubleRenderer {
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
     var members = storageMembers(plan)
+    members.append(contentsOf: plan.protocolProperties.flatMap {
+      observationStateChannelMembers($0, access: plan.access)
+    })
     members.append(contentsOf: plan.allStoredProperties.flatMap {
       computedPropertyMembers($0, access: plan.access, storageName: plan.storageName)
     })
@@ -59,9 +62,30 @@ struct SendableTestDoubleRenderer {
       lines.append(contentsOf: storageMutationMembers(property, storageName: storageName, indent: "        "))
       lines.append("      }")
     }
+    if property.isObservationState {
+      lines.append("      _\(property.name)ObservationChannel.publish(newValue)")
+    }
     lines.append("    }")
     lines.append("  }")
     return lines
+  }
+
+  private func observationStateChannelMembers(
+    _ property: TestDoubleStoredPropertyPlan,
+    access: String)
+    -> [String]
+  {
+    guard property.isObservationState else { return [] }
+    let prefix = access.isEmpty ? "" : "\(access) "
+    return [
+      "  @ObservationIgnored",
+      "  private let _\(property.name)ObservationChannel = "
+        + "VISORObservation.ObservationChannel<\(property.exposedType)>(\(property.storageDefaultExpression))",
+      "  \(prefix)var \(property.name)Source: "
+        + "VISORObservation.ObservationSource<\(property.exposedType)> {",
+      "    _\(property.name)ObservationChannel.source",
+      "  }",
+    ]
   }
 
   private func storageMutationMembers(

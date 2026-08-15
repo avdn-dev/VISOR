@@ -1,34 +1,22 @@
-//
-//  ProtocolAnalysis.swift
-//  VISOR
-//
-//  Extracted from SharedExtensions.swift
-//
-
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftParser
-
-// MARK: - ProtocolPropertyInfo
 
 struct ProtocolPropertyInfo {
   let name: String
   let type: String
   let hasSetter: Bool
   let defaultValueExpression: String?
+  let isObservationState: Bool
 }
 
-// MARK: - ParameterInfo
-
 struct ParameterInfo {
-  let externalLabel: String? // nil means no external label (e.g., `_ item: Item`)
+  let externalLabel: String?
   let internalName: String
   let type: String
   let isInout: Bool
 }
-
-// MARK: - ThrowsEffect
 
 enum ThrowsEffect {
   case none
@@ -65,8 +53,6 @@ enum ThrowsEffect {
   }
 }
 
-// MARK: - ProtocolMethodInfo
-
 struct ProtocolMethodInfo {
   let name: String
   let genericParameterClause: String
@@ -77,7 +63,7 @@ struct ProtocolMethodInfo {
   let isAsync: Bool
   let isConcurrent: Bool
   let throwsEffect: ThrowsEffect
-  let returnType: String? // nil means Void
+  let returnType: String?
   let defaultReturnExpression: String?
 
   var isThrowing: Bool {
@@ -91,10 +77,6 @@ struct ProtocolMethodInfo {
   }
 }
 
-// MARK: - ProtocolAnalysis
-
-/// Single-pass analysis of a `ProtocolDeclSyntax` member list.
-/// Replaces 5 separate computed-property traversals with one iteration.
 struct ProtocolAnalysis {
   var properties: [ProtocolPropertyInfo] = []
   var methods: [ProtocolMethodInfo] = []
@@ -107,7 +89,8 @@ struct ProtocolAnalysis {
   
   init(_ protocolDecl: ProtocolDeclSyntax) {
     
-    // We must find type aliases first.
+    // Qualifying requirement types requires the complete alias set, regardless
+    // of declaration order within the protocol.
     for member in protocolDecl.memberBlock.members {
       guard let typeAliasDecl = member.decl.as(TypeAliasDeclSyntax.self) else { continue }
       typeAliasNames.append(typeAliasDecl.name.text)
@@ -121,13 +104,11 @@ struct ProtocolAnalysis {
       typeAliasNames: typeAliasNameSet)
     
     for member in protocolDecl.memberBlock.members {
-      // Associated types
       if member.decl.is(AssociatedTypeDeclSyntax.self) {
         hasAssociatedTypes = true
         continue
       }
       
-      // Subscripts
       if member.decl.is(SubscriptDeclSyntax.self) {
         hasSubscripts = true
         continue
@@ -142,7 +123,6 @@ struct ProtocolAnalysis {
         continue
       }
       
-      // Variable declarations (properties)
       if let varDecl = member.decl.as(VariableDeclSyntax.self) {
         let isStatic = varDecl.modifiers.contains { $0.name.text == "static" || $0.name.text == "class" }
         if isStatic {
@@ -184,16 +164,20 @@ struct ProtocolAnalysis {
         let defaultValueExpression = extractAttributeExpression(
           named: AttributeName.defaultValue,
           in: varDecl.attributes)
+        let isObservationState = varDecl.attributes.contains { element in
+          guard let attribute = element.as(AttributeSyntax.self) else { return false }
+          return attribute.attributeName.trimmedDescription == AttributeName.observationState
+        }
         
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
           type: typeAliasHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
           hasSetter: hasSetter,
-          defaultValueExpression: defaultValueExpression))
+          defaultValueExpression: defaultValueExpression,
+          isObservationState: isObservationState))
         continue
       }
       
-      // Function declarations (methods)
       if let funcDecl = member.decl.as(FunctionDeclSyntax.self) {
         let isStatic = funcDecl.modifiers.contains { $0.name.text == "static" || $0.name.text == "class" }
         if isStatic {
@@ -352,7 +336,6 @@ private struct TypeAliasHandler {
     self.protocolTypeSyntax = IdentifierTypeSyntax(name: TokenSyntax(.identifier(protocolName), presence: .present))
   }
   
-  // Handle protocol types in different places
   func protocolQualifiedTypeName(for typeSyntax: TypeSyntax) -> String {
     return qualifiedType(for: typeSyntax).trimmedDescription
   }
@@ -441,16 +424,13 @@ private struct TypeAliasHandler {
       syntax.elements = newElements
       return TypeSyntax(syntax)
     
-    // If the type is already qualified by another member,
-    // we should not attempt to qualify it by the protocol type as well
+    // Preserve an existing qualification rather than prepending the protocol.
     case .memberType:
       return typeSyntax
       
-    // Other type Syntaxes we can ignore
     case .missingType, .suppressedType, .classRestrictionType:
       return typeSyntax
     
-    // To handle future TypeSyntaxes
     @unknown default:
       return typeSyntax
     }
@@ -463,7 +443,6 @@ private struct TypeAliasHandler {
     
     // TODO: Handle 6.3 module selectors
     
-    // Check any generic arguments
     if var genericArgumentClause = identifierTypeSyntax.genericArgumentClause {
       for i in genericArgumentClause.arguments.indices {
         genericArgumentClause.arguments[i] = qualifiedType(for: genericArgumentClause.arguments[i])
@@ -471,12 +450,10 @@ private struct TypeAliasHandler {
       identifierTypeSyntax.genericArgumentClause = genericArgumentClause
     }
     
-    // Check if the type is a typealias
     guard typeAliasNames.contains(identifierTypeSyntax.name.text) else {
       return TypeSyntax(identifierTypeSyntax)
     }
     
-    // If it is, qualify the type name
     let syntax = MemberTypeSyntax(
       baseType: protocolTypeSyntax,
       name: identifierTypeSyntax.name)
@@ -520,7 +497,6 @@ private struct TypeAliasHandler {
 
 // MARK: - Shared Protocol Validation for Test Double Macros
 
-/// Validates a protocol analysis for test double generation (GenerateStub/GenerateSpy).
 /// Returns `false` unless the generator can model every conformance requirement.
 func validateProtocolForTestDouble(
   _ analysis: ProtocolAnalysis,
@@ -593,14 +569,9 @@ func validateProtocolForTestDouble(
   return isValid
 }
 
-// accessLevel(of:) — use the generic version from CodeGenHelpers.swift.
-// ProtocolDeclSyntax conforms to DeclGroupSyntax, so it matches directly.
-
 // MARK: - Inout Detection
 
 extension TypeSyntax {
-  /// Returns `true` when this type syntax has an `inout` specifier
-  /// (e.g., `inout DatabaseMigrator`).
   var hasInoutSpecifier: Bool {
     guard let attributedType = self.as(AttributedTypeSyntax.self) else { return false }
     for specifier in attributedType.specifiers {

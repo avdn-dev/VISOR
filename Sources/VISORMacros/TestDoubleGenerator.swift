@@ -85,7 +85,13 @@ struct TestDoubleGenerator {
       kind: kind,
       analysis: analysis,
       isSendable: traits.isSendable)
-    if hasUnknownTypeDefaults(properties: analysis.properties, methods: analysis.methods) {
+    let observationSourceNames = Set(analysis.properties.compactMap { property in
+      property.isObservationState ? "\(property.name)Source" : nil
+    })
+    let storedProtocolProperties = analysis.properties.filter {
+      !observationSourceNames.contains($0.name)
+    }
+    if hasUnknownTypeDefaults(properties: storedProtocolProperties, methods: analysis.methods) {
       context.diagnose(Diagnostic(
         node: Syntax(protocolDecl),
         message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: kind.macroName)))
@@ -241,7 +247,10 @@ private struct OrdinaryTestDoubleRenderer {
   {
     let prefix = access.isEmpty ? "" : "\(access) "
     var members: [String] = []
-    if property.isObservationIgnored {
+    if property.isObservationState {
+      members.append("  @VISORObservation.ObservationState")
+      members.append("  @ObservationIgnored")
+    } else if property.isObservationIgnored {
       members.append("  @ObservationIgnored")
     }
     var declaration = "  \(prefix)var \(property.name)"

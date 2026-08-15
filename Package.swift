@@ -27,7 +27,9 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
   ],
   targets: [
-    .target(name: "VISORObservation"),
+    .target(
+      name: "VISORObservation",
+      dependencies: ["VISORMacros"]),
 
     .macro(
       name: "VISORMacros",
@@ -66,7 +68,7 @@ let package = Package(
 
     .testTarget(
       name: "VISORTestDoublesTests",
-      dependencies: ["VISORTestDoubles"],
+      dependencies: ["VISORObservation", "VISORTestDoubles"],
       swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]),
 
     .testTarget(
