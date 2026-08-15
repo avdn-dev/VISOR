@@ -29,6 +29,23 @@ private final class SourceFirstObservationStateProducer {
   }
 }
 
+private actor SourceFirstActorObservationStateProducer {
+  @ObservationState(initial: ObservationStateSnapshot())
+  nonisolated var snapshot: ObservationSource<ObservationStateSnapshot>
+
+  func update(count: Int) {
+    publishSnapshot(ObservationStateSnapshot(count: count, label: "actor"))
+  }
+}
+
+private final class ContextualInitialValueProducer {
+  @ObservationState(initial: Int?.none)
+  var optional: ObservationSource<Int?>
+
+  @ObservationState(initial: [Int]())
+  var values: ObservationSource<[Int]>
+}
+
 @MainActor
 private final class SnapshotConsumer {
   init(source: ObservationSource<Int>) {
@@ -101,6 +118,26 @@ struct ObservationStateTests {
     #expect(await snapshots.next() == ObservationStateSnapshot(count: 2, label: "updated"))
     #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 2, label: "updated"))
     #expect(source._visorIdentity == producer.snapshot._visorIdentity)
+  }
+
+  @Test
+  func `A source-first actor exposes State without an isolation hop`() async {
+    let producer = SourceFirstActorObservationStateProducer()
+    let source = producer.snapshot
+
+    #expect(source.currentSnapshot() == ObservationStateSnapshot())
+
+    await producer.update(count: 5)
+
+    #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 5, label: "actor"))
+  }
+
+  @Test
+  func `Typed optional and collection initial values establish their baselines`() {
+    let producer = ContextualInitialValueProducer()
+
+    #expect(producer.optional.currentSnapshot() == nil)
+    #expect(producer.values.currentSnapshot().isEmpty)
   }
 
   @Test

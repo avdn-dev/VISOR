@@ -27,7 +27,7 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
     }
 
     let channel: DeclSyntax = """
-      \(raw: property.channelModifiers)let _\(raw: property.name)Channel:
+      \(raw: property.channelModifiers)let \(raw: property.channelName):
         VISORObservation.ObservationChannel<\(raw: property.valueType)> =
         VISORObservation.ObservationChannel(\(raw: property.initialValue))
       """
@@ -38,7 +38,7 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
         private func publish\(raw: source.name.capitalisedFirst)(
           _ snapshot: sending \(raw: source.valueType)
         ) {
-          _\(raw: source.name)Channel.publish(snapshot)
+          \(raw: source.channelName).publish(snapshot)
         }
         """
       return [channel, publisher]
@@ -47,7 +47,7 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
       let source: DeclSyntax = """
         \(raw: value.sourceModifiers)var \(raw: value.name)Source:
           VISORObservation.ObservationSource<\(raw: value.valueType)> {
-          _\(raw: value.name)Channel.source
+          \(raw: value.channelName).source
         }
         """
       return [channel, source]
@@ -81,26 +81,26 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
     case .source(let source):
       let getter: AccessorDeclSyntax = """
         get {
-          _\(raw: source.name)Channel.source
+          \(raw: source.channelName).source
         }
         """
       return [getter]
 
     case .value(let value):
       let initialiser: AccessorDeclSyntax = """
-        @storageRestrictions(accesses: _\(raw: value.name)Channel)
+        @storageRestrictions(accesses: \(raw: value.channelName))
         init(initialValue) {
-          _\(raw: value.name)Channel.publish(initialValue)
+          \(raw: value.channelName).publish(initialValue)
         }
         """
       let getter: AccessorDeclSyntax = """
         get {
-          _\(raw: value.name)Channel.source.currentSnapshot()
+          \(raw: value.channelName).source.currentSnapshot()
         }
         """
       let setter: AccessorDeclSyntax = """
         set {
-          _\(raw: value.name)Channel.publish(newValue)
+          \(raw: value.channelName).publish(newValue)
         }
         """
 
@@ -173,6 +173,13 @@ private enum ObservationStateProperty {
     }
   }
 
+  var channelName: String {
+    switch self {
+    case .source(let property): property.channelName
+    case .value(let property): property.channelName
+    }
+  }
+
   var channelModifiers: String {
     switch self {
     case .source(let property): property.channelModifiers
@@ -187,6 +194,10 @@ private struct ObservationSourceProperty {
   let initialValue: String
   let isNonisolated: Bool
 
+  var channelName: String {
+    "__visorObservationState\(name.capitalisedFirst)Channel"
+  }
+
   var channelModifiers: String {
     isNonisolated ? "nonisolated private " : "private "
   }
@@ -197,6 +208,8 @@ private struct ObservationValueProperty {
   let valueType: String
   let initialValue: String
   let sourceModifiers: String
+
+  var channelName: String { "_\(name)Channel" }
 
   var channelModifiers: String {
     sourceModifiers.contains("nonisolated ")

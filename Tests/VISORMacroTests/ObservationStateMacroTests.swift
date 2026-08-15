@@ -25,18 +25,18 @@ struct ObservationStateMacroTests {
       final class Player {
         public var playback: ObservationSource<PlaybackSnapshot> {
             get {
-              _playbackChannel.source
+              __visorObservationStatePlaybackChannel.source
             }
         }
 
-        private let _playbackChannel:
+        private let __visorObservationStatePlaybackChannel:
           VISORObservation.ObservationChannel<PlaybackSnapshot> =
           VISORObservation.ObservationChannel(PlaybackSnapshot.stopped)
 
         private func publishPlayback(
           _ snapshot: sending PlaybackSnapshot
         ) {
-          _playbackChannel.publish(snapshot)
+          __visorObservationStatePlaybackChannel.publish(snapshot)
         }
 
         func stop() {
@@ -60,18 +60,18 @@ struct ObservationStateMacroTests {
       actor Player {
         nonisolated public var playback: VISORObservation.ObservationSource<PlaybackSnapshot> {
             get {
-              _playbackChannel.source
+              __visorObservationStatePlaybackChannel.source
             }
         }
 
-        nonisolated private let _playbackChannel:
+        nonisolated private let __visorObservationStatePlaybackChannel:
           VISORObservation.ObservationChannel<PlaybackSnapshot> =
           VISORObservation.ObservationChannel(PlaybackSnapshot.stopped)
 
         private func publishPlayback(
           _ snapshot: sending PlaybackSnapshot
         ) {
-          _playbackChannel.publish(snapshot)
+          __visorObservationStatePlaybackChannel.publish(snapshot)
         }
       }
       """,
@@ -146,6 +146,41 @@ struct ObservationStateMacroTests {
       expandedSource: """
       protocol PlaybackService {
         var playback: ObservationSource<PlaybackSnapshot> { get }
+      }
+      """,
+      macros: macros)
+  }
+
+  @Test
+  func `A source backing name does not collide with a conventional channel`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      final class Player {
+        @ObservationState(initial: PlaybackSnapshot.stopped)
+        var playback: ObservationSource<PlaybackSnapshot>
+
+        private let _playbackChannel = ExistingChannel()
+      }
+      """,
+      expandedSource: """
+      final class Player {
+        var playback: ObservationSource<PlaybackSnapshot> {
+            get {
+              __visorObservationStatePlaybackChannel.source
+            }
+        }
+
+        private let __visorObservationStatePlaybackChannel:
+          VISORObservation.ObservationChannel<PlaybackSnapshot> =
+          VISORObservation.ObservationChannel(PlaybackSnapshot.stopped)
+
+        private func publishPlayback(
+          _ snapshot: sending PlaybackSnapshot
+        ) {
+          __visorObservationStatePlaybackChannel.publish(snapshot)
+        }
+
+        private let _playbackChannel = ExistingChannel()
       }
       """,
       macros: macros)

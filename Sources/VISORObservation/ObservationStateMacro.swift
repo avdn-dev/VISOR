@@ -47,6 +47,13 @@
 /// @ObservationIgnored
 /// public var playback: ObservationSource<PlaybackSnapshot>
 /// ```
+///
+/// The `initial:` expression establishes the macro's generic `Value` before
+/// the property declaration is typechecked. Give otherwise contextual
+/// literals an explicit type, such as `CustomerInfo?.none` instead of `nil`
+/// and `[Item]()` instead of `[]`.
+/// The enclosing producer must leave the `publish<Property>` method name
+/// available for the generated publishing operation.
 @attached(
   accessor,
   names: named(init), named(get), named(set))

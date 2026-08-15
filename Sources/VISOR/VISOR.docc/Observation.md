@@ -115,6 +115,12 @@ one stable source, and no task or additional subscription. Publication remains
 synchronous. The macro is restricted to classes and actors so copying a
 value-type producer cannot accidentally share one channel.
 
+The macro's generic `Value` is inferred from `initial:` before the property is
+typechecked. Spell contextual baselines explicitly—for example,
+`CustomerInfo?.none` rather than `nil`, and `[Item]()` rather than `[]`.
+The macro uses a collision-resistant private backing name and reserves the
+private `publish<Property>` method name for its publishing operation.
+
 The value-first spelling remains available for existing implementations whose
 canonical producer state is a directly mutated stored value:
 
