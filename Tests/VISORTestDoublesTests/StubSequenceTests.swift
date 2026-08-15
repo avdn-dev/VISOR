@@ -31,6 +31,18 @@ struct StubSequenceTests {
       #expect(sequence.next() == "second")
    }
 
+   @Test func `copies advance independently`() {
+      var original = StubSequence([1, 2])
+      var copy = original
+
+      #expect(original.next() == 1)
+      #expect(copy.next() == 1)
+      #expect(original.next() == 2)
+      #expect(copy.next() == 2)
+      #expect(original.isEmpty)
+      #expect(copy.isEmpty)
+   }
+
    @Test func `works with Result values`() {
       enum TestError: Error { case failed }
       var sequence = StubSequence<Result<Int, any Error>>([

@@ -5,34 +5,35 @@ package nonisolated enum StubSequenceDiagnostics {
 }
 
 public nonisolated struct StubSequence<Value> {
-  private var values: [Value]
+  private var remainingValues: [Value]
 
   public init(_ values: [Value]) {
-    self.values = values
+    remainingValues = Array(values.reversed())
   }
 
   public init(_ first: Value, _ rest: Value...) {
-    values = [first] + rest
+    remainingValues = Array(rest.reversed())
+    remainingValues.append(first)
   }
 
   public var isEmpty: Bool {
-    values.isEmpty
+    remainingValues.isEmpty
   }
 
   public var remainingCount: Int {
-    values.count
+    remainingValues.count
   }
 
   public mutating func next(
     file: StaticString = #filePath,
     line: UInt = #line
   ) -> Value {
-    guard !values.isEmpty else {
+    guard let value = remainingValues.popLast() else {
       fatalError(
         StubSequenceDiagnostics.exhaustedMessage(for: Value.self),
         file: (file),
         line: line)
     }
-    return values.removeFirst()
+    return value
   }
 }
