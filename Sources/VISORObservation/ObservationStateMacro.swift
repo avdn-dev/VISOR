@@ -50,6 +50,10 @@ public macro ObservationProtocol() = #externalMacro(
 /// domain-specific plural with `observedAs: .named("permissionStatuses")`.
 /// The sequence is nonisolated because it is read-only, `Sendable`, and
 /// lock-backed; obtaining it never requires a hop to the producer's actor.
+/// The State type may be written explicitly or be syntactically evident from a
+/// nominal initialiser, static member, collection initialiser, or primitive
+/// literal. Add an explicit annotation when an initialiser is ambiguous, such
+/// as a factory function whose return type is not present in its spelling.
 ///
 /// A protocol requirement may supply `initial:` as test-double metadata.
 /// `@ObservationProtocol` generates the corresponding read-only sequence

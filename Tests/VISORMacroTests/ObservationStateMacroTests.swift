@@ -118,6 +118,181 @@ struct ObservationStateMacroTests {
   }
 
   @Test
+  func `SwiftFormat-shaped initialisers infer concrete State types`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      final class FormattedProducer {
+        @ObservationState
+        var flags = FeatureFlagSnapshot.disabled
+
+        @ObservationState
+        var appearance = ThemeObservation(allowsCustomAppearance: false)
+
+        @ObservationState
+        var sounds = [CustomNudgeSound]()
+
+        @ObservationState(observedAs: .values)
+        var enabled = false
+
+        @ObservationState
+        var retryCount = -1
+
+        @ObservationState
+        var status = "ready"
+      }
+      """,
+      expandedSource: """
+      final class FormattedProducer {
+        var flags {
+            @storageRestrictions(initializes: __visorObservationStateFlagsChannel)
+            init(initialValue) {
+              __visorObservationStateFlagsChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateFlagsChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateFlagsChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateFlagsChannel:
+          VISORObservation.ObservationChannel<FeatureFlagSnapshot>
+
+        nonisolated var flagsSnapshots:
+          VISORObservation.ObservationSource<FeatureFlagSnapshot> {
+          __visorObservationStateFlagsChannel.source
+        }
+        var appearance {
+            @storageRestrictions(initializes: __visorObservationStateAppearanceChannel)
+            init(initialValue) {
+              __visorObservationStateAppearanceChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateAppearanceChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateAppearanceChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateAppearanceChannel:
+          VISORObservation.ObservationChannel<ThemeObservation>
+
+        nonisolated var appearanceSnapshots:
+          VISORObservation.ObservationSource<ThemeObservation> {
+          __visorObservationStateAppearanceChannel.source
+        }
+        var sounds {
+            @storageRestrictions(initializes: __visorObservationStateSoundsChannel)
+            init(initialValue) {
+              __visorObservationStateSoundsChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateSoundsChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateSoundsChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateSoundsChannel:
+          VISORObservation.ObservationChannel<[CustomNudgeSound]>
+
+        nonisolated var soundsSnapshots:
+          VISORObservation.ObservationSource<[CustomNudgeSound]> {
+          __visorObservationStateSoundsChannel.source
+        }
+        var enabled {
+            @storageRestrictions(initializes: __visorObservationStateEnabledChannel)
+            init(initialValue) {
+              __visorObservationStateEnabledChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateEnabledChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateEnabledChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateEnabledChannel:
+          VISORObservation.ObservationChannel<Bool>
+
+        nonisolated var enabledValues:
+          VISORObservation.ObservationSource<Bool> {
+          __visorObservationStateEnabledChannel.source
+        }
+        var retryCount {
+            @storageRestrictions(initializes: __visorObservationStateRetryCountChannel)
+            init(initialValue) {
+              __visorObservationStateRetryCountChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateRetryCountChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateRetryCountChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateRetryCountChannel:
+          VISORObservation.ObservationChannel<Int>
+
+        nonisolated var retryCountSnapshots:
+          VISORObservation.ObservationSource<Int> {
+          __visorObservationStateRetryCountChannel.source
+        }
+        var status {
+            @storageRestrictions(initializes: __visorObservationStateStatusChannel)
+            init(initialValue) {
+              __visorObservationStateStatusChannel = VISORObservation.ObservationChannel(initialValue)
+            }
+            get {
+              __visorObservationStateStatusChannel.source.currentSnapshot()
+            }
+            set {
+              __visorObservationStateStatusChannel.publish(newValue)
+            }
+        }
+
+        nonisolated(unsafe) private var __visorObservationStateStatusChannel:
+          VISORObservation.ObservationChannel<String>
+
+        nonisolated var statusSnapshots:
+          VISORObservation.ObservationSource<String> {
+          __visorObservationStateStatusChannel.source
+        }
+      }
+      """,
+      macros: macros)
+  }
+
+  @Test
+  func `A semantically inferred factory result requires an explicit type`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      final class Producer {
+        @ObservationState
+        var snapshot = makeSnapshot()
+      }
+      """,
+      expandedSource: """
+      final class Producer {
+        var snapshot = makeSnapshot()
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message:
+            "@ObservationState cannot infer the concrete State type from this initialiser; add an explicit type annotation",
+          line: 2,
+          column: 3),
+      ],
+      macros: macros)
+  }
+
+  @Test
   func `An initialiser can establish the baseline`() {
     assertMacroExpansionSwiftTesting(
       """
@@ -271,7 +446,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State",
+            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
           column: 3),
       ],
@@ -295,7 +470,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State",
+            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
           column: 3),
       ],
@@ -319,7 +494,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State",
+            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
           column: 3),
       ],
@@ -344,7 +519,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State",
+            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 3,
           column: 3),
       ],

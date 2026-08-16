@@ -106,10 +106,12 @@ let snapshots = service.profileSnapshots
 
 The macro generates the private channel and stable `profileSnapshots`, and every
 assignment or in-place value mutation publishes synchronously. The property
-requires an explicit `Sendable` type and normal Swift initialisation. Producers
-do not need `@Observable`; if a transitional type retains it for other fields,
-place `@ObservationIgnored` immediately below `@ObservationState` on this
-property. The generated accessors still participate in Apple Observation.
+requires a syntactically evident `Sendable` type: either an explicit annotation
+or an initialiser that names the type. Ambiguous factory expressions still need
+an annotation. Producers do not need `@Observable`; if a transitional type
+retains it for other fields, place `@ObservationIgnored` immediately below
+`@ObservationState` on this property. The generated accessors still participate
+in Apple Observation.
 
 The generated consumer name defaults to `<property>Snapshots`. Use
 `observedAs: .values` for genuinely scalar State, or

@@ -8,6 +8,49 @@ private struct ObservationStateSnapshot: Equatable, Sendable {
   var label = "initial"
 }
 
+private enum InferredObservationFlag: Equatable, Sendable {
+  case disabled
+  case enabled
+}
+
+private struct InferredObservationAppearance: Equatable, Sendable {
+  var allowsCustomAppearance = false
+}
+
+private struct InferredObservationItem: Equatable, Sendable {
+  let identifier: Int
+}
+
+private final class InferredObservationStateProducer {
+  @ObservationState
+  private(set) var flag = InferredObservationFlag.disabled
+
+  @ObservationState
+  private(set) var appearance = InferredObservationAppearance(
+    allowsCustomAppearance: false)
+
+  @ObservationState
+  private(set) var items = [InferredObservationItem]()
+
+  @ObservationState(observedAs: .values)
+  private(set) var enabled = false
+
+  @ObservationState
+  private(set) var retryCount = -1
+
+  @ObservationState
+  private(set) var status = "ready"
+
+  func update() {
+    flag = .enabled
+    appearance = InferredObservationAppearance(allowsCustomAppearance: true)
+    items = [InferredObservationItem(identifier: 1)]
+    enabled = true
+    retryCount = 1
+    status = "updated"
+  }
+}
+
 private final class ObservationStateProducer {
   @ObservationState
   private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
@@ -97,6 +140,27 @@ private final class ObservableObservationStateProducer {
 
 @Suite("Producer observation state")
 struct ObservationStateTests {
+  @Test
+  func `Inferred concrete State types publish through generated sequences`() {
+    let producer = InferredObservationStateProducer()
+
+    #expect(producer.flagSnapshots.currentSnapshot() == .disabled)
+    #expect(!producer.appearanceSnapshots.currentSnapshot().allowsCustomAppearance)
+    #expect(producer.itemsSnapshots.currentSnapshot().isEmpty)
+    #expect(!producer.enabledValues.currentSnapshot())
+    #expect(producer.retryCountSnapshots.currentSnapshot() == -1)
+    #expect(producer.statusSnapshots.currentSnapshot() == "ready")
+
+    producer.update()
+
+    #expect(producer.flagSnapshots.currentSnapshot() == .enabled)
+    #expect(producer.appearanceSnapshots.currentSnapshot().allowsCustomAppearance)
+    #expect(producer.itemsSnapshots.currentSnapshot() == [InferredObservationItem(identifier: 1)])
+    #expect(producer.enabledValues.currentSnapshot())
+    #expect(producer.retryCountSnapshots.currentSnapshot() == 1)
+    #expect(producer.statusSnapshots.currentSnapshot() == "updated")
+  }
+
   @Test
   func `Assignment updates State and publishes a snapshot`() async {
     let producer = ObservationStateProducer()

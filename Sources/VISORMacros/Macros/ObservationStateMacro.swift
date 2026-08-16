@@ -254,7 +254,7 @@ private func observationStateProperty(
   from declaration: some DeclSyntaxProtocol,
   attribute: AttributeSyntax,
   in context: any MacroExpansionContext,
-  diagnose: Bool
+  diagnose shouldDiagnose: Bool
 ) -> ObservationStateProperty? {
   let owner = context.lexicalContext.first
   let hasReferenceOwner = owner?.is(ClassDeclSyntax.self) == true
@@ -266,19 +266,42 @@ private func observationStateProperty(
     variable.bindings.count == 1,
     let binding = variable.bindings.first,
     let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
-    let type = binding.typeAnnotation?.type,
-    !isObservationSource(type),
     binding.accessorBlock == nil,
     !variable.modifiers.contains(where: isStaticModifier),
     !variable.modifiers.contains(where: isUnsupportedStorageModifier)
   else {
-    diagnoseInvalidDeclaration(declaration, in: context, if: diagnose)
+    diagnoseInvalidDeclaration(declaration, in: context, if: shouldDiagnose)
+    return nil
+  }
+
+  let valueType: String
+  if let type = binding.typeAnnotation?.type {
+    guard !isObservationSource(type) else {
+      diagnoseInvalidDeclaration(declaration, in: context, if: shouldDiagnose)
+      return nil
+    }
+    valueType = type.trimmedDescription
+  } else if
+    let initialValue = binding.initializer?.value,
+    let inferredType = inferredConcreteStateType(from: initialValue)
+  {
+    guard !isObservationSourceTypeName(inferredType) else {
+      diagnoseInvalidDeclaration(declaration, in: context, if: shouldDiagnose)
+      return nil
+    }
+    valueType = inferredType
+  } else {
+    diagnose(
+      declaration,
+      in: context,
+      with: .uninferableConcreteType,
+      if: shouldDiagnose)
     return nil
   }
 
   let observableOwner = isObservable(owner)
   guard !observableOwner || hasRequiredObservationIgnoredPlacement(variable) else {
-    diagnoseMissingObservationIgnored(declaration, in: context, if: diagnose)
+    diagnoseMissingObservationIgnored(declaration, in: context, if: shouldDiagnose)
     return nil
   }
 
@@ -286,14 +309,14 @@ private func observationStateProperty(
     attribute,
     declaration: declaration,
     in: context,
-    shouldDiagnose: diagnose)
+    shouldDiagnose: shouldDiagnose)
   else {
     return nil
   }
 
-  let authoredInitialiser = binding.initializer?.value.trimmedDescription
+  let hasAuthoredInitialiser = binding.initializer != nil
   guard arguments.initialValueExpression == nil else {
-    diagnoseInvalidDeclaration(declaration, in: context, if: diagnose)
+    diagnoseInvalidDeclaration(declaration, in: context, if: shouldDiagnose)
     return nil
   }
 
@@ -306,18 +329,124 @@ private func observationStateProperty(
     channelName: channelName,
     declaration: declaration,
     in: context,
-    shouldDiagnose: diagnose)
+    shouldDiagnose: shouldDiagnose)
   else {
     return nil
   }
 
   return ObservationStateProperty(
     name: propertyName,
-    valueType: type.trimmedDescription,
+    valueType: valueType,
     sequenceName: sequenceName,
     sequenceModifiers: sequenceModifiers(from: variable),
-    hasAuthoredInitialiser: authoredInitialiser != nil,
+    hasAuthoredInitialiser: hasAuthoredInitialiser,
     participatesInAppleObservation: observableOwner)
+}
+
+/// Infers only types that are unambiguous from the authored syntax without
+/// semantic type information. These are the declaration forms SwiftFormat can
+/// produce when removing a redundant concrete type annotation.
+private func inferredConcreteStateType(from expression: ExprSyntax) -> String? {
+  if expression.is(BooleanLiteralExprSyntax.self) {
+    return "Bool"
+  }
+  if expression.is(IntegerLiteralExprSyntax.self) {
+    return "Int"
+  }
+  if expression.is(FloatLiteralExprSyntax.self) {
+    return "Double"
+  }
+  if expression.is(StringLiteralExprSyntax.self) {
+    return "String"
+  }
+  if
+    let prefix = expression.as(PrefixOperatorExprSyntax.self),
+    prefix.operator.text == "+" || prefix.operator.text == "-"
+  {
+    if prefix.expression.is(IntegerLiteralExprSyntax.self) {
+      return "Int"
+    }
+    if prefix.expression.is(FloatLiteralExprSyntax.self) {
+      return "Double"
+    }
+  }
+
+  if let call = expression.as(FunctionCallExprSyntax.self) {
+    if let type = explicitTypeReference(from: call.calledExpression) {
+      return type
+    }
+    if
+      let member = call.calledExpression.as(MemberAccessExprSyntax.self),
+      member.declName.baseName.tokenKind == .keyword(.`init`),
+      let base = member.base
+    {
+      return explicitTypeReference(from: base)
+    }
+    return nil
+  }
+
+  guard
+    let member = expression.as(MemberAccessExprSyntax.self),
+    member.declName.baseName.tokenKind != .keyword(.self),
+    let base = member.base
+  else {
+    return nil
+  }
+  return explicitTypeReference(from: base)
+}
+
+private func explicitTypeReference(from expression: ExprSyntax) -> String? {
+  if
+    let array = expression.as(ArrayExprSyntax.self),
+    array.elements.count == 1,
+    let element = array.elements.first,
+    element.trailingComma == nil,
+    let elementType = explicitTypeReference(from: element.expression)
+  {
+    return "[\(elementType)]"
+  }
+
+  if let typeExpression = expression.as(TypeExprSyntax.self) {
+    return typeExpression.type.trimmedDescription
+  }
+
+  if let reference = expression.as(DeclReferenceExprSyntax.self) {
+    let name = reference.baseName.text
+    return isTypeNameComponent(name) ? reference.trimmedDescription : nil
+  }
+
+  if let specialisation = expression.as(GenericSpecializationExprSyntax.self) {
+    guard explicitTypeReference(from: specialisation.expression) != nil else {
+      return nil
+    }
+    return specialisation.trimmedDescription
+  }
+
+  if let member = expression.as(MemberAccessExprSyntax.self),
+     let base = member.base,
+     explicitTypeReference(from: base) != nil,
+     isTypeNameComponent(member.declName.baseName.text)
+  {
+    return member.trimmedDescription
+  }
+
+  return nil
+}
+
+private func isTypeNameComponent(_ name: String) -> Bool {
+  let unescaped = name.first == "`" && name.last == "`"
+    ? String(name.dropFirst().dropLast())
+    : name
+  guard let first = unescaped.first else { return false }
+  return first == "_" || first.isUppercase
+}
+
+private func isObservationSourceTypeName(_ type: String) -> Bool {
+  let base = type.prefix { $0 != "<" }
+    .filter { !$0.isWhitespace }
+    .split(separator: ".")
+    .last
+  return base == "ObservationSource"
 }
 
 private func parseArguments(
@@ -544,6 +673,7 @@ private func diagnose(
 
 private enum ObservationStateDiagnostic: DiagnosticMessage {
   case invalidDeclaration
+  case uninferableConcreteType
   case invalidArguments
   case invalidCustomName
   case missingObservationIgnored
@@ -554,7 +684,9 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
   var message: String {
     switch self {
     case .invalidDeclaration:
-      "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State"
+      "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State"
+    case .uninferableConcreteType:
+      "@ObservationState cannot infer the concrete State type from this initialiser; add an explicit type annotation"
     case .invalidArguments:
       "@ObservationState accepts only initial: and observedAs: .snapshots, .values, or .named(\"memberName\")"
     case .invalidCustomName:
@@ -573,6 +705,7 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
   var diagnosticID: MessageID {
     let id = switch self {
     case .invalidDeclaration: "invalidDeclaration"
+    case .uninferableConcreteType: "uninferableConcreteType"
     case .invalidArguments: "invalidArguments"
     case .invalidCustomName: "invalidCustomName"
     case .missingObservationIgnored: "missingObservationIgnored"
