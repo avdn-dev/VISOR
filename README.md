@@ -81,22 +81,20 @@ struct ProfileSnapshot: Equatable, Sendable {
   var email: String
 }
 
-// The producer owns mutation. Consumers receive only its read-only source.
+// The producer mutates ordinary State. Consumers receive read-only snapshots.
 @MainActor
 final class ProfileService {
-  @ObservationState(initial: ProfileSnapshot(
-    name: "Loading",
-    email: ""))
-  var profile: ObservationSource<ProfileSnapshot>
+  @ObservationState
+  private(set) var profile: ProfileSnapshot
 
   init(snapshot: ProfileSnapshot) {
-    publishProfile(snapshot)
+    profile = snapshot
   }
 
   func refresh() async {
-    publishProfile(ProfileSnapshot(
+    profile = ProfileSnapshot(
       name: "Alice",
-      email: "alice@example.com"))
+      email: "alice@example.com")
   }
 }
 
@@ -106,12 +104,12 @@ final class ProfileService {
 final class ProfileViewModel {
   final class State {
     @Bound(
-      source: \ProfileViewModel.profileService.profile,
+      source: \ProfileViewModel.profileService.profileSnapshots,
       selecting: \ProfileSnapshot.name)
     private(set) var name = ""
 
     @Bound(
-      source: \ProfileViewModel.profileService.profile,
+      source: \ProfileViewModel.profileService.profileSnapshots,
       selecting: \ProfileSnapshot.email)
     private(set) var email = ""
   }
@@ -171,19 +169,19 @@ ProfileScreen()
 VISOR accepts exactly four source-backed declaration forms:
 
 ```swift
-@Bound(source: \FeatureViewModel.service.value)
+@Bound(source: \FeatureViewModel.service.valueSnapshots)
 private(set) var value = Value.empty
 
 @Bound(
-  source: \FeatureViewModel.service.snapshot,
+  source: \FeatureViewModel.service.featureSnapshots,
   selecting: \FeatureSnapshot.value)
 private(set) var value = Value.empty
 
-@Reaction(source: \FeatureViewModel.service.value)
+@Reaction(source: \FeatureViewModel.service.valueSnapshots)
 func valueChanged(_ value: Value) { ... }
 
 @Reaction(
-  source: \FeatureViewModel.service.snapshot,
+  source: \FeatureViewModel.service.featureSnapshots,
   selecting: \FeatureSnapshot.value)
 func valueChanged(_ value: Value) async { ... }
 ```

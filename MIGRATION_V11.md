@@ -64,13 +64,13 @@ struct ProfileSnapshot: Equatable, Sendable {
 actor ProfileService {
   private var snapshot: ProfileSnapshot
   private let channel: ObservationChannel<ProfileSnapshot>
-  nonisolated let source: ObservationSource<ProfileSnapshot>
+  nonisolated let snapshots: ObservationSource<ProfileSnapshot>
 
   init(snapshot: ProfileSnapshot) {
     self.snapshot = snapshot
     let channel = ObservationChannel(snapshot)
     self.channel = channel
-    source = channel.source
+    snapshots = channel.source
   }
 
   func apply(_ snapshot: ProfileSnapshot) {
@@ -101,15 +101,31 @@ actor ProfileService {
   }
 }
 
-let source = service.profileSource
+let snapshots = service.profileSnapshots
 ```
 
-The macro generates the private channel and stable `profileSource`, and every
+The macro generates the private channel and stable `profileSnapshots`, and every
 assignment or in-place value mutation publishes synchronously. The property
-requires an explicit `Sendable` type and initial value. Source-first producers
+requires an explicit `Sendable` type and normal Swift initialisation. Producers
 do not need `@Observable`; if a transitional type retains it for other fields,
 place `@ObservationIgnored` immediately below `@ObservationState` on this
-property.
+property. The generated accessors still participate in Apple Observation.
+
+The generated consumer name defaults to `<property>Snapshots`. Use
+`observedAs: .values` for genuinely scalar State, or
+`observedAs: .named("domainPlural")` only when a domain-specific plural is
+clearer. Protocol requirements declare the scalar too and may provide
+`initial:` solely as a generated test-double baseline; known standard types can
+infer one. Mark the enclosing protocol once so the generated sequence is part
+of its witness layout:
+
+```swift
+@ObservationProtocol
+protocol ProfileServicing {
+  @ObservationState(initial: ProfileSnapshot.empty)
+  var profile: ProfileSnapshot { get }
+}
+```
 
 For immutable stub defaults, retain one
 `ObservationSource<Snapshot>.constant(.empty)` rather than repeating
@@ -208,19 +224,19 @@ VISOR synthesises inert `deinit {}` declarations where needed to avoid the Swift
 The accepted v11.0 forms are:
 
 ```swift
-@Bound(source: \FeatureViewModel.service.valueSource)
+@Bound(source: \FeatureViewModel.service.valueSnapshots)
 private(set) var value = Value.empty
 
 @Bound(
-  source: \FeatureViewModel.service.snapshotSource,
+  source: \FeatureViewModel.service.featureSnapshots,
   selecting: \FeatureSnapshot.value)
 private(set) var value = Value.empty
 
-@Reaction(source: \FeatureViewModel.service.valueSource)
+@Reaction(source: \FeatureViewModel.service.valueSnapshots)
 func valueChanged(_ value: Value) { ... }
 
 @Reaction(
-  source: \FeatureViewModel.service.snapshotSource,
+  source: \FeatureViewModel.service.featureSnapshots,
   selecting: \FeatureSnapshot.value)
 func valueChanged(_ value: Value) async { ... }
 ```
@@ -272,7 +288,7 @@ producer's source from an explicitly owned task:
 
 ```swift
 observationTask = Task { @MainActor [weak self, dependency] in
-  for await value in dependency.valueSource {
+  for await value in dependency.valueSnapshots {
     guard !Task.isCancelled else { return }
     await self?.apply(value)
   }

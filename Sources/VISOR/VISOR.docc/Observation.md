@@ -67,12 +67,12 @@ struct SyncSnapshot: Equatable, Sendable {
 
 actor SyncService {
   private let channel: ObservationChannel<SyncSnapshot>
-  nonisolated let source: ObservationSource<SyncSnapshot>
+  nonisolated let snapshots: ObservationSource<SyncSnapshot>
 
   init(initialSnapshot: SyncSnapshot) {
     let channel = ObservationChannel(initialSnapshot)
     self.channel = channel
-    source = channel.source
+    snapshots = channel.source
   }
 
   func apply(_ snapshot: SyncSnapshot) {
@@ -90,62 +90,71 @@ Prefer one snapshot per coherent domain revision rather than one source per `@Bo
 
 ### Producer observation State
 
-For a public service API, declare the consumer capability directly.
-`@ObservationState(initial:)` generates a private channel, a stable source
-getter, and a private `publish<Property>(_)` producer operation:
+For a service that owns mutable State, annotate the ordinary domain property.
+`@ObservationState` makes assignment the single publishing operation and
+generates a stable, read-only observation sequence:
 
 ```swift
 actor SyncService {
-  @ObservationState(initial: SyncSnapshot.initial)
-  nonisolated var sync: ObservationSource<SyncSnapshot>
+  @ObservationState
+  private(set) var sync: SyncSnapshot = .initial
 
   func apply(_ snapshot: SyncSnapshot) {
-    publishSync(snapshot)
+    sync = snapshot
   }
 }
 
 let service = SyncService()
-let source = service.sync
+let current = await service.sync
+let snapshots = service.syncSnapshots
 ```
 
-The authored property is exactly the read-only public contract. The generated
-channel and publisher are private implementation details, and the expansion
-has the same runtime shape as the explicit channel example above: one channel,
-one stable source, and no task or additional subscription. Publication remains
-synchronous. The macro is restricted to classes and actors so copying a
-value-type producer cannot accidentally share one channel.
+The authored scalar is the canonical producer State: direct assignment and
+in-place value mutation both publish the resulting complete value
+synchronously. The macro synthesises one private channel and a nonisolated
+`ObservationSource` peer. It creates no task or additional subscription.
+Classes and actors are supported; value-type producers are rejected because a
+copied producer must not accidentally share one channel.
 
-The macro's generic `Value` is inferred from `initial:` before the property is
-typechecked. Spell contextual baselines explicitly—for example,
-`CustomerInfo?.none` rather than `nil`, and `[Item]()` rather than `[]`.
-The macro uses a collision-resistant private backing name and reserves the
-private `publish<Property>` method name for its publishing operation.
+The default peer uses `Snapshots` because each element is a complete durable
+State replacement. Use `Values` for genuinely scalar State, or a custom domain
+plural when that is clearer at call sites:
 
-The value-first spelling remains available for existing implementations whose
-canonical producer state is a directly mutated stored value:
+| Declaration | Generated consumer sequence |
+| --- | --- |
+| `@ObservationState var playback = ...` | `playbackSnapshots` |
+| `@ObservationState(observedAs: .values) var revision = ...` | `revisionValues` |
+| `@ObservationState(observedAs: .named("permissionStatuses")) var permissions = ...` | `permissionStatuses` |
+
+Custom names must be static Swift identifiers and must not collide with another
+member. Prefer the default unless a domain plural is materially clearer; the
+argument is an API naming decision, not a description of the macro's storage.
+
+A declaration may initialise State normally or leave it for the enclosing
+initialiser:
 
 ```swift
 @ObservationState
-private(set) var syncSnapshot: SyncSnapshot = .initial
+private(set) var sync: SyncSnapshot
 
-// Generated compatibility projection: syncSnapshotSource
+init(initial: SyncSnapshot) {
+  sync = initial
+}
 ```
-
-That form publishes assignments and in-place value mutations. Prefer the
-source-first form at module and protocol boundaries so consumer names describe
-domain State rather than the observation mechanism.
 
 A producer does not need `@Observable` merely to expose an observation source.
 When its enclosing type does use `@Observable` for other properties, place
 `@ObservationIgnored` immediately below `@ObservationState`; Swift otherwise
-expands both accessor macros from the same authored declaration:
+expands both accessor macros from the same authored declaration. The generated
+accessors still register reads and mutations with Apple Observation, so the
+canonical scalar remains observable by SwiftUI as well as VISOR:
 
 ```swift
 @Observable
 final class TransitionalService {
-  @ObservationState(initial: SyncSnapshot.initial)
+  @ObservationState
   @ObservationIgnored
-  var sync: ObservationSource<SyncSnapshot>
+  private(set) var sync: SyncSnapshot = .initial
 }
 ```
 
@@ -166,7 +175,7 @@ final class ThrowingProducer {
     didSet { statusChannel.publish(currentStatus) }
   }
 
-  var status: ObservationSource<Status> {
+  nonisolated var statusSnapshots: ObservationSource<Status> {
     statusChannel.source
   }
 
@@ -176,21 +185,35 @@ final class ThrowingProducer {
 }
 ```
 
-Use the same source-first declaration in protocols:
+Protocols declare the same domain State property. `initial:` optionally
+supplies baseline metadata for generated spies and stubs, where a protocol
+requirement cannot contain a stored initial value. Known standard types infer a
+baseline; custom types can instead use `@DefaultValue`. `@ObservationProtocol`
+synthesises the matching nonisolated requirements from those properties:
 
 ```swift
 @GenerateSpy
+@ObservationProtocol
 protocol SyncServicing {
   @ObservationState(initial: SyncSnapshot.initial)
-  var sync: ObservationSource<SyncSnapshot> { get }
+  var sync: SyncSnapshot { get }
 }
+
+let spy = SpySyncServicing()
+spy.sync = .connected
+// spy.syncSnapshots publishes .connected automatically.
 ```
 
-The source remains explicit because it is the protocol's consumer capability.
-The `initial:` expression supplies generated spies and stubs with a baseline;
-it does not constrain how production conformers acquire their initial domain
-State. Generated doubles expose `publishSync(_:)` so tests can drive later
-snapshots without replacing the stable source.
+The protocol expands conceptually to `sync` plus a get-only `syncSnapshots`.
+`@ObservationProtocol` runs once at the type level so Swift incorporates the
+generated sequence requirements into its existential witness layout. The
+property annotation still owns the domain declaration and naming; concrete
+classes and actors do not need the protocol annotation.
+The baseline does not constrain how production conformers acquire their initial
+domain State. Generated doubles make the scalar mutable for test control, and
+their setter uses the same automatic publication contract as production code.
+If a requested double cannot infer a custom State baseline, generation fails
+with a diagnostic instead of changing the production protocol's semantics.
 
 ### Related performance lanes
 
@@ -213,7 +236,7 @@ through the producer's source. `ObservationSource` is itself an
 
 ```swift
 observationTask = Task { @MainActor [weak self, dependency] in
-  for await status in dependency.status {
+  for await status in dependency.statusSnapshots {
     guard !Task.isCancelled else { return }
     await self?.apply(status)
   }
@@ -236,12 +259,12 @@ A VISOR ViewModel has this shape:
 final class SyncViewModel {
   final class State {
     @Bound(
-      source: \SyncViewModel.service.source,
+      source: \SyncViewModel.service.syncSnapshots,
       selecting: \SyncSnapshot.revision)
     private(set) var revision = 0
 
     @Bound(
-      source: \SyncViewModel.service.source,
+      source: \SyncViewModel.service.syncSnapshots,
       selecting: \SyncSnapshot.status)
     private(set) var status = Status.idle
   }
@@ -266,7 +289,7 @@ VISOR accepts exactly four source-backed forms.
 ### Bind a complete source value
 
 ```swift
-@Bound(source: \PlayerViewModel.player.currentItem)
+@Bound(source: \PlayerViewModel.player.currentItemSnapshots)
 private(set) var currentItem = PlayerItem.empty
 ```
 
@@ -276,7 +299,7 @@ The State field type matches the source snapshot type.
 
 ```swift
 @Bound(
-  source: \PlayerViewModel.player.snapshot,
+  source: \PlayerViewModel.player.playerSnapshots,
   selecting: \PlayerSnapshot.currentItem)
 private(set) var currentItem = PlayerItem.empty
 ```
@@ -286,7 +309,7 @@ Several selections from the same source share its baseline, revision lane, and s
 ### React to a complete source value
 
 ```swift
-@Reaction(source: \PlayerViewModel.player.currentItem)
+@Reaction(source: \PlayerViewModel.player.currentItemSnapshots)
 private func currentItemChanged(_ item: PlayerItem) {
   updateState(\.title, to: item.title)
 }
@@ -296,7 +319,7 @@ private func currentItemChanged(_ item: PlayerItem) {
 
 ```swift
 @Reaction(
-  source: \PlayerViewModel.player.snapshot,
+  source: \PlayerViewModel.player.playerSnapshots,
   selecting: \PlayerSnapshot.currentItem)
 private func currentItemChanged(_ item: PlayerItem) async {
   await prepareArtwork(for: item)
