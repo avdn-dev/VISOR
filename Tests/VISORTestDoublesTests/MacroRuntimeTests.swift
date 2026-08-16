@@ -4,15 +4,17 @@ import VISORObservation
 import VISORTestDoubles
 
 @GenerateSpy
+@ObservationProtocol
 protocol ObservationStateService {
-    @ObservationState(initial: 0)
-    var count: ObservationSource<Int> { get }
+    @ObservationState(observedAs: .values)
+    var count: Int { get }
 }
 
 @GenerateSpy(.sendable)
+@ObservationProtocol
 nonisolated protocol SendableObservationStateService: Sendable {
-    @ObservationState(initial: 0)
-    var count: ObservationSource<Int> { get }
+    @ObservationState(observedAs: .values)
+    var count: Int { get }
 }
 
 // MARK: - @GenerateStub Runtime Tests
@@ -176,26 +178,36 @@ struct GenerateStubMacroRuntimeTests {
 struct GenerateSpyMacroRuntimeTests {
 
     @Test
-    func `Observation State properties publish through generated spies`() async {
+    func `Observation State assignments publish through generated spies`() async {
         let spy = SpyObservationStateService()
         let service: any ObservationStateService = spy
-        let snapshots = service.count.makeAsyncIterator()
+        let values = service.countValues.makeAsyncIterator()
 
-        #expect(await snapshots.next() == 0)
-        spy.publishCount(1)
-        #expect(await snapshots.next() == 1)
+        #expect(await values.next() == 0)
+        spy.count = 1
+        #expect(await values.next() == 1)
     }
 
     @Test
-    func `Sendable Observation State publishers remain safe across isolation`() async {
+    func `Sendable Observation State assignments remain coherent across isolation`() async {
         let spy = SpySendableObservationStateService()
-        let snapshots = spy.count.makeAsyncIterator()
+        let values = spy.countValues.makeAsyncIterator()
 
-        #expect(await snapshots.next() == 0)
+        #expect(await values.next() == 0)
         await Task { @concurrent in
-            spy.publishCount(2)
+            spy.count = 2
         }.value
-        #expect(await snapshots.next() == 2)
+        #expect(await values.next() == 2)
+
+        await withTaskGroup(of: Void.self) { group in
+            for count in 3...1_000 {
+                group.addTask {
+                    spy.count = count
+                }
+            }
+        }
+
+        #expect(spy.countValues.currentSnapshot() == spy.count)
     }
 
     @Test

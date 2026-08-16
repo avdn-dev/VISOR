@@ -16,6 +16,7 @@ private let testMacros: [String: Macro.Type] = [
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
   "ObservationState": ObservationStateMacro.self,
+  "ObservationProtocol": ObservationProtocolMacro.self,
 ]
 
 private let defaultValueWarning = """
@@ -31,18 +32,23 @@ struct GenerateStubMacroTests {
   // MARK: - Protocol Stub Generation
 
   @Test
-  func `Generates a Sendable source-first Observation State control`() {
+  func `Generates a Sendable setter-backed Observation State`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateStub(.sendable)
+      @ObservationProtocol
       nonisolated protocol PlaybackService: Sendable {
-        @ObservationState(initial: PlaybackSnapshot.stopped)
-        var playback: ObservationSource<PlaybackSnapshot> { get }
+        @ObservationState(initial: PlaybackSnapshot.stopped, observedAs: .values)
+        var playback: PlaybackSnapshot { get }
       }
       """,
       expandedSource: """
       nonisolated protocol PlaybackService: Sendable {
-        var playback: ObservationSource<PlaybackSnapshot> { get }
+        var playback: PlaybackSnapshot { get }
+
+          nonisolated var playbackValues: VISORObservation.ObservationSource<PlaybackSnapshot> {
+              get
+          }
       }
 
       @Observable
@@ -53,11 +59,19 @@ struct GenerateStubMacroTests {
         private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
         @ObservationIgnored
         private let _playbackObservationChannel = VISORObservation.ObservationChannel<PlaybackSnapshot>(PlaybackSnapshot.stopped)
-        var playback: ObservationSource<PlaybackSnapshot> {
+        var playbackValues: VISORObservation.ObservationSource<PlaybackSnapshot> {
           _playbackObservationChannel.source
         }
-        func publishPlayback(_ snapshot: sending PlaybackSnapshot) {
-          _playbackObservationChannel.publish(snapshot)
+        var playback: PlaybackSnapshot {
+          get {
+            access(keyPath: \\.playback)
+            return _playbackObservationChannel.source.currentSnapshot()
+          }
+          set {
+            withMutation(keyPath: \\.playback) {
+              _playbackObservationChannel.publish(newValue)
+            }
+          }
         }
       }
       """,

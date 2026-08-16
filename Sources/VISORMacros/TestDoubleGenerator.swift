@@ -67,6 +67,20 @@ struct TestDoubleGenerator {
       return []
     }
 
+    if let property = analysis.properties.first(where: {
+      $0.observationState != nil
+        && $0.defaultValueExpression == nil
+        && defaultValue(for: $0.type) == nil
+    }) {
+      context.diagnose(Diagnostic(
+        node: Syntax(protocolDecl),
+        message: TestDoubleDiagnostic.observationStateBaselineRequired(
+          propertyName: property.name,
+          type: property.type,
+          macroName: kind.macroName)))
+      return []
+    }
+
     if kind == .spy, traits.isSendable,
        let unsupportedMethod = analysis.methods.lazy.compactMap({ method -> (ProtocolMethodInfo, [String])? in
          let genericNames = unconstrainedGenericParameterNamesRequiringSendableStorage(in: method)
@@ -85,14 +99,7 @@ struct TestDoubleGenerator {
       kind: kind,
       analysis: analysis,
       isSendable: traits.isSendable)
-    let observationSourceNames = Set(analysis.properties.compactMap { property in
-      property.isObservationState ? "\(property.name)Source" : nil
-    })
-    let storedProtocolProperties = analysis.properties.filter {
-      !observationSourceNames.contains($0.name)
-        && $0.sourceObservationState == nil
-    }
-    if hasUnknownTypeDefaults(properties: storedProtocolProperties, methods: analysis.methods) {
+    if hasUnknownTypeDefaults(properties: analysis.properties, methods: analysis.methods) {
       context.diagnose(Diagnostic(
         node: Syntax(protocolDecl),
         message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: kind.macroName)))
@@ -137,12 +144,9 @@ struct TestDoubleGenerator {
 
 private struct OrdinaryTestDoubleRenderer {
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
-    var members = plan.sourceObservationStates.flatMap {
-      sourceObservationStateMembers($0, access: plan.access)
-    }
-    members.append(contentsOf: plan.protocolProperties.flatMap {
+    var members = plan.protocolProperties.flatMap {
       directPropertyMembers($0, access: plan.access)
-    })
+    }
 
     switch plan.kind {
     case .stub:
@@ -151,25 +155,6 @@ private struct OrdinaryTestDoubleRenderer {
       members.append(contentsOf: spyMembers(plan))
     }
     return members
-  }
-
-  private func sourceObservationStateMembers(
-    _ state: TestDoubleSourceObservationStatePlan,
-    access: String)
-    -> [String]
-  {
-    let prefix = access.isEmpty ? "" : "\(access) "
-    return [
-      "  @ObservationIgnored",
-      "  private let \(state.channelName) = "
-        + "VISORObservation.ObservationChannel<\(state.valueType)>(\(state.initialValueExpression))",
-      "  \(prefix)var \(state.name): \(state.sourceType) {",
-      "    \(state.channelName).source",
-      "  }",
-      "  \(prefix)func \(state.publisherName)(_ snapshot: sending \(state.valueType)) {",
-      "    \(state.channelName).publish(snapshot)",
-      "  }",
-    ]
   }
 
   private func stubMembers(_ plan: TestDoubleGenerationPlan) -> [String] {
@@ -268,12 +253,13 @@ private struct OrdinaryTestDoubleRenderer {
     omitType: Bool = false)
     -> [String]
   {
+    if property.isObservationState {
+      return observationStateMembers(property, access: access)
+    }
+
     let prefix = access.isEmpty ? "" : "\(access) "
     var members: [String] = []
-    if property.isObservationState {
-      members.append("  @VISORObservation.ObservationState")
-      members.append("  @ObservationIgnored")
-    } else if property.isObservationIgnored {
+    if property.isObservationIgnored {
       members.append("  @ObservationIgnored")
     }
     var declaration = "  \(prefix)var \(property.name)"
@@ -284,6 +270,44 @@ private struct OrdinaryTestDoubleRenderer {
       declaration += " = \(ordinaryInitialiser)"
     }
     members.append(declaration)
+    return members
+  }
+
+  private func observationStateMembers(
+    _ property: TestDoubleStoredPropertyPlan,
+    access: String
+  ) -> [String] {
+    guard let observationState = property.observationState else { return [] }
+    let prefix = access.isEmpty ? "" : "\(access) "
+    let channelName = property.observationChannelName
+      ?? "_\(property.name)ObservationChannel"
+    let sequenceName = observationState.sequenceName(for: property.name)
+    var members = [
+      "  @ObservationIgnored",
+      "  nonisolated private let \(channelName) = "
+        + "VISORObservation.ObservationChannel<\(property.exposedType)>(\(property.storageDefaultExpression))",
+      "  nonisolated \(prefix)var \(sequenceName): "
+        + "VISORObservation.ObservationSource<\(property.exposedType)> {",
+      "    \(channelName).source",
+      "  }",
+      "  \(prefix)var \(property.name): \(property.exposedType) {",
+      "    get {",
+    ]
+    if !property.isObservationIgnored {
+      members.append("      access(keyPath: \\.\(property.name))")
+    }
+    members.append("      return \(channelName).source.currentSnapshot()")
+    members.append("    }")
+    members.append("    set {")
+    if property.isObservationIgnored {
+      members.append("      \(channelName).publish(newValue)")
+    } else {
+      members.append("      withMutation(keyPath: \\.\(property.name)) {")
+      members.append("        \(channelName).publish(newValue)")
+      members.append("      }")
+    }
+    members.append("    }")
+    members.append("  }")
     return members
   }
 }

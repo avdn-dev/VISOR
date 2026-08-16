@@ -8,12 +8,8 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
     providingPeersOf declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    if observationStateRequirement(
-      from: declaration,
-      attribute: attribute,
-      in: context,
-      diagnose: false) != nil
-    {
+    if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
+      diagnoseMissingObservationProtocolIfNeeded(declaration, in: context)
       return []
     }
 
@@ -21,37 +17,22 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
       from: declaration,
       attribute: attribute,
       in: context,
-      diagnose: false
-    ) else {
+      diagnose: false)
+    else {
       return []
     }
 
     let channel: DeclSyntax = """
-      \(raw: property.channelModifiers)let \(raw: property.channelName):
-        VISORObservation.ObservationChannel<\(raw: property.valueType)> =
-        VISORObservation.ObservationChannel(\(raw: property.initialValue))
+      \(raw: property.channelModifiers)\(raw: property.channelBinding) \(raw: property.channelName):
+        VISORObservation.ObservationChannel<\(raw: property.valueType)>
       """
-
-    switch property {
-    case .source(let source):
-      let publisher: DeclSyntax = """
-        private func publish\(raw: source.name.capitalisedFirst)(
-          _ snapshot: sending \(raw: source.valueType)
-        ) {
-          \(raw: source.channelName).publish(snapshot)
-        }
-        """
-      return [channel, publisher]
-
-    case .value(let value):
-      let source: DeclSyntax = """
-        \(raw: value.sourceModifiers)var \(raw: value.name)Source:
-          VISORObservation.ObservationSource<\(raw: value.valueType)> {
-          \(raw: value.channelName).source
-        }
-        """
-      return [channel, source]
-    }
+    let sequence: DeclSyntax = """
+      \(raw: property.sequenceModifiers)var \(raw: property.sequenceName):
+        VISORObservation.ObservationSource<\(raw: property.valueType)> {
+        \(raw: property.channelName).source
+      }
+      """
+    return [channel, sequence]
   }
 
   public static func expansion(
@@ -59,12 +40,7 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
     providingAccessorsOf declaration: some DeclSyntaxProtocol,
     in context: some MacroExpansionContext
   ) throws -> [AccessorDeclSyntax] {
-    if observationStateRequirement(
-      from: declaration,
-      attribute: attribute,
-      in: context,
-      diagnose: false) != nil
-    {
+    if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
       return []
     }
 
@@ -72,40 +48,135 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
       from: declaration,
       attribute: attribute,
       in: context,
-      diagnose: true
-    ) else {
+      diagnose: true)
+    else {
       return []
     }
 
-    switch property {
-    case .source(let source):
-      let getter: AccessorDeclSyntax = """
-        get {
-          \(raw: source.channelName).source
-        }
-        """
-      return [getter]
+    let initialiser: AccessorDeclSyntax = """
+      @storageRestrictions(initializes: \(raw: property.channelName))
+      init(initialValue) {
+        \(raw: property.channelName) = VISORObservation.ObservationChannel(initialValue)
+      }
+      """
+    var accessors = [initialiser]
 
-    case .value(let value):
-      let initialiser: AccessorDeclSyntax = """
-        @storageRestrictions(accesses: \(raw: value.channelName))
-        init(initialValue) {
-          \(raw: value.channelName).publish(initialValue)
-        }
-        """
-      let getter: AccessorDeclSyntax = """
+    let getter: AccessorDeclSyntax
+    let setter: AccessorDeclSyntax
+    if property.participatesInAppleObservation {
+      getter = """
         get {
-          \(raw: value.channelName).source.currentSnapshot()
+          access(keyPath: \\.\(raw: property.name))
+          return \(raw: property.channelName).source.currentSnapshot()
         }
         """
-      let setter: AccessorDeclSyntax = """
+      setter = """
         set {
-          \(raw: value.channelName).publish(newValue)
+          withMutation(keyPath: \\.\(raw: property.name)) {
+            \(raw: property.channelName).publish(newValue)
+          }
         }
         """
-
-      return [initialiser, getter, setter]
+    } else {
+      getter = """
+        get {
+          \(raw: property.channelName).source.currentSnapshot()
+        }
+        """
+      setter = """
+        set {
+          \(raw: property.channelName).publish(newValue)
+        }
+        """
     }
+    accessors.append(contentsOf: [getter, setter])
+    return accessors
+  }
+}
+
+public struct ObservationStateRequirementMacro: PeerMacro {
+  public static func expansion(
+    of attribute: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
+      diagnoseMissingObservationProtocolIfNeeded(declaration, in: context)
+      return []
+    }
+
+    diagnoseInvalidDeclaration(declaration, in: context, if: true)
+    return []
+  }
+}
+
+public struct ObservationProtocolMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo _: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let protocolDeclaration = declaration.as(ProtocolDeclSyntax.self) else {
+      context.diagnose(Diagnostic(
+        node: node,
+        message: ObservationStateDiagnostic.invalidProtocol))
+      return []
+    }
+
+    return protocolDeclaration.memberBlock.members.compactMap { member in
+      guard
+        let variable = member.decl.as(VariableDeclSyntax.self),
+        let attribute = variable.attributes.visorAttribute(
+          named: AttributeName.observationState),
+        let requirement = observationStateRequirement(
+          from: variable,
+          attribute: attribute,
+          in: context,
+          diagnose: true,
+          assumeProtocolOwner: true)
+      else {
+        return nil
+      }
+
+      let sequence: DeclSyntax = """
+        \(raw: requirement.sequenceModifiers)var \(raw: requirement.sequenceName): VISORObservation.ObservationSource<\(raw: requirement.valueType)> { get }
+        """
+      return sequence
+    }
+  }
+}
+
+private struct ObservationStateRequirement {
+  let valueType: String
+  let sequenceName: String
+  let sequenceModifiers: String
+}
+
+private struct ObservationStateProperty {
+  let name: String
+  let valueType: String
+  let sequenceName: String
+  let sequenceModifiers: String
+  let hasAuthoredInitialiser: Bool
+  let participatesInAppleObservation: Bool
+
+  var channelName: String {
+    "__visorObservationState\(name.capitalisedFirst)Channel"
+  }
+
+  var channelBinding: String {
+    hasAuthoredInitialiser ? "var" : "let"
+  }
+
+  var channelModifiers: String {
+    // Swift invokes the init accessor again when an enclosing initialiser
+    // replaces a declaration default. The storage restriction confines this
+    // rebind to initialisation, but an actor-visible mutable slot must still be
+    // spelt `nonisolated(unsafe)` for the compiler.
+    hasAuthoredInitialiser
+      ? "nonisolated(unsafe) private "
+      : "nonisolated private "
   }
 }
 
@@ -113,9 +184,12 @@ private func observationStateRequirement(
   from declaration: some DeclSyntaxProtocol,
   attribute: AttributeSyntax,
   in context: any MacroExpansionContext,
-  diagnose: Bool
-) -> Bool? {
-  guard context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true else {
+  diagnose: Bool,
+  assumeProtocolOwner: Bool = false
+) -> ObservationStateRequirement? {
+  guard assumeProtocolOwner
+    || context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true
+  else {
     return nil
   }
   guard
@@ -123,99 +197,57 @@ private func observationStateRequirement(
     variable.bindingSpecifier.tokenKind == .keyword(.var),
     variable.bindings.count == 1,
     let binding = variable.bindings.first,
-    binding.pattern.is(IdentifierPatternSyntax.self),
+    let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
     let type = binding.typeAnnotation?.type,
+    !isObservationSource(type),
     binding.initializer == nil,
-    binding.accessorBlock != nil,
+    isReadOnlyRequirement(binding),
     !variable.modifiers.contains(where: isStaticModifier)
   else {
-    diagnoseInvalidObservationState(declaration, in: context, if: diagnose)
+    diagnoseInvalidDeclaration(declaration, in: context, if: diagnose)
     return nil
   }
 
-  let initialValue = observationStateInitialValue(from: attribute)
-  let sourceValueType = observationSourceValueType(from: type)
-  let isValid = if initialValue != nil {
-    sourceValueType != nil && isReadOnlyRequirement(binding)
-  } else {
-    sourceValueType == nil
-  }
-
-  guard isValid else {
-    diagnoseInvalidObservationState(declaration, in: context, if: diagnose)
+  guard let arguments = parseArguments(
+    attribute,
+    declaration: declaration,
+    in: context,
+    shouldDiagnose: diagnose)
+  else {
     return nil
   }
-  return true
+  let propertyName = identifier.identifier.text
+  let sequenceName = arguments.sequenceNaming.memberName(for: propertyName)
+  guard validateGeneratedNames(
+    stateName: propertyName,
+    sequenceName: sequenceName,
+    channelName: nil,
+    declaration: declaration,
+    in: context,
+    shouldDiagnose: diagnose)
+  else {
+    return nil
+  }
+
+  return ObservationStateRequirement(
+    valueType: type.trimmedDescription,
+    sequenceName: sequenceName,
+    sequenceModifiers: protocolSequenceModifiers(from: variable))
 }
 
-private enum ObservationStateProperty {
-  case source(ObservationSourceProperty)
-  case value(ObservationValueProperty)
-
-  var name: String {
-    switch self {
-    case .source(let property): property.name
-    case .value(let property): property.name
-    }
+private func diagnoseMissingObservationProtocolIfNeeded(
+  _ declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext
+) {
+  guard
+    let owner = context.lexicalContext.first?.as(ProtocolDeclSyntax.self),
+    !owner.attributes.visorContains(named: "ObservationProtocol")
+  else {
+    return
   }
-
-  var valueType: String {
-    switch self {
-    case .source(let property): property.valueType
-    case .value(let property): property.valueType
-    }
-  }
-
-  var initialValue: String {
-    switch self {
-    case .source(let property): property.initialValue
-    case .value(let property): property.initialValue
-    }
-  }
-
-  var channelName: String {
-    switch self {
-    case .source(let property): property.channelName
-    case .value(let property): property.channelName
-    }
-  }
-
-  var channelModifiers: String {
-    switch self {
-    case .source(let property): property.channelModifiers
-    case .value(let property): property.channelModifiers
-    }
-  }
-}
-
-private struct ObservationSourceProperty {
-  let name: String
-  let valueType: String
-  let initialValue: String
-  let isNonisolated: Bool
-
-  var channelName: String {
-    "__visorObservationState\(name.capitalisedFirst)Channel"
-  }
-
-  var channelModifiers: String {
-    isNonisolated ? "nonisolated private " : "private "
-  }
-}
-
-private struct ObservationValueProperty {
-  let name: String
-  let valueType: String
-  let initialValue: String
-  let sourceModifiers: String
-
-  var channelName: String { "_\(name)Channel" }
-
-  var channelModifiers: String {
-    sourceModifiers.contains("nonisolated ")
-      ? "nonisolated private "
-      : "private "
-  }
+  context.diagnose(Diagnostic(
+    node: Syntax(declaration),
+    message: ObservationStateDiagnostic.missingObservationProtocol))
 }
 
 private func observationStateProperty(
@@ -233,79 +265,180 @@ private func observationStateProperty(
     variable.bindingSpecifier.tokenKind == .keyword(.var),
     variable.bindings.count == 1,
     let binding = variable.bindings.first,
-    let name = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text,
+    let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
     let type = binding.typeAnnotation?.type,
+    !isObservationSource(type),
     binding.accessorBlock == nil,
-    !variable.modifiers.contains(where: isStaticModifier)
+    !variable.modifiers.contains(where: isStaticModifier),
+    !variable.modifiers.contains(where: isUnsupportedStorageModifier)
   else {
-    diagnoseInvalidObservationState(declaration, in: context, if: diagnose)
+    diagnoseInvalidDeclaration(declaration, in: context, if: diagnose)
     return nil
   }
 
-  let initialArgument = observationStateInitialValue(from: attribute)
-  let sourceValueType = observationSourceValueType(from: type)
-
-  if let initialArgument, let sourceValueType {
-    return .source(ObservationSourceProperty(
-      name: name,
-      valueType: sourceValueType,
-      initialValue: initialArgument,
-      isNonisolated: variable.modifiers.contains(where: isNonisolatedModifier)))
+  let observableOwner = isObservable(owner)
+  guard !observableOwner || hasRequiredObservationIgnoredPlacement(variable) else {
+    diagnoseMissingObservationIgnored(declaration, in: context, if: diagnose)
+    return nil
   }
 
-  if initialArgument == nil,
-     sourceValueType == nil,
-     let initialiser = binding.initializer?.value.trimmedDescription
-  {
-    return .value(ObservationValueProperty(
-      name: name,
-      valueType: type.trimmedDescription,
-      initialValue: initialiser,
-      sourceModifiers: sourceModifiers(from: variable)))
-  }
-
-  diagnoseInvalidObservationState(declaration, in: context, if: diagnose)
-  return nil
-}
-
-private func observationStateInitialValue(from attribute: AttributeSyntax) -> String? {
-  guard
-    let arguments = attribute.arguments?.as(LabeledExprListSyntax.self),
-    arguments.count == 1,
-    let argument = arguments.first,
-    argument.label?.text == "initial"
+  guard let arguments = parseArguments(
+    attribute,
+    declaration: declaration,
+    in: context,
+    shouldDiagnose: diagnose)
   else {
     return nil
   }
-  return argument.expression.trimmedDescription
+
+  let authoredInitialiser = binding.initializer?.value.trimmedDescription
+  guard arguments.initialValueExpression == nil else {
+    diagnoseInvalidDeclaration(declaration, in: context, if: diagnose)
+    return nil
+  }
+
+  let propertyName = identifier.identifier.text
+  let sequenceName = arguments.sequenceNaming.memberName(for: propertyName)
+  let channelName = "__visorObservationState\(propertyName.capitalisedFirst)Channel"
+  guard validateGeneratedNames(
+    stateName: propertyName,
+    sequenceName: sequenceName,
+    channelName: channelName,
+    declaration: declaration,
+    in: context,
+    shouldDiagnose: diagnose)
+  else {
+    return nil
+  }
+
+  return ObservationStateProperty(
+    name: propertyName,
+    valueType: type.trimmedDescription,
+    sequenceName: sequenceName,
+    sequenceModifiers: sequenceModifiers(from: variable),
+    hasAuthoredInitialiser: authoredInitialiser != nil,
+    participatesInAppleObservation: observableOwner)
 }
 
-private func observationSourceValueType(from type: TypeSyntax) -> String? {
-  let arguments: GenericArgumentListSyntax?
-  if let identifier = type.as(IdentifierTypeSyntax.self),
-     identifier.name.text == "ObservationSource"
-  {
-    arguments = identifier.genericArgumentClause?.arguments
-  } else if let member = type.as(MemberTypeSyntax.self),
-            member.name.text == "ObservationSource"
-  {
-    arguments = member.genericArgumentClause?.arguments
+private func parseArguments(
+  _ attribute: AttributeSyntax,
+  declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext,
+  shouldDiagnose: Bool
+) -> ObservationStateArguments? {
+  switch ObservationStateArguments.parse(from: attribute) {
+  case .success(let arguments):
+    return arguments
+  case .failure(.invalidArguments):
+    diagnose(declaration, in: context, with: .invalidArguments, if: shouldDiagnose)
+    return nil
+  case .failure(.invalidCustomName):
+    diagnose(declaration, in: context, with: .invalidCustomName, if: shouldDiagnose)
+    return nil
+  }
+}
+
+private func validateGeneratedNames(
+  stateName: String,
+  sequenceName: String,
+  channelName: String?,
+  declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext,
+  shouldDiagnose: Bool
+) -> Bool {
+  guard sequenceName != stateName else {
+    diagnose(
+      declaration,
+      in: context,
+      with: .generatedNameCollision(sequenceName),
+      if: shouldDiagnose)
+    return false
+  }
+
+  let names = enclosingMemberNames(
+    excludingStateNamed: stateName,
+    around: declaration,
+    in: context)
+  if names.contains(sequenceName) || channelName.map(names.contains) == true {
+    let collision = names.contains(sequenceName) ? sequenceName : channelName ?? sequenceName
+    diagnose(declaration, in: context, with: .generatedNameCollision(collision), if: shouldDiagnose)
+    return false
+  }
+  return true
+}
+
+private func enclosingMemberNames(
+  excludingStateNamed stateName: String,
+  around declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext
+) -> Set<String> {
+  let ancestorMembers: MemberBlockItemListSyntax? = {
+    var ancestor = Syntax(declaration).parent
+    while let node = ancestor {
+      if let memberBlock = node.as(MemberBlockSyntax.self) {
+        return memberBlock.members
+      }
+      ancestor = node.parent
+    }
+    return nil
+  }()
+
+  let members: MemberBlockItemListSyntax?
+  if let ancestorMembers {
+    members = ancestorMembers
+  } else if let type = context.lexicalContext.first?.as(ClassDeclSyntax.self) {
+    members = type.memberBlock.members
+  } else if let type = context.lexicalContext.first?.as(ActorDeclSyntax.self) {
+    members = type.memberBlock.members
+  } else if let type = context.lexicalContext.first?.as(ProtocolDeclSyntax.self) {
+    members = type.memberBlock.members
   } else {
-    return nil
+    members = nil
   }
 
-  guard arguments?.count == 1, let valueType = arguments?.first?.argument else {
-    return nil
+  var names = Set<String>()
+  for member in members ?? [] {
+    if let variable = member.decl.as(VariableDeclSyntax.self),
+       variable.bindings.count == 1,
+       let binding = variable.bindings.first,
+       let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
+    {
+      let name = identifier.identifier.text
+      names.insert(name)
+      if name != stateName,
+         let attribute = variable.attributes.visorAttribute(named: AttributeName.observationState),
+         case .success(let arguments) = ObservationStateArguments.parse(from: attribute)
+      {
+        names.insert(arguments.sequenceNaming.memberName(for: name))
+      }
+      continue
+    }
+
+    if let function = member.decl.as(FunctionDeclSyntax.self) {
+      names.insert(function.name.text)
+    } else if let typealiasDeclaration = member.decl.as(TypeAliasDeclSyntax.self) {
+      names.insert(typealiasDeclaration.name.text)
+    } else if let classDeclaration = member.decl.as(ClassDeclSyntax.self) {
+      names.insert(classDeclaration.name.text)
+    } else if let actorDeclaration = member.decl.as(ActorDeclSyntax.self) {
+      names.insert(actorDeclaration.name.text)
+    } else if let structDeclaration = member.decl.as(StructDeclSyntax.self) {
+      names.insert(structDeclaration.name.text)
+    } else if let enumDeclaration = member.decl.as(EnumDeclSyntax.self) {
+      names.insert(enumDeclaration.name.text)
+    } else if let protocolDeclaration = member.decl.as(ProtocolDeclSyntax.self) {
+      names.insert(protocolDeclaration.name.text)
+    }
   }
-  return valueType.trimmedDescription
+  return names
 }
 
-private func sourceModifiers(from variable: VariableDeclSyntax) -> String {
-  variable.modifiers.compactMap { modifier -> String? in
+private func sequenceModifiers(from variable: VariableDeclSyntax) -> String {
+  "nonisolated " + variable.modifiers.compactMap { modifier -> String? in
     guard modifier.detail == nil else { return nil }
     switch modifier.name.tokenKind {
     case .keyword(.public), .keyword(.package), .keyword(.fileprivate),
-      .keyword(.private), .keyword(.nonisolated):
+      .keyword(.private):
       return "\(modifier.trimmedDescription) "
     case .keyword(.open):
       return "public "
@@ -315,13 +448,22 @@ private func sourceModifiers(from variable: VariableDeclSyntax) -> String {
   }.joined()
 }
 
+private func protocolSequenceModifiers(from _: VariableDeclSyntax) -> String {
+  "nonisolated "
+}
+
 private func isStaticModifier(_ modifier: DeclModifierSyntax) -> Bool {
   modifier.name.tokenKind == .keyword(.static)
     || modifier.name.tokenKind == .keyword(.class)
 }
 
-private func isNonisolatedModifier(_ modifier: DeclModifierSyntax) -> Bool {
-  modifier.name.tokenKind == .keyword(.nonisolated)
+private func isUnsupportedStorageModifier(_ modifier: DeclModifierSyntax) -> Bool {
+  switch modifier.name.tokenKind {
+  case .keyword(.lazy), .keyword(.weak), .keyword(.unowned):
+    true
+  default:
+    false
+  }
 }
 
 private func isReadOnlyRequirement(_ binding: PatternBindingSyntax) -> Bool {
@@ -335,26 +477,110 @@ private func isReadOnlyRequirement(_ binding: PatternBindingSyntax) -> Bool {
     && accessors.first?.accessorSpecifier.tokenKind == .keyword(.get)
 }
 
-private func diagnoseInvalidObservationState(
+private func isObservationSource(_ type: TypeSyntax) -> Bool {
+  if let identifier = type.as(IdentifierTypeSyntax.self) {
+    return identifier.name.text == "ObservationSource"
+  }
+  if let member = type.as(MemberTypeSyntax.self) {
+    return member.name.text == "ObservationSource"
+  }
+  return false
+}
+
+private func isObservable(_ owner: Syntax?) -> Bool {
+  if let owner = owner?.as(ClassDeclSyntax.self) {
+    return owner.attributes.visorContains(named: "Observable")
+  }
+  if let owner = owner?.as(ActorDeclSyntax.self) {
+    return owner.attributes.visorContains(named: "Observable")
+  }
+  return false
+}
+
+private func hasRequiredObservationIgnoredPlacement(
+  _ variable: VariableDeclSyntax
+) -> Bool {
+  let names = variable.attributes.compactMap { element -> String? in
+    guard let attribute = element.as(AttributeSyntax.self) else { return nil }
+    return attribute.attributeName.trimmedDescription.split(separator: ".").last.map(String.init)
+  }
+  guard let stateIndex = names.firstIndex(of: AttributeName.observationState),
+        names.indices.contains(stateIndex + 1)
+  else {
+    return false
+  }
+  return names[stateIndex + 1] == "ObservationIgnored"
+}
+
+private func diagnoseInvalidDeclaration(
   _ declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
   if shouldDiagnose: Bool
 ) {
-  guard shouldDiagnose else { return }
-  context.diagnose(Diagnostic(
-    node: Syntax(declaration),
-    message: ObservationStateDiagnostic.invalidDeclaration))
+  diagnose(declaration, in: context, with: .invalidDeclaration, if: shouldDiagnose)
 }
 
-private enum ObservationStateDiagnostic: String, DiagnosticMessage {
+private func diagnoseMissingObservationIgnored(
+  _ declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext,
+  if shouldDiagnose: Bool
+) {
+  diagnose(
+    declaration,
+    in: context,
+    with: .missingObservationIgnored,
+    if: shouldDiagnose)
+}
+
+private func diagnose(
+  _ declaration: some DeclSyntaxProtocol,
+  in context: any MacroExpansionContext,
+  with message: ObservationStateDiagnostic,
+  if shouldDiagnose: Bool
+) {
+  guard shouldDiagnose else { return }
+  context.diagnose(Diagnostic(node: Syntax(declaration), message: message))
+}
+
+private enum ObservationStateDiagnostic: DiagnosticMessage {
   case invalidDeclaration
+  case invalidArguments
+  case invalidCustomName
+  case missingObservationIgnored
+  case generatedNameCollision(String)
+  case invalidProtocol
+  case missingObservationProtocol
 
   var message: String {
-    "@ObservationState requires either a stored value with an explicit type and initial value, or an ObservationSource property with an explicit initial: argument"
+    switch self {
+    case .invalidDeclaration:
+      "@ObservationState requires mutable class or actor State with an explicit type and no initial: argument, or a get-only protocol State"
+    case .invalidArguments:
+      "@ObservationState accepts only initial: and observedAs: .snapshots, .values, or .named(\"memberName\")"
+    case .invalidCustomName:
+      "@ObservationState observedAs: .named requires a valid Swift identifier string literal"
+    case .missingObservationIgnored:
+      "@ObservationState properties in an @Observable type require @ObservationIgnored immediately below @ObservationState"
+    case .generatedNameCollision(let name):
+      "@ObservationState cannot generate '\(name)' because that member name is already in use"
+    case .invalidProtocol:
+      "@ObservationProtocol can only be attached to a protocol"
+    case .missingObservationProtocol:
+      "protocol @ObservationState requirements require @ObservationProtocol on the enclosing protocol"
+    }
   }
 
   var diagnosticID: MessageID {
-    MessageID(domain: "VISOR", id: rawValue)
+    let id = switch self {
+    case .invalidDeclaration: "invalidDeclaration"
+    case .invalidArguments: "invalidArguments"
+    case .invalidCustomName: "invalidCustomName"
+    case .missingObservationIgnored: "missingObservationIgnored"
+    case .generatedNameCollision: "generatedNameCollision"
+    case .invalidProtocol: "invalidProtocol"
+    case .missingObservationProtocol: "missingObservationProtocol"
+    }
+    return MessageID(domain: "VISOR", id: id)
   }
 
   var severity: DiagnosticSeverity { .error }

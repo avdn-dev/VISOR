@@ -7,13 +7,16 @@ struct ProtocolPropertyInfo {
   let name: String
   let type: String
   let defaultValueExpression: String?
-  let isObservationState: Bool
-  let sourceObservationState: ProtocolSourceObservationStateInfo?
+  let observationState: ProtocolObservationStateInfo?
 }
 
-struct ProtocolSourceObservationStateInfo {
-  let valueType: String
-  let initialValueExpression: String
+struct ProtocolObservationStateInfo {
+  let initialValueExpression: String?
+  let sequenceNaming: ObservationStateSequenceNaming
+
+  func sequenceName(for propertyName: String) -> String {
+    sequenceNaming.memberName(for: propertyName)
+  }
 }
 
 struct ParameterInfo {
@@ -157,31 +160,27 @@ struct ProtocolAnalysis {
           continue
         }
         
-        let defaultValueExpression = extractAttributeExpression(
-          named: AttributeName.defaultValue,
-          in: varDecl.attributes)
         let observationStateAttribute = varDecl.attributes.visorAttribute(
           named: AttributeName.observationState)
-        let sourceObservationState: ProtocolSourceObservationStateInfo? =
+        let observationState: ProtocolObservationStateInfo? =
           observationStateAttribute.flatMap { attribute in
-            guard
-              let initialValueExpression = extractAttributeExpression(
-                from: attribute),
-              let valueType = observationSourceValueType(from: typeAnnotation.type)
-            else {
+            guard case .success(let arguments) = ObservationStateArguments.parse(from: attribute) else {
               return nil
             }
-            return ProtocolSourceObservationStateInfo(
-              valueType: typeAliasHandler.protocolQualifiedTypeName(for: valueType),
-              initialValueExpression: initialValueExpression)
+            return ProtocolObservationStateInfo(
+              initialValueExpression: arguments.initialValueExpression,
+              sequenceNaming: arguments.sequenceNaming)
           }
+        let defaultValueExpression = observationState?.initialValueExpression
+          ?? extractAttributeExpression(
+            named: AttributeName.defaultValue,
+            in: varDecl.attributes)
         
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
           type: typeAliasHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
           defaultValueExpression: defaultValueExpression,
-          isObservationState: observationStateAttribute != nil && sourceObservationState == nil,
-          sourceObservationState: sourceObservationState))
+          observationState: observationState))
         continue
       }
       
@@ -337,31 +336,6 @@ private func extractAttributeExpression(from attribute: AttributeSyntax) -> Stri
     return nil
   }
   return firstArgument.expression.trimmedDescription
-}
-
-private func observationSourceValueType(from type: TypeSyntax) -> TypeSyntax? {
-  let arguments: GenericArgumentListSyntax?
-  if let identifier = type.as(IdentifierTypeSyntax.self),
-     identifier.name.text == "ObservationSource"
-  {
-    arguments = identifier.genericArgumentClause?.arguments
-  } else if let member = type.as(MemberTypeSyntax.self),
-            member.name.text == "ObservationSource"
-  {
-    arguments = member.genericArgumentClause?.arguments
-  } else {
-    return nil
-  }
-
-  guard
-    let arguments,
-    arguments.count == 1,
-    let argument = arguments.first
-  else {
-    return nil
-  }
-  guard case .type(let valueType) = argument.argument else { return nil }
-  return valueType
 }
 
 // MARK: - Typealias Handling

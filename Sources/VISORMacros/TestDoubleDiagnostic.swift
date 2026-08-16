@@ -19,6 +19,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
   case sendableTraitRequired(macroName: String)
   case unsupportedRequirement(kind: String, macroName: String)
   case unknownTypeDefaults(macroName: String)
+  case observationStateBaselineRequired(propertyName: String, type: String, macroName: String)
   case implementationNameCollision(methodName: String, preferredName: String, generatedName: String, macroName: String)
   case generatedMemberNameCollision(role: String, preferredName: String, generatedName: String, macroName: String)
   case duplicateTrait(trait: String, macroName: String)
@@ -47,6 +48,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       "@\(macroName) does not support \(kind) requirements"
     case .unknownTypeDefaults(let macroName):
       "@\(macroName): Custom types without known defaults use implicitly unwrapped optionals for properties and fatalError for methods. Use @DefaultValue for properties or @DefaultReturn for method returns."
+    case .observationStateBaselineRequired(let propertyName, let type, let macroName):
+      "@\(macroName) cannot generate observation State '\(propertyName)' because '\(type)' has no inferred baseline; supply @ObservationState(initial:) or @DefaultValue"
     case .implementationNameCollision(let methodName, let preferredName, let generatedName, let macroName):
       "@\(macroName): '\(preferredName)' collides with an existing protocol member; using '\(generatedName)' for the generated implementation closure for '\(methodName)()'."
     case .generatedMemberNameCollision(let role, let preferredName, let generatedName, let macroName):
@@ -82,6 +85,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       MessageID(domain: "VISOR", id: "unsupportedTestDoubleRequirement")
     case .unknownTypeDefaults:
       MessageID(domain: "VISOR", id: "unknownTypeDefaults")
+    case .observationStateBaselineRequired:
+      MessageID(domain: "VISOR", id: "observationStateBaselineRequired")
     case .implementationNameCollision:
       MessageID(domain: "VISOR", id: "implementationNameCollision")
     case .generatedMemberNameCollision:
@@ -100,7 +105,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
     case .notAProtocol, .associatedTypesNotSupported, .subscriptsNotSupported,
          .staticRequirementsNotSupported, .initialiserRequirementsNotSupported,
          .inheritedProtocolNotSupported, .sendableTraitRequired, .unsupportedRequirement,
-         .duplicateTrait, .unsupportedTrait, .sendableSpyUnconstrainedGenericValues:
+         .duplicateTrait, .unsupportedTrait, .sendableSpyUnconstrainedGenericValues,
+         .observationStateBaselineRequired:
       .error
     case .unknownTypeDefaults:
       .note

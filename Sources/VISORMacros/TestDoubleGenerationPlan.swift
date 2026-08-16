@@ -12,7 +12,12 @@ struct TestDoubleStoredPropertyPlan {
   let storageDefaultExpression: String
   let ordinaryInitialiser: String?
   let isObservationIgnored: Bool
-  let isObservationState: Bool
+  let observationState: ProtocolObservationStateInfo?
+  let observationChannelName: String?
+
+  var isObservationState: Bool {
+    observationState != nil
+  }
 
   init(
     name: String,
@@ -21,7 +26,8 @@ struct TestDoubleStoredPropertyPlan {
     storageDefaultExpression: String,
     ordinaryInitialiser: String?,
     isObservationIgnored: Bool,
-    isObservationState: Bool = false)
+    observationState: ProtocolObservationStateInfo? = nil,
+    observationChannelName: String? = nil)
   {
     self.name = name
     self.exposedType = exposedType
@@ -29,17 +35,9 @@ struct TestDoubleStoredPropertyPlan {
     self.storageDefaultExpression = storageDefaultExpression
     self.ordinaryInitialiser = ordinaryInitialiser
     self.isObservationIgnored = isObservationIgnored
-    self.isObservationState = isObservationState
+    self.observationState = observationState
+    self.observationChannelName = observationChannelName
   }
-}
-
-struct TestDoubleSourceObservationStatePlan {
-  let name: String
-  let sourceType: String
-  let valueType: String
-  let initialValueExpression: String
-  let channelName: String
-  let publisherName: String
 }
 
 // MARK: - TestDoubleRecordedParameterPlan
@@ -125,7 +123,6 @@ struct TestDoubleGenerationPlan {
   let isSendable: Bool
   let names: TestDoubleNamePlan
   let protocolProperties: [TestDoubleStoredPropertyPlan]
-  let sourceObservationStates: [TestDoubleSourceObservationStatePlan]
   let methods: [TestDoubleMethodGenerationPlan]
   let callLogProperty: TestDoubleStoredPropertyPlan?
 
@@ -143,30 +140,11 @@ struct TestDoubleGenerationPlan {
     self.access = access
     self.isSendable = isSendable
     self.names = names
-    let observationSourceNames = Set(analysis.properties.compactMap { property in
-      property.isObservationState ? "\(property.name)Source" : nil
-    })
-    protocolProperties = analysis.properties
-      .filter {
-        !observationSourceNames.contains($0.name)
-          && $0.sourceObservationState == nil
-      }
-      .map {
-      Self.protocolProperty($0, isSendable: isSendable)
-      }
-    let sourceProperties = analysis.properties.filter {
-      $0.sourceObservationState != nil
-    }
-    sourceObservationStates = zip(sourceProperties, names.sourceObservationStates).compactMap {
-      property, sourceNames in
-      guard let source = property.sourceObservationState else { return nil }
-      return TestDoubleSourceObservationStatePlan(
-        name: property.name,
-        sourceType: property.type,
-        valueType: source.valueType,
-        initialValueExpression: source.initialValueExpression,
-        channelName: sourceNames.channel,
-        publisherName: sourceNames.publisher)
+    protocolProperties = analysis.properties.map { property in
+      Self.protocolProperty(
+        property,
+        observationChannelName: names.observationStateChannels[property.name],
+        isSendable: isSendable)
     }
     methods = zip(analysis.methods, names.methods).map { method, methodNames in
       Self.methodPlan(
@@ -274,6 +252,7 @@ struct TestDoubleGenerationPlan {
 
   private static func protocolProperty(
     _ property: ProtocolPropertyInfo,
+    observationChannelName: String?,
     isSendable: Bool)
     -> TestDoubleStoredPropertyPlan
   {
@@ -285,7 +264,8 @@ struct TestDoubleGenerationPlan {
         storageDefaultExpression: customDefault,
         ordinaryInitialiser: customDefault,
         isObservationIgnored: isSendable && isFunctionType(property.type),
-        isObservationState: property.isObservationState)
+        observationState: property.observationState,
+        observationChannelName: observationChannelName)
     }
 
     if let knownDefault = defaultValue(for: property.type) {
@@ -296,7 +276,8 @@ struct TestDoubleGenerationPlan {
         storageDefaultExpression: knownDefault,
         ordinaryInitialiser: knownDefault,
         isObservationIgnored: isSendable && isFunctionType(property.type),
-        isObservationState: property.isObservationState)
+        observationState: property.observationState,
+        observationChannelName: observationChannelName)
     }
 
     return TestDoubleStoredPropertyPlan(
@@ -306,7 +287,8 @@ struct TestDoubleGenerationPlan {
       storageDefaultExpression: "nil",
       ordinaryInitialiser: "nil",
       isObservationIgnored: isSendable && isFunctionType(property.type),
-      isObservationState: property.isObservationState)
+      observationState: property.observationState,
+      observationChannelName: observationChannelName)
   }
 
   private static func returnProperty(

@@ -12,9 +12,6 @@
 struct SendableTestDoubleRenderer {
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
     var members = storageMembers(plan)
-    members.append(contentsOf: plan.sourceObservationStates.flatMap {
-      sourceObservationStateMembers($0, access: plan.access)
-    })
     members.append(contentsOf: plan.protocolProperties.flatMap {
       observationStateChannelMembers($0, access: plan.access)
     })
@@ -31,28 +28,9 @@ struct SendableTestDoubleRenderer {
     return members
   }
 
-  private func sourceObservationStateMembers(
-    _ state: TestDoubleSourceObservationStatePlan,
-    access: String)
-    -> [String]
-  {
-    let prefix = access.isEmpty ? "" : "\(access) "
-    return [
-      "  @ObservationIgnored",
-      "  private let \(state.channelName) = "
-        + "VISORObservation.ObservationChannel<\(state.valueType)>(\(state.initialValueExpression))",
-      "  \(prefix)var \(state.name): \(state.sourceType) {",
-      "    \(state.channelName).source",
-      "  }",
-      "  \(prefix)func \(state.publisherName)(_ snapshot: sending \(state.valueType)) {",
-      "    \(state.channelName).publish(snapshot)",
-      "  }",
-    ]
-  }
-
   private func storageMembers(_ plan: TestDoubleGenerationPlan) -> [String] {
     var members = ["  private struct \(plan.storageTypeName): Sendable {"]
-    members.append(contentsOf: plan.allStoredProperties.map {
+    members.append(contentsOf: plan.allStoredProperties.filter { !$0.isObservationState }.map {
       "    var \($0.name): \($0.storageType) = \($0.storageDefaultExpression)"
     })
     members.append("  }")
@@ -69,23 +47,35 @@ struct SendableTestDoubleRenderer {
     -> [String]
   {
     let prefix = access.isEmpty ? "" : "\(access) "
+    let observationChannelName = property.observationChannelName
+      ?? "_\(property.name)ObservationChannel"
     var lines = ["  \(prefix)var \(property.name): \(property.exposedType) {"]
     lines.append("    get {")
     if !property.isObservationIgnored {
       lines.append("      access(keyPath: \\.\(property.name))")
     }
-    lines.append("      return \(storageName).withValue { $0.\(property.name) }")
+    if property.isObservationState {
+      lines.append(
+        "      return \(observationChannelName).source.currentSnapshot()")
+    } else {
+      lines.append("      return \(storageName).withValue { $0.\(property.name) }")
+    }
     lines.append("    }")
     lines.append("    set {")
-    if property.isObservationIgnored {
+    if property.isObservationState {
+      if property.isObservationIgnored {
+        lines.append("      \(observationChannelName).publish(newValue)")
+      } else {
+        lines.append("      withMutation(keyPath: \\.\(property.name)) {")
+        lines.append("        \(observationChannelName).publish(newValue)")
+        lines.append("      }")
+      }
+    } else if property.isObservationIgnored {
       lines.append(contentsOf: storageMutationMembers(property, storageName: storageName, indent: "      "))
     } else {
       lines.append("      withMutation(keyPath: \\.\(property.name)) {")
       lines.append(contentsOf: storageMutationMembers(property, storageName: storageName, indent: "        "))
       lines.append("      }")
-    }
-    if property.isObservationState {
-      lines.append("      _\(property.name)ObservationChannel.publish(newValue)")
     }
     lines.append("    }")
     lines.append("  }")
@@ -97,15 +87,20 @@ struct SendableTestDoubleRenderer {
     access: String)
     -> [String]
   {
-    guard property.isObservationState else { return [] }
+    guard let observationState = property.observationState,
+          let channelName = property.observationChannelName
+    else {
+      return []
+    }
     let prefix = access.isEmpty ? "" : "\(access) "
+    let sequenceName = observationState.sequenceName(for: property.name)
     return [
       "  @ObservationIgnored",
-      "  private let _\(property.name)ObservationChannel = "
+      "  private let \(channelName) = "
         + "VISORObservation.ObservationChannel<\(property.exposedType)>(\(property.storageDefaultExpression))",
-      "  \(prefix)var \(property.name)Source: "
+      "  \(prefix)var \(sequenceName): "
         + "VISORObservation.ObservationSource<\(property.exposedType)> {",
-      "    _\(property.name)ObservationChannel.source",
+      "    \(channelName).source",
       "  }",
     ]
   }

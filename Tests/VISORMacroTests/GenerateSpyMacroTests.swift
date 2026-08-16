@@ -16,6 +16,7 @@ private let testMacros: [String: Macro.Type] = [
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
   "ObservationState": ObservationStateMacro.self,
+  "ObservationProtocol": ObservationProtocolMacro.self,
 ]
 
 // MARK: - GenerateSpyMacroTests
@@ -26,32 +27,75 @@ struct GenerateSpyMacroTests {
   // MARK: - Spy Generation
 
   @Test
-  func `Generates a source-first Observation State control`() {
+  func `Generates setter-backed Observation State`() {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateSpy
+      @ObservationProtocol
       protocol PlaybackService {
-        @ObservationState(initial: PlaybackSnapshot.stopped)
-        var playback: ObservationSource<PlaybackSnapshot> { get }
+        @ObservationState(initial: PlaybackSnapshot.stopped, observedAs: .values)
+        var playback: PlaybackSnapshot { get }
       }
       """,
       expandedSource: """
       protocol PlaybackService {
-        var playback: ObservationSource<PlaybackSnapshot> { get }
+        var playback: PlaybackSnapshot { get }
+
+          nonisolated var playbackValues: VISORObservation.ObservationSource<PlaybackSnapshot> {
+              get
+          }
       }
 
       @Observable
       final class SpyPlaybackService: PlaybackService {
         @ObservationIgnored
-        private let _playbackObservationChannel = VISORObservation.ObservationChannel<PlaybackSnapshot>(PlaybackSnapshot.stopped)
-        var playback: ObservationSource<PlaybackSnapshot> {
+        nonisolated private let _playbackObservationChannel = VISORObservation.ObservationChannel<PlaybackSnapshot>(PlaybackSnapshot.stopped)
+        nonisolated var playbackValues: VISORObservation.ObservationSource<PlaybackSnapshot> {
           _playbackObservationChannel.source
         }
-        func publishPlayback(_ snapshot: sending PlaybackSnapshot) {
-          _playbackObservationChannel.publish(snapshot)
+        var playback: PlaybackSnapshot {
+          get {
+            access(keyPath: \\.playback)
+            return _playbackObservationChannel.source.currentSnapshot()
+          }
+          set {
+            withMutation(keyPath: \\.playback) {
+              _playbackObservationChannel.publish(newValue)
+            }
+          }
         }
       }
       """,
+      macros: testMacros)
+  }
+
+  @Test
+  func `Observation State with a custom type requires a double baseline`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      @ObservationProtocol
+      protocol PlaybackService {
+        @ObservationState
+        var playback: PlaybackSnapshot { get }
+      }
+      """,
+      expandedSource: """
+      protocol PlaybackService {
+        var playback: PlaybackSnapshot { get }
+
+          nonisolated var playbackSnapshots: VISORObservation.ObservationSource<PlaybackSnapshot> {
+              get
+          }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message:
+            "@GenerateSpy cannot generate observation State 'playback' because 'PlaybackSnapshot' has no inferred baseline; supply @ObservationState(initial:) or @DefaultValue",
+          line: 1,
+          column: 1),
+      ],
       macros: testMacros)
   }
 

@@ -15,7 +15,6 @@ enum TestDoubleGeneratedNameRole: String {
   case storage = "synchronised-storage member"
   case storageType = "synchronised-storage type"
   case observationChannel = "observation-State channel"
-  case observationPublisher = "observation-State publisher"
 }
 
 struct TestDoubleGeneratedNameRename {
@@ -36,18 +35,13 @@ struct TestDoubleMethodNamePlan {
   let callCase: String?
 }
 
-struct TestDoubleSourceObservationStateNamePlan {
-  let channel: String
-  let publisher: String
-}
-
 struct TestDoubleNamePlan {
   let methods: [TestDoubleMethodNamePlan]
   let callType: String?
   let callLog: String?
   let storageType: String?
   let storage: String?
-  let sourceObservationStates: [TestDoubleSourceObservationStateNamePlan]
+  let observationStateChannels: [String: String]
   let renames: [TestDoubleGeneratedNameRename]
 
   init(
@@ -56,30 +50,29 @@ struct TestDoubleNamePlan {
     isSendable: Bool)
   {
     let methodPrefixes = uniqueMethodPrefixes(for: analysis.methods)
+    let observationSequenceNames = analysis.properties.compactMap { property in
+      property.observationState?.sequenceName(for: property.name)
+    }
     var memberAllocator = GeneratedNameAllocator(reserving:
-      analysis.properties.map(\.name) + analysis.methods.map(\.name))
+      analysis.properties.map(\.name)
+        + analysis.methods.map(\.name)
+        + observationSequenceNames)
     var typeAllocator = GeneratedNameAllocator(reserving: analysis.typeAliasNames)
     var renames: [TestDoubleGeneratedNameRename] = []
 
-    sourceObservationStates = analysis.properties.compactMap { property in
-      guard property.sourceObservationState != nil else { return nil }
+    observationStateChannels = Dictionary(uniqueKeysWithValues: analysis.properties.compactMap { property in
+      guard property.observationState != nil else { return nil }
       let capitalisedName = property.name.capitalisedFirst
-      return TestDoubleSourceObservationStateNamePlan(
-        channel: Self.allocate(
+      return (
+        property.name,
+        Self.allocate(
           preferred: "_\(property.name)ObservationChannel",
           fallback: "_generated\(capitalisedName)ObservationChannel",
           role: .observationChannel,
           methodName: nil,
           allocator: &memberAllocator,
-          renames: &renames),
-        publisher: Self.allocate(
-          preferred: "publish\(capitalisedName)",
-          fallback: "publishGenerated\(capitalisedName)",
-          role: .observationPublisher,
-          methodName: nil,
-          allocator: &memberAllocator,
           renames: &renames))
-    }
+    })
 
     if isSendable {
       storageType = Self.allocate(

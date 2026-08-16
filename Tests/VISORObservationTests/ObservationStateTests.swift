@@ -1,6 +1,7 @@
 import Observation
 import Testing
 @testable import VISORObservation
+import os
 
 private struct ObservationStateSnapshot: Equatable, Sendable {
   var count = 0
@@ -20,30 +21,35 @@ private final class ObservationStateProducer {
   }
 }
 
-private final class SourceFirstObservationStateProducer {
-  @ObservationState(initial: ObservationStateSnapshot())
-  var snapshot: ObservationSource<ObservationStateSnapshot>
+private enum ObservationStateInitialiserProbe {
+  static let count = OSAllocatedUnfairLock(initialState: 0)
 
-  func update(count: Int, label: String) {
-    publishSnapshot(ObservationStateSnapshot(count: count, label: label))
+  static func makeSnapshot() -> ObservationStateSnapshot {
+    count.withLock { $0 += 1 }
+    return ObservationStateSnapshot()
   }
 }
 
-private actor SourceFirstActorObservationStateProducer {
-  @ObservationState(initial: ObservationStateSnapshot())
-  nonisolated var snapshot: ObservationSource<ObservationStateSnapshot>
+private final class ExactlyOnceObservationStateProducer {
+  @ObservationState
+  var snapshot: ObservationStateSnapshot = ObservationStateInitialiserProbe.makeSnapshot()
+}
 
-  func update(count: Int) {
-    publishSnapshot(ObservationStateSnapshot(count: count, label: "actor"))
+private final class ReinitialisedObservationStateProducer {
+  @ObservationState
+  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
+
+  init(snapshot: ObservationStateSnapshot) {
+    self.snapshot = snapshot
   }
 }
 
-private final class ContextualInitialValueProducer {
-  @ObservationState(initial: Int?.none)
-  var optional: ObservationSource<Int?>
+private final class AttributeInitialValueProducer {
+  @ObservationState(observedAs: .values)
+  private(set) var optional: Int? = nil
 
-  @ObservationState(initial: [Int]())
-  var values: ObservationSource<[Int]>
+  @ObservationState
+  private(set) var items: [Int] = []
 }
 
 @MainActor
@@ -68,11 +74,9 @@ private final class SnapshotConsumer {
 
 private actor ActorObservationStateProducer {
   @ObservationState
-  nonisolated private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
-
-  init(snapshot: ObservationStateSnapshot) {
-    self.snapshot = snapshot
-  }
+  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot(
+    count: 1,
+    label: "actor")
 
   func update(count: Int) {
     snapshot.count = count
@@ -91,65 +95,50 @@ private final class ObservableObservationStateProducer {
   }
 }
 
-@MainActor
-@Observable
-private final class SourceFirstObservableObservationStateProducer {
-  @ObservationState(initial: ObservationStateSnapshot())
-  @ObservationIgnored
-  var snapshot: ObservationSource<ObservationStateSnapshot>
-
-  func update(count: Int) {
-    publishSnapshot(ObservationStateSnapshot(count: count))
-  }
-}
-
 @Suite("Producer observation state")
 struct ObservationStateTests {
   @Test
-  func `A source-first producer exposes only its read-only State`() async {
-    let producer = SourceFirstObservationStateProducer()
-    let source = producer.snapshot
-    let snapshots = source.makeAsyncIterator()
+  func `Assignment updates State and publishes a snapshot`() async {
+    let producer = ObservationStateProducer()
+    let snapshots = producer.snapshotSnapshots.makeAsyncIterator()
 
     #expect(await snapshots.next() == ObservationStateSnapshot())
 
     producer.update(count: 2, label: "updated")
 
     #expect(await snapshots.next() == ObservationStateSnapshot(count: 2, label: "updated"))
-    #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 2, label: "updated"))
-    #expect(source._visorIdentity == producer.snapshot._visorIdentity)
+    #expect(producer.snapshot == ObservationStateSnapshot(count: 2, label: "updated"))
   }
 
   @Test
-  func `A source-first actor exposes State without an isolation hop`() async {
-    let producer = SourceFirstActorObservationStateProducer()
-    let source = producer.snapshot
+  func `An authored initial value is evaluated exactly once`() {
+    ObservationStateInitialiserProbe.count.withLock { $0 = 0 }
 
-    #expect(source.currentSnapshot() == ObservationStateSnapshot())
+    let producer = ExactlyOnceObservationStateProducer()
 
-    await producer.update(count: 5)
-
-    #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 5, label: "actor"))
+    #expect(ObservationStateInitialiserProbe.count.withLock { $0 } == 1)
+    #expect(producer.snapshotSnapshots.currentSnapshot() == producer.snapshot)
   }
 
   @Test
-  func `Typed optional and collection initial values establish their baselines`() {
-    let producer = ContextualInitialValueProducer()
+  func `An enclosing initialiser can replace a declaration default`() {
+    let initial = ObservationStateSnapshot(count: 7, label: "initialised")
 
-    #expect(producer.optional.currentSnapshot() == nil)
-    #expect(producer.values.currentSnapshot().isEmpty)
+    let producer = ReinitialisedObservationStateProducer(snapshot: initial)
+
+    #expect(producer.snapshot == initial)
+    #expect(producer.snapshotSnapshots.currentSnapshot() == initial)
   }
 
   @Test
-  func `The generated source has stable identity and the latest snapshot`() {
+  func `The generated sequence has stable identity and the latest snapshot`() {
     let producer = ObservationStateProducer()
-    let source = producer.snapshotSource
+    let source = producer.snapshotSnapshots
 
     producer.update(count: 2, label: "updated")
 
-    #expect(producer.snapshot == ObservationStateSnapshot(count: 2, label: "updated"))
     #expect(source.currentSnapshot() == producer.snapshot)
-    #expect(source._visorIdentity == producer.snapshotSource._visorIdentity)
+    #expect(source._visorIdentity == producer.snapshotSnapshots._visorIdentity)
   }
 
   @Test
@@ -158,38 +147,46 @@ struct ObservationStateTests {
 
     producer.increment()
 
-    #expect(producer.snapshotSource.currentSnapshot().count == 1)
+    #expect(producer.snapshotSnapshots.currentSnapshot().count == 1)
   }
 
   @Test
-  func `An actor can expose its generated source without isolation hops`() async {
-    let producer = ActorObservationStateProducer(
-      snapshot: ObservationStateSnapshot(count: 1, label: "actor"))
-    let source = producer.snapshotSource
+  func `Attribute initial values establish typed baselines`() {
+    let producer = AttributeInitialValueProducer()
 
-    #expect(source.currentSnapshot().count == 1)
+    #expect(producer.optional == nil)
+    #expect(producer.optionalValues.currentSnapshot() == nil)
+    #expect(producer.items.isEmpty)
+    #expect(producer.itemsSnapshots.currentSnapshot().isEmpty)
+  }
+
+  @Test
+  func `An actor can expose snapshots without an isolation hop`() async {
+    let producer = ActorObservationStateProducer()
+    let snapshots = producer.snapshotSnapshots
+
+    #expect(snapshots.currentSnapshot().count == 1)
     await producer.update(count: 5)
 
-    #expect(source.currentSnapshot().count == 5)
+    #expect(snapshots.currentSnapshot().count == 5)
   }
 
   @Test @MainActor
-  func `Observation State composes with Observable`() {
+  func `Observation State participates in Apple Observation`() async {
     let producer = ObservableObservationStateProducer()
 
-    producer.update(count: 3)
+    await confirmation { changed in
+      withObservationTracking {
+        _ = producer.snapshot
+      } onChange: {
+        changed()
+      }
+
+      producer.update(count: 3)
+    }
 
     #expect(producer.snapshot.count == 3)
-    #expect(producer.snapshotSource.currentSnapshot().count == 3)
-  }
-
-  @Test @MainActor
-  func `Source-first Observation State composes with explicit Observation exclusion`() {
-    let producer = SourceFirstObservableObservationStateProducer()
-
-    producer.update(count: 4)
-
-    #expect(producer.snapshot.currentSnapshot().count == 4)
+    #expect(producer.snapshotSnapshots.currentSnapshot().count == 3)
   }
 
   @Test
@@ -197,18 +194,6 @@ struct ObservationStateTests {
     let source = ObservationSource.constant(ObservationStateSnapshot(count: 4, label: "constant"))
 
     #expect(source.currentSnapshot() == ObservationStateSnapshot(count: 4, label: "constant"))
-  }
-
-  @Test
-  func `A generated snapshot stream emits its baseline and later publications`() async {
-    let producer = ObservationStateProducer()
-    let snapshots = producer.snapshotSource.makeAsyncIterator()
-
-    #expect(await snapshots.next() == ObservationStateSnapshot())
-
-    producer.update(count: 1, label: "published")
-
-    #expect(await snapshots.next() == ObservationStateSnapshot(count: 1, label: "published"))
   }
 
   @Test
