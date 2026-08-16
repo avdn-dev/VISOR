@@ -85,7 +85,7 @@ extension AttributeListSyntax {
       let name = attribute.attributeName.trimmedDescription
         .split(separator: ".")
         .last
-      if ["ObservationIgnored", "Bound", "Polled"].contains(name) {
+      if ["ObservationIgnored", "Bound"].contains(name) {
         return false
       }
       if allowingGeneratedAttribute && name == "_ViewModelStateField" {

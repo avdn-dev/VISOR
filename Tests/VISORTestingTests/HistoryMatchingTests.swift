@@ -59,7 +59,7 @@ struct HistoryMatchingTests {
       }
     ) { test in
       await test.perform {
-        sut.state.anyValue = TestingReference(value: 1)
+        sut.state.anyValue = TestingReference()
       }
       test.expect(
         \.anyValue,
@@ -81,7 +81,7 @@ struct HistoryMatchingTests {
   @MainActor
   func `Any-held reference baseline is rejected without evaluating the predicate`() async throws {
     let sut = TestingViewModel()
-    sut.state.anyValue = TestingReference(value: 1)
+    sut.state.anyValue = TestingReference()
     var issues: [(message: String, location: SourceLocation)] = []
     var predicateEvaluations = 0
     let expectationLocation = SourceLocation(
@@ -118,7 +118,7 @@ struct HistoryMatchingTests {
   @MainActor
   func `Optional and container reference histories remain caller-stable values`() async throws {
     let sut = TestingViewModel()
-    let stableReference = TestingReference(value: 2)
+    let stableReference = TestingReference()
 
     try await observe(sut) { test in
       await test.perform {

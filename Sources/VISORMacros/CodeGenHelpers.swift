@@ -330,15 +330,6 @@ func isNonEscapingFunctionType(_ typeString: String) -> Bool {
   isFunctionType(typeString) && !isEscapingFunctionType(typeString)
 }
 
-/// Returns the type spelling to use for a generated initialiser parameter.
-/// Stored closure dependencies need `@escaping` because the generated body
-/// assigns the parameter into `self`.
-func initParameterType(for type: TypeSyntax) -> String {
-  let typeString = type.trimmedDescription
-  guard type.isTopLevelFunctionType else { return typeString }
-  return typeString.addingEscapingToTopLevelFunctionType()
-}
-
 func spyStorageType(for param: ParameterInfo, method: ProtocolMethodInfo) -> String? {
   let strippedType = stripEscaping(from: stripInout(from: param.type))
   guard !isNonEscapingFunctionType(param.type) else { return nil }
@@ -403,13 +394,6 @@ extension String {
     return first.uppercased() + dropFirst()
   }
 
-  var lowercasedFirst: String {
-    guard !isEmpty else { return self }
-    var result = self
-    result.replaceSubrange(startIndex...startIndex, with: self[startIndex].lowercased())
-    return result
-  }
-
   var trimmingWhitespace: String {
     let start = firstIndex(where: { !$0.isWhitespace }) ?? startIndex
     let end = lastIndex(where: { !$0.isWhitespace }).map(index(after:)) ?? endIndex
@@ -450,34 +434,11 @@ extension String {
     }
     return nil
   }
-
-  func addingEscapingToTopLevelFunctionType() -> String {
-    contains("@escaping") ? self : "@escaping \(self)"
-  }
 }
 
 private extension Character {
   var isIdentifierCharacter: Bool {
     isLetter || isNumber || self == "_"
-  }
-}
-
-private extension TypeSyntax {
-  var isTopLevelFunctionType: Bool {
-    if self.is(FunctionTypeSyntax.self) { return true }
-
-    if let attributedType = self.as(AttributedTypeSyntax.self) {
-      return attributedType.baseType.isTopLevelFunctionType
-    }
-
-    if let tupleType = self.as(TupleTypeSyntax.self),
-       tupleType.elements.count == 1,
-       let element = tupleType.elements.first
-    {
-      return element.type.isTopLevelFunctionType
-    }
-
-    return false
   }
 }
 

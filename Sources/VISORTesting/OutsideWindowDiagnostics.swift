@@ -1,5 +1,3 @@
-import VISOR
-
 package struct _OutsideWindowMutationForProof: Equatable {
   package enum Relation: Equatable {
     case beforeFirstAction

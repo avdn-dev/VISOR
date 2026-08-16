@@ -6,7 +6,6 @@ import SwiftParser
 struct ProtocolPropertyInfo {
   let name: String
   let type: String
-  let hasSetter: Bool
   let defaultValueExpression: String?
   let isObservationState: Bool
   let sourceObservationState: ProtocolSourceObservationStateInfo?
@@ -158,15 +157,6 @@ struct ProtocolAnalysis {
           continue
         }
         
-        let hasSetter: Bool
-        if let accessorBlock = binding.accessorBlock,
-           case .accessors(let accessors) = accessorBlock.accessors
-        {
-          hasSetter = accessors.contains { $0.accessorSpecifier.tokenKind == .keyword(.set) }
-        } else {
-          hasSetter = false
-        }
-        
         let defaultValueExpression = extractAttributeExpression(
           named: AttributeName.defaultValue,
           in: varDecl.attributes)
@@ -189,7 +179,6 @@ struct ProtocolAnalysis {
         properties.append(ProtocolPropertyInfo(
           name: identifier.identifier.text,
           type: typeAliasHandler.protocolQualifiedTypeName(for: typeAnnotation.type),
-          hasSetter: hasSetter,
           defaultValueExpression: defaultValueExpression,
           isObservationState: observationStateAttribute != nil && sourceObservationState == nil,
           sourceObservationState: sourceObservationState))

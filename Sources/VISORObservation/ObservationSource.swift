@@ -90,10 +90,6 @@ nonisolated public struct ObservationSource<Value: Sendable>:
     try core.open()
   }
 
-  package func _visorPrepareOpen() throws -> _PreparedObservation<Value> {
-    try core.prepareOpen()
-  }
-
   package func _visorErase() -> _AnyObservationSource {
     _AnyObservationSource(
       sourceID: core.sourceID,
@@ -339,7 +335,7 @@ nonisolated package struct _AnyPreparedObservation: Sendable {
   }
 
   public func _visorUnwrap<Value: Sendable>(
-    as type: Value.Type = Value.self
+    as _: Value.Type = Value.self
   ) throws -> _PreparedObservation<Value> {
     guard let box = storage as? _PreparedObservationBox<Value> else {
       throw _ObservationSourceFailure.protocolViolation(
@@ -438,7 +434,6 @@ nonisolated package struct _AnyObservationCheckpoint: Sendable {
   public let sourceID: _ObservationSourceID
   public let groupID: _ObservationGroupID
   fileprivate let group: _ObservationGroupCore
-  fileprivate let subscriptionID: UUID
   fileprivate let storage: any _ObservationCheckpointStorage
   private let waitOperation: @Sendable () async throws -> Void
   fileprivate let resumeLockedOperation:
@@ -452,7 +447,6 @@ nonisolated package struct _AnyObservationCheckpoint: Sendable {
     sourceID = checkpoint.envelope.sourceID
     groupID = subscription.core.group.id
     group = subscription.core.group
-    subscriptionID = subscription.id
     storage = _ObservationCheckpointBox(checkpoint: checkpoint)
     waitOperation = {
       try await subscription._visorWaitUntilAcknowledged(checkpoint)
@@ -475,7 +469,7 @@ nonisolated package struct _AnyObservationCheckpoint: Sendable {
   }
 
   public func _visorUnwrap<Value: Sendable>(
-    as type: Value.Type = Value.self
+    as _: Value.Type = Value.self
   ) throws -> _ObservationCheckpoint<Value> {
     guard let box = storage as? _ObservationCheckpointBox<Value> else {
       throw _ObservationSourceFailure.protocolViolation(
@@ -719,7 +713,6 @@ nonisolated package enum _ObservationRuntime {
   }
 
   private struct IndexedCheckpoint: Sendable {
-    let index: Int
     let checkpoint: _AnyObservationCheckpoint
   }
 
@@ -763,14 +756,14 @@ nonisolated package enum _ObservationRuntime {
   ) -> [[IndexedCheckpoint]] {
     var positions: [_ObservationGroupID: Int] = [:]
     var result: [[IndexedCheckpoint]] = []
-    for (index, checkpoint) in checkpoints.enumerated() {
+    for checkpoint in checkpoints {
       if let position = positions[checkpoint.groupID] {
         result[position].append(
-          IndexedCheckpoint(index: index, checkpoint: checkpoint))
+          IndexedCheckpoint(checkpoint: checkpoint))
       } else {
         positions[checkpoint.groupID] = result.count
         result.append([
-          IndexedCheckpoint(index: index, checkpoint: checkpoint),
+          IndexedCheckpoint(checkpoint: checkpoint),
         ])
       }
     }
@@ -900,10 +893,6 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
         baseline: baseline,
         subscription: _ObservationSubscription(id: id, core: self))
     }
-  }
-
-  fileprivate func prepareOpen() throws -> _PreparedObservation<Value> {
-    _PreparedObservation(openObservation: try open())
   }
 
   fileprivate func prepareOpenAssumingGroupLocked() throws

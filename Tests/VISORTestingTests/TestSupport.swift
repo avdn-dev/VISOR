@@ -74,13 +74,7 @@ final class TestingGate {
   }
 }
 
-final class TestingReference {
-  var value: Int
-
-  init(value: Int) {
-    self.value = value
-  }
-}
+final class TestingReference {}
 
 @MainActor
 @Observable
@@ -95,7 +89,7 @@ final class TestingViewModel {
     private(set) var reactedValue = -1
     var count = 0
     var status = "idle"
-    var reference = TestingReference(value: 0)
+    var reference = TestingReference()
     var anyValue: Any = 0
     var optionalReference: TestingReference?
     var referenceContainer: [TestingReference] = []

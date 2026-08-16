@@ -439,7 +439,7 @@ extension _ObservationSession {
     case .callerCancellation:
       operationTask.cancel()
       watchdog.cancel()
-      _ = beginTeardownForDeadlineSupport()
+      beginTeardownForDeadlineSupport()
       if let failure {
         return .failure(failure)
       }
@@ -458,9 +458,7 @@ extension _ObservationSession {
     }
   }
 
-  func awaitTeardownWithinDeadline(
-    _ teardown: Task<Void, Never>
-  ) async -> Bool {
+  func awaitTeardownWithinDeadline() async -> Bool {
     let coordinator: _ObservationTeardownDeadlineCoordinator
     let shouldStartWatchdog: Bool
     if let activeCoordinator = teardownDeadlineCoordinator {

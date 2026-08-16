@@ -90,9 +90,9 @@ struct JournalPolicyTests {
   @MainActor
   func `Overflow immediately releases retained prefix values`() async throws {
     let sut = TestingViewModel()
-    var first: TestingReference? = TestingReference(value: 1)
-    var second: TestingReference? = TestingReference(value: 2)
-    let current = TestingReference(value: 3)
+    var first: TestingReference? = TestingReference()
+    var second: TestingReference? = TestingReference()
+    let current = TestingReference()
     let firstProbe = WeakReference(first)
     let secondProbe = WeakReference(second)
     var infrastructureIssues: [String] = []
@@ -225,9 +225,9 @@ struct JournalPolicyTests {
   @MainActor
   func `Next perform and observe end release retained typed history`() async throws {
     let sut = TestingViewModel()
-    var initial: TestingReference? = TestingReference(value: 1)
-    var committed: TestingReference? = TestingReference(value: 2)
-    let current = TestingReference(value: 3)
+    var initial: TestingReference? = TestingReference()
+    var committed: TestingReference? = TestingReference()
+    let current = TestingReference()
     let initialProbe = WeakReference(initial)
     let committedProbe = WeakReference(committed)
     var endProbe: WeakReference<TestingReference>?
@@ -250,7 +250,7 @@ struct JournalPolicyTests {
         #expect(committedProbe.value == nil)
       }
 
-      var retainedUntilEnd: TestingReference? = TestingReference(value: 4)
+      var retainedUntilEnd: TestingReference? = TestingReference()
       endProbe = WeakReference(retainedUntilEnd)
       await test.perform {
         sut.state.reference = retainedUntilEnd!
@@ -351,9 +351,9 @@ struct JournalPolicyTests {
   @MainActor
   func `Metadata retains no reference payload and teardown clears context`() async throws {
     let sut = TestingViewModel()
-    let current = TestingReference(value: 3)
-    var first: TestingReference? = TestingReference(value: 1)
-    var second: TestingReference? = TestingReference(value: 2)
+    let current = TestingReference()
+    var first: TestingReference? = TestingReference()
+    var second: TestingReference? = TestingReference()
     let firstProbe = WeakReference(first)
     let secondProbe = WeakReference(second)
     var escapedTest: ObservationTest<TestingViewModel>?
@@ -400,7 +400,7 @@ struct JournalPolicyTests {
       await test.perform {
         sut.state.count = 1
         sut.state.status = "overflow"
-        sut.state.reference = TestingReference(value: 3)
+        sut.state.reference = TestingReference()
       }
 
       #expect(test._rawCommitFieldNames.isEmpty)

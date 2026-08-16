@@ -19,9 +19,6 @@ enum VISORDiagnostic: DiagnosticMessage {
   case invalidSourceBoundPlacement
   case invalidSourceReactionDeclaration
   case invalidSourceReactionPlacement
-  case sourceBackedBoundRequiresSource
-  case sourceBackedPolledUnsupported
-  case sourceBackedReactionRequiresSource
   case sourceObservationRequiresPlainState
   case conditionalDeinitialiserUnsupported
 
@@ -65,12 +62,6 @@ enum VISORDiagnostic: DiagnosticMessage {
         "@Reaction(source:) or @Reaction(source:selecting:)"
     case .invalidSourceReactionPlacement:
       "@Reaction(source:) is only supported on a direct @ViewModel member"
-    case .sourceBackedBoundRequiresSource:
-      "@Bound requires the source: form"
-    case .sourceBackedPolledUnsupported:
-      "@Polled is unsupported; use an ObservationSource or an explicit clock-owned activity"
-    case .sourceBackedReactionRequiresSource:
-      "@Reaction requires the source: form"
     case .sourceObservationRequiresPlainState:
       "@ViewModel requires a plain State without @Observable"
     case .conditionalDeinitialiserUnsupported:
@@ -98,9 +89,6 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .invalidSourceBoundPlacement: "invalidSourceBoundPlacement"
     case .invalidSourceReactionDeclaration: "invalidSourceReactionDeclaration"
     case .invalidSourceReactionPlacement: "invalidSourceReactionPlacement"
-    case .sourceBackedBoundRequiresSource: "sourceBackedBoundRequiresSource"
-    case .sourceBackedPolledUnsupported: "sourceBackedPolledUnsupported"
-    case .sourceBackedReactionRequiresSource: "sourceBackedReactionRequiresSource"
     case .sourceObservationRequiresPlainState: "sourceObservationRequiresPlainState"
     case .conditionalDeinitialiserUnsupported: "conditionalDeinitialiserUnsupported"
     }

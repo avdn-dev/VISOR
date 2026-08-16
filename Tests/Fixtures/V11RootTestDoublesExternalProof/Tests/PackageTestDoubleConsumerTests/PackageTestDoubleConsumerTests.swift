@@ -4,7 +4,7 @@ import Testing
 @Suite("Package test-double boundary")
 struct PackageTestDoubleConsumerTests {
   @Test
-  func ordinaryPackagePeerCanBeConstructedAcrossTargets() {
+  func `Ordinary package peer can be constructed across targets`() {
     let stub = StubPackageCatalogueServing()
     stub.countReturnValue = 42
 
@@ -12,7 +12,7 @@ struct PackageTestDoubleConsumerTests {
   }
 
   @Test
-  func sendablePackagePeerCanBeConstructedAcrossTargets() {
+  func `Sendable package peer can be constructed across targets`() {
     let spy = SpyPackageEventRecording()
 
     spy.record(42)

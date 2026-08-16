@@ -365,7 +365,7 @@ struct ObservationSessionReentrancyTests {
   }
 
   @Test(.timeLimit(.minutes(1))) @MainActor
-  func `Standalone handler cannot checkpoint its own lane`() async throws {
+  func `Handler cannot checkpoint its own lane`() async throws {
     let channel = ObservationChannel(0)
     let reference = ReentrantLaneReference<Int>()
     let checkpointReturned = ReentrancySignal()
@@ -391,8 +391,8 @@ struct ObservationSessionReentrancyTests {
         },
       ])
     reference.lane = lane
-    let prepared = try lane._visorPrepare()
-    try await prepared._visorActivate()
+    let session = _ObservationSession(lanes: [lane._visorErase()])
+    try await session._visorStart()
 
     channel.publish(1)
     await checkpointReturned.wait()
@@ -407,11 +407,11 @@ struct ObservationSessionReentrancyTests {
     let finalCheckpoint = try await lane._visorCheckpointAndPause()
     #expect(log.values == [0, 1, 2])
     try lane._visorResume(after: finalCheckpoint)
-    await lane._visorCancelAndJoin()
+    await session._visorStop()
   }
 
   @Test(.timeLimit(.minutes(1))) @MainActor
-  func `Standalone handler requests cancellation without joining itself`() async throws {
+  func `Handler requests lane cancellation without joining itself`() async throws {
     let channel = ObservationChannel(0)
     let reference = ReentrantLaneReference<Int>()
     let requestReturned = ReentrancySignal()
@@ -425,12 +425,12 @@ struct ObservationSessionReentrancyTests {
         },
       ])
     reference.lane = lane
-    let prepared = try lane._visorPrepare()
-    try await prepared._visorActivate()
+    let session = _ObservationSession(lanes: [lane._visorErase()])
+    try await session._visorStart()
 
     channel.publish(1)
     await requestReturned.wait()
-    await lane._visorCancelAndJoin()
+    await session._visorStop()
 
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }

@@ -378,17 +378,4 @@ public final class ObservationTest<SUT: ViewModel> {
     _ = try await session._visorWaitForFailure()
   }
 
-  package func _captureBaselineForProof(
-    sourceLocation: SourceLocation = #_sourceLocation
-  ) {
-    guard let journal, let state else {
-      recordEndedScopeMisuse(sourceLocation: sourceLocation)
-      return
-    }
-    guard journal.begin(
-      state: state,
-      sourceLocation: sourceLocation
-    ) else { return }
-    journal.close()
-  }
 }

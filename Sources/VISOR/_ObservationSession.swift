@@ -160,10 +160,6 @@ package final class _ObservationLane<Value: Sendable> {
       })
   }
 
-  package func _visorPrepare() throws -> _PreparedLane<Value> {
-    try adopt(source._visorPrepareOpen(), sessionID: nil)
-  }
-
   fileprivate func adopt(
     _ observation: _PreparedObservation<Value>,
     sessionID: UUID?
@@ -243,13 +239,6 @@ package final class _ObservationLane<Value: Sendable> {
     }
   }
 
-  fileprivate func apply(
-    _ envelope: _ObservationEnvelope<Value>
-  ) async throws {
-    try await applyProjection(envelope)
-    try await applyInitialReactionsAndAcknowledge(envelope)
-  }
-
   fileprivate func startWorker(
     reportingFailure: @escaping @MainActor @Sendable
       (_ObservationSourceFailure) -> Void = { _ in }
@@ -316,14 +305,6 @@ package final class _ObservationLane<Value: Sendable> {
     worker = nil
     subscription = nil
     lifecycle = .ended
-  }
-
-  fileprivate func cancelPreparation() {
-    guard lifecycle == .prepared
-      || lifecycle == .projected
-      || lifecycle == .initialised
-    else { return }
-    signalCancellation()
   }
 
   package func _visorCheckpointAndPause() async throws
@@ -402,19 +383,8 @@ package final class _PreparedLane<Value: Sendable> {
     self.opened = opened
   }
 
-  package var baseline: Value {
-    observation.baseline.snapshot
-  }
-
   fileprivate var erasedSubscription: _AnyObservationSubscription {
     opened.subscription._visorErase()
-  }
-
-  package func _visorApply(
-    _ checkpoint: _AnyObservationCheckpoint
-  ) async throws {
-    try await _visorApplyProjection(checkpoint)
-    try await _visorApplyInitialReactions()
   }
 
   package func _visorApplyProjection(
@@ -467,31 +437,6 @@ package final class _PreparedLane<Value: Sendable> {
     phase = .active
   }
 
-  /// Compatibility spelling for the earlier single-lane proof.
-  package func _visorActivate() async throws {
-    guard phase == .pending else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "A prepared observation lane can activate once")
-    }
-    do {
-      try await lane.apply(opened.baseline)
-      phase = .initialised
-      try lane.startWorker()
-      phase = .active
-    } catch {
-      phase = .cancelled
-      observation._visorCancel()
-      throw error
-    }
-  }
-
-  package func _visorCancel() {
-    guard phase != .cancelled else { return }
-    phase = .cancelled
-    observation._visorCancel()
-    lane.cancelPreparation()
-  }
-
   fileprivate func signalCancellation() {
     phase = .cancelled
     lane.signalCancellation()
@@ -541,8 +486,6 @@ package final class _AnyObservationLane {
 package final class _AnyPreparedObservationLane {
   private let subscriptionOperation:
     @MainActor () -> _AnyObservationSubscription
-  private let applyOperation:
-    @MainActor (_AnyObservationCheckpoint) async throws -> Void
   private let applyProjectionOperation:
     @MainActor (_AnyObservationCheckpoint) async throws -> Void
   private let applyInitialReactionsOperation:
@@ -555,7 +498,6 @@ package final class _AnyPreparedObservationLane {
 
   fileprivate init<Value: Sendable>(_ lane: _PreparedLane<Value>) {
     subscriptionOperation = { lane.erasedSubscription }
-    applyOperation = { try await lane._visorApply($0) }
     applyProjectionOperation = { try await lane._visorApplyProjection($0) }
     applyInitialReactionsOperation = {
       try await lane._visorApplyInitialReactions()
@@ -569,12 +511,6 @@ package final class _AnyPreparedObservationLane {
 
   fileprivate var subscription: _AnyObservationSubscription {
     subscriptionOperation()
-  }
-
-  fileprivate func apply(
-    _ checkpoint: _AnyObservationCheckpoint
-  ) async throws {
-    try await applyOperation(checkpoint)
   }
 
   fileprivate func applyProjection(
@@ -750,13 +686,13 @@ package final class _ObservationSession {
       return
 
     case .cancelled:
-      let teardown = beginTeardown()
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown()
+      _ = await awaitTeardownWithinDeadline()
       throw CancellationError()
 
     case .failure(let startupFailure):
-      let teardown = beginTeardown(failure: startupFailure)
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown(failure: startupFailure)
+      _ = await awaitTeardownWithinDeadline()
       throw failure ?? startupFailure
     }
   }
@@ -876,12 +812,12 @@ package final class _ObservationSession {
     case .success(let value):
       paused = value
     case .cancelled:
-      let teardown = beginTeardown()
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown()
+      _ = await awaitTeardownWithinDeadline()
       throw CancellationError()
     case .failure(let pauseFailure):
-      let teardown = beginTeardown(failure: pauseFailure)
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown(failure: pauseFailure)
+      _ = await awaitTeardownWithinDeadline()
       throw failure ?? pauseFailure
     }
 
@@ -896,8 +832,8 @@ package final class _ObservationSession {
       return result
     } catch {
       let primary = failure ?? (error as? _ObservationSourceFailure)
-      let teardown = beginTeardown(failure: primary)
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown(failure: primary)
+      _ = await awaitTeardownWithinDeadline()
       throw failure ?? error
     }
   }
@@ -977,8 +913,8 @@ package final class _ObservationSession {
       lifecycle = .ready
     } catch {
       let primary = failure ?? (error as? _ObservationSourceFailure)
-      let teardown = beginTeardown(failure: primary)
-      _ = await awaitTeardownWithinDeadline(teardown)
+      beginTeardown(failure: primary)
+      _ = await awaitTeardownWithinDeadline()
       throw failure ?? error
     }
   }
@@ -1002,19 +938,19 @@ package final class _ObservationSession {
 
   package func _visorStopWithinDeadline() async -> Bool {
     if case .stopped = lifecycle { return true }
-    let teardown = beginTeardown()
+    beginTeardown()
     // Joining here would make a handler wait for the worker or startup task
     // that is currently awaiting that same handler. The request is already
     // visible synchronously through `.stopping`; its owner can join later.
     guard !isExecutingHandler else { return false }
     guard !hasExceededTeardownDeadline else { return false }
-    return await awaitTeardownWithinDeadline(teardown)
+    return await awaitTeardownWithinDeadline()
   }
 
   /// Synchronously makes cancellation visible before an owner awaits joined
   /// teardown. This remains package-only lifecycle machinery.
   package func _visorRequestStop() {
-    _ = beginTeardown()
+    beginTeardown()
   }
 
   private var isExecutingHandler: Bool {
@@ -1028,8 +964,7 @@ package final class _ObservationSession {
     controlPlaneFailed(failure)
   }
 
-  @discardableResult
-  func beginTeardownForDeadlineSupport() -> Task<Void, Never> {
+  func beginTeardownForDeadlineSupport() {
     beginTeardown()
   }
 
@@ -1085,23 +1020,21 @@ package final class _ObservationSession {
     // Latch the cause, revoke the lifecycle and request cancellation before
     // invoking arbitrary owner code. A synchronous re-entrant failure then
     // observes this first cause and cannot replace or report it twice.
-    _ = beginTeardown(failure: failure)
+    beginTeardown(failure: failure)
     onFailure(failure)
   }
 
   private func beginTeardown(
     failure newFailure: _ObservationSourceFailure? = nil
-  ) -> Task<Void, Never> {
+  ) {
     if case .stopped = lifecycle {
-      return Task { @MainActor in }
+      return
     }
     if let newFailure, failure == nil {
       failure = newFailure
       failureLatch.latch(newFailure)
     }
-    if let teardownTask {
-      return teardownTask
-    }
+    if teardownTask != nil { return }
 
     lifecycle = .stopping
     activeControlTask?.cancel()
@@ -1134,7 +1067,6 @@ package final class _ObservationSession {
       }
     }
     teardownTask = teardown
-    return teardown
   }
 
 }

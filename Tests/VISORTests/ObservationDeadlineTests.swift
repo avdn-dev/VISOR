@@ -9,11 +9,6 @@ import VISORObservation
 
 @MainActor
 private final class DeadlineSleeper {
-  struct Arm {
-    let order: Int
-    let duration: Duration
-  }
-
   private struct Pending {
     let id: Int
     let continuation: CheckedContinuation<Void, any Error>
@@ -24,19 +19,19 @@ private final class DeadlineSleeper {
     let continuation: CheckedContinuation<Void, Never>
   }
 
-  private(set) var arms: [Arm] = []
+  private(set) var armCount = 0
   private var pending: [Pending] = []
   private var armWaiters: [ArmWaiter] = []
   private var nextID = 0
 
   deinit {}
 
-  func sleep(for duration: Duration) async throws {
+  func sleep(for _: Duration) async throws {
     let id = nextID
     nextID += 1
-    arms.append(Arm(order: id, duration: duration))
-    let completed = armWaiters.filter { $0.target <= arms.count }
-    armWaiters.removeAll { $0.target <= arms.count }
+    armCount += 1
+    let completed = armWaiters.filter { $0.target <= armCount }
+    armWaiters.removeAll { $0.target <= armCount }
     for waiter in completed {
       waiter.continuation.resume()
     }
@@ -58,7 +53,7 @@ private final class DeadlineSleeper {
   }
 
   func waitUntilArmed(_ target: Int) async {
-    guard arms.count < target else { return }
+    guard armCount < target else { return }
     await withCheckedContinuation { continuation in
       armWaiters.append(ArmWaiter(
         target: target,
@@ -202,9 +197,7 @@ private final class DeadlineTaskCanceller {
 nonisolated private final class ConcurrentDeadlineSleeper: Sendable {
   private struct State: Sendable {
     var pending: CheckedContinuation<Void, any Error>?
-    var isArmed = false
     var isFired = false
-    var armWaiters: [CheckedContinuation<Void, Never>] = []
   }
 
   private let lock = OSAllocatedUnfairLock(initialState: State())
@@ -216,25 +209,20 @@ nonisolated private final class ConcurrentDeadlineSleeper: Sendable {
         (continuation: CheckedContinuation<Void, any Error>) in
         let registration: (
           isCancelled: Bool,
-          isFired: Bool,
-          armWaiters: [CheckedContinuation<Void, Never>]
+          isFired: Bool
         ) =
           lock.withLock { state in
             if Task.isCancelled {
-              return (true, false, [])
+              return (true, false)
             }
-            state.isArmed = true
-            let waiters = state.armWaiters
-            state.armWaiters.removeAll(keepingCapacity: false)
             if state.isFired {
               state.isFired = false
-              return (false, true, waiters)
+              return (false, true)
             }
             precondition(state.pending == nil)
             state.pending = continuation
-            return (false, false, waiters)
+            return (false, false)
           }
-        for waiter in registration.armWaiters { waiter.resume() }
         if registration.isCancelled {
           continuation.resume(throwing: CancellationError())
           return
@@ -248,17 +236,6 @@ nonisolated private final class ConcurrentDeadlineSleeper: Sendable {
         state.pending.take()
       }
       continuation?.resume(throwing: CancellationError())
-    }
-  }
-
-  func waitUntilArmed() async {
-    await withCheckedContinuation { continuation in
-      let isArmed = lock.withLock { state in
-        if state.isArmed { return true }
-        state.armWaiters.append(continuation)
-        return false
-      }
-      if isArmed { continuation.resume() }
     }
   }
 
@@ -282,11 +259,6 @@ nonisolated private final class ArmedWatchdogController: Sendable {
     case cancelled
   }
 
-  private struct ArmWaiter: Sendable {
-    let target: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
-
   private struct Arm: Sendable {
     var isFired = false
     var continuation: CheckedContinuation<Void, any Error>?
@@ -296,7 +268,6 @@ nonisolated private final class ArmedWatchdogController: Sendable {
     var nextID = 0
     var arms: [Int: Arm] = [:]
     var armIDs: [Int] = []
-    var armWaiters: [ArmWaiter] = []
   }
 
   private let lock = OSAllocatedUnfairLock(initialState: State())
@@ -308,22 +279,14 @@ nonisolated private final class ArmedWatchdogController: Sendable {
   func makeWatchdog(
     for _: Duration
   ) -> _ObservationDeadlinePolicy.ArmedWatchdog {
-    let registration: (
-      id: Int,
-      waiters: [CheckedContinuation<Void, Never>]
-    ) = lock.withLock { state in
+    let id = lock.withLock { state in
       let id = state.nextID
       state.nextID += 1
       state.arms[id] = Arm()
       state.armIDs.append(id)
-      let waiters = state.armWaiters
-        .filter { $0.target <= state.armIDs.count }
-        .map(\.continuation)
-      state.armWaiters.removeAll { $0.target <= state.armIDs.count }
-      return (id, waiters)
+      return id
     }
-    for waiter in registration.waiters { waiter.resume() }
-    return { try await self.wait(for: registration.id) }
+    return { try await self.wait(for: id) }
   }
 
   @concurrent
@@ -359,19 +322,6 @@ nonisolated private final class ArmedWatchdogController: Sendable {
         state.arms.removeValue(forKey: id)?.continuation
       }
       continuation?.resume(throwing: CancellationError())
-    }
-  }
-
-  func waitUntilArmed(_ target: Int) async {
-    await withCheckedContinuation { continuation in
-      let isArmed = lock.withLock { state in
-        if state.armIDs.count >= target { return true }
-        state.armWaiters.append(ArmWaiter(
-          target: target,
-          continuation: continuation))
-        return false
-      }
-      if isArmed { continuation.resume() }
     }
   }
 
@@ -803,7 +753,7 @@ struct ObservationDeadlineTests {
     await sleeper.waitUntilArmed(1)
     readinessGate.open()
     _ = try await startup.value
-    let armsBeforeTeardown = sleeper.arms.count
+    let armsBeforeTeardown = sleeper.armCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
@@ -936,7 +886,7 @@ struct ObservationDeadlineTests {
     await sleeper.waitUntilArmed(1)
     readinessGate.open()
     try await startup.value
-    let armsBeforeTeardown = sleeper.arms.count
+    let armsBeforeTeardown = sleeper.armCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
@@ -950,14 +900,14 @@ struct ObservationDeadlineTests {
 
     // Both callers use the one session coordinator: there is one watchdog and
     // one true-join callback, not one observer task per caller.
-    #expect(sleeper.arms.count == armsBeforeTeardown + 1)
+    #expect(sleeper.armCount == armsBeforeTeardown + 1)
     sleeper.fire(armsBeforeTeardown)
     #expect(await firstStop.value == false)
     #expect(await secondStop.value == false)
 
-    let armsAfterDeadline = sleeper.arms.count
+    let armsAfterDeadline = sleeper.armCount
     #expect(await session._visorStopWithinDeadline() == false)
-    #expect(sleeper.arms.count == armsAfterDeadline)
+    #expect(sleeper.armCount == armsAfterDeadline)
     #expect(failures.failures.count == 1)
 
     let stopped = DeadlineSignal()
@@ -997,7 +947,7 @@ struct ObservationDeadlineTests {
     await sleeper.waitUntilArmed(1)
     readinessGate.open()
     try await startup.value
-    let armsBeforeTeardown = sleeper.arms.count
+    let armsBeforeTeardown = sleeper.armCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
@@ -1014,7 +964,7 @@ struct ObservationDeadlineTests {
       stops[index].cancel()
     }
 
-    #expect(sleeper.arms.count == armsBeforeTeardown + 1)
+    #expect(sleeper.armCount == armsBeforeTeardown + 1)
     sleeper.fire(armsBeforeTeardown)
     for stop in stops {
       #expect(await stop.value == false)
@@ -1027,9 +977,9 @@ struct ObservationDeadlineTests {
         omittedSourceCount: 0),
     ])
 
-    let armsAfterDeadline = sleeper.arms.count
+    let armsAfterDeadline = sleeper.armCount
     #expect(await session._visorStopWithinDeadline() == false)
-    #expect(sleeper.arms.count == armsAfterDeadline)
+    #expect(sleeper.armCount == armsAfterDeadline)
 
     let stopped = DeadlineSignal()
     session._visorWhenStopped { stopped.fire() }
@@ -1067,7 +1017,7 @@ struct ObservationDeadlineTests {
     await sleeper.waitUntilArmed(1)
     readinessGate.open()
     try await startup.value
-    let armsBeforeTeardown = sleeper.arms.count
+    let armsBeforeTeardown = sleeper.armCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()

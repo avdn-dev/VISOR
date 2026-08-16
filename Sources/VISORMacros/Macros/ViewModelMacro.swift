@@ -18,13 +18,6 @@ struct SourceObservationSelection {
 }
 
 extension AttributeSyntax {
-  var isSourceObservationForm: Bool {
-    guard let arguments = arguments?.as(LabeledExprListSyntax.self) else {
-      return false
-    }
-    return arguments.contains { $0.label?.text == "source" }
-  }
-
   var sourceObservationSelection: SourceObservationSelection? {
     guard let arguments = arguments?.as(LabeledExprListSyntax.self) else {
       return nil
@@ -70,13 +63,11 @@ extension MacroExpansionContext {
 }
 
 private struct SourceBoundRecipe {
-  let source: ExprSyntax
   let selection: ExprSyntax?
   let fieldName: String
 }
 
 private struct SourceReactionRecipe {
-  let source: ExprSyntax
   let selection: ExprSyntax?
   let methodName: String
   let argumentLabel: String?
@@ -114,7 +105,6 @@ private func observationRoutingAttributes(
       return [
         Substring(AttributeName.bound),
         Substring(AttributeName.reaction),
-        Substring("Polled"),
       ].contains(name)
     } ?? []
 }
@@ -266,9 +256,8 @@ private extension ClassDeclSyntax {
       let bounds = attributes.filter {
         routingMarkerName($0) == AttributeName.bound
       }
-      let hasOtherRoutingMarker = attributes.contains { attribute in
-        ["Polled", AttributeName.reaction]
-          .contains(routingMarkerName(attribute))
+      let hasOtherRoutingMarker = attributes.contains {
+        routingMarkerName($0) == AttributeName.reaction
       }
       if hasOtherRoutingMarker || bounds.count > 1 {
         return true
@@ -335,22 +324,10 @@ private extension ClassDeclSyntax {
       let bounds = attributes.filter {
         routingMarkerName($0) == AttributeName.bound
       }
-      for attribute in bounds where !attribute.isSourceObservationForm {
-        context.diagnose(Diagnostic(
-          node: Syntax(attribute),
-          message: VISORDiagnostic.sourceBackedBoundRequiresSource))
-      }
       if bounds.count > 1 {
         context.diagnose(Diagnostic(
           node: Syntax(member.decl),
           message: VISORDiagnostic.invalidSourceBoundDeclaration))
-      }
-      for attribute in attributes where
-        routingMarkerName(attribute) == "Polled"
-      {
-        context.diagnose(Diagnostic(
-          node: Syntax(attribute),
-          message: VISORDiagnostic.sourceBackedPolledUnsupported))
       }
       for attribute in attributes where
         routingMarkerName(attribute) == AttributeName.reaction
@@ -369,26 +346,17 @@ private extension ClassDeclSyntax {
       let reactions = attributes.filter {
         routingMarkerName($0) == AttributeName.reaction
       }
-      for attribute in reactions where !attribute.isSourceObservationForm {
-        context.diagnose(Diagnostic(
-          node: Syntax(attribute),
-          message: VISORDiagnostic.sourceBackedReactionRequiresSource))
-      }
       if reactions.count > 1 {
         context.diagnose(Diagnostic(
           node: Syntax(member.decl),
           message: VISORDiagnostic.invalidSourceReactionDeclaration))
       }
       for attribute in attributes where
-        routingMarkerName(attribute) == AttributeName.bound ||
-        routingMarkerName(attribute) == "Polled"
+        routingMarkerName(attribute) == AttributeName.bound
       {
-        let message = routingMarkerName(attribute) == AttributeName.bound
-          ? VISORDiagnostic.invalidSourceBoundPlacement
-          : VISORDiagnostic.sourceBackedPolledUnsupported
         context.diagnose(Diagnostic(
           node: Syntax(attribute),
-          message: message))
+          message: VISORDiagnostic.invalidSourceBoundPlacement))
       }
     }
   }
@@ -524,7 +492,6 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
         continue
       }
       let entry = SourceBoundRecipe(
-        source: observation.source,
         selection: observation.selection,
         fieldName: identifier.identifier.text)
       groups[groupIndex(for: observation.source)].bounds.append(entry)
@@ -541,7 +508,6 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
         continue
       }
       let entry = SourceReactionRecipe(
-        source: observation.source,
         selection: observation.selection,
         methodName: function.name.text,
         argumentLabel: parameter.firstName.text == "_"

@@ -4,9 +4,7 @@ import Testing
 import VISOR
 import os
 
-struct GatewayNonEquatableValue {
-  var rawValue: Int
-}
+struct GatewayNonEquatableValue {}
 
 enum GatewayMutationError: Error, Equatable {
   case expected
@@ -29,13 +27,7 @@ struct GatewayMutableValue: Equatable {
   }
 }
 
-final class GatewayIdentityReference {
-  var rawValue: Int
-
-  init(rawValue: Int) {
-    self.rawValue = rawValue
-  }
-}
+final class GatewayIdentityReference {}
 
 final class GatewayEquatableReference: Equatable {
   var rawValue: Int
@@ -57,9 +49,9 @@ final class GatewayEquatableReference: Equatable {
 final class GatewayState {
   var count = 0
   var settings = Settings()
-  var nonEquatableValue = GatewayNonEquatableValue(rawValue: 0)
+  var nonEquatableValue = GatewayNonEquatableValue()
   var mutableValue = GatewayMutableValue(rawValue: 0)
-  var identityReference = GatewayIdentityReference(rawValue: 0)
+  var identityReference = GatewayIdentityReference()
   var equatableReference = GatewayEquatableReference(rawValue: 0)
   var identifier: String
   private var hiddenRevision = 0
@@ -212,7 +204,7 @@ struct StateGatewayTests {
     probe = installGatewayNotificationProbe {
       state.nonEquatableValue
     }
-    state.nonEquatableValue = GatewayNonEquatableValue(rawValue: 0)
+    state.nonEquatableValue = GatewayNonEquatableValue()
     #expect(probe.count == 1)
   }
 
@@ -229,7 +221,7 @@ struct StateGatewayTests {
     probe = installGatewayNotificationProbe {
       state.identityReference
     }
-    state.identityReference = GatewayIdentityReference(rawValue: 0)
+    state.identityReference = GatewayIdentityReference()
     #expect(probe.count == 1)
 
     probe = installGatewayNotificationProbe {

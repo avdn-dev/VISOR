@@ -472,10 +472,6 @@ private actor OwnerService {
     channel.publish(snapshot)
   }
 
-  nonisolated func publishSynchronously(_ snapshot: OwnerSnapshot) {
-    channel.publish(snapshot)
-  }
-
   nonisolated func terminateObservationForProof() {
     channel._visorTerminate()
   }

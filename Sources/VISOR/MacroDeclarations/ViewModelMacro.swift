@@ -56,10 +56,6 @@
 ///   }
 /// }
 /// ```
-///
-/// `@Polled` is deliberately unsupported. Use an
-/// `ObservationSource` for durable state or an explicitly owned, injected-clock
-/// activity for genuinely time-based work.
 @attached(
   member,
   names:
