@@ -17,7 +17,7 @@ View  →  ViewModel  →  Interactor  →  Service
 - **ViewModel** is explicitly MainActor and owns one stable, macro-instrumented State instance. It projects service snapshots, handles user actions, and calls its Router when routed.
 - **Interactor** optionally coordinates a named use case across services.
 - **Service** owns domain or platform state under its natural isolation and publishes stable snapshots.
-- **Router** owns typed navigation, presentation, tabs, and deep links.
+- **Router** owns typed navigation, presentation, top-level destinations, and deep links.
 - **Factory** hides ViewModel construction behind SwiftUI environment injection.
 
 VISOR is split into four products:
@@ -49,7 +49,8 @@ There is no umbrella product. Import and link only the capabilities a target use
 
 - [Navigation](Navigation.md)
 - ``Router``
-- ``NavigationContainer``
+- ``RouterHost``
+- ``RouterStack``
 - ``NavigationButton``
 - ``NavigationScene``
 - ``Destination``
@@ -61,8 +62,8 @@ There is no umbrella product. Import and link only the capabilities a target use
 - ``SheetDestination``
 - ``FullScreenDestination``
 - ``PresentableDestination``
-- ``TabDestination``
-- ``NoTabDestination``
+- ``RootDestination``
+- ``NoRootDestination``
 
 ### Testing
 

@@ -513,13 +513,26 @@ display strings in ViewModel State.
 
 ## 11. Audit navigation ownership
 
-V11 makes the mounted navigation hierarchy authoritative. A root `Router`
-starts inactive. Calls made on the root to `push`, present, dismiss, or
-`popToRoot` target the currently mounted active Router; if no
-`NavigationContainer` is active, the action is rejected. Calls made directly on
-a child Router remain local to that child.
+V11 removes the tab-specific navigation model and the overloaded
+`NavigationContainer`. Migrate the public vocabulary directly; there are no
+deprecated aliases or compatibility overloads:
 
-For an application with one navigation stack, omit the `Tab` associated type
+| V10 | V11 |
+|---|---|
+| `TabDestination` | `RootDestination` |
+| `NoTabDestination` | `NoRootDestination` |
+| `NavigationScene.Tab` | `NavigationScene.Root` |
+| `selectedTab` | `selectedRoot` |
+| `Destination.tab` | `Destination.root` |
+| `select(tab:)` | `select(root:)` |
+| `selectAndPush(tab:destination:)` | `selectAndPush(root:destination:)` |
+| `NavigationContainer` | `RouterStack` for a stack; `RouterHost` for an application-owned container |
+
+Root destinations represent independently stateful top-level branches. Render
+them as tabs, sidebar rows, or another native selector without changing Router
+semantics.
+
+For an application with one navigation stack, omit the `Root` associated type
 and bind the root Router directly:
 
 ```swift
@@ -527,12 +540,12 @@ nonisolated enum AppScene: NavigationScene {
   typealias Push = AppPush
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
-  // Tab defaults to NoTabDestination.
+  // Root defaults to NoRootDestination.
 }
 
 @State private var router = Router<AppScene>()
 
-NavigationContainer(
+RouterStack(
   router: router,
   pushContent: { destination in pushView(for: destination) },
   sheetContent: { destination in sheetView(for: destination) },
@@ -546,11 +559,17 @@ Declare `NavigationScene` conformances `nonisolated`. The protocol requires a
 `SendableMetatype` so typed destinations and deep-link parsers remain usable
 outside MainActor isolation.
 
-Tab-based applications keep using `NavigationContainer(parentRouter:tab:...)`.
-Audit code and tests that issue root navigation actions before a container is
-mounted; those actions no longer mutate an inactive root Router. Root actions
-issued while a tab or modal is active now route to that visible child rather
-than always mutating root state.
+Wrap `TabView`, `NavigationSplitView`, or another application-owned container in
+`RouterHost`. Give each selected branch a
+`RouterStack(parentRouter:root:...)`. Place Router state in the scene-root View
+when each macOS or iPadOS window should have independent selection, path, and
+presentation state.
+
+The mounted hierarchy is authoritative. A root Router starts inactive. Root
+calls to `push`, present, dismiss, or `popToRoot` target the currently active
+mounted Router; without a `RouterHost`, the action is rejected. Calls made
+directly on a child Router remain local. Audit actions issued before mounting
+and assumptions that root actions always mutate root state.
 
 Deep-link configuration is shared by the whole Router tree. Configure it once
 with `configureDeepLinks(scheme:parsers:)`; existing and future child Routers

@@ -13,7 +13,7 @@ VISOR gives those decisions one explicit shape:
 - `@LazyViewModel` owns the generated observation session, gates content on readiness, and applies scene-lifetime policy.
 - `VISORTesting` fences one structured action at a time and checks its complete State mutation history.
 - `VISORTestDoubles` generates stubs and spies without pulling the production or testing runtime into a service module.
-- `Router` centralises typed navigation, modal presentation, tabs, and deep links.
+- `Router` centralises typed navigation, modal presentation, top-level destinations, and deep links.
 
 VISOR is aimed at applications with repeated feature modules, service-backed state, async side effects, cheap previews, and tests that should not depend on sleeps or observation races.
 

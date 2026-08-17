@@ -27,7 +27,7 @@ public enum DeepLinkOutcome<Scene: NavigationScene> {
   /// A parser recognised the route but rejected its inputs.
   case invalid
 
-  /// The URL resolved, but no navigation container is currently mounted.
+  /// The URL resolved, but no RouterHost is currently mounted.
   case inactive
 }
 
@@ -68,9 +68,9 @@ private enum RouterModalPresentation<Scene: NavigationScene> {
 
 /// Observable router that manages navigation state for a NavigationScene.
 ///
-/// The root Router coordinates one navigation tree. A root NavigationContainer
-/// may bind it directly for a single stack, while tab containers and modal
-/// presentation records use child Routers with isolated navigation state.
+/// The root Router coordinates one navigation tree. A ``RouterHost`` may bind
+/// it directly, while top-level destinations and modal presentation records use
+/// child Routers with isolated navigation state.
 @MainActor @Observable
 public final class Router<Scene: NavigationScene> {
 
@@ -87,7 +87,7 @@ public final class Router<Scene: NavigationScene> {
   /// - Parameter logger: Optional `os.Logger` for debug-level navigation logging.
   public init(logger: Logger? = nil) {
     self.level = 0
-    self.tab = nil
+    self.rootDestination = nil
     self.parent = nil
     self.logger = logger
     self.treeContext = RouterTreeContext()
@@ -98,17 +98,18 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// - Parameters:
   ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
-  ///   - tab: The tab this router manages, or `nil` for root/modal routers.
+  ///   - rootDestination: The top-level destination this router manages, or
+  ///     `nil` for root and modal Routers.
   ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
   ///   - logger: Optional `os.Logger` for debug-level navigation logging.
   package init(
     level: Int,
-    tab: Scene.Tab? = nil,
+    rootDestination: Scene.Root? = nil,
     parent: Router? = nil,
     logger: Logger? = nil)
   {
     self.level = level
-    self.tab = tab
+    self.rootDestination = rootDestination
     self.parent = parent
     self.logger = logger
     self.treeContext = parent?.treeContext ?? RouterTreeContext()
@@ -117,8 +118,8 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Navigation State
 
-  /// The currently selected tab (only meaningful on the root router).
-  public var selectedTab: Scene.Tab?
+  /// The currently selected top-level destination.
+  public var selectedRoot: Scene.Root?
 
   /// The navigation stack path for push destinations.
   public var navigationPath: [Scene.Push] = []
@@ -158,8 +159,10 @@ public final class Router<Scene: NavigationScene> {
   /// The depth level of this router (0 = root).
   public let level: Int
 
-  /// The tab this router is associated with (nil for root/modal routers).
-  public let tab: Scene.Tab?
+  /// The top-level destination this Router is associated with.
+  ///
+  /// Root and modal Routers have no root destination.
+  public let rootDestination: Scene.Root?
 
   /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
   package weak let parent: Router?
@@ -195,21 +198,23 @@ public final class Router<Scene: NavigationScene> {
     target.presentFullScreenLocally(fullScreen)
   }
 
-  /// Select a tab (propagates to parent if this is a child router).
-  public func select(tab: Scene.Tab) {
-    log("select tab: \(tab)")
+  /// Select a top-level destination.
+  ///
+  /// Calls on child Routers propagate to the root Router.
+  public func select(root: Scene.Root) {
+    log("select root: \(root)")
     if let parent {
-      parent.select(tab: tab)
+      parent.select(root: root)
     } else {
-      selectedTab = tab
+      selectedRoot = root
     }
   }
 
   /// Navigate to a unified destination.
   public func navigate(to destination: Destination<Scene>) {
     switch destination {
-    case .tab(let tab):
-      select(tab: tab)
+    case .root(let root):
+      select(root: root)
     case .push(let destination):
       push(destination)
     case .sheet(let sheet):
@@ -219,12 +224,12 @@ public final class Router<Scene: NavigationScene> {
     }
   }
 
-  /// Switch to a tab and push a destination onto that tab's navigation stack.
-  public func selectAndPush(tab: Scene.Tab, destination: Scene.Push) {
-    let root = rootRouter
-    root.log("selectAndPush: tab=\(tab), destination=\(destination)")
-    root.childRouter(for: tab).pushLocally(destination)
-    root.selectedTab = tab
+  /// Select a top-level destination and push onto its navigation stack.
+  public func selectAndPush(root: Scene.Root, destination: Scene.Push) {
+    let rootRouter = rootRouter
+    rootRouter.log("selectAndPush: root=\(root), destination=\(destination)")
+    rootRouter.childRouter(for: root).pushLocally(destination)
+    rootRouter.selectedRoot = root
   }
 
   /// Pop to the root of the navigation stack. Root calls target the currently
@@ -255,10 +260,19 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Active State
 
-  /// Mark this Router as mounted and make it the active visible node.
+  /// Marks this Router as mounted and makes it active unless one of its mounted
+  /// descendants is already the active visible node.
   package func activate() {
     log("activate (level \(level))")
     isMounted = true
+    if let activeRouter = treeContext.activeRouter,
+       activeRouter !== self,
+       activeRouter.isMounted,
+       activeRouter.isDescendant(of: self)
+    {
+      isActive = false
+      return
+    }
     if let previous = treeContext.activeRouter, previous !== self {
       previous.isActive = false
     }
@@ -319,26 +333,26 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Child Management
 
-  /// Create or return the cached child router for a tab's NavigationContainer.
-  public func childRouter(for tab: Scene.Tab) -> Router {
-    if let existing = tabChildren[tab] {
+  /// Creates or returns the cached child Router for a top-level destination.
+  public func childRouter(for root: Scene.Root) -> Router {
+    if let existing = rootChildren[root] {
       return existing
     }
     let child = Router(
       level: level + 1,
-      tab: tab,
+      rootDestination: root,
       parent: self,
       logger: logger)
-    tabChildren[tab] = child
-    log("childRouter created for tab \(tab) at level \(child.level)")
+    rootChildren[root] = child
+    log("childRouter created for root \(root) at level \(child.level)")
     return child
   }
 
-  /// Create a child router for a modal's NavigationContainer.
+  /// Creates a child Router for a modal's RouterStack.
   package func childRouter() -> Router {
     let child = Router(
       level: level + 1,
-      tab: nil,
+      rootDestination: nil,
       parent: self,
       logger: logger)
     log("childRouter created (modal) at level \(child.level)")
@@ -375,10 +389,10 @@ public final class Router<Scene: NavigationScene> {
 
   // MARK: - Preview
 
-  /// Create a preview router with the given tab selected.
-  public static func preview(tab: Scene.Tab? = nil) -> Router {
+  /// Creates a preview Router with the given top-level destination selected.
+  public static func preview(root: Scene.Root? = nil) -> Router {
     let router = Router()
-    router.selectedTab = tab
+    router.selectedRoot = root
     return router
   }
 
@@ -392,7 +406,7 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// ```swift
   /// router.configureDeepLinks(scheme: "myapp", parsers: [
-  ///   .equal(to: ["profile"], destination: .tab(.profile)),
+  ///   .equal(to: ["profile"], destination: .root(.profile)),
   /// ])
   /// ```
   public func configureDeepLinks(scheme: String, parsers: [DeepLinkParser<Scene>]) {
@@ -404,15 +418,25 @@ public final class Router<Scene: NavigationScene> {
   // MARK: Private
 
   private let logger: Logger?
-  /// Cached child routers keyed by tab. Bounded by the finite `Scene.Tab` enum;
-  /// intentionally never evicted so tab navigation state is preserved across switches.
-  @ObservationIgnored private var tabChildren: [Scene.Tab: Router] = [:]
+  /// Cached child Routers keyed by top-level destination. The cache is
+  /// intentionally never evicted so each destination preserves its navigation
+  /// state while another destination is selected.
+  @ObservationIgnored private var rootChildren: [Scene.Root: Router] = [:]
   @ObservationIgnored private let treeContext: RouterTreeContext<Scene>
   @ObservationIgnored private var isMounted = false
   private var modalPresentation: RouterModalPresentation<Scene>?
 
   private var rootRouter: Router {
     parent?.rootRouter ?? self
+  }
+
+  private func isDescendant(of router: Router) -> Bool {
+    var ancestor = parent
+    while let candidate = ancestor {
+      if candidate === router { return true }
+      ancestor = candidate.parent
+    }
+    return false
   }
 
   /// Only the mounted target handles SwiftUI's tree-wide `onOpenURL` delivery.
@@ -425,8 +449,8 @@ public final class Router<Scene: NavigationScene> {
     if let activeRouter = root.treeContext.activeRouter, activeRouter.isMounted {
       return activeRouter
     }
-    if let selectedTab = root.selectedTab,
-       let selectedRouter = root.tabChildren[selectedTab],
+    if let selectedRoot = root.selectedRoot,
+       let selectedRouter = root.rootChildren[selectedRoot],
        selectedRouter.isMounted
     {
       return selectedRouter
@@ -444,7 +468,7 @@ public final class Router<Scene: NavigationScene> {
       return target
     }
 
-    log("\(action) rejected: no navigation container is active")
+    log("\(action) rejected: no RouterHost is active")
     return nil
   }
 

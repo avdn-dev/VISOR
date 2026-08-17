@@ -7,7 +7,7 @@
 
 extension ViewModelFactory {
   /// Create a routed factory that receives a typed Router at VM creation time.
-  /// The Router is automatically bridged from the NavigationContainer's environment.
+  /// The Router is automatically bridged from the RouterHost's environment.
   ///
   /// Usage (composition root):
   /// ```swift

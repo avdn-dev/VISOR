@@ -48,7 +48,7 @@
 /// > The generated `viewModel` property fails with a diagnostic precondition if accessed
 /// > before initialisation. The generated `body` renders `content` only while the backing
 /// > `@State` contains a ViewModel; its task creates that instance when the owner mounts.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(containerRouter), named(scenePhase))
+@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(hostRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
   _: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving

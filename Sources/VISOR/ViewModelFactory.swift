@@ -12,7 +12,7 @@ package enum ViewModelFactoryDiagnostics {
   package static func missingRouterMessage<VM: ViewModel>(for viewModelType: VM.Type) -> String {
     "Could not create \(describe(viewModelType)): routed ViewModelFactory requires a router, " +
       "but EnvironmentValues.router was nil. Ensure the @LazyViewModel view is rendered " +
-      "inside a NavigationContainer, or inject a non-routed factory if this ViewModel does not navigate."
+      "inside a RouterHost, or inject a non-routed factory if this ViewModel does not navigate."
   }
 
   package static func routerTypeMismatchMessage<VM: ViewModel, Scene: NavigationScene>(
@@ -22,7 +22,7 @@ package enum ViewModelFactoryDiagnostics {
   ) -> String {
     "Could not create \(describe(viewModelType)): routed ViewModelFactory expected \(describe(expected)) " +
       "but received \(describe(type(of: router))). Ensure the view is inside " +
-      "a NavigationContainer<\(describe(Scene.self))> matching the factory's router type."
+      "a RouterHost that provides Router<\(describe(Scene.self))>."
   }
 
   private static func describe(_ type: Any.Type) -> String {

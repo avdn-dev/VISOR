@@ -12,7 +12,7 @@
 /// Conforming types serve as route values — they carry stable identifiers and any
 /// lightweight input needed to configure the destination, but do not create the
 /// view themselves. View creation is handled by the content closures passed to
-/// ``NavigationContainer``.
+/// ``RouterStack``.
 public protocol PushDestination: Hashable, Sendable {}
 
 /// Shared requirements for modal destinations (sheets and full-screen presentations).
@@ -20,7 +20,7 @@ public protocol PushDestination: Hashable, Sendable {}
 /// Conforming types serve as route values. `Identifiable` is required by SwiftUI's
 /// item-driven presentation modifiers. The `id` identifies the logical presentation
 /// and may remain stable while other destination payload changes. View resolution is
-/// handled by the content closures passed to ``NavigationContainer``.
+/// handled by the content closures passed to ``RouterHost`` and ``RouterStack``.
 public protocol PresentableDestination: Hashable, Identifiable, Sendable {}
 
 /// A destination that can be presented as a sheet.
@@ -28,20 +28,24 @@ public protocol SheetDestination: PresentableDestination {}
 
 /// A destination with full-screen presentation intent.
 ///
-/// ``NavigationContainer`` uses a native full-screen cover where available and
+/// ``RouterHost`` uses a native full-screen cover where available and
 /// adapts the presentation to a sheet on macOS.
 public protocol FullScreenDestination: PresentableDestination {}
 
-/// A tab identifier. Tabs define their views in the consumer's TabView, so no view is required here.
-public protocol TabDestination: Hashable, Sendable {}
+/// A top-level navigation destination.
+///
+/// Root destinations identify independently stateful navigation branches. The
+/// application decides whether to render them as tabs, sidebar rows, split-view
+/// selections, or another native platform navigation pattern.
+public protocol RootDestination: Hashable, Sendable {}
 
-/// The default tab destination for navigation scenes that do not use a `TabView`.
-public enum NoTabDestination: TabDestination {}
+/// The default root destination for navigation scenes with a single stack.
+public enum NoRootDestination: RootDestination {}
 
 // MARK: - NavigationScene
 
-/// Groups the destination types into a single generic parameter. `Tab` defaults
-/// to ``NoTabDestination`` for single-stack applications.
+/// Groups the destination types into a single generic parameter. `Root` defaults
+/// to ``NoRootDestination`` for single-stack applications.
 ///
 /// Conform an enum to this protocol to define all navigation destinations for your app:
 /// ```swift
@@ -49,12 +53,12 @@ public enum NoTabDestination: TabDestination {}
 ///   typealias Push = AppPush
 ///   typealias Sheet = AppSheet
 ///   typealias FullScreen = AppFullScreen
-///   typealias Tab = AppTab
+///   typealias Root = AppRoot
 /// }
 /// ```
 public protocol NavigationScene: SendableMetatype {
   associatedtype Push: PushDestination
   associatedtype Sheet: SheetDestination
   associatedtype FullScreen: FullScreenDestination
-  associatedtype Tab: TabDestination = NoTabDestination
+  associatedtype Root: RootDestination = NoRootDestination
 }

@@ -3,7 +3,7 @@ import VISOR
 
 // MARK: - Navigation Scene Types
 
-nonisolated enum TestTab: Int, TabDestination {
+nonisolated enum TestRoot: Int, RootDestination {
   case home = 0
   case settings = 1
 }
@@ -31,7 +31,7 @@ nonisolated enum TestScene: NavigationScene {
   typealias Push = TestPush
   typealias Sheet = TestSheet
   typealias FullScreen = TestFullScreen
-  typealias Tab = TestTab
+  typealias Root = TestRoot
 }
 
 nonisolated enum SingleStackTestScene: NavigationScene {

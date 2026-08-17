@@ -73,8 +73,8 @@ private struct GeneratedOwnerScreen: View {
 
   var content: some View {
     Text("Revision \(state.revision)")
-      .onAppear { contentAppeared.record() }
-      .onDisappear { contentDisappeared.record() }
+      .onAppear(perform: contentAppeared.record)
+      .onDisappear(perform: contentDisappeared.record)
   }
 }
 
@@ -88,8 +88,8 @@ private struct GeneratedScenePhaseOwnerScreen: View {
 
   var content: some View {
     Text("Revision \(state.revision)")
-      .onAppear { contentAppeared.record() }
-      .onDisappear { contentDisappeared.record() }
+      .onAppear(perform: contentAppeared.record)
+      .onDisappear(perform: contentDisappeared.record)
   }
 }
 
@@ -284,8 +284,8 @@ extension ViewModelObservationOwnerTests {
     let root = AnyView(
       _visorOwnedViewModelContent(for: viewModel) { _ in
         Text("Ready")
-          .onAppear { contentAppeared.record() }
-          .onDisappear { contentDisappeared.record() }
+          .onAppear(perform: contentAppeared.record)
+          .onDisappear(perform: contentDisappeared.record)
       })
     let hostingView = NSHostingView(rootView: root)
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
@@ -342,18 +342,18 @@ extension ViewModelObservationOwnerTests {
         observationPolicy: .alwaysObserving,
         content: { _ in
           Text("Ready")
-            .onAppear { contentAppeared.record() }
+            .onAppear(perform: contentAppeared.record)
         },
         suspended: { Color.clear },
         pending: {
           ProgressView("Preparing Screen")
-            .onAppear { pendingAppeared.record() }
+            .onAppear(perform: pendingAppeared.record)
         },
         failure: {
           ContentUnavailableView(
             "Unable to Load",
             systemImage: "exclamationmark.triangle")
-            .onAppear { failureAppeared.record() }
+            .onAppear(perform: failureAppeared.record)
         }))
     let hostingView = NSHostingView(rootView: root)
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
@@ -433,7 +433,7 @@ extension ViewModelObservationOwnerTests {
       observationPolicy: .alwaysObserving,
       content: { _ in
         Text("Ready")
-          .onAppear { contentAppeared.record() }
+          .onAppear(perform: contentAppeared.record)
       },
       suspended: { Color.clear },
       pending: { ProgressView("Preparing Screen") },
@@ -441,7 +441,7 @@ extension ViewModelObservationOwnerTests {
         ContentUnavailableView(
           "Unable to Load",
           systemImage: "exclamationmark.triangle")
-          .onAppear { failureAppeared.record() }
+          .onAppear(perform: failureAppeared.record)
       })
   }
 }

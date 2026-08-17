@@ -1,17 +1,20 @@
 # Navigation
 
-Type-safe navigation with Router, NavigationScene, deep linking, and modal hierarchies.
+Type-safe navigation with Router, native SwiftUI containers, deep links, and modal hierarchies.
 
 ## Overview
 
-VISOR's navigation system centralises all navigation state in a ``Router`` object, decoupling views from their destinations. Feature Views dispatch actions to routed ViewModels, which decide what to show and call the Router. ``NavigationContainer`` handles the SwiftUI wiring.
+VISOR centralises navigation state in a ``Router`` without prescribing how the
+application presents its top-level destinations. Feature Views dispatch actions
+to routed ViewModels, which make navigation decisions and call their local
+Router. ``RouterHost`` supplies the SwiftUI environment and lifecycle boundary;
+``RouterStack`` is the single-stack convenience built on top of it.
 
-Destination types are route-value enums — they carry stable identifiers and any
-lightweight input needed to configure a screen, but don't create the view. Prefer
-model identifiers over complete model snapshots so a destination resolves current
-data. View creation is handled by content closures passed to
-``NavigationContainer``, which means the destination enums can live in a shared
-module without importing feature view types.
+Destination types are route values. They carry stable identifiers and the
+lightweight input needed to configure a screen, but do not create views. Prefer
+model identifiers over complete snapshots so a destination resolves current
+data. Content closures perform view resolution in the application target, where
+all relevant feature view types are visible.
 
 ## Defining Destinations
 
@@ -36,9 +39,10 @@ nonisolated enum AppFullScreen: FullScreenDestination {
   var id: Self { self }
 }
 
-// Declare this only when the application uses a TabView.
-nonisolated enum AppTab: TabDestination {
-  case home, search, profile
+nonisolated enum AppRoot: RootDestination {
+  case home
+  case search
+  case profile
 }
 ```
 
@@ -49,14 +53,16 @@ nonisolated enum AppTab: TabDestination {
 | ``PushDestination`` | `Hashable` | `NavigationStack` push |
 | ``SheetDestination`` | `Hashable`, `Identifiable` | `.sheet(item:)` |
 | ``FullScreenDestination`` | `Hashable`, `Identifiable` | Full-screen intent; adapts to `.sheet(item:)` on macOS |
-| ``TabDestination`` | `Hashable` | Tab selection (no view — defined in your `TabView`) |
+| ``RootDestination`` | `Hashable` | Top-level tabs, sidebar rows, or another application-owned selector |
 
-``SheetDestination`` and ``FullScreenDestination`` both inherit from ``PresentableDestination``, which provides the shared `Hashable & Identifiable` requirements.
+``SheetDestination`` and ``FullScreenDestination`` inherit from
+``PresentableDestination``, which provides their shared `Hashable & Identifiable`
+requirements.
 
 A presentation's `id` is its logical screen identity; it does not have to be
-the complete destination value. This is useful when the route carries changing
-input for the same screen. Namespace identities by destination case so unrelated
-screens cannot accidentally share one:
+the complete destination value. This allows changing input for an existing
+presentation without discarding its child Router. Namespace identities by case
+so unrelated screens cannot accidentally share one:
 
 ```swift
 nonisolated enum EditorSheet: SheetDestination {
@@ -76,12 +82,11 @@ nonisolated enum EditorSheet: SheetDestination {
 
 Presenting updated payload with the same ID preserves that modal's child Router.
 A different ID or presentation style creates a fresh child. Each Router node has
-one direct modal slot, so the latest sheet or full-screen request replaces the
-previous request on that node. Nested presentation remains available from the
-presented modal's child Router.
+one direct modal slot, so its latest sheet or full-screen request replaces its
+previous request. A presented child Router can still present another modal.
 
 `Hashable` lets push destinations participate in a navigation path; it does not
-make the path unique. Repeated equal push destinations are appended normally.
+make that path unique. Repeated equal push destinations are appended normally.
 
 ### NavigationScene
 
@@ -92,12 +97,12 @@ nonisolated enum AppScene: NavigationScene {
   typealias Push = AppPush
   typealias Sheet = AppSheet
   typealias FullScreen = AppFullScreen
-  typealias Tab = AppTab
+  typealias Root = AppRoot
 }
 ```
 
-`Tab` is optional. A single-stack application omits it and receives
-``NoTabDestination`` as the default:
+`Root` is optional. A single-stack application omits it and receives
+``NoRootDestination`` as the default:
 
 ```swift
 nonisolated enum SingleStackScene: NavigationScene {
@@ -107,14 +112,16 @@ nonisolated enum SingleStackScene: NavigationScene {
 }
 ```
 
-This is the generic parameter used by ``Router``, ``NavigationContainer``, ``NavigationButton``, and ``Destination``.
-Its conformance is nonisolated so the scene metatype can safely participate in
-`Sendable` navigation values and parsers. Spell `nonisolated` explicitly in
-MainActor-by-default targets, as shown above.
+This scene is the generic parameter used by ``Router``, ``RouterHost``,
+``RouterStack``, ``NavigationButton``, and ``Destination``. Its conformance is
+nonisolated so the scene metatype can participate safely in `Sendable`
+navigation values and parsers. Spell `nonisolated` explicitly in
+MainActor-by-default targets.
 
 ## Writing Content Closures
 
-Content closures map destination values to views. Write them as `@ViewBuilder` functions that switch over each destination:
+Content closures map route values to views. Write them as `@ViewBuilder`
+functions that switch over each destination:
 
 ```swift
 @ViewBuilder
@@ -141,38 +148,34 @@ func fullScreenContent(for destination: AppFullScreen) -> some View {
 }
 ```
 
-Place these functions in a target that can see all feature view types, typically
-the app target.
-
 ## Router
 
-``Router`` is an `@Observable` object that manages one navigation tree. Create
-one root Router per window or scene and pass it to ``NavigationContainer``:
+``Router`` is an `@Observable` object that manages one navigation tree:
 
 ```swift
 let router = Router<AppScene>()
 ```
 
-### Navigation methods
+### Navigation Methods
 
 | Method | Description |
 |--------|-------------|
-| `push(_:)` | Push onto the navigation stack |
+| `push(_:)` | Push onto the active navigation stack |
 | `present(sheet:)` | Present a sheet |
 | `present(fullScreen:)` | Present a destination with full-screen intent |
-| `select(tab:)` | Switch tab (propagates to root) |
+| `select(root:)` | Select a top-level destination |
 | `navigate(to:)` | Unified dispatch via ``Destination`` |
-| `selectAndPush(tab:destination:)` | Switch tab and push in one step |
-| `popToRoot()` | Clear the navigation stack |
+| `selectAndPush(root:destination:)` | Select a root destination and push in one operation |
+| `popToRoot()` | Clear the active navigation stack |
 | `dismissSheet()` | Dismiss the current sheet |
 | `dismissFullScreen()` | Dismiss the current full-screen destination |
-| `childRouter(for:)` | Get or create a cached child router for a tab |
+| `childRouter(for:)` | Get or create the cached Router for a root destination |
 
 ```swift
-// Once the root NavigationContainer has appeared:
+// Once a RouterHost has appeared:
 router.push(.detail(id: "42"))
 router.present(sheet: .preferences)
-router.select(tab: .profile)
+router.select(root: .profile)
 router.popToRoot()
 ```
 
@@ -180,45 +183,43 @@ In feature code, prefer making these calls from a routed ViewModel's action
 handler.
 
 Calls on the root Router target the currently active visible Router: the root
-stack in a single-stack application, the selected tab, or the topmost modal.
-Calls on a non-root Router read from the SwiftUI environment remain local to
-that container. In a single-stack application the environment Router is also
-the root coordinator. `select(tab:)` and `selectAndPush(tab:destination:)`
-explicitly coordinate tabs regardless of the active container.
+stack in a single-stack application, the selected root destination, or the
+topmost modal. Calls on a non-root Router obtained from the SwiftUI environment
+remain local to that host. `select(root:)` and
+`selectAndPush(root:destination:)` explicitly coordinate the root Router from
+any node in its tree.
 
-A Router becomes active when its container appears. Calls made before any
-container is mounted are rejected rather than being retained as invisible
-navigation state. Pass an `os.Logger` to the root initialiser to record those
-diagnostics.
+A Router is **mounted** while its host exists in the visible SwiftUI hierarchy.
+Exactly one mounted Router in a tree is **active** and receives root actions and
+deep links. A newly visible child becomes active; dismissing it restores the
+nearest mounted ancestor. A late disappearance from an old branch cannot
+deactivate a newer branch.
 
-### Parent-Child Hierarchy
+Calls made before any host is mounted are rejected rather than retained as
+invisible navigation state. Pass an `os.Logger` to the root initialiser to
+record those diagnostics.
 
-Routers form a tree. Each child tracks its depth (`level`) and the tab it manages (`tab`). The hierarchy enables:
+### Root and Modal Children
 
-- **Optional tabs**: A root container binds the root Router directly when the application has one stack.
-- **Tab isolation**: Each tab has its own navigation stack via `childRouter(for:)`.
-- **Modal nesting**: Sheets and full-screen presentations get their own child router, enabling push navigation within modals.
-- **Active-leaf routing**: One visible Router receives root actions and deep links. Dismissing a modal restores its nearest mounted ancestor.
+Each root destination receives a cached child Router with its own navigation
+path. Switching between tabs or sidebar rows therefore preserves independent
+stack state. Modal presentations receive fresh child Routers whose lifetime is
+owned by the presentation record.
 
-Late disappearance from an old tab or modal cannot deactivate a newer visible
-Router.
-
-### Previews
-
-Create a preview router with an optional tab selection:
+Create a preview Router with an optional initial root selection:
 
 ```swift
-Router<AppScene>.preview(tab: .home)
+Router<AppScene>.preview(root: .home)
 ```
 
-## NavigationContainer
+## RouterStack
 
-``NavigationContainer`` wires a ``Router`` to `NavigationStack` and platform-adaptive modal presentation. Pass content closures that map each destination type to its view.
-
-For a single stack, bind the root Router directly:
+Use ``RouterStack`` when a navigation surface is one `NavigationStack`:
 
 ```swift
-NavigationContainer(
+@State private var router = Router<SingleStackScene>()
+
+RouterStack(
   router: router,
   pushContent: pushContent(for:),
   sheetContent: sheetContent(for:),
@@ -228,90 +229,178 @@ NavigationContainer(
 }
 ```
 
-For a tab, create or reuse that tab's child Router:
+`RouterStack` composes ``RouterHost`` with a `NavigationStack`, binds
+`router.navigationPath`, and registers the push destination resolver. Sheets
+and adaptive full-screen presentations receive their own `RouterStack`, so a
+presented flow can push without additional wiring.
+
+Full-screen destinations use SwiftUI's native `.fullScreenCover(item:)` where
+available. On macOS, where that modifier is unavailable, the same route intent
+adapts to `.sheet(item:)`. On visionOS this remains a modal presentation; it
+does not open an `ImmersiveSpace`.
+
+## Native Top-Level Navigation
+
+``RouterHost`` mounts a Router around arbitrary SwiftUI content. VISOR owns the
+Router lifecycle, deep links, environment and modal state; the application owns
+the native navigation container, columns, sidebar content, window chrome and
+size adaptation.
+
+### Tabs
+
+Render each root destination as a tab by placing one branch ``RouterStack`` in
+the `TabView`:
 
 ```swift
-NavigationContainer(
-  parentRouter: router,
-  tab: .home,
-  pushContent: pushContent(for:),
-  sheetContent: sheetContent(for:),
-  fullScreenContent: fullScreenContent(for:)
-) {
-  HomeScreen()
+struct AppRootView: View {
+  @State private var router = Router<AppScene>.preview(root: .home)
+
+  var body: some View {
+    @Bindable var router = router
+
+    RouterHost(
+      router: router,
+      pushContent: pushContent(for:),
+      sheetContent: sheetContent(for:),
+      fullScreenContent: fullScreenContent(for:)
+    ) {
+      TabView(selection: $router.selectedRoot) {
+        RouterStack(
+          parentRouter: router,
+          root: .home,
+          pushContent: pushContent(for:),
+          sheetContent: sheetContent(for:),
+          fullScreenContent: fullScreenContent(for:)
+        ) {
+          HomeScreen()
+        }
+        .tabItem { Label("Home", systemImage: "house") }
+        .tag(AppRoot.home as AppRoot?)
+
+        RouterStack(
+          parentRouter: router,
+          root: .profile,
+          pushContent: pushContent(for:),
+          sheetContent: sheetContent(for:),
+          fullScreenContent: fullScreenContent(for:)
+        ) {
+          ProfileScreen()
+        }
+        .tabItem { Label("Profile", systemImage: "person") }
+        .tag(AppRoot.profile as AppRoot?)
+      }
+    }
+  }
 }
 ```
 
-Modal containers are created automatically by the sheet and adaptive
-full-screen presentation modifiers.
+The same root selection works with SwiftUI's sidebar-adaptable tab style on
+platform versions that provide it; the Router API does not change.
 
-The container:
-- Borrows a root Router, reuses a tab child, or owns a manually requested modal child.
-- Manages active state (`onAppear` / `onDisappear`).
-- Routes incoming URLs via `onOpenURL`.
-- Wraps sheets and full-screen presentations in their own NavigationContainer, automatically propagating the content closures so push navigation works within modals.
+### Sidebars and Split Views
 
-Full-screen destinations use SwiftUI's native `.fullScreenCover(item:)` on iOS,
-Mac Catalyst, tvOS, watchOS, and visionOS. On macOS, where SwiftUI marks that
-modifier unavailable, ``NavigationContainer`` adapts the route to a
-`.sheet(item:)`. On visionOS this remains a modal presentation; it does not open
-an `ImmersiveSpace`.
+On iPadOS and macOS, bind a `NavigationSplitView` sidebar to the same root
+selection and place the selected branch's stack in the detail column:
 
-### Example App Structure
+```swift
+struct SplitAppRootView: View {
+  @State private var router = Router<AppScene>.preview(root: .home)
+
+  var body: some View {
+    @Bindable var router = router
+
+    RouterHost(
+      router: router,
+      pushContent: pushContent(for:),
+      sheetContent: sheetContent(for:),
+      fullScreenContent: fullScreenContent(for:)
+    ) {
+      NavigationSplitView {
+        List(selection: $router.selectedRoot) {
+          Label("Home", systemImage: "house").tag(AppRoot.home)
+          Label("Search", systemImage: "magnifyingglass").tag(AppRoot.search)
+          Label("Profile", systemImage: "person").tag(AppRoot.profile)
+        }
+        .navigationTitle("VISOR")
+      } detail: {
+        if let root = router.selectedRoot {
+          RouterStack(
+            parentRouter: router,
+            root: root,
+            pushContent: pushContent(for:),
+            sheetContent: sheetContent(for:),
+            fullScreenContent: fullScreenContent(for:)
+          ) {
+            rootContent(for: root)
+          }
+        } else {
+          ContentUnavailableView(
+            "Select a Destination",
+            systemImage: "sidebar.left")
+        }
+      }
+    }
+  }
+}
+```
+
+Do not switch between stack and split layouts by horizontal size class inside
+VISOR. `NavigationSplitView` already owns its platform collapse behaviour, and
+the application is the only layer that knows which content belongs in each
+column. macOS inspectors, commands, menus and toolbar composition remain native
+application concerns and can dispatch into the focused window's Router.
+
+### Windows and Scenes
+
+Place Router state inside the scene-root View to give every `WindowGroup`
+instance an independent navigation tree:
 
 ```swift
 @main
 struct MyApp: App {
   var body: some Scene {
     WindowGroup {
-      AppRoot()
-    }
-  }
-}
-
-struct AppRoot: View {
-  @State private var router = Router<AppScene>()
-
-  var body: some View {
-    TabView(selection: Bindable(router).selectedTab) {
-      NavigationContainer(
-        parentRouter: router,
-        tab: .home,
-        pushContent: pushContent(for:),
-        sheetContent: sheetContent(for:),
-        fullScreenContent: fullScreenContent(for:)
-      ) {
-        HomeScreen()
-      }
-      .tabItem { Label("Home", systemImage: "house") }
-      .tag(AppTab.home)
-
-      NavigationContainer(
-        parentRouter: router,
-        tab: .profile,
-        pushContent: pushContent(for:),
-        sheetContent: sheetContent(for:),
-        fullScreenContent: fullScreenContent(for:)
-      ) {
-        ProfileScreen()
-      }
-      .tabItem { Label("Profile", systemImage: "person") }
-      .tag(AppTab.profile)
+      AppRootView() // AppRootView owns its Router in @State.
     }
   }
 }
 ```
 
-Placing the Router in scene-root `@State` gives every `WindowGroup` instance an
-independent navigation tree. Move the Router into `App` state only when every
-window should deliberately share one navigation tree. ``NavigationContainer``
-borrows root and tab Routers, so replacing an input Router replaces the tree the
-container observes instead of retaining its first input as local State.
+Move the Router into `App` state only when multiple windows should deliberately
+share one navigation tree. Sharing by default breaks per-window selection,
+stack and presentation state expected on macOS and iPadOS.
+
+## Modal Completion and Dismissal
+
+VISOR does not inject Close, Cancel or Done controls because only the feature
+knows whether leaving confirms work, abandons a draft, or merely closes
+information. Provide a visible semantic action where the platform and flow need
+one:
+
+```swift
+struct EditProfileScreen: View {
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    EditProfileContent()
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Cancel") { dismiss() }
+        }
+      }
+  }
+}
+```
+
+Use `.confirmationAction` for a genuine confirmation. A routed ViewModel may
+instead call `dismissSheet()` or `dismissFullScreen()` when dismissal follows a
+domain action. A sheet or full-screen onboarding flow may present another sheet
+through its local Router; nested presentation is part of the Router hierarchy.
 
 ## NavigationButton
 
-A convenience button that reads the ``Router`` from the environment and
-dispatches directly:
+``NavigationButton`` reads the local Router from the environment and dispatches
+directly:
 
 ```swift
 NavigationButton<AppScene, _>(push: .detail(id: "1")) {
@@ -323,20 +412,18 @@ NavigationButton<AppScene, _>(sheet: .preferences) {
 }
 ```
 
-`NavigationButton` bypasses ViewModel action handling. Routed ViewModels are the
-preferred navigation architecture for feature flows; use this convenience only
-when deliberately choosing direct View-to-Router dispatch.
+This bypasses ViewModel action handling. Routed ViewModels are the preferred
+navigation architecture for feature flows; use the button only when deliberately
+choosing direct View-to-Router dispatch.
 
 ## Deep Linking
 
-Configure deep link handling with a URL scheme and composable parsers:
+Configure deep-link handling with a URL scheme and ordered parsers:
 
 ```swift
 router.configureDeepLinks(scheme: "myapp", parsers: [
-  // Static match: myapp://profile
-  .equal(to: ["profile"], destination: .tab(.profile)),
+  .equal(to: ["profile"], destination: .root(.profile)),
 
-  // Custom parser: myapp://item/550E8400-E29B-41D4-A716-446655440000
   DeepLinkParser { request in
     guard request.components.first == "item" else { return .noMatch }
     guard request.components.count == 2,
@@ -344,21 +431,19 @@ router.configureDeepLinks(scheme: "myapp", parsers: [
           let id = UUID(uuidString: decodedID)
     else { return .invalid }
     return .destination(.push(.detail(id: id.uuidString)))
-  }
+  },
 ])
 ```
 
-``DeepLinkRequest`` exposes the original URL and its host-plus-path
-`components`. ``DeepLinkParser`` provides `.equal(to:destination:)` for static
-matches and a custom parsing closure for dynamic routes. Return `.noMatch` when
-the parser does not recognise the route so evaluation can continue. Once a
-parser recognises its route, return `.invalid` for a wrong component count,
-failed decoding, or malformed identifier; this stops evaluation instead of
-letting a later parser reinterpret bad input. Decode a component exactly once.
+``DeepLinkRequest`` exposes the original URL and its host-plus-path components.
+Return `.noMatch` when a parser does not recognise the route so evaluation can
+continue. Once a parser recognises its route, return `.invalid` for the wrong
+component count, failed decoding, or a malformed identifier. This stops a later
+parser from reinterpreting invalid input. Decode a component exactly once.
 
-``NavigationContainer`` calls ``Router/openDeepLink(_:)`` automatically for the
-active mounted Router. Call it directly when another application boundary
-receives a URL and use the ``DeepLinkOutcome`` to make failure handling explicit:
+``RouterHost`` calls ``Router/openDeepLink(_:)`` automatically for the active
+mounted Router. Call it directly when another application boundary receives a
+URL and handle its explicit outcome:
 
 ```swift
 switch router.openDeepLink(url) {
@@ -369,14 +454,12 @@ case .unconfigured, .schemeMismatch, .unmatched, .invalid, .inactive:
 }
 ```
 
-Each Router tree stores one current deep-link configuration. Configuring the
-root—or any child—updates existing and future tab and modal Routers immediately,
-so configuration order does not affect URL handling. Separate scene-root
-Routers retain independent configurations.
+Each Router tree stores one current configuration. Configuring the root—or any
+child—updates existing and future root and modal children immediately. Separate
+scene-root Routers retain independent configurations.
 
-The configured scheme is only the first validation boundary. For HTTPS links,
-validate the complete host with an exact, case-insensitive comparison—never a
-suffix test—and then validate the path and query values:
+For HTTPS links, validate the complete host with an exact, case-insensitive
+comparison, then validate the path and query values:
 
 ```swift
 router.configureDeepLinks(scheme: "https", parsers: [
@@ -386,21 +469,20 @@ router.configureDeepLinks(scheme: "https", parsers: [
     else { return .noMatch }
     guard request.components == ["links.example.com", "profile"]
     else { return .noMatch }
-    return .destination(.tab(.profile))
-  }
+    return .destination(.root(.profile))
+  },
 ])
 ```
 
 Parsing proves only that a URL is structurally valid. The service that loads or
 mutates the referenced resource must still enforce authentication and
-authorisation; never treat possession of a deep link as permission.
+authorisation; possession of a deep link is not permission.
 
 ## Routed Factories
 
-Use a routed factory for every ViewModel that can navigate. This is the
-preferred feature-navigation path: the View dispatches an action, the ViewModel
-makes the navigation decision, and ``NavigationContainer`` supplies the local
-Router automatically:
+Use a routed factory for every ViewModel that can navigate. The View dispatches
+an action, the ViewModel makes the navigation decision, and ``RouterHost``
+supplies its local Router:
 
 ```swift
 let factory: GalleryViewModel.Factory = .routed { (router: Router<AppScene>) in
@@ -413,12 +495,12 @@ GalleryScreen()
 
 ## Destination
 
-``Destination`` is the unified navigation value accepted by
-`router.navigate(to:)` and emitted by deep-link parsers:
+``Destination`` is the unified value accepted by `router.navigate(to:)` and
+emitted by deep-link parsers:
 
 ```swift
 enum Destination<Scene: NavigationScene> {
-  case tab(Scene.Tab)
+  case root(Scene.Root)
   case push(Scene.Push)
   case sheet(Scene.Sheet)
   case fullScreen(Scene.FullScreen)

@@ -20,10 +20,19 @@ nonisolated enum DocumentationFullScreen: FullScreenDestination {
   var id: Self { self }
 }
 
+nonisolated enum DocumentationRootDestination: String, RootDestination, CaseIterable, Identifiable {
+  case library
+  case settings
+
+  var id: Self { self }
+  var title: String { rawValue.capitalized }
+}
+
 nonisolated enum DocumentationScene: NavigationScene {
   typealias Push = DocumentationPush
   typealias Sheet = DocumentationSheet
   typealias FullScreen = DocumentationFullScreen
+  typealias Root = DocumentationRootDestination
 }
 
 @MainActor
@@ -156,7 +165,7 @@ struct DocumentationRoot: View {
   @State private var router = Router<DocumentationScene>()
 
   var body: some View {
-    NavigationContainer(
+    RouterStack(
       router: router,
       pushContent: { destination in
         switch destination {
@@ -174,6 +183,96 @@ struct DocumentationRoot: View {
           router: router,
           consumer: RootObservationConsumer(initialValue: 0))
       })
+  }
+}
+
+@MainActor
+struct DocumentationSplitRoot: View {
+  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
+  var body: some View {
+    @Bindable var router = router
+
+    RouterHost(
+      router: router,
+      pushContent: pushContent(for:),
+      sheetContent: { _ in Text("Preferences") },
+      fullScreenContent: { _ in Text("Onboarding") }
+    ) {
+      NavigationSplitView {
+        List(selection: $router.selectedRoot) {
+          ForEach(DocumentationRootDestination.allCases) { root in
+            Text(root.title).tag(root)
+          }
+        }
+      } detail: {
+        if let root = router.selectedRoot {
+          RouterStack(
+            parentRouter: router,
+            root: root,
+            pushContent: pushContent(for:),
+            sheetContent: { _ in Text("Preferences") },
+            fullScreenContent: { _ in Text("Onboarding") }
+          ) {
+            Text(root.title)
+          }
+        } else {
+          ContentUnavailableView("Select a Destination", systemImage: "sidebar.left")
+        }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func pushContent(for destination: DocumentationPush) -> some View {
+    switch destination {
+    case .detail(let id): Text("Detail \(id)")
+    }
+  }
+}
+
+@MainActor
+struct DocumentationTabRoot: View {
+  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
+  var body: some View {
+    @Bindable var router = router
+
+    RouterHost(
+      router: router,
+      pushContent: pushContent(for:),
+      sheetContent: { _ in Text("Preferences") },
+      fullScreenContent: { _ in Text("Onboarding") }
+    ) {
+      TabView(selection: $router.selectedRoot) {
+        rootStack(for: .library)
+          .tabItem { Label("Library", systemImage: "books.vertical") }
+          .tag(DocumentationRootDestination.library as DocumentationRootDestination?)
+
+        rootStack(for: .settings)
+          .tabItem { Label("Settings", systemImage: "gear") }
+          .tag(DocumentationRootDestination.settings as DocumentationRootDestination?)
+      }
+    }
+  }
+
+  private func rootStack(for root: DocumentationRootDestination) -> some View {
+    RouterStack(
+      parentRouter: router,
+      root: root,
+      pushContent: pushContent(for:),
+      sheetContent: { _ in Text("Preferences") },
+      fullScreenContent: { _ in Text("Onboarding") }
+    ) {
+      Text(root.title)
+    }
+  }
+
+  @ViewBuilder
+  private func pushContent(for destination: DocumentationPush) -> some View {
+    switch destination {
+    case .detail(let id): Text("Detail \(id)")
+    }
   }
 }
 

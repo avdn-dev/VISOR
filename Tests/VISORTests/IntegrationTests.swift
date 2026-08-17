@@ -156,7 +156,7 @@ struct IntegrationTests {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .tab(.home)),
+      .equal(to: ["home"], destination: .root(.home)),
       .equal(
         to: ["settings", "detail"],
         destination: .push(.detail(id: "deep"))),

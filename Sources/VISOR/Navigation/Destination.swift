@@ -7,8 +7,8 @@
 
 /// A unified destination for Router navigation and deep link dispatch.
 public enum Destination<Scene: NavigationScene> {
-  /// Switch to the specified tab.
-  case tab(Scene.Tab)
+  /// Select the specified top-level destination.
+  case root(Scene.Root)
   /// Push a destination onto the navigation stack.
   case push(Scene.Push)
   /// Present a modal sheet.

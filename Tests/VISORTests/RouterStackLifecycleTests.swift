@@ -1,5 +1,5 @@
 //
-//  NavigationContainerLifecycleTests.swift
+//  RouterStackLifecycleTests.swift
 //  VISOR
 //
 //  Created by Anh Nguyen on 14/8/2026.
@@ -83,36 +83,99 @@ private struct NavigationTabLifecycleHost: View {
   let probe: NavigationLifecycleProbe
 
   var body: some View {
-    TabView(selection: $router.selectedTab) {
-      NavigationContainer(
-        parentRouter: router,
-        tab: .home,
-        pushContent: { _ in EmptyView() },
-        sheetContent: { _ in EmptyView() },
-        fullScreenContent: { _ in EmptyView() }
-      ) {
-        NavigationLifecycleMarker(
-          appeared: .homeAppeared,
-          disappeared: .homeDisappeared,
-          probe: probe)
-      }
-      .tabItem { Text("Home") }
-      .tag(TestTab.home as TestTab?)
+    RouterHost(
+      router: router,
+      pushContent: { _ in EmptyView() },
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() }
+    ) {
+      TabView(selection: $router.selectedRoot) {
+        RouterStack(
+          parentRouter: router,
+          root: .home,
+          pushContent: { _ in EmptyView() },
+          sheetContent: { _ in EmptyView() },
+          fullScreenContent: { _ in EmptyView() }
+        ) {
+          NavigationLifecycleMarker(
+            appeared: .homeAppeared,
+            disappeared: .homeDisappeared,
+            probe: probe)
+        }
+        .tabItem { Text("Home") }
+        .tag(TestRoot.home as TestRoot?)
 
-      NavigationContainer(
-        parentRouter: router,
-        tab: .settings,
-        pushContent: { _ in EmptyView() },
-        sheetContent: { _ in EmptyView() },
-        fullScreenContent: { _ in EmptyView() }
-      ) {
-        NavigationLifecycleMarker(
-          appeared: .settingsAppeared,
-          disappeared: nil,
-          probe: probe)
+        RouterStack(
+          parentRouter: router,
+          root: .settings,
+          pushContent: { _ in EmptyView() },
+          sheetContent: { _ in EmptyView() },
+          fullScreenContent: { _ in EmptyView() }
+        ) {
+          NavigationLifecycleMarker(
+            appeared: .settingsAppeared,
+            disappeared: nil,
+            probe: probe)
+        }
+        .tabItem { Text("Settings") }
+        .tag(TestRoot.settings as TestRoot?)
       }
-      .tabItem { Text("Settings") }
-      .tag(TestTab.settings as TestTab?)
+    }
+  }
+}
+
+@MainActor
+private struct NavigationSplitLifecycleHost: View {
+  @Bindable var router: Router<TestScene>
+  let probe: NavigationLifecycleProbe
+
+  var body: some View {
+    RouterHost(
+      router: router,
+      pushContent: { _ in EmptyView() },
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() }
+    ) {
+      NavigationSplitView {
+        List(selection: $router.selectedRoot) {
+          Text("Home").tag(TestRoot.home)
+          Text("Settings").tag(TestRoot.settings)
+        }
+      } detail: {
+        switch router.selectedRoot {
+        case .home:
+          rootStack(
+            root: .home,
+            appeared: .homeAppeared,
+            disappeared: .homeDisappeared)
+        case .settings:
+          rootStack(
+            root: .settings,
+            appeared: .settingsAppeared,
+            disappeared: nil)
+        case nil:
+          Text("Select a destination")
+        }
+      }
+    }
+  }
+
+  private func rootStack(
+    root: TestRoot,
+    appeared: NavigationLifecycleEvent,
+    disappeared: NavigationLifecycleEvent?
+  ) -> some View {
+    RouterStack(
+      parentRouter: router,
+      root: root,
+      pushContent: { _ in EmptyView() },
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() }
+    ) {
+      NavigationLifecycleMarker(
+        appeared: appeared,
+        disappeared: disappeared,
+        probe: probe)
     }
   }
 }
@@ -150,14 +213,36 @@ private final class NavigationViewHost {
   }
 }
 
-@Suite("NavigationContainer lifecycle", .serialized)
+@Suite("Router host and stack lifecycle", .serialized)
 @MainActor
-struct NavigationContainerLifecycleTests {
+struct RouterStackLifecycleTests {
+  @Test(.timeLimit(.minutes(1)))
+  func `Mounted RouterHost without a selected root activates the root Router`() async {
+    let router = Router<TestScene>()
+    let probe = NavigationLifecycleProbe()
+    let root = AnyView(RouterHost(
+      router: router,
+      pushContent: { _ in EmptyView() },
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() }
+    ) {
+      NavigationLifecycleMarker(
+        appeared: .homeAppeared,
+        disappeared: nil,
+        probe: probe)
+    })
+    let host = NavigationViewHost(rootView: root)
+    defer { host.close() }
+    await probe.wait(for: .homeAppeared)
+
+    #expect(router.isActive)
+  }
+
   @Test(.timeLimit(.minutes(1)))
   func `Mounted stack follows Router push and pop`() async {
     let router = Router<TestScene>()
     let probe = NavigationLifecycleProbe()
-    let root = AnyView(NavigationContainer(
+    let root = AnyView(RouterStack(
       router: router,
       pushContent: { _ in
         NavigationLifecycleMarker(
@@ -192,7 +277,7 @@ struct NavigationContainerLifecycleTests {
     let home = router.childRouter(for: .home)
     let settings = router.childRouter(for: .settings)
     let probe = NavigationLifecycleProbe()
-    router.selectedTab = .home
+    router.selectedRoot = .home
 
     let host = NavigationViewHost(rootView: AnyView(
       NavigationTabLifecycleHost(router: router, probe: probe)))
@@ -202,7 +287,7 @@ struct NavigationContainerLifecycleTests {
     #expect(home.isActive)
     #expect(!settings.isActive)
 
-    router.select(tab: .settings)
+    router.select(root: .settings)
     host.layout()
     await probe.wait(for: .settingsAppeared)
     await probe.wait(for: .homeDisappeared)
@@ -216,10 +301,39 @@ struct NavigationContainerLifecycleTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
+  func `Mounted NavigationSplitView activates the selected root Router`() async {
+    let router = Router<TestScene>()
+    let home = router.childRouter(for: .home)
+    let settings = router.childRouter(for: .settings)
+    let probe = NavigationLifecycleProbe()
+    router.selectedRoot = .home
+
+    let host = NavigationViewHost(rootView: AnyView(
+      NavigationSplitLifecycleHost(router: router, probe: probe)))
+    defer { host.close() }
+    await probe.wait(for: .homeAppeared)
+
+    #expect(home.isActive)
+    #expect(!settings.isActive)
+
+    router.select(root: .settings)
+    host.layout()
+    await probe.wait(for: .settingsAppeared)
+    await probe.wait(for: .homeDisappeared)
+
+    #expect(!home.isActive)
+    #expect(settings.isActive)
+
+    router.present(sheet: .preferences)
+    #expect(home.presentingSheet == nil)
+    #expect(settings.presentingSheet == .preferences)
+  }
+
+  @Test(.timeLimit(.minutes(1)))
   func `Mounted sheet restores its presenting Router on dismissal`() async throws {
     let router = Router<TestScene>()
     let probe = NavigationLifecycleProbe()
-    let root = AnyView(NavigationContainer(
+    let root = AnyView(RouterStack(
       router: router,
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in

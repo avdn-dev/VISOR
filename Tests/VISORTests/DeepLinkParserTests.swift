@@ -61,29 +61,29 @@ struct DeepLinkParserTests {
   func `equal parser matches exact components`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let url = URL(string: "myapp://settings")!
     let result = parser.parse(DeepLinkRequest(url: url))
-    #expect(result == .destination(.tab(.settings)))
+    #expect(result == .destination(.root(.settings)))
   }
 
   @Test
   func `Parser can be called from a nonisolated context`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let result = parseDeepLink(parser, url: URL(string: "myapp://settings")!)
 
-    #expect(result == .destination(.tab(.settings)))
+    #expect(result == .destination(.root(.settings)))
   }
 
   @Test
   func `equal parser rejects non-matching components`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let url = URL(string: "myapp://home")!
     let result = parser.parse(DeepLinkRequest(url: url))
@@ -163,11 +163,11 @@ struct DeepLinkParserTests {
   func `equal parser with empty components`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: [],
-      destination: .tab(.home))
+      destination: .root(.home))
 
     let url = URL(string: "myapp://")!
     let result = parser.parse(DeepLinkRequest(url: url))
-    #expect(result == .destination(.tab(.home)))
+    #expect(result == .destination(.root(.home)))
   }
 
   // MARK: - Query and Fragment Combined
@@ -195,7 +195,7 @@ struct DeepLinkParserTests {
   func `equal parser rejects URL with fewer components than expected`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings", "detail"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let url = URL(string: "myapp://settings")!
     #expect(parser.parse(DeepLinkRequest(url: url)) == .noMatch)
@@ -205,7 +205,7 @@ struct DeepLinkParserTests {
   func `equal parser rejects URL with more components than expected`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let url = URL(string: "myapp://settings/extra")!
     #expect(parser.parse(DeepLinkRequest(url: url)) == .noMatch)
@@ -215,11 +215,11 @@ struct DeepLinkParserTests {
   func `equal parser is case-sensitive for path components`() {
     let parser = DeepLinkParser<TestScene>.equal(
       to: ["settings"],
-      destination: .tab(.settings))
+      destination: .root(.settings))
 
     let lowercase = URL(string: "myapp://settings")!
     #expect(
-      parser.parse(DeepLinkRequest(url: lowercase)) == .destination(.tab(.settings)))
+      parser.parse(DeepLinkRequest(url: lowercase)) == .destination(.root(.settings)))
 
     let uppercase = URL(string: "myapp://Settings")!
     #expect(

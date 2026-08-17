@@ -33,7 +33,7 @@ struct LazyViewModelMacroTests {
       public struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -69,7 +69,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -91,7 +91,7 @@ struct LazyViewModelMacroTests {
       struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -127,7 +127,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -151,7 +151,7 @@ struct LazyViewModelMacroTests {
       public struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -187,7 +187,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -211,7 +211,7 @@ struct LazyViewModelMacroTests {
       private struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -247,7 +247,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -269,7 +269,7 @@ struct LazyViewModelMacroTests {
       fileprivate struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -305,7 +305,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -327,7 +327,7 @@ struct LazyViewModelMacroTests {
       package struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -363,7 +363,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -388,7 +388,7 @@ struct LazyViewModelMacroTests {
         struct InnerView: View {
           var content: some View { Text("") }
 
-            @Environment(\\.router) private var containerRouter
+            @Environment(\\.router) private var hostRouter
 
             @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -424,7 +424,7 @@ struct LazyViewModelMacroTests {
                 }
                 .task {
                     if _viewModel == nil {
-                        _viewModel = factory.makeViewModel(router: containerRouter)
+                        _viewModel = factory.makeViewModel(router: hostRouter)
                     }
                 }
             }
@@ -547,7 +547,7 @@ struct LazyViewModelMacroTests {
       struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -583,7 +583,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -605,7 +605,7 @@ struct LazyViewModelMacroTests {
       struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -641,7 +641,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -663,7 +663,7 @@ struct LazyViewModelMacroTests {
       struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -699,7 +699,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -721,7 +721,7 @@ struct LazyViewModelMacroTests {
       public struct MyView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -757,7 +757,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -783,7 +783,7 @@ struct LazyViewModelMacroTests {
         var state: Int = 0
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -815,7 +815,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -842,7 +842,7 @@ struct LazyViewModelMacroTests {
         let title = "", state = 0
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
 
@@ -874,7 +874,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }
@@ -901,7 +901,7 @@ struct LazyViewModelMacroTests {
       struct FeatureView: View {
         var content: some View { Text("") }
 
-          @Environment(\\.router) private var containerRouter
+          @Environment(\\.router) private var hostRouter
 
           @Environment(VISOR.ViewModelFactory<Feature.GenericViewModel<LiveService>>.self) private var factory
 
@@ -937,7 +937,7 @@ struct LazyViewModelMacroTests {
               }
               .task {
                   if _viewModel == nil {
-                      _viewModel = factory.makeViewModel(router: containerRouter)
+                      _viewModel = factory.makeViewModel(router: hostRouter)
                   }
               }
           }

@@ -92,7 +92,7 @@ struct ViewModelFactoryTests {
 
     #expect(message.contains("RoutedTestVM"))
     #expect(message.contains("EnvironmentValues.router was nil"))
-    #expect(message.contains("NavigationContainer"))
+    #expect(message.contains("RouterHost"))
   }
 
   @Test

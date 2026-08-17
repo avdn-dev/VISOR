@@ -12,16 +12,16 @@ VISOR defines five application roles plus a factory boundary:
 | **ViewModel** | Owns stable UI State, handles actions, projects service snapshots, and coordinates feature navigation | Interactor, Service, Router when routed |
 | **Interactor** | Coordinates a named use case across services; optional | Service |
 | **Service** | Owns domain or platform state and its natural isolation | Other services |
-| **Router** | Owns typed navigation, presentation, tabs, and deep links | — |
+| **Router** | Owns typed navigation, presentation, top-level destinations, and deep links | — |
 | **Factory** | Creates a ViewModel with its dependencies without exposing composition to the View | Composition root |
 
 Dependencies point towards domain and platform capabilities. A service is not required to be MainActor or `@Observable`; source-backed state crosses that boundary through `ObservationSource` snapshots.
 
 Feature navigation follows **View → routed ViewModel → Router**. A View
 dispatches an action; its ViewModel decides whether and how to navigate. A
-navigation host View still binds `NavigationContainer`, `TabView`, and Router
-state as composition infrastructure, but it does not move feature navigation
-decisions into rendering code.
+navigation host View still binds `RouterHost`, `RouterStack`, native SwiftUI
+containers, and Router state as composition infrastructure, but it does not
+move feature navigation decisions into rendering code.
 
 ## View and Content
 
@@ -303,7 +303,7 @@ ViewModels; resolve dependencies at the composition root and pass them explicitl
 
 ### Routed factories
 
-Use a routed factory for every ViewModel that can navigate. `NavigationContainer`
+Use a routed factory for every ViewModel that can navigate. `RouterHost`
 supplies its local Router when `@LazyViewModel` creates the ViewModel:
 
 ```swift

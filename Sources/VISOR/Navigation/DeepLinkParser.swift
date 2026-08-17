@@ -65,7 +65,7 @@ nonisolated extension DeepLinkParseResult: Sendable {}
 ///
 /// ```swift
 /// router.configureDeepLinks(scheme: "myapp", parsers: [
-///   .equal(to: ["profile"], destination: .tab(.profile)),
+///   .equal(to: ["profile"], destination: .root(.profile)),
 ///   DeepLinkParser { request in
 ///     guard request.components.first == "item" else { return .noMatch }
 ///     guard request.components.count == 2,
@@ -109,7 +109,7 @@ extension DeepLinkParser {
   ///
   /// ```swift
   /// // Matches "myapp://profile" or "myapp:///profile"
-  /// .equal(to: ["profile"], destination: .tab(.profile))
+  /// .equal(to: ["profile"], destination: .root(.profile))
   /// ```
   public static func equal(
     to components: [String],

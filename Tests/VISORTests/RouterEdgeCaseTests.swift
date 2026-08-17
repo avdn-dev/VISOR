@@ -16,23 +16,23 @@ import Foundation
 struct RouterEdgeCaseTests {
 
   @Test
-  func `select tab falls back to self when parent deallocated`() {
+  func `select root falls back to self when parent deallocated`() {
     var parent: Router<TestScene>? = Router<TestScene>()
     let child = Router<TestScene>(level: 1, parent: parent)
     parent = nil
 
-    child.select(tab: .settings)
-    #expect(child.selectedTab == .settings)
+    child.select(root: .settings)
+    #expect(child.selectedRoot == .settings)
   }
 
   @Test
-  func `Deep hierarchy grandchild tab propagates to root`() {
+  func `Deep hierarchy grandchild root selection propagates to root`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     let grandchild = child.childRouter(for: .home)
 
-    grandchild.select(tab: .settings)
-    #expect(root.selectedTab == .settings)
+    grandchild.select(root: .settings)
+    #expect(root.selectedRoot == .settings)
   }
 
   @Test
@@ -52,7 +52,7 @@ struct RouterEdgeCaseTests {
   }
 
   @Test
-  func `Multiple children for different tabs are independent`() {
+  func `Multiple children for different roots are independent`() {
     let root = Router<TestScene>()
     let homeChild = root.childRouter(for: .home)
     let settingsChild = root.childRouter(for: .settings)
@@ -127,10 +127,10 @@ struct RouterEdgeCaseTests {
     #expect(root.isActive)
   }
 
-  // MARK: - Child state preserved across tab switches
+  // MARK: - Child state preserved across root switches
 
   @Test
-  func `childRouter state preserved across tab switches`() {
+  func `childRouter state preserved across root switches`() {
     let root = Router<TestScene>()
     let homeChild = root.childRouter(for: .home)
     let settingsChild = root.childRouter(for: .settings)
@@ -138,8 +138,8 @@ struct RouterEdgeCaseTests {
     homeChild.push(.detail(id: "home-1"))
     settingsChild.push(.detail(id: "settings-1"))
 
-    root.select(tab: .settings)
-    root.select(tab: .home)
+    root.select(root: .settings)
+    root.select(root: .home)
 
     #expect(homeChild.navigationPath == [.detail(id: "home-1")])
     #expect(settingsChild.navigationPath == [.detail(id: "settings-1")])
@@ -148,27 +148,27 @@ struct RouterEdgeCaseTests {
   // MARK: - Tree-wide deep-link configuration
 
   @Test
-  func `Existing tab and modal routers receive later configuration`() {
+  func `Existing root and modal routers receive later configuration`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     let modal = child.childRouter()
 
     root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .tab(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings)),
     ])
 
     let url = URL(string: "test://settings")!
     child.activate()
-    #expect(child.openDeepLink(url) == .handled(.tab(.settings)))
+    #expect(child.openDeepLink(url) == .handled(.root(.settings)))
     modal.activate()
-    #expect(modal.openDeepLink(url) == .handled(.tab(.settings)))
+    #expect(modal.openDeepLink(url) == .handled(.root(.settings)))
   }
 
   @Test
   func `Child created after configureDeepLinks inherits configuration`() {
     let root = Router<TestScene>()
     root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .tab(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings)),
     ])
 
     // Child created after configuration should read the shared tree context.
@@ -176,7 +176,7 @@ struct RouterEdgeCaseTests {
     child.activate()
 
     let result = child.openDeepLink(URL(string: "test://settings")!)
-    #expect(result == .handled(.tab(.settings)))
+    #expect(result == .handled(.root(.settings)))
   }
 
   // MARK: - Exclusive modal presentation
@@ -327,13 +327,13 @@ struct RouterEdgeCaseTests {
   }
 
   @Test
-  func `navigate(to: .tab) on child propagates to root`() {
+  func `navigate(to: .root) on child propagates to root`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     child.activate()
 
-    child.navigate(to: .tab(.settings))
-    #expect(root.selectedTab == .settings)
+    child.navigate(to: .root(.settings))
+    #expect(root.selectedRoot == .settings)
   }
 
   // MARK: - Multiple configureDeepLinks calls overwrite configuration
@@ -345,12 +345,12 @@ struct RouterEdgeCaseTests {
     let modal = child.childRouter()
 
     root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .tab(.home)),
+      .equal(to: ["home"], destination: .root(.home)),
     ])
 
     // Second call overwrites
     root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .tab(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings)),
     ])
 
     let homeURL = URL(string: "test://home")!
@@ -360,7 +360,7 @@ struct RouterEdgeCaseTests {
       #expect(
         router.openDeepLink(homeURL) == .unmatched,
         "First parser should be overwritten for every existing Router")
-      #expect(router.openDeepLink(settingsURL) == .handled(.tab(.settings)))
+      #expect(router.openDeepLink(settingsURL) == .handled(.root(.settings)))
     }
   }
 
@@ -395,14 +395,14 @@ struct RouterEdgeCaseTests {
   // MARK: - selectAndPush from deep hierarchy
 
   @Test
-  func `selectAndPush from child targets the root tab router`() {
+  func `selectAndPush from child targets the root destination Router`() {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
 
-    child.selectAndPush(tab: .settings, destination: .detail(id: "deep"))
+    child.selectAndPush(root: .settings, destination: .detail(id: "deep"))
 
     let settings = root.childRouter(for: .settings)
     #expect(settings.navigationPath == [.detail(id: "deep")])
-    #expect(root.selectedTab == .settings)
+    #expect(root.selectedRoot == .settings)
   }
 }
