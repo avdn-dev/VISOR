@@ -22,9 +22,9 @@ public enum ObservationStateSequenceName: Sendable {
 /// macro so their existential witness layout is complete. Concrete classes and
 /// actors do not use this annotation.
 @attached(member, names: arbitrary)
-public macro ObservationProtocol() = #externalMacro(
+public macro ObservationStateRequirements() = #externalMacro(
   module: "VISORMacros",
-  type: "ObservationProtocolMacro")
+  type: "ObservationStateRequirementsMacro")
 
 /// Declares producer-owned State whose assignments are observable.
 ///
@@ -56,13 +56,14 @@ public macro ObservationProtocol() = #externalMacro(
 /// as a factory function whose return type is not present in its spelling.
 ///
 /// A protocol requirement may supply `initial:` as test-double metadata.
-/// `@ObservationProtocol` generates the corresponding read-only sequence
-/// requirement. `@GenerateStub` and `@GenerateSpy` use an explicit initial
-/// value, `@DefaultValue`, or a known standard default for their mutable State:
+/// `@ObservationStateRequirements` generates the corresponding read-only
+/// sequence requirement. `@GenerateStub` and `@GenerateSpy` use an explicit
+/// initial value, `@DefaultValue`, or a known standard default for their mutable
+/// State:
 ///
 /// ```swift
 /// @GenerateSpy
-/// @ObservationProtocol
+/// @ObservationStateRequirements
 /// protocol PlaybackService {
 ///   @ObservationState(initial: PlaybackSnapshot.stopped)
 ///   var playback: PlaybackSnapshot { get }

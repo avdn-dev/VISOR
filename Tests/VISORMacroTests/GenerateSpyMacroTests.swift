@@ -16,7 +16,7 @@ private let testMacros: [String: Macro.Type] = [
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
   "ObservationState": ObservationStateMacro.self,
-  "ObservationProtocol": ObservationProtocolMacro.self,
+  "ObservationStateRequirements": ObservationStateRequirementsMacro.self,
 ]
 
 // MARK: - GenerateSpyMacroTests
@@ -31,7 +31,7 @@ struct GenerateSpyMacroTests {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateSpy
-      @ObservationProtocol
+      @ObservationStateRequirements
       protocol PlaybackService {
         @ObservationState(initial: PlaybackSnapshot.stopped, observedAs: .values)
         var playback: PlaybackSnapshot { get }
@@ -74,7 +74,7 @@ struct GenerateSpyMacroTests {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateSpy
-      @ObservationProtocol
+      @ObservationStateRequirements
       protocol PlaybackService {
         @ObservationState
         var playback: PlaybackSnapshot { get }

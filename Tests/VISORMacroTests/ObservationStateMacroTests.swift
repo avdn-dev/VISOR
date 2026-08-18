@@ -6,7 +6,7 @@ import Testing
 struct ObservationStateMacroTests {
   private let macros: [String: Macro.Type] = [
     "ObservationState": ObservationStateMacro.self,
-    "ObservationProtocol": ObservationProtocolMacro.self,
+    "ObservationStateRequirements": ObservationStateRequirementsMacro.self,
   ]
 
   @Test
@@ -411,7 +411,7 @@ struct ObservationStateMacroTests {
   func `A protocol State synthesises its observation requirement`() {
     assertMacroExpansionSwiftTesting(
       """
-      @ObservationProtocol
+      @ObservationStateRequirements
       protocol CounterService {
         @ObservationState(observedAs: .values)
         var count: Int { get }
@@ -505,7 +505,7 @@ struct ObservationStateMacroTests {
   func `A protocol State is read-only and supplies an initial value`() {
     assertMacroExpansionSwiftTesting(
       """
-      @ObservationProtocol
+      @ObservationStateRequirements
       protocol CounterService {
         @ObservationState
         var count: Int { get set }
@@ -543,7 +543,7 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message:
-            "protocol @ObservationState requirements require @ObservationProtocol on the enclosing protocol",
+            "protocol @ObservationState requirements require @ObservationStateRequirements on the enclosing protocol",
           line: 2,
           column: 3),
       ],
@@ -551,10 +551,10 @@ struct ObservationStateMacroTests {
   }
 
   @Test
-  func `ObservationProtocol only accepts protocols`() {
+  func `ObservationStateRequirements only accepts protocols`() {
     assertMacroExpansionSwiftTesting(
       """
-      @ObservationProtocol
+      @ObservationStateRequirements
       final class Counter {}
       """,
       expandedSource: """
@@ -562,7 +562,7 @@ struct ObservationStateMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(
-          message: "@ObservationProtocol can only be attached to a protocol",
+          message: "@ObservationStateRequirements can only be attached to a protocol",
           line: 1,
           column: 1),
       ],

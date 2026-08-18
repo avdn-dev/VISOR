@@ -122,7 +122,7 @@ infer one. Mark the enclosing protocol once so the generated sequence is part
 of its witness layout:
 
 ```swift
-@ObservationProtocol
+@ObservationStateRequirements
 protocol ProfileServicing {
   @ObservationState(initial: ProfileSnapshot.empty)
   var profile: ProfileSnapshot { get }

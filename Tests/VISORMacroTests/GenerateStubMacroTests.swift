@@ -16,7 +16,7 @@ private let testMacros: [String: Macro.Type] = [
   "DefaultValue": DefaultValueMacro.self,
   "DefaultReturn": DefaultValueMacro.self,
   "ObservationState": ObservationStateMacro.self,
-  "ObservationProtocol": ObservationProtocolMacro.self,
+  "ObservationStateRequirements": ObservationStateRequirementsMacro.self,
 ]
 
 private let defaultValueWarning = """
@@ -36,7 +36,7 @@ struct GenerateStubMacroTests {
     assertMacroExpansionSwiftTesting(
       """
       @GenerateStub(.sendable)
-      @ObservationProtocol
+      @ObservationStateRequirements
       nonisolated protocol PlaybackService: Sendable {
         @ObservationState(initial: PlaybackSnapshot.stopped, observedAs: .values)
         var playback: PlaybackSnapshot { get }

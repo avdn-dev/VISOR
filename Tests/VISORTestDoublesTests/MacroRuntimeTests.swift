@@ -4,14 +4,14 @@ import VISORObservation
 import VISORTestDoubles
 
 @GenerateSpy
-@ObservationProtocol
+@ObservationStateRequirements
 protocol ObservationStateService {
     @ObservationState(observedAs: .values)
     var count: Int { get }
 }
 
 @GenerateSpy(.sendable)
-@ObservationProtocol
+@ObservationStateRequirements
 nonisolated protocol SendableObservationStateService: Sendable {
     @ObservationState(observedAs: .values)
     var count: Int { get }

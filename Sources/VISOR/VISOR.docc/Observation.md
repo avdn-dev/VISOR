@@ -188,12 +188,13 @@ final class ThrowingProducer {
 Protocols declare the same domain State property. `initial:` optionally
 supplies baseline metadata for generated spies and stubs, where a protocol
 requirement cannot contain a stored initial value. Known standard types infer a
-baseline; custom types can instead use `@DefaultValue`. `@ObservationProtocol`
-synthesises the matching nonisolated requirements from those properties:
+baseline; custom types can instead use `@DefaultValue`.
+`@ObservationStateRequirements` synthesises the matching nonisolated
+requirements from those properties:
 
 ```swift
 @GenerateSpy
-@ObservationProtocol
+@ObservationStateRequirements
 protocol SyncServicing {
   @ObservationState(initial: SyncSnapshot.initial)
   var sync: SyncSnapshot { get }
@@ -205,10 +206,10 @@ spy.sync = .connected
 ```
 
 The protocol expands conceptually to `sync` plus a get-only `syncSnapshots`.
-`@ObservationProtocol` runs once at the type level so Swift incorporates the
-generated sequence requirements into its existential witness layout. The
-property annotation still owns the domain declaration and naming; concrete
-classes and actors do not need the protocol annotation.
+`@ObservationStateRequirements` runs once at the type level so Swift
+incorporates the generated sequence requirements into its existential witness
+layout. The property annotation still owns the domain declaration and naming;
+concrete classes and actors do not need the protocol annotation.
 The baseline does not constrain how production conformers acquire their initial
 domain State. Generated doubles make the scalar mutable for test control, and
 their setter uses the same automatic publication contract as production code.

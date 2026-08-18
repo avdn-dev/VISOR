@@ -9,7 +9,7 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
-      diagnoseMissingObservationProtocolIfNeeded(declaration, in: context)
+      diagnoseMissingObservationStateRequirementsIfNeeded(declaration, in: context)
       return []
     }
 
@@ -101,7 +101,7 @@ public struct ObservationStateRequirementMacro: PeerMacro {
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
-      diagnoseMissingObservationProtocolIfNeeded(declaration, in: context)
+      diagnoseMissingObservationStateRequirementsIfNeeded(declaration, in: context)
       return []
     }
 
@@ -110,7 +110,7 @@ public struct ObservationStateRequirementMacro: PeerMacro {
   }
 }
 
-public struct ObservationProtocolMacro: MemberMacro {
+public struct ObservationStateRequirementsMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
@@ -235,19 +235,19 @@ private func observationStateRequirement(
     sequenceModifiers: protocolSequenceModifiers(from: variable))
 }
 
-private func diagnoseMissingObservationProtocolIfNeeded(
+private func diagnoseMissingObservationStateRequirementsIfNeeded(
   _ declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext
 ) {
   guard
     let owner = context.lexicalContext.first?.as(ProtocolDeclSyntax.self),
-    !owner.attributes.visorContains(named: "ObservationProtocol")
+    !owner.attributes.visorContains(named: "ObservationStateRequirements")
   else {
     return
   }
   context.diagnose(Diagnostic(
     node: Syntax(declaration),
-    message: ObservationStateDiagnostic.missingObservationProtocol))
+    message: ObservationStateDiagnostic.missingObservationStateRequirements))
 }
 
 private func observationStateProperty(
@@ -679,7 +679,7 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
   case missingObservationIgnored
   case generatedNameCollision(String)
   case invalidProtocol
-  case missingObservationProtocol
+  case missingObservationStateRequirements
 
   var message: String {
     switch self {
@@ -696,9 +696,9 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
     case .generatedNameCollision(let name):
       "@ObservationState cannot generate '\(name)' because that member name is already in use"
     case .invalidProtocol:
-      "@ObservationProtocol can only be attached to a protocol"
-    case .missingObservationProtocol:
-      "protocol @ObservationState requirements require @ObservationProtocol on the enclosing protocol"
+      "@ObservationStateRequirements can only be attached to a protocol"
+    case .missingObservationStateRequirements:
+      "protocol @ObservationState requirements require @ObservationStateRequirements on the enclosing protocol"
     }
   }
 
@@ -711,7 +711,7 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
     case .missingObservationIgnored: "missingObservationIgnored"
     case .generatedNameCollision: "generatedNameCollision"
     case .invalidProtocol: "invalidProtocol"
-    case .missingObservationProtocol: "missingObservationProtocol"
+    case .missingObservationStateRequirements: "missingObservationStateRequirements"
     }
     return MessageID(domain: "VISOR", id: id)
   }
