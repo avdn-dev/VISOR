@@ -29,13 +29,18 @@ Change the package requirement to `11.0.0` or later and declare products by resp
 Use the imports that match those dependencies:
 
 ```swift
+import Observation       // @Observable in ViewModel targets
+import Testing           // @Test and expectations in test targets
 import VISORObservation // channel/source producers
 import VISOR            // ViewModel, SwiftUI, and navigation
 import VISORTesting     // observe/perform/expect in Swift Testing targets
 import VISORTestDoubles // generated stub/spy declarations
 ```
 
-There is no umbrella product. `VISORTesting` re-exports `VISOR` and Swift Testing; it does not re-export `VISORTestDoubles`.
+There is no umbrella product, and VISOR products do not re-export Apple
+frameworks or sibling VISOR products. Import each module that owns a symbol you
+spell. Macro-generated implementation references remain qualified and do not
+require extra imports.
 
 ## 2. Give each producer an explicit source
 
@@ -290,15 +295,22 @@ producer's source from an explicitly owned task:
 
 ```swift
 observationTask = Task { @MainActor [weak self, dependency] in
-  for await value in dependency.valueSnapshots {
-    guard !Task.isCancelled else { return }
-    await self?.apply(value)
+  do {
+    for try await value in dependency.valueSnapshots {
+      guard !Task.isCancelled else { return }
+      await self?.apply(value)
+    }
+  } catch {
+    await self?.handleObservationFailure(error)
   }
 }
 ```
 
 It emits the atomic baseline and then the newest pending snapshot, and ends
-cooperatively with the consuming task. It is not part of generated ViewModel
+cooperatively with consuming-task cancellation. Unexpected source termination
+or a runtime invariant failure throws `ObservationSourceError`; handle it as an
+infrastructure failure rather than treating it as normal completion. The
+iterator is deliberately single-consumer and not `Sendable`. It is not part of generated ViewModel
 readiness, revision acknowledgement, or `VISORTesting.perform` fencing. A
 lossless occurrence still requires an explicit event sequence with a buffering
 policy selected by its owner.
@@ -569,12 +581,20 @@ The mounted hierarchy is authoritative. A root Router starts inactive. Root
 calls to `push`, present, dismiss, or `popToRoot` target the currently active
 mounted Router; without a `RouterHost`, the action is rejected. Calls made
 directly on a child Router remain local. Audit actions issued before mounting
-and assumptions that root actions always mutate root state.
+and assumptions that root actions always mutate root state. These actions and
+`navigate(to:)` now return a discardable `Bool`: `true` means the action was
+accepted, while dismissal additionally returns `false` when there was no
+matching presentation to remove. Check the result wherever rejection affects
+application behaviour. `presentingSheet` and `presentingFullScreen` are now
+read-only state; use the corresponding present and dismiss methods rather than
+assigning modal state directly.
 
 Deep-link configuration is shared by the whole Router tree. Configure it once
-with `configureDeepLinks(scheme:parsers:)`; existing and future child Routers
-read the same latest configuration. Code that expected a copied per-child
-handler should remove that assumption.
+with `try configureDeepLinks(scheme:parsers:)`; existing and future child
+Routers read the same latest configuration. The method rejects an empty or
+malformed URL scheme with `DeepLinkConfigurationError` before mutating the
+tree's configuration. Code that expected a copied per-child handler should
+remove that assumption.
 
 The public parse-only `deepLinkHandler` is removed. Pass a
 `DeepLinkRequest` to custom parsers and return `.noMatch`, `.invalid`, or
