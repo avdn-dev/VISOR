@@ -34,18 +34,29 @@ run_stage "Testing selector contracts" \
 
 documentation_workspace=$(mktemp -d /tmp/visor-docc-validation.XXXXXX)
 trap 'rm -rf -- "$documentation_workspace"' EXIT
-documentation_output="$documentation_workspace/archive"
 module_cache="$documentation_workspace/module-cache"
-mkdir -p "$documentation_output" "$module_cache"
+mkdir -p "$module_cache"
 
-printf '\n==> %s\n' "VISOR DocC archive"
-CLANG_MODULE_CACHE_PATH="$module_cache" \
-SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
-swift package --allow-writing-to-directory "$documentation_output" \
-  generate-documentation --target VISOR \
-  --output-path "$documentation_output" \
-  --transform-for-static-hosting \
-  --hosting-base-path VISOR
+for documentation_target in \
+  VISORObservation \
+  VISOR \
+  VISORTesting \
+  VISORTestDoubles
+do
+  documentation_output="$documentation_workspace/$documentation_target.doccarchive"
+  mkdir -p "$documentation_output"
+
+  printf '\n==> %s\n' "$documentation_target DocC archive"
+  CLANG_MODULE_CACHE_PATH="$module_cache" \
+  SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
+  swift package --allow-writing-to-directory "$documentation_output" \
+    generate-documentation --target "$documentation_target" \
+    --output-path "$documentation_output" \
+    --experimental-skip-synthesized-symbols \
+    --warnings-as-errors \
+    --transform-for-static-hosting \
+    --hosting-base-path VISOR
+done
 
 run_stage "Unstaged whitespace checks" git diff --check
 run_stage "Staged whitespace checks" git diff --cached --check
