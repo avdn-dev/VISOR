@@ -13,29 +13,41 @@ public struct NavigationButton<Scene: NavigationScene, Label: View>: View {
   // MARK: Lifecycle
 
   /// Create a button that pushes a destination.
+  ///
+  /// - Parameters:
+  ///   - destination: The destination pushed by the button.
+  ///   - label: The button's visual content.
   public init(
     push destination: Scene.Push,
     @ViewBuilder label: () -> Label)
   {
-    action = { router in router.push(destination) }
+    action = { router in _ = router.push(destination) }
     self.label = label()
   }
 
   /// Create a button that presents a sheet.
+  ///
+  /// - Parameters:
+  ///   - destination: The sheet destination presented by the button.
+  ///   - label: The button's visual content.
   public init(
     sheet destination: Scene.Sheet,
     @ViewBuilder label: () -> Label)
   {
-    action = { router in router.present(sheet: destination) }
+    action = { router in _ = router.present(sheet: destination) }
     self.label = label()
   }
 
   /// Create a button that presents a destination with full-screen intent.
+  ///
+  /// - Parameters:
+  ///   - destination: The full-screen destination presented by the button.
+  ///   - label: The button's visual content.
   public init(
     fullScreen destination: Scene.FullScreen,
     @ViewBuilder label: () -> Label)
   {
-    action = { router in router.present(fullScreen: destination) }
+    action = { router in _ = router.present(fullScreen: destination) }
     self.label = label()
   }
 

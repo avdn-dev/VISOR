@@ -36,7 +36,9 @@ public protocol FullScreenDestination: PresentableDestination {}
 ///
 /// Root destinations identify independently stateful navigation branches. The
 /// application decides whether to render them as tabs, sidebar rows, split-view
-/// selections, or another native platform navigation pattern.
+/// selections, or another native platform navigation pattern. Keep this value
+/// space bounded because ``Router`` retains one child Router per root to
+/// preserve each branch's navigation state.
 public protocol RootDestination: Hashable, Sendable {}
 
 /// The default root destination for navigation scenes with a single stack.
@@ -57,8 +59,15 @@ public enum NoRootDestination: RootDestination {}
 /// }
 /// ```
 public protocol NavigationScene: SendableMetatype {
+  /// Values that can be pushed on this scene's navigation stacks.
   associatedtype Push: PushDestination
+
+  /// Values that can be presented as sheets in this scene.
   associatedtype Sheet: SheetDestination
+
+  /// Values that can be presented with full-screen intent in this scene.
   associatedtype FullScreen: FullScreenDestination
+
+  /// Independently stateful top-level branches in this scene.
   associatedtype Root: RootDestination = NoRootDestination
 }

@@ -1,6 +1,28 @@
 import RootGatewayModelsNonisolated
 import VISOR
 
+private enum ProbePush: PushDestination {
+  case value
+}
+
+private enum ProbeSheet: SheetDestination {
+  case value
+
+  var id: Self { self }
+}
+
+private enum ProbeFullScreen: FullScreenDestination {
+  case value
+
+  var id: Self { self }
+}
+
+private enum ProbeScene: NavigationScene {
+  typealias Push = ProbePush
+  typealias Sheet = ProbeSheet
+  typealias FullScreen = ProbeFullScreen
+}
+
 @MainActor
 public func compileRootGatewayAccessBoundary() {
   typealias State = NonisolatedGatewayState
@@ -8,6 +30,7 @@ public func compileRootGatewayAccessBoundary() {
   let field: _StateField<State, Int> = State._visorSelectors.count
   let erased = State._visorAllFields[0]
   let sourceBackedView = NonisolatedSourceBackedView()
+  let router = Router<ProbeScene>()
 
   _ = field
   _ = erased
@@ -39,5 +62,13 @@ public func compileRootGatewayAccessBoundary() {
 
   #if VISOR_PROBE_ERASED_READ
   _ = erased.read(from: State())
+  #endif
+
+  #if VISOR_PROBE_SHEET_SETTER
+  router.presentingSheet = .value
+  #endif
+
+  #if VISOR_PROBE_FULL_SCREEN_SETTER
+  router.presentingFullScreen = .value
   #endif
 }

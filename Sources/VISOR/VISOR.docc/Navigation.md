@@ -171,6 +171,11 @@ let router = Router<AppScene>()
 | `dismissFullScreen()` | Dismiss the current full-screen destination |
 | `childRouter(for:)` | Get or create the cached Router for a root destination |
 
+Actions that require a mounted host return `true` when accepted and `false`
+when no active target exists. Dismissal methods return `false` when there is no
+matching presentation to remove. The results are discardable for fire-and-forget
+UI actions and available when application logic needs an explicit outcome.
+
 ```swift
 // Once a RouterHost has appeared:
 router.push(.detail(id: "42"))
@@ -196,8 +201,9 @@ nearest mounted ancestor. A late disappearance from an old branch cannot
 deactivate a newer branch.
 
 Calls made before any host is mounted are rejected rather than retained as
-invisible navigation state. Pass an `os.Logger` to the root initialiser to
-record those diagnostics.
+invisible navigation state. Check the returned `Bool` when the caller must react
+to rejection, and pass an `os.Logger` to the root initialiser to record those
+diagnostics.
 
 ### Root and Modal Children
 
@@ -421,7 +427,7 @@ choosing direct View-to-Router dispatch.
 Configure deep-link handling with a URL scheme and ordered parsers:
 
 ```swift
-router.configureDeepLinks(scheme: "myapp", parsers: [
+try router.configureDeepLinks(scheme: "myapp", parsers: [
   .equal(to: ["profile"], destination: .root(.profile)),
 
   DeepLinkParser { request in
@@ -434,6 +440,11 @@ router.configureDeepLinks(scheme: "myapp", parsers: [
   },
 ])
 ```
+
+Configuration validates the scheme before mutating Router state. Handle
+``DeepLinkConfigurationError`` at the composition boundary; schemes must start
+with an ASCII letter and may then contain ASCII letters, digits, `+`, `-`, or
+`.`. Do not include `://`.
 
 ``DeepLinkRequest`` exposes the original URL and its host-plus-path components.
 Return `.noMatch` when a parser does not recognise the route so evaluation can
@@ -462,7 +473,7 @@ For HTTPS links, validate the complete host with an exact, case-insensitive
 comparison, then validate the path and query values:
 
 ```swift
-router.configureDeepLinks(scheme: "https", parsers: [
+try router.configureDeepLinks(scheme: "https", parsers: [
   DeepLinkParser { request in
     guard request.url.host()?.caseInsensitiveCompare("links.example.com")
             == .orderedSame

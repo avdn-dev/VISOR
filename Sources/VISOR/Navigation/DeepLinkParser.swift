@@ -16,6 +16,9 @@ import Foundation
 /// counts, decoding values exactly once, and rejecting malformed identifiers.
 public struct DeepLinkRequest: Hashable, Sendable {
   /// Creates a request from an external URL without decoding its route values.
+  ///
+  /// - Parameter url: The URL whose host and path form the ordered route
+  ///   components.
   public init(url: URL) {
     self.url = url
 
@@ -64,7 +67,7 @@ nonisolated extension DeepLinkParseResult: Sendable {}
 /// `Router.configureDeepLinks(scheme:parsers:)`:
 ///
 /// ```swift
-/// router.configureDeepLinks(scheme: "myapp", parsers: [
+/// try router.configureDeepLinks(scheme: "myapp", parsers: [
 ///   .equal(to: ["profile"], destination: .root(.profile)),
 ///   DeepLinkParser { request in
 ///     guard request.components.first == "item" else { return .noMatch }
@@ -91,6 +94,9 @@ public struct DeepLinkParser<Scene: NavigationScene>: Sendable {
   // MARK: Public
 
   /// Validate and map one request.
+  ///
+  /// - Parameter request: A scheme-validated deep-link request.
+  /// - Returns: Whether the parser did not match, rejected, or resolved the request.
   public func parse(_ request: DeepLinkRequest) -> DeepLinkParseResult<Scene> {
     parseRequest(request)
   }
@@ -111,6 +117,11 @@ extension DeepLinkParser {
   /// // Matches "myapp://profile" or "myapp:///profile"
   /// .equal(to: ["profile"], destination: .root(.profile))
   /// ```
+  ///
+  /// - Parameters:
+  ///   - components: The exact, percent-encoded host-plus-path components.
+  ///   - destination: The destination returned for an exact match.
+  /// - Returns: A parser that otherwise returns ``DeepLinkParseResult/noMatch``.
   public static func equal(
     to components: [String],
     destination: Destination<Scene>)

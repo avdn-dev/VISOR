@@ -39,9 +39,9 @@ nonisolated enum DocumentationScene: NavigationScene {
 func openDocumentationDeepLink(
   _ url: URL,
   with router: Router<DocumentationScene>)
-  -> DeepLinkOutcome<DocumentationScene>
+  throws -> DeepLinkOutcome<DocumentationScene>
 {
-  router.configureDeepLinks(scheme: "documentation", parsers: [
+  try router.configureDeepLinks(scheme: "documentation", parsers: [
     DeepLinkParser { request in
       guard request.components.first == "detail" else { return .noMatch }
       guard request.components.count == 2,

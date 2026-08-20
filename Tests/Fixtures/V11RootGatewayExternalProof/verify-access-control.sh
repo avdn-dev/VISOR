@@ -54,6 +54,36 @@ verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_NAME name
 verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_IDENTITY identity
 verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_READ read
 
+verify_get_only() {
+  flag=$1
+  member=$2
+
+  set +e
+  output=$(swift build \
+    --package-path "$proof_directory" \
+    --target RootGatewayAccessControlProbe \
+    -Xswiftc "-D$flag" 2>&1)
+  status=$?
+  set -e
+
+  if [ "$status" -eq 0 ]; then
+    echo "Expected $member assignment to fail, but the target compiled." >&2
+    exit 1
+  fi
+
+  case "$output" in
+    *"'$member' is a get-only property"*) ;;
+    *)
+      echo "The $member assignment probe failed for an unexpected reason:" >&2
+      echo "$output" >&2
+      exit 1
+      ;;
+  esac
+}
+
+verify_get_only VISOR_PROBE_SHEET_SETTER presentingSheet
+verify_get_only VISOR_PROBE_FULL_SCREEN_SETTER presentingFullScreen
+
 verify_hidden_type() {
   flag=$1
   type_name=$2
