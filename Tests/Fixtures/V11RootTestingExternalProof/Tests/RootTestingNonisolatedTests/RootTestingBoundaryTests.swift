@@ -1,9 +1,17 @@
 import RootTestingModelsNonisolated
 import RootTestingSupport
+import Testing
 import VISORTesting
 
 @Suite("Root VISORTesting from a nonisolated target")
 struct RootTestingBoundaryTests {
+  @Test
+  func `Public observation errors can be handled downstream`() {
+    let error = ObservationTestError.resultUnavailable
+
+    #expect(error.errorDescription?.contains("State window was unavailable") == true)
+  }
+
   @Test
   @MainActor
   func `The generated model supports source-fenced public testing APIs`() async throws {

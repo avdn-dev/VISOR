@@ -1,8 +1,24 @@
+import Foundation
 import Testing
 import VISOR
 
+/// A failure produced by VISOR's test-observation control plane.
+public enum ObservationTestError: Error, Equatable, Sendable {
+  /// The requested operation could not run, so no result exists.
+  case resultUnavailable
+}
+
+extension ObservationTestError: LocalizedError {
+  /// A human-readable explanation suitable for a failed test diagnostic.
+  public var errorDescription: String? {
+    switch self {
+    case .resultUnavailable:
+      "The observation action could not run because its State window was unavailable. Review the recorded test issue for the underlying infrastructure failure."
+    }
+  }
+}
+
 enum ObservationTestControlError: Error {
-  case unavailableResult
   case stateIdentityChanged
 }
 
@@ -53,6 +69,11 @@ public final class ObservationTest<SUT: ViewModel> {
   // MainActor-isolated classes.
   deinit {}
 
+  /// Performs one ViewModel action and fences all participating sources.
+  ///
+  /// - Parameters:
+  ///   - action: The action dispatched through `ViewModel.handle(_:)`.
+  ///   - sourceLocation: The call site used for test diagnostics.
   public func perform(
     _ action: SUT.Action,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -69,6 +90,11 @@ public final class ObservationTest<SUT: ViewModel> {
     _ = await closeWindow(sourceLocation: sourceLocation)
   }
 
+  /// Performs one nonthrowing asynchronous operation and fences its State writes.
+  ///
+  /// - Parameters:
+  ///   - operation: The complete structured operation under test.
+  ///   - sourceLocation: The call site used for test diagnostics.
   public func perform(
     _ operation: @MainActor () async -> Void,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -81,6 +107,12 @@ public final class ObservationTest<SUT: ViewModel> {
     _ = await closeWindow(sourceLocation: sourceLocation)
   }
 
+  /// Performs one throwing Void operation and fences its State writes.
+  ///
+  /// - Parameters:
+  ///   - operation: The complete structured operation under test.
+  ///   - sourceLocation: The call site used for test diagnostics.
+  /// - Throws: The operation's error after the observation window is closed.
   public func perform(
     _ operation: @MainActor () async throws -> Void,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -98,6 +130,15 @@ public final class ObservationTest<SUT: ViewModel> {
     _ = await closeWindow(sourceLocation: sourceLocation)
   }
 
+  /// Performs one throwing value-producing operation and fences its State writes.
+  ///
+  /// - Parameters:
+  ///   - operation: The complete structured operation under test.
+  ///   - sourceLocation: The call site used for test diagnostics.
+  /// - Returns: The operation's result after the observation window is closed.
+  /// - Throws: Cancellation, the operation's error, or an unavailable-result
+  ///   ``ObservationTestError/resultUnavailable`` if infrastructure fails
+  ///   before the operation starts.
   public func perform<Result>(
     _ operation: @MainActor () async throws -> Result,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -111,7 +152,7 @@ public final class ObservationTest<SUT: ViewModel> {
       if Task.isCancelled {
         throw CancellationError()
       }
-      throw ObservationTestControlError.unavailableResult
+      throw ObservationTestError.resultUnavailable
     }
 
     let result: Result
@@ -373,7 +414,7 @@ public final class ObservationTest<SUT: ViewModel> {
 
   package func _waitForSessionFailureForProof() async throws {
     guard let session else {
-      throw ObservationTestControlError.unavailableResult
+      throw ObservationTestError.resultUnavailable
     }
     _ = try await session._visorWaitForFailure()
   }

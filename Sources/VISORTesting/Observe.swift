@@ -8,6 +8,12 @@ import VISOR
 /// safety deadline expires first, the function returns after reporting the
 /// failure while retaining the State reservation until the session truly
 /// joins, preventing a replacement scope from receiving retired writes.
+///
+/// - Parameters:
+///   - sut: The ViewModel whose generated observation session is tested.
+///   - sourceLocation: The call site used for infrastructure diagnostics.
+///   - body: The scoped test operation. Do not retain its handle beyond the closure.
+/// - Throws: Cancellation or an error thrown by `body`.
 @MainActor
 public func observe<SUT: ViewModel>(
   _ sut: SUT,
@@ -173,7 +179,7 @@ private func observeImplementation<SUT: ViewModel>(
   do {
     try await body(test)
     try Task.checkCancellation()
-  } catch ObservationTestControlError.unavailableResult {
+  } catch ObservationTestError.resultUnavailable {
     test.end()
     await session._visorStop()
     test.reportUnobservedSessionFailure(
