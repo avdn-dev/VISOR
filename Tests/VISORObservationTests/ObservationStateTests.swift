@@ -99,9 +99,13 @@ private final class AttributeInitialValueProducer {
 private final class SnapshotConsumer {
   init(source: ObservationSource<Int>) {
     task = Task { [weak self, source] in
-      for await _ in source {
-        guard !Task.isCancelled else { return }
-        self?.receive()
+      do {
+        for try await _ in source {
+          guard !Task.isCancelled else { return }
+          self?.receive()
+        }
+      } catch {
+        Issue.record("Healthy lifetime-test source failed: \(error)")
       }
     }
   }
@@ -162,15 +166,17 @@ struct ObservationStateTests {
   }
 
   @Test
-  func `Assignment updates State and publishes a snapshot`() async {
+  func `Assignment updates State and publishes a snapshot`() async throws {
     let producer = ObservationStateProducer()
     let snapshots = producer.snapshotSnapshots.makeAsyncIterator()
 
-    #expect(await snapshots.next() == ObservationStateSnapshot())
+    #expect(try await snapshots.next() == ObservationStateSnapshot())
 
     producer.update(count: 2, label: "updated")
 
-    #expect(await snapshots.next() == ObservationStateSnapshot(count: 2, label: "updated"))
+    #expect(
+      try await snapshots.next()
+        == ObservationStateSnapshot(count: 2, label: "updated"))
     #expect(producer.snapshot == ObservationStateSnapshot(count: 2, label: "updated"))
   }
 

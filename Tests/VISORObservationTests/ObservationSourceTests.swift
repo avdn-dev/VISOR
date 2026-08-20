@@ -20,6 +20,50 @@ private actor Producer {
   }
 }
 
+@Suite("Public observation snapshots")
+struct ObservationSnapshotsTests {
+  @Test
+  func `Each iterator independently receives the baseline and next publication`() async throws {
+    let channel = ObservationChannel(0)
+    let first = channel.source.makeAsyncIterator()
+    let second = channel.source.makeAsyncIterator()
+
+    #expect(try await first.next() == 0)
+    #expect(try await second.next() == 0)
+
+    channel.publish(1)
+
+    #expect(try await first.next() == 1)
+    #expect(try await second.next() == 1)
+  }
+
+  @Test
+  func `Iterator coalesces queued publications to the latest snapshot`() async throws {
+    let channel = ObservationChannel(0)
+    let iterator = channel.source.makeAsyncIterator()
+    #expect(try await iterator.next() == 0)
+
+    channel.publish(1)
+    channel.publish(2)
+    channel.publish(3)
+
+    #expect(try await iterator.next() == 3)
+  }
+
+  @Test
+  func `Unexpected termination surfaces the public iterator error`() async throws {
+    let channel = ObservationChannel(0)
+    let iterator = channel.source.makeAsyncIterator()
+    #expect(try await iterator.next() == 0)
+
+    channel._visorTerminate()
+
+    await #expect(throws: ObservationSourceError.terminatedUnexpectedly) {
+      _ = try await iterator.next()
+    }
+  }
+}
+
 private actor OrderedProducer {
   private var value = 0
   private let channel: ObservationChannel<Int>

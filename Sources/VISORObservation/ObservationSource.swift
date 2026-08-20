@@ -1,6 +1,38 @@
 import Foundation
 import os
 
+/// A failure encountered while iterating an ``ObservationSource`` directly.
+///
+/// Cancellation is a normal sequence-lifecycle event and finishes iteration
+/// without throwing. These cases instead indicate that the source can no
+/// longer provide coherent snapshots.
+nonisolated public enum ObservationSourceError: Error, Equatable, Sendable {
+  /// The source stopped without a normal producer-lifecycle completion.
+  case terminatedUnexpectedly
+
+  /// The source exhausted its monotonically increasing revision space.
+  case revisionExhausted
+
+  /// The observation runtime rejected an inconsistent operation.
+  ///
+  /// - Parameter detail: A diagnostic description of the failed invariant.
+  case runtimeFailure(detail: String)
+}
+
+extension ObservationSourceError: LocalizedError {
+  /// A human-readable explanation suitable for diagnostics.
+  public var errorDescription: String? {
+    switch self {
+    case .terminatedUnexpectedly:
+      "The observation source terminated unexpectedly."
+    case .revisionExhausted:
+      "The observation source exhausted its revision space."
+    case .runtimeFailure(let detail):
+      "The observation source runtime failed: \(detail)"
+    }
+  }
+}
+
 nonisolated package struct _ObservationGroupID: Hashable, Sendable {
   fileprivate let rawValue: UUID
 }
@@ -26,7 +58,10 @@ nonisolated public struct ObservationSource<Value: Sendable>:
   AsyncSequence,
   Sendable
 {
+  /// The snapshot emitted by this sequence.
   public typealias Element = Value
+
+  /// An independently owned iterator over this source.
   public typealias AsyncIterator = ObservationSnapshots<Value>.Iterator
 
   fileprivate let core: _ObservationCore<Value>
@@ -35,6 +70,7 @@ nonisolated public struct ObservationSource<Value: Sendable>:
     self.core = core
   }
 
+  /// Returns the source's latest published snapshot synchronously.
   public func currentSnapshot() -> Value {
     core.currentSnapshot()
   }
@@ -44,6 +80,10 @@ nonisolated public struct ObservationSource<Value: Sendable>:
   /// Retain the returned source as stable producer or test-double state. Do
   /// not recreate it from a computed source property because each call would
   /// have a different source identity.
+  ///
+  /// - Parameter snapshot: The immutable snapshot retained for the source's
+  ///   lifetime.
+  /// - Returns: A source that always exposes `snapshot`.
   public static func constant(_ snapshot: sending Value) -> Self {
     ObservationChannel(snapshot).source
   }
@@ -67,7 +107,10 @@ nonisolated public struct ObservationSource<Value: Sendable>:
   /// Opens an independently owned initial-plus-latest snapshot stream.
   ///
   /// Direct iteration is equivalent to iterating ``snapshots``. Each iterator
-  /// owns a separate subscription.
+  /// owns a separate subscription. Iteration throws ``ObservationSourceError``
+  /// if the source can no longer provide coherent snapshots.
+  ///
+  /// - Returns: A new iterator with an independent source subscription.
   public func makeAsyncIterator() -> AsyncIterator {
     snapshots.makeAsyncIterator()
   }
@@ -109,17 +152,24 @@ nonisolated public struct ObservationSnapshots<Value: Sendable>:
   AsyncSequence,
   Sendable
 {
+  /// The snapshot emitted by this sequence.
   public typealias Element = Value
 
   fileprivate let source: ObservationSource<Value>
 
+  /// Opens an iterator with an independent source subscription.
+  ///
+  /// - Returns: A new iterator for the source represented by this sequence.
   public func makeAsyncIterator() -> Iterator {
     Iterator(source: source)
   }
 
+  /// A single-consumer iterator over an ``ObservationSource``.
+  ///
+  /// The iterator intentionally does not conform to `Sendable`: its mutable
+  /// subscription state must be consumed serially by one task.
   nonisolated public final class Iterator:
-    AsyncIteratorProtocol,
-    @unchecked Sendable
+    AsyncIteratorProtocol
   {
     fileprivate init(source: ObservationSource<Value>) {
       self.source = source
@@ -129,7 +179,13 @@ nonisolated public struct ObservationSnapshots<Value: Sendable>:
       observation?.subscription._visorCancel()
     }
 
-    public func next() async -> Value? {
+    /// Returns the baseline or newest available snapshot.
+    ///
+    /// - Returns: The next snapshot, or `nil` after cancellation or normal
+    ///   iterator completion.
+    /// - Throws: ``ObservationSourceError`` when the source terminates or its
+    ///   runtime detects an invalid state transition.
+    public func next() async throws(ObservationSourceError) -> Value? {
       guard !isFinished else { return nil }
 
       do {
@@ -146,9 +202,15 @@ nonisolated public struct ObservationSnapshots<Value: Sendable>:
           return nil
         }
         return envelope.snapshot
-      } catch {
+      } catch is CancellationError {
         finish()
         return nil
+      } catch let failure as _ObservationSourceFailure {
+        finish()
+        throw ObservationSourceError(failure)
+      } catch {
+        finish()
+        throw .runtimeFailure(detail: String(describing: error))
       }
     }
 
@@ -171,8 +233,14 @@ nonisolated public struct ObservationSnapshots<Value: Sendable>:
 /// value semantics. Producers must publish stable full snapshots.
 nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
   private let core: _ObservationCore<Value>
+
+  /// The stable, read-only capability distributed to consumers.
   public let source: ObservationSource<Value>
 
+  /// Creates a producer channel with its initial snapshot.
+  ///
+  /// - Parameter initialSnapshot: The first immutable snapshot exposed to
+  ///   every new source iterator.
   public init(_ initialSnapshot: sending Value) {
     let core = _ObservationCore(
       initialSnapshot,
@@ -183,6 +251,10 @@ nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
 
   /// Creates another performance lane in the anchor channel's immutable
   /// producer checkpoint group without introducing a third public concept.
+  ///
+  /// - Parameters:
+  ///   - initialSnapshot: The first immutable snapshot for the new channel.
+  ///   - anchor: A channel whose checkpoint group this channel joins.
   public init<Anchor: Sendable>(
     _ initialSnapshot: sending Value,
     groupedWith anchor: ObservationChannel<Anchor>
@@ -196,6 +268,9 @@ nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
 
   /// Publication is deliberately synchronous. An actor service can mutate its
   /// domain state and publish the matching snapshot in the same actor turn.
+  ///
+  /// - Parameter snapshot: A stable snapshot that will not be mutated through
+  ///   a shared reference after publication.
   public func publish(_ snapshot: sending Value) {
     core.publish(snapshot)
   }
@@ -224,6 +299,28 @@ nonisolated package enum _ObservationSourceFailure:
     omittedSourceCount: Int)
 }
 
+private extension ObservationSourceError {
+  init(_ failure: _ObservationSourceFailure) {
+    switch failure {
+    case .unexpectedTermination:
+      self = .terminatedUnexpectedly
+    case .revisionExhausted:
+      self = .revisionExhausted
+    case .failed(let detail), .protocolViolation(let detail):
+      self = .runtimeFailure(detail: detail)
+    case .safetyDeadlineExceeded(
+      let phase,
+      let sourceIDs,
+      let omittedSourceCount
+    ):
+      let visibleSourceCount = sourceIDs.count
+      let totalSourceCount = visibleSourceCount + omittedSourceCount
+      self = .runtimeFailure(
+        detail: "Safety deadline exceeded during \(phase) for \(totalSourceCount) source(s)")
+    }
+  }
+}
+
 nonisolated package struct _ObservationSourceID: Hashable, Sendable {
   fileprivate let rawValue: UUID
 }
@@ -233,34 +330,34 @@ nonisolated package struct _ObservationEpoch: Hashable, Sendable {
 }
 
 nonisolated package struct _ObservationEnvelope<Value: Sendable>: Sendable {
-  public let sourceID: _ObservationSourceID
-  public let epoch: _ObservationEpoch
-  public let revision: UInt64
-  public let snapshot: Value
+  package let sourceID: _ObservationSourceID
+  package let epoch: _ObservationEpoch
+  package let revision: UInt64
+  package let snapshot: Value
 }
 
 nonisolated package struct _ObservationCheckpoint<Value: Sendable>: Sendable {
   fileprivate let subscriptionID: UUID
-  public let envelope: _ObservationEnvelope<Value>
+  package let envelope: _ObservationEnvelope<Value>
 }
 
 nonisolated package struct _OpenObservation<Value: Sendable>: Sendable {
-  public let baseline: _ObservationEnvelope<Value>
-  public let subscription: _ObservationSubscription<Value>
+  package let baseline: _ObservationEnvelope<Value>
+  package let subscription: _ObservationSubscription<Value>
 }
 
 nonisolated package struct _PreparedObservation<Value: Sendable>: Sendable {
   fileprivate let openObservation: _OpenObservation<Value>
 
-  public var baseline: _ObservationEnvelope<Value> {
+  package var baseline: _ObservationEnvelope<Value> {
     openObservation.baseline
   }
 
-  public func _visorActivate() -> _OpenObservation<Value> {
+  package func _visorActivate() -> _OpenObservation<Value> {
     openObservation
   }
 
-  public func _visorCancel() {
+  package func _visorCancel() {
     openObservation.subscription._visorCancel()
   }
 }
@@ -269,43 +366,43 @@ nonisolated package struct _ObservationSubscription<Value: Sendable>: Sendable {
   fileprivate let id: UUID
   fileprivate let core: _ObservationCore<Value>
 
-  public func _visorNext() async throws -> _ObservationEnvelope<Value>? {
+  package func _visorNext() async throws -> _ObservationEnvelope<Value>? {
     try await core.next(for: id)
   }
 
-  public func _visorAcknowledge(
+  package func _visorAcknowledge(
     _ envelope: _ObservationEnvelope<Value>
   ) throws {
     try core.acknowledge(envelope, for: id)
   }
 
-  public func _visorCheckpointAndPause() throws -> _ObservationCheckpoint<Value> {
+  package func _visorCheckpointAndPause() throws -> _ObservationCheckpoint<Value> {
     try core.checkpointAndPause(id: id)
   }
 
-  public func _visorWaitUntilAcknowledged(
+  package func _visorWaitUntilAcknowledged(
     _ checkpoint: _ObservationCheckpoint<Value>
   ) async throws {
     try await core.waitUntilAcknowledged(checkpoint, for: id)
   }
 
-  public func _visorClaimForDirectReconciliation(
+  package func _visorClaimForDirectReconciliation(
     _ checkpoint: _ObservationCheckpoint<Value>
   ) throws -> _ObservationEnvelope<Value> {
     try core.claimForDirectReconciliation(checkpoint, for: id)
   }
 
-  public func _visorResume(
+  package func _visorResume(
     after checkpoint: _ObservationCheckpoint<Value>
   ) throws {
     try core.resume(after: checkpoint, for: id)
   }
 
-  public func _visorCancel() {
+  package func _visorCancel() {
     core.cancel(id: id)
   }
 
-  public func _visorErase() -> _AnyObservationSubscription {
+  package func _visorErase() -> _AnyObservationSubscription {
     _AnyObservationSubscription(self)
   }
 }
@@ -320,8 +417,8 @@ nonisolated fileprivate struct _PreparedObservationBox<Value: Sendable>:
 }
 
 nonisolated package struct _AnyPreparedObservation: Sendable {
-  public let sourceID: _ObservationSourceID
-  public let groupID: _ObservationGroupID
+  package let sourceID: _ObservationSourceID
+  package let groupID: _ObservationGroupID
   fileprivate let storage: any _PreparedObservationStorage
   private let cancelOperation: @Sendable () -> Void
 
@@ -334,7 +431,7 @@ nonisolated package struct _AnyPreparedObservation: Sendable {
     cancelOperation = { observation._visorCancel() }
   }
 
-  public func _visorUnwrap<Value: Sendable>(
+  package func _visorUnwrap<Value: Sendable>(
     as _: Value.Type = Value.self
   ) throws -> _PreparedObservation<Value> {
     guard let box = storage as? _PreparedObservationBox<Value> else {
@@ -344,14 +441,14 @@ nonisolated package struct _AnyPreparedObservation: Sendable {
     return box.observation
   }
 
-  public func _visorCancel() {
+  package func _visorCancel() {
     cancelOperation()
   }
 }
 
 nonisolated package struct _AnyObservationSource: Sendable {
-  public let sourceID: _ObservationSourceID
-  public let groupID: _ObservationGroupID
+  package let sourceID: _ObservationSourceID
+  package let groupID: _ObservationGroupID
   fileprivate let group: _ObservationGroupCore
   fileprivate let validatePrepareLocked: @Sendable () throws -> Void
   fileprivate let prepareLocked: @Sendable () throws -> _AnyPreparedObservation
@@ -431,8 +528,8 @@ nonisolated fileprivate struct _AnyResumeOutcome: Sendable {
 }
 
 nonisolated package struct _AnyObservationCheckpoint: Sendable {
-  public let sourceID: _ObservationSourceID
-  public let groupID: _ObservationGroupID
+  package let sourceID: _ObservationSourceID
+  package let groupID: _ObservationGroupID
   fileprivate let group: _ObservationGroupCore
   fileprivate let storage: any _ObservationCheckpointStorage
   private let waitOperation: @Sendable () async throws -> Void
@@ -468,7 +565,7 @@ nonisolated package struct _AnyObservationCheckpoint: Sendable {
     cancelOperation()
   }
 
-  public func _visorUnwrap<Value: Sendable>(
+  package func _visorUnwrap<Value: Sendable>(
     as _: Value.Type = Value.self
   ) throws -> _ObservationCheckpoint<Value> {
     guard let box = storage as? _ObservationCheckpointBox<Value> else {
@@ -489,8 +586,8 @@ nonisolated fileprivate struct _ObservationCheckpointBox<Value: Sendable>:
 }
 
 nonisolated package struct _AnyObservationSubscription: Sendable {
-  public let sourceID: _ObservationSourceID
-  public let groupID: _ObservationGroupID
+  package let sourceID: _ObservationSourceID
+  package let groupID: _ObservationGroupID
   fileprivate let group: _ObservationGroupCore
   fileprivate let subscriptionID: UUID
   fileprivate let checkpointLockedOperation:
@@ -521,14 +618,14 @@ nonisolated package struct _AnyObservationSubscription: Sendable {
     cancelOperation = { subscription._visorCancel() }
   }
 
-  public func _visorCancel() {
+  package func _visorCancel() {
     cancelOperation()
   }
 }
 
 /// Provisional underscored operations used by generated session code.
 nonisolated package enum _ObservationRuntime {
-  public static func _visorPrepareAll(
+  package static func _visorPrepareAll(
     _ sources: [_AnyObservationSource]
   ) throws -> [_AnyPreparedObservation] {
     guard Set(sources.map(\.sourceID)).count == sources.count else {
@@ -575,7 +672,7 @@ nonisolated package enum _ObservationRuntime {
     }
   }
 
-  public static func _visorCheckpointAndPauseAll(
+  package static func _visorCheckpointAndPauseAll(
     _ subscriptions: [_AnyObservationSubscription]
   ) throws -> [_AnyObservationCheckpoint] {
     guard Set(subscriptions.map(\.subscriptionID)).count
@@ -639,7 +736,7 @@ nonisolated package enum _ObservationRuntime {
     }
   }
 
-  public static func _visorWaitUntilAcknowledgedAll(
+  package static func _visorWaitUntilAcknowledgedAll(
     _ checkpoints: [_AnyObservationCheckpoint]
   ) async throws {
     do {
@@ -659,7 +756,7 @@ nonisolated package enum _ObservationRuntime {
     }
   }
 
-  public static func _visorResumeAll(
+  package static func _visorResumeAll(
     after checkpoints: [_AnyObservationCheckpoint]
   ) throws {
     let groups = checkpointGroups(checkpoints)
@@ -772,7 +869,6 @@ nonisolated package enum _ObservationRuntime {
 }
 
 nonisolated private struct _AcknowledgementWaiter: Sendable {
-  let id: UUID
   let revision: UInt64
   let continuation: CheckedContinuation<Void, any Error>
 }
@@ -782,7 +878,7 @@ nonisolated fileprivate struct _SubscriptionState<Value: Sendable>: Sendable {
   var lastAcknowledgedRevision: UInt64?
   var pauseEnvelope: _ObservationEnvelope<Value>?
   var nextWaiter: CheckedContinuation<_ObservationEnvelope<Value>?, any Error>?
-  var acknowledgementWaiters: [_AcknowledgementWaiter] = []
+  var acknowledgementWaiters: [UUID: _AcknowledgementWaiter] = [:]
 }
 
 nonisolated private struct _CoreState<Value: Sendable>: Sendable {
@@ -1023,12 +1119,13 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
       }
 
       subscription.lastAcknowledgedRevision = envelope.revision
-      let ready = subscription.acknowledgementWaiters.filter {
+      let ready = subscription.acknowledgementWaiters.values.filter {
         $0.revision <= envelope.revision
       }
-      subscription.acknowledgementWaiters.removeAll {
-        $0.revision <= envelope.revision
-      }
+      subscription.acknowledgementWaiters =
+        subscription.acknowledgementWaiters.filter {
+          $0.value.revision > envelope.revision
+        }
       state.subscriptions[id] = subscription
       return ready.map(\.continuation)
     }
@@ -1129,11 +1226,10 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
             return .success
           }
 
-          subscription.acknowledgementWaiters.append(
+          subscription.acknowledgementWaiters[waiterID] =
             _AcknowledgementWaiter(
-              id: waiterID,
               revision: checkpoint.envelope.revision,
-              continuation: continuation))
+              continuation: continuation)
           state.subscriptions[id] = subscription
           return .suspended
         }
@@ -1265,8 +1361,10 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
     // `removeValue` critical section when no continuation retains it.
     withExtendedLifetime(subscription?.pauseEnvelope) {
       subscription?.nextWaiter?.resume(returning: nil)
-      for waiter in subscription?.acknowledgementWaiters ?? [] {
-        waiter.continuation.resume(throwing: CancellationError())
+      if let subscription {
+        for waiter in subscription.acknowledgementWaiters.values {
+          waiter.continuation.resume(throwing: CancellationError())
+        }
       }
     }
   }
@@ -1295,7 +1393,7 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
           resumptions.next.append(nextWaiter)
         }
         resumptions.acknowledgements.append(
-          contentsOf: subscription.acknowledgementWaiters.map(\.continuation))
+          contentsOf: subscription.acknowledgementWaiters.values.map(\.continuation))
       }
       state.subscriptions.removeAll(keepingCapacity: false)
       return resumptions
@@ -1326,12 +1424,11 @@ nonisolated fileprivate final class _ObservationCore<Value: Sendable>: Sendable 
     let continuation = lock.withLock {
       state -> CheckedContinuation<Void, any Error>? in
       guard var subscription = state.subscriptions[id],
-            let index = subscription.acknowledgementWaiters.firstIndex(
-              where: { $0.id == waiterID })
+            let waiter = subscription.acknowledgementWaiters.removeValue(
+              forKey: waiterID)
       else {
         return nil
       }
-      let waiter = subscription.acknowledgementWaiters.remove(at: index)
       state.subscriptions[id] = subscription
       return waiter.continuation
     }
