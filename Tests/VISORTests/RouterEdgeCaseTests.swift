@@ -148,12 +148,12 @@ struct RouterEdgeCaseTests {
   // MARK: - Tree-wide deep-link configuration
 
   @Test
-  func `Existing root and modal routers receive later configuration`() {
+  func `Existing root and modal routers receive later configuration`() throws {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     let modal = child.childRouter()
 
-    root.configureDeepLinks(scheme: "test", parsers: [
+    try root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .root(.settings)),
     ])
 
@@ -165,9 +165,9 @@ struct RouterEdgeCaseTests {
   }
 
   @Test
-  func `Child created after configureDeepLinks inherits configuration`() {
+  func `Child created after configureDeepLinks inherits configuration`() throws {
     let root = Router<TestScene>()
-    root.configureDeepLinks(scheme: "test", parsers: [
+    try root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .root(.settings)),
     ])
 
@@ -339,17 +339,17 @@ struct RouterEdgeCaseTests {
   // MARK: - Multiple configureDeepLinks calls overwrite configuration
 
   @Test
-  func `Multiple configureDeepLinks calls overwrite configuration`() {
+  func `Multiple configureDeepLinks calls overwrite configuration`() throws {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     let modal = child.childRouter()
 
-    root.configureDeepLinks(scheme: "test", parsers: [
+    try root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .root(.home)),
     ])
 
     // Second call overwrites
-    root.configureDeepLinks(scheme: "test", parsers: [
+    try root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["settings"], destination: .root(.settings)),
     ])
 

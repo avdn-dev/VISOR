@@ -152,10 +152,10 @@ struct IntegrationTests {
   }
 
   @Test
-  func `A deep link opened by a child router reaches its push destination`() {
+  func `A deep link opened by a child router reaches its push destination`() throws {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
-    root.configureDeepLinks(scheme: "test", parsers: [
+    try root.configureDeepLinks(scheme: "test", parsers: [
       .equal(to: ["home"], destination: .root(.home)),
       .equal(
         to: ["settings", "detail"],
@@ -177,7 +177,7 @@ struct IntegrationTests {
       RoutedTestVM(routerID: ObjectIdentifier(router))
     }
 
-    let viewModel = factory.makeViewModel(router: router)
+    let viewModel = factory._visorMakeViewModel(router: router)
     #expect(viewModel.routerID == ObjectIdentifier(router))
   }
 }
