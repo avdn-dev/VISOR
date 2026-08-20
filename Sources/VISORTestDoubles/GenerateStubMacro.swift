@@ -2,6 +2,8 @@
 ///
 /// Pass ``TestDoubleTrait/sendable`` to generate checked Sendable,
 /// synchronised storage.
+///
+/// - Parameter traits: Options that specialise the generated stub.
 @attached(peer, names: prefixed(Stub))
 public macro GenerateStub(_ traits: TestDoubleTrait...) = #externalMacro(
   module: "VISORMacros",

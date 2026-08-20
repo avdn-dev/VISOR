@@ -92,6 +92,15 @@ public final class _ObservationRecipeVisitor {
 
   deinit {}
 
+  /// Adds one generated source description to the visitor.
+  ///
+  /// This method is public only because attached macro expansions are
+  /// type-checked in the consuming module.
+  ///
+  /// - Parameters:
+  ///   - source: The source shared by the generated handlers.
+  ///   - projections: State projections run for every delivered snapshot.
+  ///   - initialReactions: Reactions also run while establishing readiness.
   public func add<Snapshot: Sendable>(
     source: ObservationSource<Snapshot>,
     projections: [

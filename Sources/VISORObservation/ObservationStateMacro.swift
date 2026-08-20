@@ -12,6 +12,8 @@ public enum ObservationStateSequenceName: Sendable {
   case values
 
   /// Generates the member named by a static Swift identifier.
+  ///
+  /// - Parameter name: The exact generated source-property name.
   case named(StaticString)
 }
 
@@ -40,7 +42,7 @@ public macro ObservationStateRequirements() = #externalMacro(
 ///   playback = .stopped
 /// }
 ///
-/// for await snapshot in service.playbackSnapshots {
+/// for try await snapshot in service.playbackSnapshots {
 ///   // Receives the current snapshot, then each replacement.
 /// }
 /// ```
@@ -94,6 +96,8 @@ public macro ObservationState() = #externalMacro(
   type: "ObservationStateMacro")
 
 /// Declares observable State and selects its generated sequence name.
+///
+/// - Parameter naming: The naming convention for the generated source property.
 @attached(
   accessor,
   names: named(init), named(get), named(set))
@@ -109,6 +113,8 @@ public macro ObservationState(
 /// Protocol requirements cannot contain a stored initial value. Concrete
 /// classes and actors initialise their scalar normally and do not use this
 /// overload.
+///
+/// - Parameter initial: The baseline used by generated test doubles.
 @attached(peer, names: arbitrary)
 public macro ObservationState<Value: Sendable>(
   initial: Value
@@ -118,6 +124,10 @@ public macro ObservationState<Value: Sendable>(
 
 /// Marks a protocol State requirement with a test-double baseline and selects
 /// its generated sequence name.
+///
+/// - Parameters:
+///   - initial: The baseline used by generated test doubles.
+///   - naming: The naming convention for the generated source property.
 @attached(peer, names: arbitrary)
 public macro ObservationState<Value: Sendable>(
   initial: Value,

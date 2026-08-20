@@ -26,12 +26,19 @@ import VISORObservation
 ///   }
 /// }
 /// ```
+///
+/// - Parameters:
+///   - source: A key path from the ViewModel to a stable snapshot source.
+///   - selection: A key path selecting the State field's value from each snapshot.
 @attached(peer)
 public macro Bound<Root, Snapshot: Sendable, Value>(
   source: KeyPath<Root, ObservationSource<Snapshot>>,
   selecting selection: KeyPath<Snapshot, Value>
 ) = #externalMacro(module: "VISORMacros", type: "BoundMacro")
 
+/// Projects every complete source value into the annotated State field.
+///
+/// - Parameter source: A key path from the ViewModel to the stable value source.
 @attached(peer)
 public macro Bound<Root, Value: Sendable>(
   source: KeyPath<Root, ObservationSource<Value>>

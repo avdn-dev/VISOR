@@ -45,7 +45,11 @@
 ///       let result = await service.fetchAll()
 ///       state[\.items] = .loaded(result)
 ///     case .delete(let id):
-///       try? await service.delete(id)
+///       do {
+///         try await service.delete(id)
+///       } catch {
+///         state[\.items] = .failure(.deleteFailed)
+///       }
 ///     }
 ///   }
 ///

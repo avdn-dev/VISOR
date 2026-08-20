@@ -64,10 +64,6 @@ nonisolated private final class _ViewModelObservationRequestSignal: Sendable {
   }
 }
 
-/// An inert identity token emitted by `@ViewModel`.
-///
-/// Generated downstream code can construct and carry this token, but only
-/// VISOR can use it to claim production observation ownership.
 /// Result of attempting to acquire a ViewModel's observation identity lease.
 nonisolated package enum _ViewModelObservationOwnershipClaim {
   case claimed
@@ -75,6 +71,11 @@ nonisolated package enum _ViewModelObservationOwnershipClaim {
   case cancelled
 }
 
+/// An inert identity token emitted by `@ViewModel`.
+///
+/// Generated downstream code can construct and carry this token, but only
+/// VISOR can use it to claim production observation ownership. This type is
+/// public solely because attached macro expansions are checked downstream.
 public final class _ViewModelObservationOwnership: Sendable {
   private typealias Waiter = CheckedContinuation<Bool, Never>
 
@@ -92,6 +93,7 @@ public final class _ViewModelObservationOwnership: Sendable {
 
   private let lock = OSAllocatedUnfairLock(initialState: State())
 
+  /// Creates a fresh per-ViewModel ownership identity.
   public init() {}
 
   /// Claims immediately unless another active owner holds the lease. When the
@@ -692,6 +694,12 @@ package struct _ViewModelObservationHost<
 
 /// The only production-owner bridge named by generated downstream code.
 /// Its opaque result hides the concrete host and all lifecycle capabilities.
+///
+/// - Parameters:
+///   - viewModel: The generated ViewModel owned by the host.
+///   - observationPolicy: The scene-lifecycle policy for observation.
+///   - content: The content rendered after observation becomes ready.
+/// - Returns: An opaque lifecycle host for generated `@LazyViewModel` content.
 @MainActor
 public func _visorOwnedViewModelContent<VM, Content>(
   for viewModel: VM,

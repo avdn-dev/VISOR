@@ -16,9 +16,17 @@
 /// }
 /// ```
 public enum Loadable<Value, Failure: Error> {
+  /// Work is in progress and no value is available.
   case loading
+  /// Work completed successfully without a value to display.
   case empty
+  /// Work completed successfully with a value.
+  ///
+  /// - Parameter value: The loaded value.
   case loaded(Value)
+  /// Work failed with a typed domain error.
+  ///
+  /// - Parameter failure: The failure produced by the operation.
   case failure(Failure)
 }
 
@@ -35,6 +43,9 @@ nonisolated extension Loadable {
   public var failure: Failure? { if case .failure(let failure) = self { failure } else { nil } }
 
   /// Transform the loaded value, preserving `loading`/`empty`/`failure` states.
+  ///
+  /// - Parameter transform: Maps the loaded value into a new value type.
+  /// - Returns: A loadable value with the transformed loaded case.
   public func map<NewValue>(_ transform: (Value) -> NewValue) -> Loadable<NewValue, Failure> {
     switch self {
     case .loading: .loading
@@ -45,6 +56,9 @@ nonisolated extension Loadable {
   }
 
   /// Transform the failure while preserving the loading state and loaded value.
+  ///
+  /// - Parameter transform: Maps the failure into a new error type.
+  /// - Returns: A loadable value with the transformed failure case.
   public func mapFailure<NewFailure: Error>(
     _ transform: (Failure) -> NewFailure
   ) -> Loadable<Value, NewFailure> {
@@ -57,6 +71,10 @@ nonisolated extension Loadable {
   }
 
   /// Transform the loaded value into another `Loadable`, preserving non-loaded states.
+  ///
+  /// - Parameter transform: Maps the loaded value into another loadable value.
+  /// - Returns: The transform result for a loaded value, or the unchanged
+  ///   non-loaded state.
   public func flatMap<NewValue>(
     _ transform: (Value) -> Loadable<NewValue, Failure>
   ) -> Loadable<NewValue, Failure> {

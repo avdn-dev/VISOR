@@ -1,0 +1,29 @@
+# ``VISORTestDoubles``
+
+Generate configurable stubs and call-recording spies without depending on the
+VISOR production or testing runtimes.
+
+## Overview
+
+Attach `@GenerateStub` or `@GenerateSpy` to a protocol. Generated peers preserve
+the protocol's access level and isolation. Use the `.sendable` trait only when
+the protocol is `Sendable`; the generated double then uses checked, lock-backed
+storage without holding its lock across asynchronous work.
+
+Override inferred property and method defaults with `@DefaultValue` and
+`@DefaultReturn`. Use ``StubSequence`` when successive calls should return a
+deterministic series of values.
+
+## Topics
+
+### Generation
+
+- ``GenerateStub(_:)``
+- ``GenerateSpy(_:)``
+- ``TestDoubleTrait``
+
+### Configuration
+
+- ``DefaultValue(_:)``
+- ``DefaultReturn(_:)``
+- ``StubSequence``
