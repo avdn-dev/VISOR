@@ -179,26 +179,26 @@ struct GenerateStubMacroRuntimeTests {
 struct GenerateSpyMacroRuntimeTests {
 
     @Test
-    func `Observation State assignments publish through generated spies`() async {
+    func `Observation State assignments publish through generated spies`() async throws {
         let spy = SpyObservationStateService()
         let service: any ObservationStateService = spy
         let values = service.countValues.makeAsyncIterator()
 
-        #expect(await values.next() == 0)
+        #expect(try await values.next() == 0)
         spy.count = 1
-        #expect(await values.next() == 1)
+        #expect(try await values.next() == 1)
     }
 
     @Test
-    func `Sendable Observation State assignments remain coherent across isolation`() async {
+    func `Sendable Observation State assignments remain coherent across isolation`() async throws {
         let spy = SpySendableObservationStateService()
         let values = spy.countValues.makeAsyncIterator()
 
-        #expect(await values.next() == 0)
+        #expect(try await values.next() == 0)
         await Task { @concurrent in
             spy.count = 2
         }.value
-        #expect(await values.next() == 2)
+        #expect(try await values.next() == 2)
 
         await withTaskGroup(of: Void.self) { group in
             for count in 3...1_000 {
