@@ -72,6 +72,7 @@ Declare only the products each target imports. A feature that owns a source-back
 ## Quick start
 
 ```swift
+import Observation
 import SwiftUI
 import VISOR
 import VISORObservation

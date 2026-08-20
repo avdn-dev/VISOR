@@ -1,5 +1,6 @@
 import RootTestingModelsMainActor
 import RootTestingSupport
+import Testing
 import VISORTesting
 
 @Suite("Root VISORTesting from a MainActor-by-default target")

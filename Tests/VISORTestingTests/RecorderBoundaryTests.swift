@@ -1,6 +1,7 @@
 import Observation
 import os
 import Testing
+import VISOR
 import VISORTesting
 
 private final class RecorderBoundaryDescriptionCounter: Sendable {

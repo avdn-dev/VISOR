@@ -1,4 +1,5 @@
 import Testing
+import VISOR
 import VISORTesting
 
 private enum DeadlineLifecycleError: Error {
