@@ -46,7 +46,7 @@ struct ViewModelFactoryTests {
   @Test
   func `Non-routed factory ignores router context`() {
     let factory = ViewModelFactory { FactoryTestVM() }
-    let result = factory.makeViewModel(router: NSObject())
+    let result = factory._visorMakeViewModel(router: NSObject())
     #expect(result.initialValue == 0)
   }
 
@@ -56,7 +56,7 @@ struct ViewModelFactoryTests {
     let factory = ViewModelFactory<RoutedTestVM>(routed: { context in
       RoutedTestVM(routerID: ObjectIdentifier(context))
     })
-    let result = factory.makeViewModel(router: sentinel)
+    let result = factory._visorMakeViewModel(router: sentinel)
     #expect(result.routerID == ObjectIdentifier(sentinel))
   }
 
@@ -82,7 +82,7 @@ struct ViewModelFactoryTests {
     let factory: ViewModelFactory<RoutedTestVM> = .routed { (r: Router<TestScene>) in
       RoutedTestVM(routerID: ObjectIdentifier(r))
     }
-    let result = factory.makeViewModel(router: router)
+    let result = factory._visorMakeViewModel(router: router)
     #expect(result.routerID == ObjectIdentifier(router))
   }
 
@@ -91,7 +91,7 @@ struct ViewModelFactoryTests {
     let message = ViewModelFactoryDiagnostics.missingRouterMessage(for: RoutedTestVM.self)
 
     #expect(message.contains("RoutedTestVM"))
-    #expect(message.contains("EnvironmentValues.router was nil"))
+    #expect(message.contains("EnvironmentValues._visorRouter was nil"))
     #expect(message.contains("RouterHost"))
   }
 

@@ -8,6 +8,10 @@
 import SwiftUI
 
 extension EnvironmentValues {
-  /// Type-erased router, automatically set by RouterHost.
-  @Entry public var router: AnyObject?
+  /// Generated-code bridge for the type-erased Router supplied by RouterHost.
+  ///
+  /// This property is public only because attached macro expansions are
+  /// type-checked in the consuming module. Application code should read a
+  /// typed ``Router`` from the environment instead.
+  @Entry public var _visorRouter: AnyObject?
 }

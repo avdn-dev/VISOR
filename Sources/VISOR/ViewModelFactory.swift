@@ -5,13 +5,14 @@
 //  Created by Anh Nguyen on 19/2/2026.
 //
 
+import Observation
 
 // MARK: - ViewModelFactory
 
 package enum ViewModelFactoryDiagnostics {
   package static func missingRouterMessage<VM: ViewModel>(for viewModelType: VM.Type) -> String {
     "Could not create \(describe(viewModelType)): routed ViewModelFactory requires a router, " +
-      "but EnvironmentValues.router was nil. Ensure the @LazyViewModel view is rendered " +
+      "but EnvironmentValues._visorRouter was nil. Ensure the @LazyViewModel view is rendered " +
       "inside a RouterHost, or inject a non-routed factory if this ViewModel does not navigate."
   }
 
@@ -53,6 +54,8 @@ public final class ViewModelFactory<VM: ViewModel> {
   @ObservationIgnored private let _make: (AnyObject?) -> VM
 
   /// Create a factory that does not need a router.
+  ///
+  /// - Parameter make: A closure that creates a fresh ViewModel on demand.
   public init(_ make: @escaping () -> VM) {
     _make = { _ in make() }
   }
@@ -69,8 +72,26 @@ public final class ViewModelFactory<VM: ViewModel> {
     }
   }
 
-  /// Create a ViewModel. The router parameter is for generated code only.
-  public func makeViewModel(router: AnyObject? = nil) -> VM {
+  /// Creates a ViewModel from this factory.
+  ///
+  /// Use this method for non-routed factories. `@LazyViewModel` supplies the
+  /// generated Router bridge automatically for factories created with
+  /// ``routed(_:)``.
+  ///
+  /// - Returns: A newly created ViewModel.
+  public func makeViewModel() -> VM {
+    _make(nil)
+  }
+
+  /// Creates a ViewModel with the generated type-erased Router bridge.
+  ///
+  /// This method is public only because attached macro expansions are
+  /// type-checked in the consuming module. Call ``makeViewModel()`` from
+  /// application code.
+  ///
+  /// - Parameter router: The Router injected by `RouterHost`, if mounted.
+  /// - Returns: A newly created ViewModel.
+  public func _visorMakeViewModel(router: AnyObject?) -> VM {
     _make(router)
   }
 }

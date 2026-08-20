@@ -49,7 +49,7 @@ public struct LazyViewModelMacro: MemberMacro {
     let prefix = (access == "public" || access == "open") ? "\(access) " : ""
 
     var members: [DeclSyntax] = [
-      "@Environment(\\.router) private var hostRouter",
+      "@Environment(\\._visorRouter) private var hostRouter",
       "@Environment(VISOR.ViewModelFactory<\(raw: viewModelType)>.self) private var factory",
     ]
 
@@ -89,7 +89,7 @@ public struct LazyViewModelMacro: MemberMacro {
           }
           .task {
               if _viewModel == nil {
-                  _viewModel = factory.makeViewModel(router: hostRouter)
+                  _viewModel = factory._visorMakeViewModel(router: hostRouter)
               }
           }
       }

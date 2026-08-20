@@ -41,16 +41,18 @@
 /// TextField("Name", text: bindableState[\.name])
 /// ```
 ///
-/// - Parameter observationPolicy: Controls whether observation pauses based on scene phase.
-///   Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
-///   view models driving high-frequency work that wastes resources when the UI is not visible.
+/// - Parameters:
+///   - viewModelType: The concrete ViewModel type owned by the generated view.
+///   - observationPolicy: Controls whether observation pauses based on scene phase.
+///     Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
+///     view models driving high-frequency work that wastes resources when the UI is not visible.
 ///
 /// > The generated `viewModel` property fails with a diagnostic precondition if accessed
 /// > before initialisation. The generated `body` renders `content` only while the backing
 /// > `@State` contains a ViewModel; its task creates that instance when the owner mounts.
 @attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(hostRouter), named(scenePhase))
 public macro LazyViewModel<VM: ViewModel>(
-  _: VM.Type,
+  _ viewModelType: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving
 ) = #externalMacro(
   module: "VISORMacros",

@@ -15,6 +15,10 @@ extension ViewModelFactory {
   ///     GalleryViewModel(router: router, galleryService: galleryService)
   /// }
   /// ```
+  ///
+  /// - Parameter make: A closure that receives the typed Router mounted around
+  ///   the `@LazyViewModel` view and creates a fresh ViewModel.
+  /// - Returns: A factory configured for Router injection.
   public static func routed<Scene: NavigationScene>(
     _ make: @escaping (Router<Scene>) -> VM
   ) -> ViewModelFactory<VM> {

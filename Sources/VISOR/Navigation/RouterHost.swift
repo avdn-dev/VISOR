@@ -28,6 +28,13 @@ public struct RouterHost<
   // MARK: Lifecycle
 
   /// Creates a host for an existing Router.
+  ///
+  /// - Parameters:
+  ///   - router: The Router whose lifecycle and presentations are hosted.
+  ///   - pushContent: Resolves pushed destination values into views.
+  ///   - sheetContent: Resolves sheet destination values into views.
+  ///   - fullScreenContent: Resolves full-screen destination values into views.
+  ///   - content: The application-owned navigation container or root content.
   public init(
     router: Router<Scene>,
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
@@ -43,6 +50,14 @@ public struct RouterHost<
   }
 
   /// Creates a host for a cached top-level destination Router.
+  ///
+  /// - Parameters:
+  ///   - parentRouter: The Router that owns the top-level branch cache.
+  ///   - root: The branch hosted by this view.
+  ///   - pushContent: Resolves pushed destination values into views.
+  ///   - sheetContent: Resolves sheet destination values into views.
+  ///   - fullScreenContent: Resolves full-screen destination values into views.
+  ///   - content: The application-owned navigation container or branch content.
   public init(
     parentRouter: Router<Scene>,
     root: Scene.Root,
@@ -69,7 +84,7 @@ public struct RouterHost<
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent)
       .environment(router)
-      .environment(\.router, router)
+      .environment(\._visorRouter, router)
       .onAppear(perform: router.activate)
       .onDisappear(perform: router.deactivate)
       .onOpenURL { url in
