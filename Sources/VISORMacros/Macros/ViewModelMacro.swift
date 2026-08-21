@@ -80,6 +80,59 @@ private struct SourceObservationRecipeGroup {
   var reactions: [SourceReactionRecipe] = []
 }
 
+private struct ViewModelDependency {
+  let name: String
+  let parameterType: String
+}
+
+private struct StateInitialisationArgument {
+  let label: String?
+  let source: ExprSyntax
+  let selection: ExprSyntax?
+}
+
+private struct StateInitialisation {
+  let snapshotReads: [String]
+  let arguments: [String]
+}
+
+private struct ViewModelSynthesisPlan {
+  let stateDeclaration: DeclSyntax?
+  let initialiserDeclaration: DeclSyntax?
+}
+
+private func viewModelInitialiserParameterType(
+  for type: TypeSyntax
+) -> String {
+  let typeString = type.trimmedDescription
+  guard type.isTopLevelViewModelFunctionType else { return typeString }
+  guard !typeString.contains("@escaping") else { return typeString }
+  return "@escaping \(typeString)"
+}
+
+private extension TypeSyntax {
+  var isTopLevelViewModelFunctionType: Bool {
+    if self.is(FunctionTypeSyntax.self) { return true }
+    if let attributedType = self.as(AttributedTypeSyntax.self) {
+      return attributedType.baseType.isTopLevelViewModelFunctionType
+    }
+    if
+      let tupleType = self.as(TupleTypeSyntax.self),
+      tupleType.elements.count == 1,
+      let element = tupleType.elements.first
+    {
+      return element.type.isTopLevelViewModelFunctionType
+    }
+    return false
+  }
+
+  var hasImplicitNilInitialValue: Bool {
+    self.is(OptionalTypeSyntax.self) ||
+      trimmedDescription.hasPrefix("Optional<") ||
+      trimmedDescription.hasSuffix("!")
+  }
+}
+
 private func observationRoutingAttributes(
   on declaration: some DeclSyntaxProtocol
 ) -> [AttributeSyntax] {
@@ -234,18 +287,302 @@ private extension ClassDeclSyntax {
     }
   }
 
+  var hasExplicitViewModelInitialiser: Bool {
+    memberBlock.members.contains { $0.decl.is(InitializerDeclSyntax.self) }
+  }
+
+  func viewModelSynthesisPlan(
+    state: ClassDeclSyntax
+  ) -> ViewModelSynthesisPlan? {
+    if declaredViewModelStateProperty != nil,
+       stableViewModelStateProperty == nil
+    {
+      return nil
+    }
+
+    if hasExplicitViewModelInitialiser {
+      guard stableViewModelStateProperty != nil else { return nil }
+      return ViewModelSynthesisPlan(
+        stateDeclaration: nil,
+        initialiserDeclaration: nil)
+    }
+
+    guard let dependencies = synthesisedViewModelDependencies else {
+      return nil
+    }
+
+    let generatesState = stableViewModelStateProperty == nil
+    let authoredStateNeedsAssignment = stableViewModelStateProperty?
+      .bindings.first?.initializer == nil
+    let needsStateInitialisation = generatesState || authoredStateNeedsAssignment
+
+    let stateInitialisation: StateInitialisation?
+    if needsStateInitialisation {
+      guard let initialisation = synthesisedStateInitialisation(
+        state: state,
+        dependencies: dependencies)
+      else {
+        return nil
+      }
+      stateInitialisation = initialisation
+    } else {
+      stateInitialisation = nil
+    }
+
+    let access = accessLevel(of: self)
+    let prefix = access == "public" || access == "open" ? "public " : ""
+    let stateDeclaration: DeclSyntax? = generatesState
+      ? DeclSyntax(stringLiteral: "\(prefix)let state: State")
+      : nil
+
+    guard !dependencies.isEmpty || needsStateInitialisation else {
+      return ViewModelSynthesisPlan(
+        stateDeclaration: stateDeclaration,
+        initialiserDeclaration: nil)
+    }
+
+    let parameters = dependencies.map {
+      "\($0.name): \($0.parameterType)"
+    }.joined(separator: ", ")
+    var body = dependencies.map { "self.\($0.name) = \($0.name)" }
+
+    if let stateInitialisation {
+      body.append(contentsOf: stateInitialisation.snapshotReads)
+      if stateInitialisation.arguments.isEmpty {
+        body.append("self.state = State()")
+      } else {
+        let arguments = stateInitialisation.arguments
+          .joined(separator: ",\n  ")
+        body.append("""
+          self.state = State(
+            \(arguments))
+          """)
+      }
+    }
+
+    let bodySource = body.joined(separator: "\n")
+    let initialiser: DeclSyntax = DeclSyntax(stringLiteral: """
+      \(prefix)init(\(parameters)) {
+        \(bodySource)
+      }
+      """)
+    return ViewModelSynthesisPlan(
+      stateDeclaration: stateDeclaration,
+      initialiserDeclaration: initialiser)
+  }
+
+  private var synthesisedViewModelDependencies: [ViewModelDependency]? {
+    var dependencies: [ViewModelDependency] = []
+
+    for member in memberBlock.members {
+      guard let variable = member.decl.as(VariableDeclSyntax.self) else {
+        continue
+      }
+      if variable.modifiers.contains(where: {
+        $0.name.text == "static" || $0.name.text == "class"
+      }) {
+        continue
+      }
+
+      for binding in variable.bindings where
+        binding.accessorBlock == nil && binding.initializer == nil
+      {
+        if variable.bindingSpecifier.text == "var" {
+          guard binding.typeAnnotation?.type.hasImplicitNilInitialValue == true
+          else {
+            return nil
+          }
+          continue
+        }
+        guard
+          variable.bindingSpecifier.text == "let",
+          let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+          let type = binding.typeAnnotation?.type
+        else {
+          return nil
+        }
+        let name = identifier.identifier.text
+        if name == "state" { continue }
+        dependencies.append(ViewModelDependency(
+          name: name,
+          parameterType: viewModelInitialiserParameterType(for: type)))
+      }
+    }
+
+    return dependencies
+  }
+
+  private func synthesisedStateInitialisation(
+    state: ClassDeclSyntax,
+    dependencies: [ViewModelDependency]
+  ) -> StateInitialisation? {
+    let initialisers = state.memberBlock.members.compactMap {
+      $0.decl.as(InitializerDeclSyntax.self)
+    }
+
+    if initialisers.isEmpty {
+      guard stateCanUseImplicitInitialiser(state) else { return nil }
+      return StateInitialisation(snapshotReads: [], arguments: [])
+    }
+
+    guard initialisers.count == 1, let initialiser = initialisers.first else {
+      return nil
+    }
+    guard
+      initialiser.optionalMark == nil,
+      initialiser.genericParameterClause == nil,
+      initialiser.signature.effectSpecifiers == nil
+    else {
+      return nil
+    }
+
+    let dependencyNames = Set(dependencies.map(\.name))
+    let bounds = sourceBoundStateFields(in: state)
+    var arguments: [StateInitialisationArgument] = []
+
+    for parameter in initialiser.signature.parameterClause.parameters {
+      guard parameter.ellipsis == nil else { return nil }
+      let internalName = parameter.secondName?.text
+        ?? parameter.firstName.text
+      if let bound = bounds[internalName] {
+        guard sourceAccessPath(
+          from: bound.source,
+          dependencyNames: dependencyNames) != nil
+        else {
+          return nil
+        }
+        arguments.append(StateInitialisationArgument(
+          label: parameter.firstName.text == "_"
+            ? nil
+            : parameter.firstName.text,
+          source: bound.source,
+          selection: bound.selection))
+      } else if parameter.defaultValue == nil {
+        return nil
+      }
+    }
+
+    var sources: [(source: ExprSyntax, accessPath: String)] = []
+    func sourceIndex(for argument: StateInitialisationArgument) -> Int? {
+      let spelling = argument.source.trimmedDescription
+      if let index = sources.firstIndex(where: {
+        $0.source.trimmedDescription == spelling
+      }) {
+        return index
+      }
+      guard let accessPath = sourceAccessPath(
+        from: argument.source,
+        dependencyNames: dependencyNames)
+      else {
+        return nil
+      }
+      sources.append((source: argument.source, accessPath: accessPath))
+      return sources.index(before: sources.endIndex)
+    }
+
+    var renderedArguments: [String] = []
+    for argument in arguments {
+      guard let index = sourceIndex(for: argument) else { return nil }
+      let snapshot = "_visorInitialSource\(index)"
+      let value = argument.selection.map {
+        "\(snapshot)[keyPath: \($0.trimmedDescription)]"
+      } ?? snapshot
+      renderedArguments.append(argument.label.map {
+        "\($0): \(value)"
+      } ?? value)
+    }
+
+    let reads = sources.enumerated().map { index, source in
+      "let _visorInitialSource\(index) = " +
+        "\(source.accessPath).currentSnapshot()"
+    }
+    return StateInitialisation(
+      snapshotReads: reads,
+      arguments: renderedArguments)
+  }
+
+  private func sourceBoundStateFields(
+    in state: ClassDeclSyntax
+  ) -> [String: SourceObservationSelection] {
+    var fields: [String: SourceObservationSelection] = [:]
+    for member in state.memberBlock.members {
+      guard
+        let variable = member.decl.as(VariableDeclSyntax.self),
+        let attribute = variable.attributes.visorAttribute(named: "Bound"),
+        let observation = attribute.sourceObservationSelection,
+        let binding = variable.bindings.first,
+        let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
+      else {
+        continue
+      }
+      fields[identifier.identifier.text] = observation
+    }
+    return fields
+  }
+
+  private func stateCanUseImplicitInitialiser(
+    _ state: ClassDeclSyntax
+  ) -> Bool {
+    for member in state.memberBlock.members {
+      guard let variable = member.decl.as(VariableDeclSyntax.self) else {
+        continue
+      }
+      if variable.modifiers.contains(where: {
+        $0.name.text == "static" || $0.name.text == "class"
+      }) {
+        continue
+      }
+      if variable.bindings.contains(where: {
+        $0.accessorBlock == nil &&
+          $0.initializer == nil &&
+          $0.typeAnnotation?.type.hasImplicitNilInitialValue != true
+      }) {
+        return false
+      }
+    }
+    return true
+  }
+
+  private func sourceAccessPath(
+    from expression: ExprSyntax,
+    dependencyNames: Set<String>
+  ) -> String? {
+    guard let keyPath = expression.as(KeyPathExprSyntax.self) else {
+      return nil
+    }
+    let components = keyPath.components.compactMap { component -> String? in
+      guard case .property(let property) = component.component else {
+        return nil
+      }
+      return property.declName.baseName.text
+    }
+    guard
+      components.count == keyPath.components.count,
+      let dependency = components.first,
+      dependencyNames.contains(dependency)
+    else {
+      return nil
+    }
+    return components.joined(separator: ".")
+  }
+
+  func hasStableOrSynthesisedState(state: ClassDeclSyntax) -> Bool {
+    stableViewModelStateProperty != nil ||
+      viewModelSynthesisPlan(state: state)?.stateDeclaration != nil
+  }
+
   var hasConformanceCompatiblePublicState: Bool {
     let access = accessLevel(of: self)
     guard access == "public" || access == "open" else { return true }
-    guard
-      let state = nestedViewModelState,
-      let stateProperty = stableViewModelStateProperty
-    else {
+    guard let state = nestedViewModelState else { return false }
+    let stateAccess = accessLevel(of: state)
+    guard stateAccess == "public" || stateAccess == "open" else {
       return false
     }
-    let stateAccess = accessLevel(of: state)
-    return (stateAccess == "public" || stateAccess == "open") &&
-      stateProperty.modifiers.stateFieldAccessPrefix == "public "
+    if let stateProperty = stableViewModelStateProperty {
+      return stateProperty.modifiers.stateFieldAccessPrefix == "public "
+    }
+    return viewModelSynthesisPlan(state: state)?.stateDeclaration != nil
   }
 
   var hasRejectedSourceObservationDeclaration: Bool {
@@ -440,12 +777,15 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       return []
     }
 
-    guard viewModel.stableViewModelStateProperty != nil else {
+    let synthesisPlan = viewModel.viewModelSynthesisPlan(state: state)
+    guard viewModel.hasStableOrSynthesisedState(state: state) else {
       let diagnosticNode = viewModel.declaredViewModelStateProperty
         .map(Syntax.init) ?? Syntax(viewModel)
       context.diagnose(Diagnostic(
         node: diagnosticNode,
-        message: VISORDiagnostic.viewModelRequiresStableState))
+        message: viewModel.declaredViewModelStateProperty == nil
+          ? VISORDiagnostic.viewModelRequiresInitialisation
+          : VISORDiagnostic.viewModelRequiresStableState))
       return []
     }
 
@@ -527,6 +867,13 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
         "VISOR._ViewModelObservationOwnership()"),
     ]
 
+    if let stateDeclaration = synthesisPlan?.stateDeclaration {
+      members.append(stateDeclaration)
+    }
+    if let initialiserDeclaration = synthesisPlan?.initialiserDeclaration {
+      members.append(initialiserDeclaration)
+    }
+
     // Swift 6.2.4 can crash in release builds while synthesising destruction
     // for explicitly MainActor-isolated macro-expanded classes. An explicit
     // empty deinitialiser avoids that optimiser defect and remains inert at
@@ -602,7 +949,7 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       state.modifiers.contains(where: { $0.name.text == "final" }),
       viewModel.hasExplicitMainActor,
       viewModel.attributes.visorContains(named: AttributeName.observable),
-      viewModel.stableViewModelStateProperty != nil,
+      viewModel.hasStableOrSynthesisedState(state: state),
       viewModel.hasConformanceCompatiblePublicState,
       viewModel.conditionalDeinitialisers.isEmpty,
       state.conditionalDeinitialisers.isEmpty,
@@ -655,7 +1002,7 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       !state.hasRejectedStateField,
       viewModel.conditionalDeinitialisers.isEmpty,
       state.conditionalDeinitialisers.isEmpty,
-      viewModel.stableViewModelStateProperty != nil,
+      viewModel.hasStableOrSynthesisedState(state: state),
       viewModel.hasConformanceCompatiblePublicState,
       !viewModel.hasRejectedSourceObservationDeclaration
     else {

@@ -62,9 +62,9 @@ struct RootGatewayNonisolatedTests {
     requireViewModelConformance(viewModel)
     _ = viewModel._visorBuildObservationRecipe
 
-    #expect(viewModel.state.revision == -1)
-    #expect(viewModel.state.mirroredRevision == -1)
-    #expect(viewModel.state.projectedRevision == -1)
+    #expect(viewModel.state.revision == 41)
+    #expect(viewModel.state.mirroredRevision == 41)
+    #expect(viewModel.state.projectedRevision == 41)
     #expect(viewModel.state.reactedRevision == -1)
     #expect(viewModel.state.reactedLabel == "unreconciled")
     #expect(consumer.snapshot() == 41)

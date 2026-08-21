@@ -134,8 +134,6 @@ final class CounterViewModel {
     case increment
   }
 
-  let state = State()
-
   func handle(_ action: Action) {
     switch action {
     case .increment:
@@ -150,10 +148,10 @@ The shape is intentional:
 - `@MainActor` is explicit on every ViewModel; consumer targets do not need MainActor-by-default.
 - `@Observable` applies to the ViewModel, not its nested State declaration.
 - State is a plain `final class`. `@ViewModel` attaches its MainActor Observation accessors and routed field selectors.
-- `state` is a stored `let`, preserving one State identity for SwiftUI ownership and scoped testing.
+- `state` is a stored `let`, preserving one State identity for SwiftUI ownership and scoped testing. `@ViewModel` synthesises it when safe, or accepts an authored property for custom construction.
 - An `Action` enum is optional. Read-only ViewModels use the default `Never` action.
 
-For a public ViewModel, nested State and the stored `state` property must also be public enough to satisfy the generated conformance.
+For a public ViewModel, nested State must be public enough to satisfy the generated conformance. A synthesised `state` property and memberwise initialiser inherit that public access.
 
 ### Generated surface
 
@@ -162,34 +160,45 @@ For the source-backed shape, `@ViewModel` generates:
 1. `ViewModel` and source-backed runtime conformance;
 2. `typealias Factory = ViewModelFactory<ClassName>`;
 3. State Observation accessors and flat routed selectors;
-4. a grouped internal observation recipe for source-backed `@Bound` and `@Reaction` declarations; and
-5. a per-instance structured-owner identity token.
+4. a stable `state` property and memberwise dependency initialiser when State construction is unambiguous;
+5. a grouped internal observation recipe for source-backed `@Bound` and `@Reaction` declarations; and
+6. a per-instance structured-owner identity token.
 
 Swift 6.2.4 can crash in release optimisation while synthesising destruction for these explicitly MainActor macro-expanded classes. VISOR emits inert `deinit {}` declarations for the ViewModel and State when the user has not written an unconditional deinitialiser. A user-authored unconditional `deinit` is preserved. Conditional deinitialiser declarations are diagnosed because the macro cannot safely guarantee the workaround on every build path.
 
 ### State initialisation
 
-State fields keep ordinary declaration defaults or values assigned by a custom initialiser:
+When no ViewModel initialiser is authored, `@ViewModel` synthesises one from uninitialised stored `let` dependencies. It also synthesises `state` when State can be constructed from declaration defaults or required `@Bound` fields. Fields selecting the same source are seeded from one coherent current snapshot:
 
 ```swift
 final class State {
-  private(set) var title: String
-  private(set) var items: Loadable<[Item], ItemLoadFailure> = .loading
+  @Bound(
+    source: \ProfileViewModel.service.source,
+    selecting: \ProfileSnapshot.name)
+  private(set) var name: String
 
-  init(title: String) {
-    self.title = title
+  init(name: String) {
+    self.name = name
   }
 }
 
-let state: State
+let service: ProfileService
+// `@ViewModel` synthesises `let state: State` and `init(service:)`.
+```
 
-init(title: String, service: ItemService) {
-  state = State(title: title)
+Write the property and initialiser explicitly when construction needs a derived value, side effect, multiple State initialisers, or any other policy VISOR cannot prove:
+
+```swift
+let state: State
+let service: ItemService
+
+init(service: ItemService) {
   self.service = service
+  state = State(title: service.makeInitialTitle())
 }
 ```
 
-A source-backed `@Bound` field may also have a placeholder default. The generated owner replaces it from the source baseline before content or an observation test becomes ready.
+A source-backed `@Bound` field may instead have a placeholder default. The generated owner replaces it from the source baseline before content or an observation test becomes ready.
 
 ### Routed mutation
 

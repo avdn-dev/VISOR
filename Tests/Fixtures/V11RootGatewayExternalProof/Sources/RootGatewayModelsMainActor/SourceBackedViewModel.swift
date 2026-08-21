@@ -10,28 +10,31 @@ import VISOR
 public final class MainActorSourceBackedViewModel {
   public final class State {
     @Bound(source: \MainActorSourceBackedViewModel.consumer.source)
-    public private(set) var revision = -1
+    public private(set) var revision: Int
 
     @Bound(source: \MainActorSourceBackedViewModel.consumer.source)
-    public private(set) var mirroredRevision = -1
+    public private(set) var mirroredRevision: Int
 
     @Bound(
       source: \MainActorSourceBackedViewModel.consumer.projectedSource,
       selecting: \RootProjectedSnapshot.revision)
-    public private(set) var projectedRevision = -1
+    public private(set) var projectedRevision: Int
 
     public private(set) var reactedRevision = -1
     public private(set) var reactedLabel = "unreconciled"
 
-    public init() {}
+    public init(
+      revision: Int,
+      mirroredRevision: Int,
+      projectedRevision: Int)
+    {
+      self.revision = revision
+      self.mirroredRevision = mirroredRevision
+      self.projectedRevision = projectedRevision
+    }
   }
 
-  public let state = State()
   public let consumer: RootObservationConsumer
-
-  public init(consumer: RootObservationConsumer) {
-    self.consumer = consumer
-  }
 
   @Reaction(source: \MainActorSourceBackedViewModel.consumer.source)
   private func revisionChanged(_ revision: Int) {

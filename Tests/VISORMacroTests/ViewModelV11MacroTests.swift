@@ -23,6 +23,400 @@ import Testing
   @Suite("V11 ViewModel macro")
   struct ViewModelV11MacroTests {
     @Test
+    func `State ownership and an empty initialiser are synthesised when omitted`() {
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        final class EmptyViewModel {
+          final class State {
+            var count = 0
+          }
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          final class EmptyViewModel {
+            @MainActor @VISOR._ViewModelState
+            final class State {
+              var count = 0
+            }
+
+              typealias Factory = ViewModelFactory<EmptyViewModel>
+
+              let _visorObservationOwnership = VISOR._ViewModelObservationOwnership()
+
+              let state: State
+
+              init() {
+                self.state = State()
+              }
+
+              deinit {
+              }
+          }
+
+          extension EmptyViewModel: @MainActor ViewModel {
+          }
+          """,
+        macros: viewModelV11Macros)
+    }
+
+    @Test
+    func `Memberwise initialiser establishes State from coherent source baselines`() {
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        public final class SourceInitialisedViewModel {
+          public final class State {
+            @Bound(
+              source: \\SourceInitialisedViewModel.consumer.snapshotSource,
+              selecting: \\Snapshot.count)
+            public private(set) var count: Int
+
+            @Bound(
+              source: \\SourceInitialisedViewModel.consumer.snapshotSource,
+              selecting: \\Snapshot.label)
+            public private(set) var label: String
+
+            @Bound(source: \\SourceInitialisedViewModel.status.valueSource)
+            public private(set) var status: Status
+
+            public init(count: Int, label: String, status: Status) {
+              self.count = count
+              self.label = label
+              self.status = status
+            }
+          }
+
+          public let consumer: Consumer
+          private let status: StatusService
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          public final class SourceInitialisedViewModel {
+            @MainActor @VISOR._ViewModelState
+            public final class State {
+              public private(set) var count: Int
+              public private(set) var label: String
+              public private(set) var status: Status
+
+              public init(count: Int, label: String, status: Status) {
+                self.count = count
+                self.label = label
+                self.status = status
+              }
+            }
+
+            public let consumer: Consumer
+            private let status: StatusService
+
+              public typealias Factory = ViewModelFactory<SourceInitialisedViewModel>
+
+              public let _visorObservationOwnership = VISOR._ViewModelObservationOwnership()
+
+              public let state: State
+
+              public init(consumer: Consumer, status: StatusService) {
+                self.consumer = consumer
+                self.status = status
+                let _visorInitialSource0 = consumer.snapshotSource.currentSnapshot()
+                let _visorInitialSource1 = status.valueSource.currentSnapshot()
+                self.state = State(
+                  count: _visorInitialSource0[keyPath: \\Snapshot.count],
+                  label: _visorInitialSource0[keyPath: \\Snapshot.label],
+                  status: _visorInitialSource1)
+              }
+
+              deinit {
+              }
+
+              public func _visorBuildObservationRecipe(
+                into visitor: VISOR._ObservationRecipeVisitor
+              ) {
+                visitor.add(
+                source: self[keyPath: \\SourceInitialisedViewModel.consumer.snapshotSource],
+                projections: [
+                  { [weak self] snapshot in
+                guard let self else {
+                    return
+                }
+                self.updateState(\\.count, to: snapshot[keyPath: \\Snapshot.count])
+                  },
+                  { [weak self] snapshot in
+                    guard let self else {
+                    return
+                }
+                    self.updateState(\\.label, to: snapshot[keyPath: \\Snapshot.label])
+                  }
+                ],
+                initialReactions: [
+
+                ])
+                visitor.add(
+                  source: self[keyPath: \\SourceInitialisedViewModel.status.valueSource],
+                  projections: [
+                    { [weak self] snapshot in
+                  guard let self else {
+                    return
+                }
+                  self.updateState(\\.status, to: snapshot)
+                  }
+                  ],
+                  initialReactions: [
+
+                  ])
+              }
+          }
+
+          extension SourceInitialisedViewModel: @MainActor ViewModel {
+          }
+          """,
+        macros: viewModelV11Macros)
+    }
+
+    @Test
+    func `Custom initialisation remains authored`() {
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        final class CustomViewModel {
+          final class State {
+            var count: Int
+
+            init(count: Int) {
+              self.count = count
+            }
+          }
+
+          let state: State
+          let service: Service
+
+          init(service: Service) {
+            self.service = service
+            self.state = State(count: service.initialCount)
+            recordConstruction()
+          }
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          final class CustomViewModel {
+            @MainActor @VISOR._ViewModelState
+            final class State {
+              var count: Int
+
+              init(count: Int) {
+                self.count = count
+              }
+            }
+
+            let state: State
+            let service: Service
+
+            init(service: Service) {
+              self.service = service
+              self.state = State(count: service.initialCount)
+              recordConstruction()
+            }
+
+              typealias Factory = ViewModelFactory<CustomViewModel>
+
+              let _visorObservationOwnership = VISOR._ViewModelObservationOwnership()
+
+              deinit {
+              }
+          }
+
+          extension CustomViewModel: @MainActor ViewModel {
+          }
+          """,
+        macros: viewModelV11Macros)
+    }
+
+    @Test
+    func `Memberwise initialisers preserve dependency types and exclude owned storage`() {
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        package final class DependencyViewModel {
+          final class State {}
+          private var cachedValue = ""
+          private var task: Task<Void, Never>?
+          private let defaultedValue = "default"
+          private let router: Router<AppScene>
+          private let service: any Service
+          private let onAppear: () -> Void
+          private let openURL: @MainActor @Sendable (URL) -> Bool
+          private let onDismiss: (() -> Void)
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          package final class DependencyViewModel {
+            @MainActor @VISOR._ViewModelState
+            final class State {}
+            private var cachedValue = ""
+            private var task: Task<Void, Never>?
+            private let defaultedValue = "default"
+            private let router: Router<AppScene>
+            private let service: any Service
+            private let onAppear: () -> Void
+            private let openURL: @MainActor @Sendable (URL) -> Bool
+            private let onDismiss: (() -> Void)
+
+              typealias Factory = ViewModelFactory<DependencyViewModel>
+
+              let _visorObservationOwnership = VISOR._ViewModelObservationOwnership()
+
+              let state: State
+
+              init(router: Router<AppScene>, service: any Service, onAppear: @escaping () -> Void, openURL: @escaping @MainActor @Sendable (URL) -> Bool, onDismiss: @escaping (() -> Void)) {
+                self.router = router
+                self.service = service
+                self.onAppear = onAppear
+                self.openURL = openURL
+                self.onDismiss = onDismiss
+                self.state = State()
+              }
+
+              deinit {
+              }
+          }
+
+          extension DependencyViewModel: @MainActor ViewModel {
+          }
+          """,
+        macros: viewModelV11Macros)
+    }
+
+    @Test
+    func `Unsafe synthesis shapes fail closed`() {
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        final class MutableDependencyViewModel {
+          final class State {}
+          var service: Service
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          final class MutableDependencyViewModel {
+            final class State {}
+            var service: Service
+          }
+          """,
+        diagnostics: [
+          DiagnosticSpec(
+            id: MessageID(
+              domain: "VISOR",
+              id: "viewModelRequiresInitialisation"),
+            message:
+              "@ViewModel cannot synthesise initialisation for this State; declare a stored 'let state' and a custom initialiser",
+            line: 1,
+            column: 1,
+            severity: .error)
+        ],
+        macros: viewModelV11Macros)
+
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        final class AmbiguousStateViewModel {
+          final class State {
+            init() {}
+            init(count: Int) {}
+          }
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          final class AmbiguousStateViewModel {
+            final class State {
+              init() {}
+              init(count: Int) {}
+            }
+          }
+          """,
+        diagnostics: [
+          DiagnosticSpec(
+            id: MessageID(
+              domain: "VISOR",
+              id: "viewModelRequiresInitialisation"),
+            message:
+              "@ViewModel cannot synthesise initialisation for this State; declare a stored 'let state' and a custom initialiser",
+            line: 1,
+            column: 1,
+            severity: .error)
+        ],
+        macros: viewModelV11Macros)
+
+      assertMacroExpansionSwiftTesting(
+        """
+        @MainActor
+        @Observable
+        @ViewModel
+        final class DerivedStateViewModel {
+          final class State {
+            var summary: String
+
+            init(summary: String) {
+              self.summary = summary
+            }
+          }
+
+          let service: Service
+        }
+        """,
+        expandedSource: """
+          @MainActor
+          @Observable
+          final class DerivedStateViewModel {
+            final class State {
+              var summary: String
+
+              init(summary: String) {
+                self.summary = summary
+              }
+            }
+
+            let service: Service
+          }
+          """,
+        diagnostics: [
+          DiagnosticSpec(
+            id: MessageID(
+              domain: "VISOR",
+              id: "viewModelRequiresInitialisation"),
+            message:
+              "@ViewModel cannot synthesise initialisation for this State; declare a stored 'let state' and a custom initialiser",
+            line: 1,
+            column: 1,
+            severity: .error)
+        ],
+        macros: viewModelV11Macros)
+    }
+
+    @Test
     func `A plain State cascades the hidden gateway and uses the default recipe hook`() {
       assertMacroExpansionSwiftTesting(
         """
@@ -118,6 +512,11 @@ import Testing
               typealias Factory = ViewModelFactory<SourceViewModel>
 
               let _visorObservationOwnership = VISOR._ViewModelObservationOwnership()
+
+              init(service: Service, status: StatusService) {
+                self.service = service
+                self.status = status
+              }
 
               deinit {
               }

@@ -14,6 +14,7 @@ enum VISORDiagnostic: DiagnosticMessage {
   case lazyViewModelStateAliasCollision
   case viewModelRequiresMainActor
   case viewModelRequiresStableState
+  case viewModelRequiresInitialisation
   case viewModelRequiresVisibleState
   case invalidSourceBoundDeclaration
   case invalidSourceBoundPlacement
@@ -50,6 +51,8 @@ enum VISORDiagnostic: DiagnosticMessage {
       "@ViewModel requires the class to be explicitly @MainActor"
     case .viewModelRequiresStableState:
       "@ViewModel requires State to be held by a stored 'let state' property"
+    case .viewModelRequiresInitialisation:
+      "@ViewModel cannot synthesise initialisation for this State; declare a stored 'let state' and a custom initialiser"
     case .viewModelRequiresVisibleState:
       "a public @ViewModel requires public nested State and public let state"
     case .invalidSourceBoundDeclaration:
@@ -84,6 +87,7 @@ enum VISORDiagnostic: DiagnosticMessage {
     case .lazyViewModelStateAliasCollision: "lazyViewModelStateAliasCollision"
     case .viewModelRequiresMainActor: "viewModelRequiresMainActor"
     case .viewModelRequiresStableState: "viewModelRequiresStableState"
+    case .viewModelRequiresInitialisation: "viewModelRequiresInitialisation"
     case .viewModelRequiresVisibleState: "viewModelRequiresVisibleState"
     case .invalidSourceBoundDeclaration: "invalidSourceBoundDeclaration"
     case .invalidSourceBoundPlacement: "invalidSourceBoundPlacement"
