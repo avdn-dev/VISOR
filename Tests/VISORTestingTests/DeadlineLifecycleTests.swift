@@ -84,11 +84,8 @@ private final class TestingDeadlineSleeper {
 @MainActor
 private final class NthPauseGate {
   private let target: Int
+  private let operation = ControllableOperation<Void, Never>()
   private var count = 0
-  private var hasStarted = false
-  private var isOpen = false
-  private var startedWaiters: [CheckedContinuation<Void, Never>] = []
-  private var openWaiters: [CheckedContinuation<Void, Never>] = []
 
   init(target: Int) {
     self.target = target
@@ -99,32 +96,15 @@ private final class NthPauseGate {
   func visit() async {
     count += 1
     guard count == target else { return }
-    hasStarted = true
-    let started = startedWaiters
-    startedWaiters.removeAll()
-    for waiter in started {
-      waiter.resume()
-    }
-    guard !isOpen else { return }
-    await withCheckedContinuation { continuation in
-      openWaiters.append(continuation)
-    }
+    await operation.run()
   }
 
   func waitUntilStarted() async {
-    guard !hasStarted else { return }
-    await withCheckedContinuation { continuation in
-      startedWaiters.append(continuation)
-    }
+    await operation.waitUntilStarted()
   }
 
   func open() {
-    isOpen = true
-    let waiters = openWaiters
-    openWaiters.removeAll()
-    for waiter in waiters {
-      waiter.resume()
-    }
+    operation.finish()
   }
 }
 
@@ -141,31 +121,6 @@ private final class DeadlineIssueLog {
 
   func record(_ message: String, at location: SourceLocation) {
     entries.append(Entry(message: message, location: location))
-  }
-}
-
-@MainActor
-private final class DeadlineSignal {
-  private var hasFired = false
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-
-  deinit {}
-
-  func wait() async {
-    guard !hasFired else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(continuation)
-    }
-  }
-
-  func fire() {
-    guard !hasFired else { return }
-    hasFired = true
-    let waiters = waiters
-    self.waiters.removeAll()
-    for waiter in waiters {
-      waiter.resume()
-    }
   }
 }
 
@@ -190,7 +145,7 @@ struct DeadlineLifecycleTests {
   @MainActor
   func `Readiness reports at observe and withholds the body`() async throws {
     let service = TestingService(10)
-    let reactionGate = TestingGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
       reactionGate: reactionGate)
@@ -227,7 +182,7 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.first?.message.hasPrefix(
       "VISOR failed while starting observation:") == true)
 
-    reactionGate.open()
+    reactionGate.finish()
   }
 
   @Test
@@ -235,7 +190,7 @@ struct DeadlineLifecycleTests {
   func `A suspended user action receives no VISOR deadline`() async throws {
     let sut = TestingViewModel()
     let sleeper = TestingDeadlineSleeper()
-    let actionGate = TestingGate()
+    let actionGate = ControllableOperation<Void, Never>()
     let issues = DeadlineIssueLog()
     var actionCompleted = false
 
@@ -246,7 +201,7 @@ struct DeadlineLifecycleTests {
         issueRecorder: issues.record
       ) { test in
         await test.perform {
-          await actionGate.suspend()
+          await actionGate.run()
           actionCompleted = true
         }
         test.expect(\.count, hasExactChanges: [])
@@ -257,7 +212,7 @@ struct DeadlineLifecycleTests {
     #expect(!actionCompleted)
     #expect(issues.entries.isEmpty)
 
-    actionGate.open()
+    actionGate.finish()
     try await observation.value
     #expect(actionCompleted)
     #expect(issues.entries.isEmpty)
@@ -388,7 +343,7 @@ struct DeadlineLifecycleTests {
   @MainActor
   func `Teardown preserves the body error and reports at observe`() async {
     let service = TestingService()
-    let reactionGate = TestingGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
       reactionGate: reactionGate)
@@ -425,27 +380,27 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.first?.message.hasPrefix(
       "VISOR failed while running the observation session:") == true)
 
-    reactionGate.open()
+    reactionGate.finish()
   }
 
   @Test
   @MainActor
   func `A timed-out scope reserves State until its handler truly joins`() async throws {
     let service = TestingService()
-    let reactionGate = TestingGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
       reactionGate: reactionGate)
     let firstSleeper = TestingDeadlineSleeper()
     let firstIssues = DeadlineIssueLog()
-    let trueJoin = DeadlineSignal()
+    let trueJoin = TestEventCounter()
     var firstBodyRan = false
 
     let firstObservation = Task { @MainActor in
       try await _observeWithDeadlinePolicyForProof(
         sut,
         deadlinePolicy: testingDeadlinePolicy(sleeper: firstSleeper),
-        _visorDidFinishTeardown: trueJoin.fire,
+        _visorDidFinishTeardown: trueJoin.record,
         issueRecorder: firstIssues.record
       ) { _ in
         firstBodyRan = true
@@ -483,7 +438,7 @@ struct DeadlineLifecycleTests {
 
     // The retired handler completes its final State write. The finished
     // journal ignores it, and only true join releases the reservation.
-    reactionGate.open()
+    reactionGate.finish()
     await trueJoin.wait()
     #expect(sut.state.reactedValue == 10)
 

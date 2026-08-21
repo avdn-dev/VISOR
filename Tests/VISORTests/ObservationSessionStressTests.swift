@@ -1,38 +1,10 @@
 import Testing
 import VISOR
 import VISORObservation
+import VISORTesting
 
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
-
-@MainActor
-private final class ObservationSessionStressBarrier {
-  private struct Waiter {
-    let target: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
-
-  private var arrivalCount = 0
-  private var waiters: [Waiter] = []
-
-  deinit {}
-
-  func arrive() {
-    arrivalCount += 1
-    let ready = waiters.filter { $0.target <= arrivalCount }
-    waiters.removeAll { $0.target <= arrivalCount }
-    for waiter in ready {
-      waiter.continuation.resume()
-    }
-  }
-
-  func waitUntilArrived(_ target: Int) async {
-    guard arrivalCount < target else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(Waiter(target: target, continuation: continuation))
-    }
-  }
-}
 
 nonisolated private enum ObservationFailureWaitOutcome: Equatable, Sendable {
   case failure(_ObservationSourceFailure)
@@ -55,11 +27,11 @@ struct ObservationSessionStressTests {
     ])
     try await session._visorStart()
 
-    let barrier = ObservationSessionStressBarrier()
+    let barrier = TestEventCounter()
     let waiters: [Task<ObservationFailureWaitOutcome, Never>] =
       (0..<Self.waiterCount).map { _ in
         Task { @MainActor in
-          barrier.arrive()
+          barrier.record()
           do {
             return .failure(try await session._visorWaitForFailure())
           } catch is CancellationError {
@@ -70,7 +42,7 @@ struct ObservationSessionStressTests {
         }
       }
 
-    await barrier.waitUntilArrived(Self.waiterCount)
+    await barrier.wait(for: Self.waiterCount)
     for index in waiters.indices where index.isMultiple(of: 2) {
       waiters[index].cancel()
     }
@@ -129,11 +101,11 @@ struct ObservationSessionStressTests {
     ])
     try await session._visorStart()
 
-    let barrier = ObservationSessionStressBarrier()
+    let barrier = TestEventCounter()
     let waiters: [Task<ObservationFailureWaitOutcome, Never>] =
       (0..<Self.waiterCount).map { _ in
         Task { @MainActor in
-          barrier.arrive()
+          barrier.record()
           do {
             return .failure(try await session._visorWaitForFailure())
           } catch is CancellationError {
@@ -144,7 +116,7 @@ struct ObservationSessionStressTests {
         }
       }
 
-    await barrier.waitUntilArrived(Self.waiterCount)
+    await barrier.wait(for: Self.waiterCount)
     await session._visorStop()
 
     for waiter in waiters {

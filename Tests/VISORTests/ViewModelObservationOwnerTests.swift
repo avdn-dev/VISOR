@@ -2,6 +2,7 @@ import Observation
 import SwiftUI
 import Testing
 import VISORObservation
+import VISORTesting
 @testable import VISOR
 
 private struct OwnerSnapshot: Sendable {
@@ -9,30 +10,6 @@ private struct OwnerSnapshot: Sendable {
 }
 
 #if os(macOS)
-@MainActor
-private final class HostLifecycleEvent {
-  private(set) var count = 0
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-
-  deinit {}
-
-  func record() {
-    count += 1
-    let waiters = waiters
-    self.waiters.removeAll(keepingCapacity: false)
-    for waiter in waiters {
-      waiter.resume()
-    }
-  }
-
-  func wait() async {
-    guard count == 0 else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(continuation)
-    }
-  }
-}
-
 private final class HostLeaseCandidate: Sendable {}
 
 @MainActor
@@ -68,8 +45,8 @@ private struct ScenePhaseHost<Content: View>: View {
 @MainActor
 @LazyViewModel(OwnerSourceBackedViewModel.self)
 private struct GeneratedOwnerScreen: View {
-  let contentAppeared: HostLifecycleEvent
-  let contentDisappeared: HostLifecycleEvent
+  let contentAppeared: TestEventCounter
+  let contentDisappeared: TestEventCounter
 
   var content: some View {
     Text("Revision \(state.revision)")
@@ -83,8 +60,8 @@ private struct GeneratedOwnerScreen: View {
   OwnerSourceBackedViewModel.self,
   observationPolicy: .pauseWhenInactive)
 private struct GeneratedScenePhaseOwnerScreen: View {
-  let contentAppeared: OwnerEventCounter
-  let contentDisappeared: OwnerEventCounter
+  let contentAppeared: TestEventCounter
+  let contentDisappeared: TestEventCounter
 
   var content: some View {
     Text("Revision \(state.revision)")
@@ -99,7 +76,7 @@ extension ViewModelObservationOwnerTests {
   func `Generated LazyViewModel waits for readiness and joins on removal`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     statusService.publishSynchronously(.loading)
 
     let viewModel = OwnerSourceBackedViewModel(
@@ -107,8 +84,8 @@ extension ViewModelObservationOwnerTests {
       statusService: statusService,
       reactionGate: reactionGate)
     let factory = OwnerSourceBackedViewModel.Factory { viewModel }
-    let contentAppeared = HostLifecycleEvent()
-    let contentDisappeared = HostLifecycleEvent()
+    let contentAppeared = TestEventCounter()
+    let contentDisappeared = TestEventCounter()
     let root = AnyView(
       GeneratedOwnerScreen(
         contentAppeared: contentAppeared,
@@ -124,7 +101,7 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.open()
+    reactionGate.finish()
     await contentAppeared.wait()
     #expect(contentAppeared.count == 1)
     #expect(viewModel.state.reactedStatus == .loading)
@@ -154,15 +131,15 @@ extension ViewModelObservationOwnerTests {
   func `A mounted pause-when-inactive host follows the injected scene phase`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
     let factory = OwnerSourceBackedViewModel.Factory { viewModel }
     let phase = HostScenePhase(.active)
-    let contentAppeared = OwnerEventCounter()
-    let contentDisappeared = OwnerEventCounter()
+    let contentAppeared = TestEventCounter()
+    let contentDisappeared = TestEventCounter()
     let root = AnyView(
       ScenePhaseHost(phase: phase) {
         GeneratedScenePhaseOwnerScreen(
@@ -204,7 +181,7 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.open()
+    reactionGate.finish()
     await contentAppeared.wait(for: 2)
 
     #expect(contentAppeared.count == 2)
@@ -271,15 +248,15 @@ extension ViewModelObservationOwnerTests {
   func `A mounted host gates content and joins observation before release`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     statusService.publishSynchronously(.loading)
 
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
-    let contentAppeared = HostLifecycleEvent()
-    let contentDisappeared = HostLifecycleEvent()
+    let contentAppeared = TestEventCounter()
+    let contentDisappeared = TestEventCounter()
 
     let root = AnyView(
       _visorOwnedViewModelContent(for: viewModel) { _ in
@@ -297,7 +274,7 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.open()
+    reactionGate.finish()
     await contentAppeared.wait()
     #expect(contentAppeared.count == 1)
 
@@ -332,9 +309,9 @@ extension ViewModelObservationOwnerTests {
     let service = OwnerService()
     service.terminateObservationForProof()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let pendingAppeared = HostLifecycleEvent()
-    let failureAppeared = HostLifecycleEvent()
-    let contentAppeared = HostLifecycleEvent()
+    let pendingAppeared = TestEventCounter()
+    let failureAppeared = TestEventCounter()
+    let contentAppeared = TestEventCounter()
 
     let root = AnyView(
       _ViewModelObservationHost(
@@ -384,8 +361,8 @@ extension ViewModelObservationOwnerTests {
   @MainActor
   func `A duplicate mounted owner presents failure instead of content`() async {
     let viewModel = OwnerEmptyViewModel()
-    let contentAppeared = OwnerEventCounter()
-    let failureAppeared = OwnerEventCounter()
+    let contentAppeared = TestEventCounter()
+    let failureAppeared = TestEventCounter()
 
     let root = AnyView(
       VStack {
@@ -425,8 +402,8 @@ extension ViewModelObservationOwnerTests {
   @MainActor
   private func duplicateOwnerProofHost(
     viewModel: OwnerEmptyViewModel,
-    contentAppeared: OwnerEventCounter,
-    failureAppeared: OwnerEventCounter
+    contentAppeared: TestEventCounter,
+    failureAppeared: TestEventCounter
   ) -> some View {
     _ViewModelObservationHost(
       viewModel: viewModel,
@@ -501,45 +478,6 @@ private actor OwnerStatusService {
 }
 
 @MainActor
-private final class OwnerReactionGate {
-  private var isOpen = false
-  private var hasStarted = false
-  private var openWaiters: [CheckedContinuation<Void, Never>] = []
-  private var startedWaiters: [CheckedContinuation<Void, Never>] = []
-
-  deinit {}
-
-  func suspend() async {
-    hasStarted = true
-    let started = startedWaiters
-    startedWaiters.removeAll(keepingCapacity: false)
-    for waiter in started {
-      waiter.resume()
-    }
-    guard !isOpen else { return }
-    await withCheckedContinuation { continuation in
-      openWaiters.append(continuation)
-    }
-  }
-
-  func waitUntilStarted() async {
-    guard !hasStarted else { return }
-    await withCheckedContinuation { continuation in
-      startedWaiters.append(continuation)
-    }
-  }
-
-  func open() {
-    isOpen = true
-    let waiters = openWaiters
-    openWaiters.removeAll(keepingCapacity: false)
-    for waiter in waiters {
-      waiter.resume()
-    }
-  }
-}
-
-@MainActor
 @Observable
 @ViewModel
 private final class OwnerEmptyViewModel {
@@ -576,12 +514,12 @@ private final class OwnerSourceBackedViewModel {
   let state = State()
   let service: OwnerService
   let statusService: OwnerStatusService
-  private let reactionGate: OwnerReactionGate?
+  private let reactionGate: ControllableOperation<Void, Never>?
 
   init(
     service: OwnerService,
     statusService: OwnerStatusService = OwnerStatusService(),
-    reactionGate: OwnerReactionGate? = nil
+    reactionGate: ControllableOperation<Void, Never>? = nil
   ) {
     self.service = service
     self.statusService = statusService
@@ -598,7 +536,7 @@ private final class OwnerSourceBackedViewModel {
   @Reaction(source: \OwnerSourceBackedViewModel.statusService.source)
   private func statusChanged(_ status: OwnerStatus) async {
     if status == .loading {
-      await reactionGate?.suspend()
+      await reactionGate?.run()
     }
     updateState(\.reactedStatus, to: status)
   }
@@ -606,35 +544,6 @@ private final class OwnerSourceBackedViewModel {
   deinit {}
 }
 
-
-@MainActor
-private final class OwnerEventCounter {
-  private struct Waiter {
-    let target: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
-
-  private(set) var count = 0
-  private var waiters: [Waiter] = []
-
-  func record() {
-    count += 1
-    let completed = waiters.filter { $0.target <= count }
-    waiters.removeAll { $0.target <= count }
-    for waiter in completed {
-      waiter.continuation.resume()
-    }
-  }
-
-  func wait(for target: Int) async {
-    guard count < target else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(Waiter(
-        target: target,
-        continuation: continuation))
-    }
-  }
-}
 
 @MainActor
 private final class GenerationStartProbe {
@@ -648,35 +557,6 @@ private final class GenerationStartProbe {
   func record() {
     activeSubscriptionCounts.append(
       service.activeObservationCountForProof)
-  }
-}
-
-@MainActor
-private final class OwnershipClaimGate {
-  private var isOpen = false
-  private var hasStarted = false
-  private var openWaiters: [CheckedContinuation<Void, Never>] = []
-  private var startedWaiters: [CheckedContinuation<Void, Never>] = []
-
-  func suspend() async {
-    hasStarted = true
-    let startedWaiters = startedWaiters
-    self.startedWaiters.removeAll()
-    for waiter in startedWaiters { waiter.resume() }
-    guard !isOpen else { return }
-    await withCheckedContinuation { openWaiters.append($0) }
-  }
-
-  func waitUntilStarted() async {
-    guard !hasStarted else { return }
-    await withCheckedContinuation { startedWaiters.append($0) }
-  }
-
-  func open() {
-    isOpen = true
-    let openWaiters = openWaiters
-    self.openWaiters.removeAll()
-    for waiter in openWaiters { waiter.resume() }
   }
 }
 
@@ -766,7 +646,7 @@ struct ViewModelObservationOwnerTests {
   @MainActor
   func `An empty generated recipe crosses readiness without deadlock`() async {
     let viewModel = OwnerEmptyViewModel()
-    let ready = OwnerEventCounter()
+    let ready = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerEmptyViewModel>(
       _visorDidBecomeReady: { ready.record() })
 
@@ -794,15 +674,15 @@ struct ViewModelObservationOwnerTests {
   func `Content remains unavailable until complete session readiness`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     await service.publish(OwnerSnapshot(revision: 4))
     await statusService.publish(.loading)
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
-    let ready = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
+    let ready = TestEventCounter()
+    let stopped = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
       _visorDidStopGeneration: { stopped.record() })
@@ -823,7 +703,7 @@ struct ViewModelObservationOwnerTests {
     #expect(viewModel.state.revision == 4)
     #expect(viewModel.state.reactedStatus == .idle)
 
-    reactionGate.open()
+    reactionGate.finish()
     await ready.wait(for: 1)
     #expect(owner._visorCanExposeContent(
       for: viewModel,
@@ -854,14 +734,14 @@ struct ViewModelObservationOwnerTests {
   func `A replacing host waits for joined teardown before claiming the lease`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
-    let firstReady = OwnerEventCounter()
-    let contenderFailed = OwnerEventCounter()
-    let contenderReady = OwnerEventCounter()
+    let firstReady = TestEventCounter()
+    let contenderFailed = TestEventCounter()
+    let contenderReady = TestEventCounter()
     let contender = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { contenderReady.record() },
       _visorDidFail: { _ in contenderFailed.record() })
@@ -895,7 +775,7 @@ struct ViewModelObservationOwnerTests {
     #expect(contenderReady.count == 0)
     #expect(service.activeObservationCountForProof == 1)
 
-    reactionGate.open()
+    reactionGate.finish()
     await hostLifetime.value
     await contenderReady.wait(for: 1)
     #expect(contenderFailed.count == 0)
@@ -913,14 +793,14 @@ struct ViewModelObservationOwnerTests {
   func `A teardown deadline keeps the owner lease releasing until the true join`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
     let sleeper = OwnerDeadlineSleeper()
-    let firstReady = OwnerEventCounter()
-    let firstStopped = OwnerEventCounter()
+    let firstReady = TestEventCounter()
+    let firstStopped = TestEventCounter()
     let firstOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { firstReady.record() },
       _visorDidStopGeneration: { firstStopped.record() },
@@ -948,9 +828,9 @@ struct ViewModelObservationOwnerTests {
       for: viewModel,
       isEnabled: true))
 
-    let replacementWaited = OwnerEventCounter()
-    let replacementReady = OwnerEventCounter()
-    let replacementFailed = OwnerEventCounter()
+    let replacementWaited = TestEventCounter()
+    let replacementReady = TestEventCounter()
+    let replacementFailed = TestEventCounter()
     let replacement = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { replacementReady.record() },
       _visorDidFail: { _ in replacementFailed.record() },
@@ -966,7 +846,7 @@ struct ViewModelObservationOwnerTests {
     #expect(replacementFailed.count == 0)
     #expect(firstStopped.count == 0)
 
-    reactionGate.open()
+    reactionGate.finish()
     await firstStopped.wait(for: 1)
     await replacementReady.wait(for: 1)
 
@@ -988,15 +868,15 @@ struct ViewModelObservationOwnerTests {
   func `Scene disable reports its deadline and restarts only after the true join`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
     let sleeper = OwnerDeadlineSleeper()
-    let ready = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
-    let failed = OwnerEventCounter()
+    let ready = TestEventCounter()
+    let stopped = TestEventCounter()
+    let failed = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
       _visorDidFail: { _ in failed.record() },
@@ -1039,7 +919,7 @@ struct ViewModelObservationOwnerTests {
     #expect(ready.count == 1)
     #expect(stopped.count == 0)
 
-    reactionGate.open()
+    reactionGate.finish()
     await stopped.wait(for: 1)
     await ready.wait(for: 2)
 
@@ -1059,13 +939,13 @@ struct ViewModelObservationOwnerTests {
   func `A cancelled replacement relinquishes a newly claimed lease before the next hand-off`() async {
     let service = OwnerService()
     let statusService = OwnerStatusService()
-    let reactionGate = OwnerReactionGate()
+    let reactionGate = ControllableOperation<Void, Never>()
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService,
       reactionGate: reactionGate)
 
-    let firstReady = OwnerEventCounter()
+    let firstReady = TestEventCounter()
     let firstOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { firstReady.record() })
     let firstLifetime = Task { @MainActor in
@@ -1079,12 +959,12 @@ struct ViewModelObservationOwnerTests {
 
     firstLifetime.cancel()
 
-    let secondWaited = OwnerEventCounter()
-    let secondClaimGate = OwnershipClaimGate()
-    let secondFailed = OwnerEventCounter()
+    let secondWaited = TestEventCounter()
+    let secondClaimGate = ControllableOperation<Void, Never>()
+    let secondFailed = TestEventCounter()
     let secondOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidFail: { _ in secondFailed.record() },
-      _visorDidClaimOwnership: { await secondClaimGate.suspend() },
+      _visorDidClaimOwnership: { await secondClaimGate.run() },
       _visorDidEnterOwnershipWait: { secondWaited.record() })
     let secondLifetime = Task { @MainActor in
       await secondOwner._visorRun(
@@ -1093,7 +973,7 @@ struct ViewModelObservationOwnerTests {
     }
     await secondWaited.wait(for: 1)
 
-    reactionGate.open()
+    reactionGate.finish()
     await firstLifetime.value
     await secondClaimGate.waitUntilStarted()
 
@@ -1101,9 +981,9 @@ struct ViewModelObservationOwnerTests {
     // this contender is still suspended immediately after its async claim.
     secondLifetime.cancel()
 
-    let thirdWaited = OwnerEventCounter()
-    let thirdReady = OwnerEventCounter()
-    let thirdFailed = OwnerEventCounter()
+    let thirdWaited = TestEventCounter()
+    let thirdReady = TestEventCounter()
+    let thirdFailed = TestEventCounter()
     let thirdOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { thirdReady.record() },
       _visorDidFail: { _ in thirdFailed.record() },
@@ -1120,7 +1000,7 @@ struct ViewModelObservationOwnerTests {
     #expect(thirdReady.count == 0)
     #expect(service.activeObservationCountForProof == 0)
 
-    secondClaimGate.open()
+    secondClaimGate.finish()
     await secondLifetime.value
     await thirdReady.wait(for: 1)
 
@@ -1142,8 +1022,8 @@ struct ViewModelObservationOwnerTests {
     let service = OwnerService()
     service.terminateObservationForProof()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let failed = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
+    let failed = TestEventCounter()
+    let stopped = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidFail: { _ in failed.record() },
       _visorDidStopGeneration: { stopped.record() })
@@ -1183,8 +1063,8 @@ struct ViewModelObservationOwnerTests {
     let viewModel = OwnerSourceBackedViewModel(
       service: service,
       statusService: statusService)
-    let ready = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
+    let ready = TestEventCounter()
+    let stopped = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
       _visorDidStopGeneration: { stopped.record() })
@@ -1222,7 +1102,7 @@ struct ViewModelObservationOwnerTests {
   func `Rapid restart joins the old generation before opening the new one`() async {
     let service = OwnerService()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let ready = OwnerEventCounter()
+    let ready = TestEventCounter()
     let starts = GenerationStartProbe(service: service)
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
@@ -1254,8 +1134,8 @@ struct ViewModelObservationOwnerTests {
   func `Latest disabled request wins rapid false-true-false churn`() async {
     let service = OwnerService()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let ready = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
+    let ready = TestEventCounter()
+    let stopped = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
       _visorDidStopGeneration: { stopped.record() })
@@ -1287,8 +1167,8 @@ struct ViewModelObservationOwnerTests {
   func `A second owner for one ViewModel identity is rejected`() async {
     let service = OwnerService()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let firstReady = OwnerEventCounter()
-    let secondFailed = OwnerEventCounter()
+    let firstReady = TestEventCounter()
+    let secondFailed = TestEventCounter()
     let firstOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { firstReady.record() })
     let secondOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
@@ -1322,7 +1202,7 @@ struct ViewModelObservationOwnerTests {
   func `A new owner can claim the identity after joined hand-off`() async {
     let service = OwnerService()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let firstReady = OwnerEventCounter()
+    let firstReady = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { firstReady.record() })
     let first = Task { @MainActor in
@@ -1338,7 +1218,7 @@ struct ViewModelObservationOwnerTests {
     // explicit post-join release, not a weak-reference side effect.
     #expect(service.activeObservationCountForProof == 0)
 
-    let secondReady = OwnerEventCounter()
+    let secondReady = TestEventCounter()
     let secondOwner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { secondReady.record() })
     let second = Task { @MainActor in
@@ -1363,9 +1243,9 @@ struct ViewModelObservationOwnerTests {
   func `Infrastructure failure waits for a later activation edge before retrying`() async {
     let service = OwnerService()
     let viewModel = OwnerSourceBackedViewModel(service: service)
-    let ready = OwnerEventCounter()
-    let failed = OwnerEventCounter()
-    let stopped = OwnerEventCounter()
+    let ready = TestEventCounter()
+    let failed = TestEventCounter()
+    let stopped = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() },
       _visorDidFail: { _ in failed.record() },
@@ -1409,7 +1289,7 @@ struct ViewModelObservationOwnerTests {
   func `Readiness cannot cross a ViewModel identity boundary`() async {
     let firstViewModel = OwnerSourceBackedViewModel(service: OwnerService())
     let secondViewModel = OwnerSourceBackedViewModel(service: OwnerService())
-    let ready = OwnerEventCounter()
+    let ready = TestEventCounter()
     let owner = _ViewModelObservationOwner<OwnerSourceBackedViewModel>(
       _visorDidBecomeReady: { ready.record() })
 

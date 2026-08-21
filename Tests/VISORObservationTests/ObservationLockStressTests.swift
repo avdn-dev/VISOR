@@ -1,31 +1,6 @@
 import Testing
 import VISORObservation
-
-private actor ObservationStressBarrier {
-  private let participantCount: Int
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-  private var isOpen = false
-
-  init(participantCount: Int) {
-    self.participantCount = participantCount
-  }
-
-  func arriveAndWait() async {
-    guard !isOpen else { return }
-
-    await withCheckedContinuation { continuation in
-      waiters.append(continuation)
-      guard waiters.count == participantCount else { return }
-
-      isOpen = true
-      let resumptions = waiters
-      waiters.removeAll(keepingCapacity: false)
-      for resumption in resumptions {
-        resumption.resume()
-      }
-    }
-  }
-}
+import VISORTesting
 
 private func isAllowedSequentialCut(
   first: Int,
@@ -61,7 +36,7 @@ struct ObservationLockStressTests {
     let channel = ObservationChannel(0)
     let workerCount = 8
     let publicationsPerWorker = 500
-    let barrier = ObservationStressBarrier(participantCount: workerCount)
+    let barrier = TestBarrier(participantCount: workerCount)
 
     await withTaskGroup(of: Void.self) { group in
       for worker in 0..<workerCount {
@@ -91,7 +66,7 @@ struct ObservationLockStressTests {
     let channels = [first, second, third]
     let workersPerChannel = 4
     let publicationsPerWorker = 250
-    let barrier = ObservationStressBarrier(
+    let barrier = TestBarrier(
       participantCount: channels.count * workersPerChannel)
 
     #expect(first.source._visorGroupIdentity == second.source._visorGroupIdentity)
@@ -140,7 +115,7 @@ struct ObservationLockStressTests {
     for value in 1...250 {
       channel.publish(value)
       let checkpoint = try opened.subscription._visorCheckpointAndPause()
-      let registrationRace = ObservationStressBarrier(participantCount: 2)
+      let registrationRace = TestBarrier(participantCount: 2)
       let waiter = Task {
         await registrationRace.arriveAndWait()
         try await opened.subscription
@@ -173,7 +148,7 @@ struct ObservationLockStressTests {
     let second = ObservationChannel(0, groupedWith: first)
 
     for current in 1...250 {
-      let barrier = ObservationStressBarrier(participantCount: 2)
+      let barrier = TestBarrier(participantCount: 2)
       let publication = Task {
         await barrier.arriveAndWait()
         first.publish(current)
@@ -228,7 +203,7 @@ struct ObservationLockStressTests {
       secondOpened.subscription._visorErase(),
     ]
     for current in 1...250 {
-      let barrier = ObservationStressBarrier(participantCount: 2)
+      let barrier = TestBarrier(participantCount: 2)
       let publication = Task {
         await barrier.arriveAndWait()
         first.publish(current)

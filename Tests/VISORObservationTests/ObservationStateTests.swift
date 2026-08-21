@@ -1,5 +1,6 @@
 import Observation
 import Testing
+import VISORTesting
 @testable import VISORObservation
 import os
 
@@ -97,11 +98,16 @@ private final class AttributeInitialValueProducer {
 
 @MainActor
 private final class SnapshotConsumer {
-  init(source: ObservationSource<Int>) {
-    task = Task { [weak self, source] in
+  init(
+    source: ObservationSource<Int>,
+    lifecycle: TestEventCounter)
+  {
+    self.lifecycle = lifecycle
+    task = Task { [weak self, source, lifecycle] in
       do {
         for try await _ in source {
           guard !Task.isCancelled else { return }
+          lifecycle.record()
           self?.receive()
         }
       } catch {
@@ -111,9 +117,11 @@ private final class SnapshotConsumer {
   }
 
   deinit {
+    lifecycle.record()
     task?.cancel()
   }
 
+  private let lifecycle: TestEventCounter
   private var task: Task<Void, Never>?
 
   private func receive() { }
@@ -270,16 +278,15 @@ struct ObservationStateTests {
   @MainActor
   func `A service-owned snapshot task releases its owner while waiting`() async {
     let channel = ObservationChannel(0)
-    var consumer: SnapshotConsumer? = SnapshotConsumer(source: channel.source)
+    let lifecycle = TestEventCounter()
+    var consumer: SnapshotConsumer? = SnapshotConsumer(
+      source: channel.source,
+      lifecycle: lifecycle)
     weak let weakConsumer = consumer
 
-    while channel.source._visorActiveSubscriptionCount == 0 {
-      await Task.yield()
-    }
+    await lifecycle.wait()
     consumer = nil
-    for _ in 0..<100 where weakConsumer != nil {
-      await Task.yield()
-    }
+    await lifecycle.wait(for: 2)
 
     #expect(weakConsumer == nil)
   }

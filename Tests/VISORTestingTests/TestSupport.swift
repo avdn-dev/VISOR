@@ -35,46 +35,6 @@ actor TestingService {
   }
 }
 
-@MainActor
-final class TestingGate {
-  private var hasStarted = false
-  private var isOpen = false
-  private var startedWaiters: [CheckedContinuation<Void, Never>] = []
-  private var openWaiters: [CheckedContinuation<Void, Never>] = []
-
-  deinit {}
-
-  func suspend() async {
-    hasStarted = true
-    let started = startedWaiters
-    startedWaiters.removeAll()
-    for waiter in started {
-      waiter.resume()
-    }
-
-    guard !isOpen else { return }
-    await withCheckedContinuation { continuation in
-      openWaiters.append(continuation)
-    }
-  }
-
-  func waitUntilStarted() async {
-    guard !hasStarted else { return }
-    await withCheckedContinuation { continuation in
-      startedWaiters.append(continuation)
-    }
-  }
-
-  func open() {
-    isOpen = true
-    let waiters = openWaiters
-    openWaiters.removeAll()
-    for waiter in waiters {
-      waiter.resume()
-    }
-  }
-}
-
 final class TestingReference {}
 
 @MainActor
@@ -102,11 +62,11 @@ final class TestingViewModel {
 
   let state = State()
   let service: TestingService
-  private let reactionGate: TestingGate?
+  private let reactionGate: ControllableOperation<Void, Never>?
 
   init(
     service: TestingService = TestingService(),
-    reactionGate: TestingGate? = nil
+    reactionGate: ControllableOperation<Void, Never>? = nil
   ) {
     self.service = service
     self.reactionGate = reactionGate
@@ -124,7 +84,7 @@ final class TestingViewModel {
     selecting: \TestingSnapshot.value)
   private func sourceChanged(_ value: Int) async {
     if value == 10 {
-      await reactionGate?.suspend()
+      await reactionGate?.run()
     }
     updateState(\.reactedValue, to: value)
   }

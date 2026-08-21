@@ -56,11 +56,11 @@ let package = Package(
 
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR", "VISORObservation"]),
+      dependencies: ["VISOR", "VISORObservation", "VISORTesting"]),
 
     .testTarget(
       name: "VISORObservationTests",
-      dependencies: ["VISORObservation"]),
+      dependencies: ["VISORObservation", "VISORTesting"]),
 
     .testTarget(
       name: "VISORTestingTests",

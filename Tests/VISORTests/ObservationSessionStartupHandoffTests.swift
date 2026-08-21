@@ -1,31 +1,10 @@
 import Testing
 import VISOR
 import VISORObservation
+import VISORTesting
 
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
-
-@MainActor
-private final class StartupHandoffSignal {
-  private var continuation: CheckedContinuation<Void, Never>?
-  private var didFire = false
-
-  deinit {}
-
-  func wait() async {
-    guard !didFire else { return }
-    await withCheckedContinuation { continuation in
-      self.continuation = continuation
-    }
-  }
-
-  func fire() {
-    guard !didFire else { return }
-    didFire = true
-    continuation?.resume()
-    continuation = nil
-  }
-}
 
 @MainActor
 private final class StartupHandoffFailureLog {
@@ -39,8 +18,8 @@ struct ObservationSessionStartupHandoffTests {
   @Test(.timeLimit(.minutes(1))) @MainActor
   func `Pause during startup hand-off is rejected without trapping`() async throws {
     let channel = ObservationChannel(0)
-    let handoffGate = StartupHandoffSignal()
-    let handoffStarted = StartupHandoffSignal()
+    let handoffGate = TestEventCounter()
+    let handoffStarted = TestEventCounter()
     var operationCount = 0
     let session = _ObservationSession(
       lanes: [
@@ -49,7 +28,7 @@ struct ObservationSessionStartupHandoffTests {
           handlers: [])._visorErase(),
       ],
       _visorAfterStartupHandoff: {
-        handoffStarted.fire()
+        handoffStarted.record()
         await handoffGate.wait()
       })
 
@@ -66,13 +45,13 @@ struct ObservationSessionStartupHandoffTests {
     } catch let failure as _ObservationSourceFailure {
       guard case .protocolViolation = failure else {
         Issue.record("Expected a protocol violation, got \(failure)")
-        handoffGate.fire()
+        handoffGate.record()
         return
       }
     }
 
     #expect(operationCount == 0)
-    handoffGate.fire()
+    handoffGate.record()
     try await startup.value
     #expect(session._visorIsReady)
 
@@ -86,7 +65,7 @@ struct ObservationSessionStartupHandoffTests {
   @Test @MainActor
   func `Worker failure at the startup hand-off cannot report ready`() async {
     let channel = ObservationChannel(0)
-    let failureObserved = StartupHandoffSignal()
+    let failureObserved = TestEventCounter()
     let log = StartupHandoffFailureLog()
     let session = _ObservationSession(
       lanes: [
@@ -101,7 +80,7 @@ struct ObservationSessionStartupHandoffTests {
       },
       _visorOnFailure: { failure in
         log.failures.append(failure)
-        failureObserved.fire()
+        failureObserved.record()
       })
 
     await #expect(throws: _ObservationSourceFailure.unexpectedTermination) {

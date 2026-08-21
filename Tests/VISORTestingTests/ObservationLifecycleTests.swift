@@ -142,19 +142,19 @@ struct ObservationLifecycleTests {
   func `Cancellation abandons the window and joins the source session`() async {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    let gate = TestingGate()
+    let gate = ControllableOperation<Void, Never>()
 
     let task = Task { @MainActor in
       try await observe(sut) { test in
         await test.perform {
-          await gate.suspend()
+          await gate.run()
         }
       }
     }
 
     await gate.waitUntilStarted()
     task.cancel()
-    gate.open()
+    gate.finish()
 
     await #expect(throws: CancellationError.self) {
       try await task.value
@@ -167,7 +167,7 @@ struct ObservationLifecycleTests {
   func `Concurrent perform is rejected without corrupting the active window`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    let gate = TestingGate()
+    let gate = ControllableOperation<Void, Never>()
     var issues: [String] = []
     var rejectedOperationRan = false
 
@@ -180,7 +180,7 @@ struct ObservationLifecycleTests {
     ) { test in
       let first = Task { @MainActor in
         await test.perform {
-          await gate.suspend()
+          await gate.run()
           await service.publish(1)
         }
       }
@@ -193,7 +193,7 @@ struct ObservationLifecycleTests {
       #expect(issues == [
         "A perform window is already active for this State"
       ])
-      gate.open()
+      gate.finish()
       await first.value
       test.expect(\.sourceValue, hasExactChanges: [1])
     }

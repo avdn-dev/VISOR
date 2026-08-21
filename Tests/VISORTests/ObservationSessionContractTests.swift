@@ -1,6 +1,7 @@
 import Testing
 import VISOR
 import VISORObservation
+import VISORTesting
 
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
@@ -12,37 +13,6 @@ private final class ObservationSessionContractLog {
   var text = ""
 
   deinit {}
-}
-
-@MainActor
-private final class ObservationSessionContractGate {
-  private var didStart = false
-  private var startedWaiters: [CheckedContinuation<Void, Never>] = []
-  private var continuation: CheckedContinuation<Void, Never>?
-
-  deinit {}
-
-  func wait() async {
-    didStart = true
-    let waiters = startedWaiters
-    startedWaiters.removeAll(keepingCapacity: false)
-    for waiter in waiters { waiter.resume() }
-    await withCheckedContinuation { continuation in
-      self.continuation = continuation
-    }
-  }
-
-  func waitUntilStarted() async {
-    guard !didStart else { return }
-    await withCheckedContinuation { continuation in
-      startedWaiters.append(continuation)
-    }
-  }
-
-  func open() {
-    continuation?.resume()
-    continuation = nil
-  }
 }
 
 @Suite("Observation session contract")
@@ -149,13 +119,13 @@ struct ObservationSessionContractTests {
   func `Whole-session fence pauses every lane before draining`() async throws {
     let integer = ObservationChannel(0)
     let text = ObservationChannel("zero", groupedWith: integer)
-    let gate = ObservationSessionContractGate()
+    let gate = ControllableOperation<Void, Never>()
     let log = ObservationSessionContractLog()
     let session = _ObservationSession(lanes: [
       _ObservationLane(
         source: integer.source,
         handlers: [{ value in
-          if value == 1 { await gate.wait() }
+          if value == 1 { await gate.run() }
           log.integer = value
         }])._visorErase(),
       _ObservationLane(
@@ -176,7 +146,7 @@ struct ObservationSessionContractTests {
 
     text.publish("two")
     #expect(log.text == "one")
-    gate.open()
+    gate.finish()
     try await fence.value
 
     try await session._visorWithPause {

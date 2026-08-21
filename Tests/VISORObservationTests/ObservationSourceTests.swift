@@ -1,5 +1,6 @@
 import Testing
 import VISORObservation
+import VISORTesting
 
 private actor Producer {
   private let channel: ObservationChannel<Int>
@@ -183,34 +184,6 @@ private final class Model {
   }
 }
 
-@MainActor
-private final class HandlerGate {
-  private var startedContinuation: CheckedContinuation<Void, Never>?
-  private var continuation: CheckedContinuation<Void, Never>?
-  private(set) var didStart = false
-
-  func wait() async {
-    didStart = true
-    startedContinuation?.resume()
-    startedContinuation = nil
-    await withCheckedContinuation { continuation in
-      self.continuation = continuation
-    }
-  }
-
-  func waitUntilStarted() async {
-    guard !didStart else { return }
-    await withCheckedContinuation { continuation in
-      startedContinuation = continuation
-    }
-  }
-
-  func open() {
-    continuation?.resume()
-    continuation = nil
-  }
-}
-
 @Suite("V11 cooperative observation source")
 struct ObservationSourceTests {
   @Test @MainActor
@@ -380,13 +353,13 @@ struct ObservationSourceTests {
   func `A checkpoint waits for its immediate handler to acknowledge`() async throws {
     let producer = Producer(initial: 0)
     let model = Model()
-    let gate = HandlerGate()
+    let gate = ControllableOperation<Void, Never>()
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
       receive: { [model, gate] value in
         if value == 1 {
-          await gate.wait()
+          await gate.run()
         }
         model.receive(value)
       })
@@ -400,7 +373,7 @@ struct ObservationSourceTests {
 
     await gate.waitUntilStarted()
     #expect(model.current == 0)
-    gate.open()
+    gate.finish()
 
     let checkpoint = try await fence.value
     #expect(model.current == 1)
@@ -413,13 +386,13 @@ struct ObservationSourceTests {
     let channel = ObservationChannel(0)
     let slowModel = Model()
     let fastModel = Model()
-    let gate = HandlerGate()
+    let gate = ControllableOperation<Void, Never>()
     let slow = try await Consumer.start(
       source: channel.source,
       project: { .deliver($0) },
       receive: { [slowModel, gate] value in
         if value == 1 {
-          await gate.wait()
+          await gate.run()
         }
         slowModel.receive(value)
       })
@@ -446,7 +419,7 @@ struct ObservationSourceTests {
     #expect(fastModel.current == 2)
     #expect(slowModel.current == 0)
 
-    gate.open()
+    gate.finish()
     let slowSettled = try await slow.checkpointAndPause()
     #expect(slowModel.current == 2)
 

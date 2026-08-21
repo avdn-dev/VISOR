@@ -11,7 +11,7 @@ struct SourceFencedObservationTests {
   @MainActor
   func `Readiness precedes the body and perform closes on a finite frontier`() async throws {
     let service = TestingService(1)
-    let gate = TestingGate()
+    let gate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(service: service, reactionGate: gate)
 
     #expect(sut.state.sourceValue == -1)
@@ -37,7 +37,7 @@ struct SourceFencedObservationTests {
       await gate.waitUntilStarted()
       #expect(sut.state.sourceValue == 10)
       #expect(sut.state.reactedValue == 1)
-      gate.open()
+      gate.finish()
       await fencedAction.value
 
       test.expect(\.sourceValue, hasExactChanges: [10])
