@@ -26,3 +26,9 @@ without awaiting it is intentionally outside the action window.
 
 - ``ObservationTest/expect(_:hasExactChanges:sourceLocation:)``
 - ``ObservationTest/expect(_:alwaysSatisfies:sourceLocation:)``
+
+### Concurrency control
+
+- ``ControllableOperation``
+- ``TestEventCounter``
+- ``TestBarrier``
