@@ -37,10 +37,10 @@ import VISORTesting     // observe/perform/expect in Swift Testing targets
 import VISORTestDoubles // generated stub/spy declarations
 ```
 
-There is no umbrella product, and VISOR products do not re-export Apple
-frameworks or sibling VISOR products. Import each module that owns a symbol you
-spell. Macro-generated implementation references remain qualified and do not
-require extra imports.
+There is no umbrella product, and VISOR products do not re-export sibling VISOR
+products. Import each module that owns a symbol you spell. The sole framework
+exception is `VISORTestDoubles`, which re-exports Apple Observation because its
+peer macros generate observable types in the importing source file.
 
 ## 2. Give each producer an explicit source
 
@@ -471,6 +471,10 @@ nonisolated protocol AnalyticsService: Sendable {
 ```
 
 Import `VISORTesting` as well only when that target also uses the observation test DSL. The products intentionally do not re-export each other.
+
+No separate `import Observation` is needed for generated doubles;
+`VISORTestDoubles` re-exports it because the generated peer is type-checked in
+the declaration's source file.
 
 All test-double declarations moved out of `VISOR`:
 

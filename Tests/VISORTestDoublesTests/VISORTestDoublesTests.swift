@@ -1,5 +1,4 @@
 import os
-import Observation
 import Testing
 import VISORTestDoubles
 

@@ -6,17 +6,21 @@ Fence structured actions, inspect complete State histories, and generate isolate
 
 VISOR separates testing by responsibility:
 
-- `VISORTesting` integrates the source-backed ViewModel runtime with Swift Testing. It re-exports `VISOR` and Swift Testing.
-- `VISORTestDoubles` provides stub and spy macros without depending on `VISOR`, `VISORObservation`, SwiftUI, or Swift Testing.
+- `VISORTesting` integrates the source-backed ViewModel runtime with Swift Testing.
+- `VISORTestDoubles` provides stub and spy macros without depending on `VISOR`, `VISORObservation`, SwiftUI, or Swift Testing. It re-exports Apple Observation because generated peers are observable.
 
 A ViewModel test can import both when it needs both capabilities:
 
 ```swift
+import Testing
 import VISORTesting
 import VISORTestDoubles
 ```
 
-A service or preview-fixture module that only declares generated doubles should import only `VISORTestDoubles`.
+Import every module whose symbols the file spells; neither testing product
+re-exports a sibling VISOR product. A file that only declares generated doubles
+needs only `VISORTestDoubles`—it supplies the Observation import required by
+the generated peer.
 
 ## Observation tests
 
@@ -137,6 +141,7 @@ Cancellation remains cancellation, and an error thrown by the test body or perfo
 ## Generated test doubles
 
 Import `VISORTestDoubles` where the protocol and generated peers are declared.
+No separate Observation import is required.
 
 ### @GenerateStub
 

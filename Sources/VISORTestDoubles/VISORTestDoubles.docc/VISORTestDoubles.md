@@ -10,6 +10,9 @@ the protocol's access level and isolation. Use the `.sendable` trait only when
 the protocol is `Sendable`; the generated double then uses checked, lock-backed
 storage without holding its lock across asynchronous work.
 
+Importing `VISORTestDoubles` also imports Apple Observation, which the macros
+need when they emit an observable peer in the declaration's source file.
+
 Override inferred property and method defaults with `@DefaultValue` and
 `@DefaultReturn`. Use ``StubSequence`` when successive calls should return a
 deterministic series of values.

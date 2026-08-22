@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 import VISORTestDoubles
 
 // MARK: - Test-double macro runtime fixtures

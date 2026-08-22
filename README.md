@@ -39,6 +39,10 @@ VISOR has four deliberately separate products and no umbrella product:
 | `VISORTesting` | Swift Testing integration: `observe`, `perform`, and `expect` |
 | `VISORTestDoubles` | `@GenerateStub`, `@GenerateSpy`, and their configuration attributes |
 
+Products do not re-export sibling VISOR products. `VISORTestDoubles` does
+re-export Apple's `Observation` module because its peer macros generate
+observable types in the importing source file.
+
 ## Installation
 
 Add VISOR with Swift Package Manager:
