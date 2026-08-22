@@ -12,22 +12,33 @@ import Foundation
 /// A URL and its route components after Router scheme validation.
 ///
 /// Components contain the URL host followed by its path segments and preserve
-/// percent encoding. Custom parsers are responsible for validating component
-/// counts, decoding values exactly once, and rejecting malformed identifiers.
+/// percent encoding and empty interior segments. Custom parsers are responsible
+/// for validating component counts, decoding values exactly once, and rejecting
+/// malformed identifiers.
 public struct DeepLinkRequest: Hashable, Sendable {
   /// Creates a request from an external URL without decoding its route values.
   public init(url: URL) {
     self.url = url
 
-    let pathSegments = url.path().split(separator: "/")
+    let path = url.path(percentEncoded: true)
+    var pathSegments = path
+      .split(separator: "/", omittingEmptySubsequences: false)
+      .map(String.init)
+    if pathSegments.first?.isEmpty == true {
+      pathSegments.removeFirst()
+    }
+    if path.hasSuffix("/"), pathSegments.last?.isEmpty == true {
+      pathSegments.removeLast()
+    }
+
+    self.isStructurallyValid = !pathSegments.contains(where: \.isEmpty)
+
     var components: [String] = []
     components.reserveCapacity(1 + pathSegments.count)
     if let host = url.host() {
       components.append(host)
     }
-    for segment in pathSegments {
-      components.append(String(segment))
-    }
+    components.append(contentsOf: pathSegments)
     self.components = components
   }
 
@@ -36,6 +47,12 @@ public struct DeepLinkRequest: Hashable, Sendable {
 
   /// The host and path segments used for ordered route matching.
   public let components: [String]
+
+  /// Whether the path has no empty interior route segments.
+  ///
+  /// A structural leading separator and one conventional trailing separator
+  /// are allowed. Repeated or interior separators make the request invalid.
+  public let isStructurallyValid: Bool
 }
 
 // MARK: - DeepLinkParseResult

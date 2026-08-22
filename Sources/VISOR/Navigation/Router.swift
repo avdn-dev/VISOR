@@ -45,7 +45,7 @@ public enum DeepLinkOutcome<Scene: NavigationScene> {
   /// Every parser reported that it did not recognise the route.
   case unmatched
 
-  /// A parser recognised the route but rejected its inputs.
+  /// The URL path is structurally invalid, or a parser rejected its inputs.
   case invalid
 
   /// The URL resolved, but no RouterHost is currently mounted.
@@ -340,8 +340,9 @@ public final class Router<Scene: NavigationScene> {
 
   /// Validate and open a deep-link URL in this Router tree.
   ///
-  /// The first parser to return a destination or invalid result ends parsing.
-  /// A valid destination targets the currently active mounted Router, regardless
+  /// A structurally invalid path is rejected before parser dispatch. Otherwise,
+  /// the first parser to return a destination or invalid result ends parsing. A
+  /// valid destination targets the currently active mounted Router, regardless
   /// of which Router in the tree receives this call.
   ///
   /// - Returns: An explicit outcome describing whether and why dispatch succeeded.
@@ -355,6 +356,9 @@ public final class Router<Scene: NavigationScene> {
     }
 
     let request = DeepLinkRequest(url: url)
+    guard request.isStructurallyValid else {
+      return reportDeepLinkOutcome(.invalid)
+    }
     for parser in configuration.parsers {
       switch parser.parse(request) {
       case .noMatch:
@@ -502,6 +506,15 @@ public final class Router<Scene: NavigationScene> {
   /// Only the mounted target handles SwiftUI's tree-wide `onOpenURL` delivery.
   package var receivesDeepLinks: Bool {
     rootRouter.currentNavigationActionTarget === self
+  }
+
+  /// Handles an automatic URL delivery and reports its outcome to the host.
+  package func receiveDeepLink(
+    _ url: URL,
+    onOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
+  ) {
+    guard receivesDeepLinks else { return }
+    onOutcome(openDeepLink(url))
   }
 
   private var currentNavigationActionTarget: Router? {

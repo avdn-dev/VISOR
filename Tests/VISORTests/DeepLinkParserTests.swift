@@ -28,13 +28,19 @@ struct DeepLinkParserTests {
   @Test
   func `Request strips scheme and splits path`() {
     let url = URL(string: "myapp://valentine/accept")!
-    #expect(DeepLinkRequest(url: url).components == ["valentine", "accept"])
+    let request = DeepLinkRequest(url: url)
+
+    #expect(request.components == ["valentine", "accept"])
+    #expect(request.isStructurallyValid)
   }
 
   @Test
   func `Request handles triple-slash`() {
     let url = URL(string: "myapp:///settings")!
-    #expect(DeepLinkRequest(url: url).components == ["settings"])
+    let request = DeepLinkRequest(url: url)
+
+    #expect(request.components == ["settings"])
+    #expect(request.isStructurallyValid)
   }
 
   @Test
@@ -46,7 +52,28 @@ struct DeepLinkParserTests {
   @Test
   func `Request handles trailing slash`() {
     let url = URL(string: "myapp://settings/")!
-    #expect(DeepLinkRequest(url: url).components == ["settings"])
+    let request = DeepLinkRequest(url: url)
+
+    #expect(request.components == ["settings"])
+    #expect(request.isStructurallyValid)
+  }
+
+  @Test
+  func `Request preserves an empty interior segment as invalid structure`() {
+    let url = URL(string: "myapp://item//42")!
+    let request = DeepLinkRequest(url: url)
+
+    #expect(request.components == ["item", "", "42"])
+    #expect(!request.isStructurallyValid)
+  }
+
+  @Test
+  func `Request rejects more than one trailing separator`() {
+    let url = URL(string: "myapp://item//")!
+    let request = DeepLinkRequest(url: url)
+
+    #expect(request.components == ["item", ""])
+    #expect(!request.isStructurallyValid)
   }
 
   @Test
@@ -182,9 +209,12 @@ struct DeepLinkParserTests {
 
   @Test
   func `Request components preserve percent-encoded characters`() {
-    let url = URL(string: "myapp://item/hello%20world")!
-    // Custom scheme URLs preserve percent-encoding in path components
-    #expect(DeepLinkRequest(url: url).components == ["item", "hello%20world"])
+    let spaceURL = URL(string: "myapp://item/hello%20world")!
+    let slashURL = URL(string: "myapp://item/a%2Fb")!
+
+    #expect(DeepLinkRequest(url: spaceURL).components == ["item", "hello%20world"])
+    #expect(DeepLinkRequest(url: slashURL).components == ["item", "a%2Fb"])
+    #expect(DeepLinkRequest(url: slashURL).isStructurallyValid)
   }
 
   // MARK: - Case-Sensitive Path Components

@@ -16,6 +16,10 @@ import SwiftUI
 /// the Router into the environment, coordinates the active Router tree, handles
 /// deep links, and renders Router-owned modal presentations.
 ///
+/// Pass `onDeepLinkOutcome` to react to URLs delivered automatically to the
+/// active host. Calling ``Router/openDeepLink(_:)`` directly only returns its
+/// outcome and does not invoke this host callback.
+///
 /// Use ``RouterStack`` when the hosted layout is a single `NavigationStack`.
 public struct RouterHost<
   Scene: NavigationScene,
@@ -27,9 +31,10 @@ public struct RouterHost<
 
   // MARK: Lifecycle
 
-  /// Creates a host for an existing Router.
+  /// Creates a host for an existing Router and an optional automatic URL outcome callback.
   public init(
     router: Router<Scene>,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
@@ -40,12 +45,14 @@ public struct RouterHost<
     self.pushContent = pushContent
     self.sheetContent = sheetContent
     self.fullScreenContent = fullScreenContent
+    self.onDeepLinkOutcome = onDeepLinkOutcome
   }
 
   /// Creates a host for a cached top-level destination Router.
   public init(
     parentRouter: Router<Scene>,
     root: Scene.Root,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
@@ -53,6 +60,7 @@ public struct RouterHost<
   ) {
     self.init(
       router: parentRouter.childRouter(for: root),
+      onDeepLinkOutcome: onDeepLinkOutcome,
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
@@ -67,14 +75,14 @@ public struct RouterHost<
       content: content,
       pushContent: pushContent,
       sheetContent: sheetContent,
-      fullScreenContent: fullScreenContent)
+      fullScreenContent: fullScreenContent,
+      onDeepLinkOutcome: onDeepLinkOutcome)
       .environment(router)
       .environment(\._visorRouter, router)
       .onAppear(perform: router.activate)
       .onDisappear(perform: router.deactivate)
       .onOpenURL { url in
-        guard router.receivesDeepLinks else { return }
-        router.openDeepLink(url)
+        router.receiveDeepLink(url, onOutcome: onDeepLinkOutcome)
       }
       .id(ObjectIdentifier(router))
   }
@@ -86,6 +94,7 @@ public struct RouterHost<
   private let pushContent: (Scene.Push) -> PushView
   private let sheetContent: (Scene.Sheet) -> SheetView
   private let fullScreenContent: (Scene.FullScreen) -> FullScreenView
+  private let onDeepLinkOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
 }
 
 // MARK: - RouterHostContent
@@ -104,12 +113,14 @@ private struct RouterHostContent<
   let pushContent: (Scene.Push) -> PushView
   let sheetContent: (Scene.Sheet) -> SheetView
   let fullScreenContent: (Scene.FullScreen) -> FullScreenView
+  let onDeepLinkOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
 
   var body: some View {
     content
       .sheet(item: $router.sheetPresentation) { presentation in
         RouterStack(
           presentedRouter: presentation.router,
+          onDeepLinkOutcome: onDeepLinkOutcome,
           pushContent: pushContent,
           sheetContent: sheetContent,
           fullScreenContent: fullScreenContent
@@ -120,6 +131,7 @@ private struct RouterHostContent<
       .adaptiveFullScreenPresentation(item: $router.fullScreenPresentation) { presentation in
         RouterStack(
           presentedRouter: presentation.router,
+          onDeepLinkOutcome: onDeepLinkOutcome,
           pushContent: pushContent,
           sheetContent: sheetContent,
           fullScreenContent: fullScreenContent

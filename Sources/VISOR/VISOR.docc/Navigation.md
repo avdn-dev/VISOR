@@ -447,14 +447,30 @@ with an ASCII letter and may then contain ASCII letters, digits, `+`, `-`, or
 `.`. Do not include `://`.
 
 ``DeepLinkRequest`` exposes the original URL and its host-plus-path components.
+It omits the structural leading path separator and accepts one conventional
+trailing separator, so both `myapp://profile` and `myapp:///profile/` produce
+`["profile"]`. Literal repeated or interior separators are preserved as empty
+components and make ``DeepLinkRequest/isStructurallyValid`` false. The Router
+returns ``DeepLinkOutcome/invalid`` before dispatching such a request to a
+parser. A percent-encoded separator such as `%2F` remains part of one encoded
+component; decode each dynamic value exactly once.
+
 Return `.noMatch` when a parser does not recognise the route so evaluation can
 continue. Once a parser recognises its route, return `.invalid` for the wrong
 component count, failed decoding, or a malformed identifier. This stops a later
-parser from reinterpreting invalid input. Decode a component exactly once.
+parser from reinterpreting invalid input.
 
-``RouterHost`` calls ``Router/openDeepLink(_:)`` automatically for the active
-mounted Router. Call it directly when another application boundary receives a
-URL and handle its explicit outcome:
+``RouterHost`` and ``RouterStack`` call ``Router/openDeepLink(_:)`` automatically
+for the active mounted Router. Supply `onDeepLinkOutcome` to present
+unsupported-link UI or record telemetry for automatic URL delivery. Router-owned
+modal stacks inherit the callback. If an application constructs several sibling
+hosts, pass the same callback to each; only the active host processes a given
+URL.
+
+An inactive host ignores SwiftUI's tree-wide URL delivery to prevent duplicate
+processing, so its callback is not invoked. Call `openDeepLink(_:)` directly
+when another application boundary receives a URL and handle its explicit
+outcome, including `.inactive`. A direct call does not invoke a host callback:
 
 ```swift
 switch router.openDeepLink(url) {

@@ -544,6 +544,73 @@ struct RouterTests {
     #expect(root.selectedRoot == nil)
   }
 
+  @Test
+  func `Malformed path returns invalid before parser dispatch`() throws {
+    let root = Router<TestScene>()
+    try root.configureDeepLinks(scheme: "test", parsers: [
+      DeepLinkParser { _ in .destination(.root(.settings)) },
+    ])
+    root.activate()
+
+    let result = root.openDeepLink(URL(string: "test://detail//42")!)
+
+    #expect(result == .invalid)
+    #expect(root.selectedRoot == nil)
+  }
+
+  @Test
+  func `Automatic receiver reports every reachable deep-link outcome`() throws {
+    let root = Router<TestScene>()
+    root.activate()
+    var outcomes: [DeepLinkOutcome<TestScene>] = []
+    let record: @MainActor (DeepLinkOutcome<TestScene>) -> Void = {
+      outcomes.append($0)
+    }
+
+    root.receiveDeepLink(
+      URL(string: "test://settings")!,
+      onOutcome: record)
+
+    try root.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["settings"], destination: .root(.settings)),
+    ])
+    root.receiveDeepLink(
+      URL(string: "other://settings")!,
+      onOutcome: record)
+    root.receiveDeepLink(
+      URL(string: "test://unknown")!,
+      onOutcome: record)
+    root.receiveDeepLink(
+      URL(string: "test://detail//42")!,
+      onOutcome: record)
+    root.receiveDeepLink(
+      URL(string: "test://settings")!,
+      onOutcome: record)
+
+    #expect(outcomes == [
+      .unconfigured,
+      .schemeMismatch,
+      .unmatched,
+      .invalid,
+      .handled(.root(.settings)),
+    ])
+  }
+
+  @Test
+  func `Inactive automatic receiver ignores delivery without hiding direct outcome`() throws {
+    let root = Router<TestScene>()
+    try root.configureDeepLinks(scheme: "test", parsers: [
+      .equal(to: ["settings"], destination: .root(.settings)),
+    ])
+    var outcomes: [DeepLinkOutcome<TestScene>] = []
+    let url = URL(string: "test://settings")!
+
+    root.receiveDeepLink(url) { outcomes.append($0) }
+
+    #expect(outcomes.isEmpty)
+    #expect(root.openDeepLink(url) == .inactive)
+  }
+
   // MARK: - activate idempotent
 
   @Test
@@ -759,6 +826,7 @@ struct RouterTests {
 
     let stack = RouterStack(
       router: root,
+      onDeepLinkOutcome: { _ in },
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
       fullScreenContent: { _ in EmptyView() }
@@ -777,6 +845,7 @@ struct RouterTests {
     let host = RouterHost(
       parentRouter: root,
       root: .home,
+      onDeepLinkOutcome: { _ in },
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
       fullScreenContent: { _ in EmptyView() }

@@ -15,6 +15,9 @@ import SwiftUI
 /// ``RouterHost`` for lifecycle, deep-link, environment, and modal presentation
 /// handling. Use `RouterHost` directly when the application needs a split view
 /// or another native navigation container.
+///
+/// Pass `onDeepLinkOutcome` to react to URLs delivered automatically to the
+/// active stack. Router-owned modal stacks inherit the callback.
 public struct RouterStack<
   Scene: NavigationScene,
   Content: View,
@@ -25,9 +28,10 @@ public struct RouterStack<
 
   // MARK: Lifecycle
 
-  /// Creates a stack for an existing Router.
+  /// Creates a stack for an existing Router and an optional automatic URL outcome callback.
   public init(
     router: Router<Scene>,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
@@ -38,12 +42,14 @@ public struct RouterStack<
     self.pushContent = pushContent
     self.sheetContent = sheetContent
     self.fullScreenContent = fullScreenContent
+    self.onDeepLinkOutcome = onDeepLinkOutcome
   }
 
   /// Creates a stack for a cached top-level destination Router.
   public init(
     parentRouter: Router<Scene>,
     root: Scene.Root,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
@@ -51,6 +57,7 @@ public struct RouterStack<
   ) {
     self.init(
       router: parentRouter.childRouter(for: root),
+      onDeepLinkOutcome: onDeepLinkOutcome,
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
@@ -59,6 +66,7 @@ public struct RouterStack<
 
   init(
     presentedRouter: Router<Scene>,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void,
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
@@ -66,6 +74,7 @@ public struct RouterStack<
   ) {
     self.init(
       router: presentedRouter,
+      onDeepLinkOutcome: onDeepLinkOutcome,
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
@@ -77,6 +86,7 @@ public struct RouterStack<
   public var body: some View {
     RouterHost(
       router: router,
+      onDeepLinkOutcome: onDeepLinkOutcome,
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent
@@ -95,6 +105,7 @@ public struct RouterStack<
   private let pushContent: (Scene.Push) -> PushView
   private let sheetContent: (Scene.Sheet) -> SheetView
   private let fullScreenContent: (Scene.FullScreen) -> FullScreenView
+  private let onDeepLinkOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
 }
 
 // MARK: - RouterStackContent
