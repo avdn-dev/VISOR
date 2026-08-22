@@ -70,10 +70,6 @@ public final class ObservationTest<SUT: ViewModel> {
   deinit {}
 
   /// Performs one ViewModel action and fences all participating sources.
-  ///
-  /// - Parameters:
-  ///   - action: The action dispatched through `ViewModel.handle(_:)`.
-  ///   - sourceLocation: The call site used for test diagnostics.
   public func perform(
     _ action: SUT.Action,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -91,10 +87,6 @@ public final class ObservationTest<SUT: ViewModel> {
   }
 
   /// Performs one nonthrowing asynchronous operation and fences its State writes.
-  ///
-  /// - Parameters:
-  ///   - operation: The complete structured operation under test.
-  ///   - sourceLocation: The call site used for test diagnostics.
   public func perform(
     _ operation: @MainActor () async -> Void,
     sourceLocation: SourceLocation = #_sourceLocation
@@ -108,10 +100,6 @@ public final class ObservationTest<SUT: ViewModel> {
   }
 
   /// Performs one throwing Void operation and fences its State writes.
-  ///
-  /// - Parameters:
-  ///   - operation: The complete structured operation under test.
-  ///   - sourceLocation: The call site used for test diagnostics.
   /// - Throws: The operation's error after the observation window is closed.
   public func perform(
     _ operation: @MainActor () async throws -> Void,
@@ -131,10 +119,6 @@ public final class ObservationTest<SUT: ViewModel> {
   }
 
   /// Performs one throwing value-producing operation and fences its State writes.
-  ///
-  /// - Parameters:
-  ///   - operation: The complete structured operation under test.
-  ///   - sourceLocation: The call site used for test diagnostics.
   /// - Returns: The operation's result after the observation window is closed.
   /// - Throws: Cancellation, the operation's error, or an unavailable-result
   ///   ``ObservationTestError/resultUnavailable`` if infrastructure fails

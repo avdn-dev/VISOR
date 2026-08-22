@@ -12,8 +12,6 @@ public enum ObservationStateSequenceName: Sendable {
   case values
 
   /// Generates the member named by a static Swift identifier.
-  ///
-  /// - Parameter name: The exact generated source-property name.
   case named(StaticString)
 }
 

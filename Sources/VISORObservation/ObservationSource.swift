@@ -76,10 +76,6 @@ nonisolated public struct ObservationSource<Value: Sendable>:
   /// Retain the returned source as stable producer or test-double state. Do
   /// not recreate it from a computed source property because each call would
   /// have a different source identity.
-  ///
-  /// - Parameter snapshot: The immutable snapshot retained for the source's
-  ///   lifetime.
-  /// - Returns: A source that always exposes `snapshot`.
   public static func constant(_ snapshot: sending Value) -> Self {
     ObservationChannel(snapshot).source
   }
@@ -105,8 +101,6 @@ nonisolated public struct ObservationSource<Value: Sendable>:
   /// Direct iteration is equivalent to iterating ``snapshots``. Each iterator
   /// owns a separate subscription. Iteration throws ``ObservationSourceError``
   /// if the source can no longer provide coherent snapshots.
-  ///
-  /// - Returns: A new iterator with an independent source subscription.
   public func makeAsyncIterator() -> AsyncIterator {
     snapshots.makeAsyncIterator()
   }
@@ -154,8 +148,6 @@ nonisolated public struct ObservationSnapshots<Value: Sendable>:
   fileprivate let source: ObservationSource<Value>
 
   /// Opens an iterator with an independent source subscription.
-  ///
-  /// - Returns: A new iterator for the source represented by this sequence.
   public func makeAsyncIterator() -> Iterator {
     Iterator(source: source)
   }
@@ -234,9 +226,6 @@ nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
   public let source: ObservationSource<Value>
 
   /// Creates a producer channel with its initial snapshot.
-  ///
-  /// - Parameter initialSnapshot: The first immutable snapshot exposed to
-  ///   every new source iterator.
   public init(_ initialSnapshot: sending Value) {
     let core = _ObservationCore(
       initialSnapshot,
@@ -247,10 +236,6 @@ nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
 
   /// Creates another performance lane in the anchor channel's immutable
   /// producer checkpoint group without introducing a third public concept.
-  ///
-  /// - Parameters:
-  ///   - initialSnapshot: The first immutable snapshot for the new channel.
-  ///   - anchor: A channel whose checkpoint group this channel joins.
   public init<Anchor: Sendable>(
     _ initialSnapshot: sending Value,
     groupedWith anchor: ObservationChannel<Anchor>

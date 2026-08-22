@@ -35,13 +35,8 @@ public protocol ViewModel: Observable, AnyObject {
   var _visorObservationOwnership: _ViewModelObservationOwnership { get }
   /// Describes cooperative observation sources to VISOR's package-owned
   /// runtime. `@ViewModel` generates this hook.
-  ///
-  /// - Parameter visitor: The package-created sink that receives generated
-  ///   source descriptions.
   func _visorBuildObservationRecipe(into visitor: _ObservationRecipeVisitor)
   /// Dispatch an action. Implement sync or async as needed; the protocol requires `async`.
-  ///
-  /// - Parameter action: The user or system action to handle.
   func handle(_ action: Action) async
 }
 
@@ -59,7 +54,5 @@ extension ViewModel {
 
 extension ViewModel where Action == Never {
   /// Handles the uninhabited default action without requiring boilerplate.
-  ///
-  /// - Parameter action: An unreachable `Never` value.
   public func handle(_ action: Never) async {}
 }

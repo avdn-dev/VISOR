@@ -16,10 +16,6 @@ public struct _StateField<Root: AnyObject, Value> {
   package let name: String
 
   /// Creates generated metadata for a State field.
-  ///
-  /// - Parameters:
-  ///   - name: The authored State property name used in diagnostics.
-  ///   - keyPath: The writable reference key path to that property.
   public init(
     _ name: String,
     keyPath: ReferenceWritableKeyPath<Root, Value>
@@ -57,10 +53,6 @@ public struct _AnyStateField<Root: AnyObject> {
   package let name: String
 
   /// Erases one generated State field while retaining its untracked reader.
-  ///
-  /// - Parameters:
-  ///   - field: The typed field metadata to erase.
-  ///   - untrackedRead: A generated accessor that avoids Observation tracking.
   public init<Value>(
     _ field: _StateField<Root, Value>,
     untrackedRead: @escaping (Root) -> Value
@@ -81,12 +73,6 @@ public struct _AnyStateField<Root: AnyObject> {
 /// This protocol is public only for external macro expansions.
 public protocol _StateMutationRecorder: AnyObject {
   /// Records one completed generated State assignment.
-  ///
-  /// - Parameters:
-  ///   - fieldID: The stable identity of the generated field metadata.
-  ///   - fieldName: The authored State property name.
-  ///   - oldValue: The value before assignment.
-  ///   - newValue: The value after assignment.
   func record(
     fieldID: ObjectIdentifier,
     fieldName: String,
@@ -112,8 +98,6 @@ public protocol _ViewModelState: AnyObject {
 
 extension _ViewModelState {
   /// Reads or writes State through a generated selector key path.
-  ///
-  /// - Parameter selection: A key path into the generated selector namespace.
   public subscript<Value>(
     _ selection: KeyPath<_VISORSelectors, _StateField<Self, Value>>
   ) -> Value {
@@ -128,11 +112,6 @@ extension _ViewModelState {
   }
 
   /// Records a generated State mutation when a test scope is active.
-  ///
-  /// - Parameters:
-  ///   - field: The generated field metadata.
-  ///   - oldValue: The value before assignment.
-  ///   - newValue: The value after assignment.
   public func _visorRecordMutation<Value>(
     _ field: _StateField<Self, Value>,
     oldValue: Value,
@@ -150,10 +129,6 @@ extension _ViewModelState {
 
 extension ViewModel {
   /// Replaces one State field through its generated selector.
-  ///
-  /// - Parameters:
-  ///   - selection: A key path into the generated State selector namespace.
-  ///   - value: The replacement value.
   public func updateState<Value>(
     _ selection: KeyPath<
       State._VISORSelectors,

@@ -93,7 +93,7 @@ public final class _ViewModelObservationOwnership: Sendable {
 
   private let lock = OSAllocatedUnfairLock(initialState: State())
 
-  /// Creates a fresh per-ViewModel ownership identity.
+  /// Creates a fresh ownership identity for one ViewModel instance.
   public init() {}
 
   /// Claims immediately unless another active owner holds the lease. When the
@@ -694,12 +694,6 @@ package struct _ViewModelObservationHost<
 
 /// The only production-owner bridge named by generated downstream code.
 /// Its opaque result hides the concrete host and all lifecycle capabilities.
-///
-/// - Parameters:
-///   - viewModel: The generated ViewModel owned by the host.
-///   - observationPolicy: The scene-lifecycle policy for observation.
-///   - content: The content rendered after observation becomes ready.
-/// - Returns: An opaque lifecycle host for generated `@LazyViewModel` content.
 @MainActor
 public func _visorOwnedViewModelContent<VM, Content>(
   for viewModel: VM,

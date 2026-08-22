@@ -16,8 +16,6 @@ nonisolated public enum DeepLinkConfigurationError: Error, Equatable, Sendable {
   ///
   /// A scheme must start with an ASCII letter and may then contain ASCII
   /// letters, digits, `+`, `-`, or `.`.
-  ///
-  /// - Parameter scheme: The rejected scheme.
   case invalidScheme(String)
 }
 
@@ -106,8 +104,7 @@ public final class Router<Scene: NavigationScene> {
   nonisolated deinit { }
 
   /// Creates a root router.
-  ///
-  /// - Parameter logger: Optional `os.Logger` for debug-level navigation logging.
+  /// Pass a logger to record rejected actions and deep-link outcomes.
   public init(logger: Logger? = nil) {
     self.level = 0
     self.rootDestination = nil
@@ -118,13 +115,6 @@ public final class Router<Scene: NavigationScene> {
   }
 
   /// Creates a router node in the navigation hierarchy.
-  ///
-  /// - Parameters:
-  ///   - level: Depth in the hierarchy (0 = root). Incremented automatically by `childRouter()`.
-  ///   - rootDestination: The top-level destination this router manages, or
-  ///     `nil` for root and modal Routers.
-  ///   - parent: The parent router. Stored as a `weak` reference to avoid retain cycles.
-  ///   - logger: Optional `os.Logger` for debug-level navigation logging.
   package init(
     level: Int,
     rootDestination: Scene.Root? = nil,
@@ -194,7 +184,6 @@ public final class Router<Scene: NavigationScene> {
   /// Push a destination onto the navigation stack. Root calls target the
   /// currently active visible Router; child calls remain local.
   ///
-  /// - Parameter destination: The typed destination to append.
   /// - Returns: `true` when the action was accepted, or `false` when no
   ///   `RouterHost` is active for a root Router.
   @discardableResult
@@ -209,7 +198,6 @@ public final class Router<Scene: NavigationScene> {
   /// When called on the root Router, delegates to the currently active visible
   /// Router. Calls on a child Router remain local to that child.
   ///
-  /// - Parameter sheet: The typed sheet destination to present.
   /// - Returns: `true` when the action was accepted, or `false` when no
   ///   `RouterHost` is active for a root Router.
   @discardableResult
@@ -224,7 +212,6 @@ public final class Router<Scene: NavigationScene> {
   /// When called on the root Router, delegates to the currently active visible
   /// Router. Calls on a child Router remain local to that child.
   ///
-  /// - Parameter fullScreen: The typed full-screen destination to present.
   /// - Returns: `true` when the action was accepted, or `false` when no
   ///   `RouterHost` is active for a root Router.
   @discardableResult
@@ -237,8 +224,6 @@ public final class Router<Scene: NavigationScene> {
   /// Select a top-level destination.
   ///
   /// Calls on child Routers propagate to the root Router.
-  ///
-  /// - Parameter root: The top-level destination to select.
   public func select(root: Scene.Root) {
     log("select root: \(root)")
     if let parent {
@@ -250,7 +235,6 @@ public final class Router<Scene: NavigationScene> {
 
   /// Navigate to a unified destination.
   ///
-  /// - Parameter destination: The root, push, sheet, or full-screen destination.
   /// - Returns: `true` when the action was accepted, or `false` when the
   ///   destination needs an active `RouterHost` and none is active.
   @discardableResult
@@ -269,10 +253,6 @@ public final class Router<Scene: NavigationScene> {
   }
 
   /// Select a top-level destination and push onto its navigation stack.
-  ///
-  /// - Parameters:
-  ///   - root: The top-level destination whose cached Router should receive the push.
-  ///   - destination: The destination to append before selecting `root`.
   public func selectAndPush(root: Scene.Root, destination: Scene.Push) {
     let rootRouter = rootRouter
     rootRouter.log("selectAndPush: root=\(root), destination=\(destination)")
@@ -364,7 +344,6 @@ public final class Router<Scene: NavigationScene> {
   /// A valid destination targets the currently active mounted Router, regardless
   /// of which Router in the tree receives this call.
   ///
-  /// - Parameter url: The external URL to validate and dispatch.
   /// - Returns: An explicit outcome describing whether and why dispatch succeeded.
   @discardableResult
   public func openDeepLink(_ url: URL) -> DeepLinkOutcome<Scene> {
@@ -399,9 +378,6 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Child Management
 
   /// Creates or returns the cached child Router for a top-level destination.
-  ///
-  /// - Parameter root: The bounded, application-owned navigation branch.
-  /// - Returns: The stable Router associated with `root`.
   public func childRouter(for root: Scene.Root) -> Router {
     if let existing = rootChildren[root] {
       return existing
@@ -458,8 +434,6 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Preview
 
   /// Creates a preview Router with the given top-level destination selected.
-  ///
-  /// - Parameter root: The optional top-level destination selected initially.
   /// - Returns: An inactive Router intended for preview composition.
   public static func preview(root: Scene.Root? = nil) -> Router {
     let router = Router()

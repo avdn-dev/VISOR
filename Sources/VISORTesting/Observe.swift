@@ -9,10 +9,7 @@ import VISOR
 /// failure while retaining the State reservation until the session truly
 /// joins, preventing a replacement scope from receiving retired writes.
 ///
-/// - Parameters:
-///   - sut: The ViewModel whose generated observation session is tested.
-///   - sourceLocation: The call site used for infrastructure diagnostics.
-///   - body: The scoped test operation. Do not retain its handle beyond the closure.
+/// The supplied ``ObservationTest`` handle is valid only inside `body`.
 /// - Throws: Cancellation or an error thrown by `body`.
 @MainActor
 public func observe<SUT: ViewModel>(

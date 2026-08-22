@@ -12,17 +12,11 @@ public nonisolated struct StubSequence<Value> {
   private var remainingValues: [Value]
 
   /// Creates a sequence from values returned in array order.
-  ///
-  /// - Parameter values: The complete ordered set of stub return values.
   public init(_ values: [Value]) {
     remainingValues = Array(values.reversed())
   }
 
   /// Creates a non-empty sequence from variadic values.
-  ///
-  /// - Parameters:
-  ///   - first: The first value returned.
-  ///   - rest: The remaining values, in return order.
   public init(_ first: Value, _ rest: Value...) {
     remainingValues = Array(rest.reversed())
     remainingValues.append(first)
@@ -42,11 +36,6 @@ public nonisolated struct StubSequence<Value> {
   ///
   /// Exhaustion is a test-configuration error and fails immediately with a
   /// diagnostic naming `Value` and the call site.
-  ///
-  /// - Parameters:
-  ///   - file: The source file reported if the sequence is exhausted.
-  ///   - line: The source line reported if the sequence is exhausted.
-  /// - Returns: The next configured value.
   public mutating func next(
     file: StaticString = #filePath,
     line: UInt = #line

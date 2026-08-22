@@ -3,11 +3,6 @@ import VISOR
 
 extension ObservationTest {
   /// Requires the complete distinct post-baseline trace to equal `expected`.
-  ///
-  /// - Parameters:
-  ///   - selection: A key path into the generated State selector namespace.
-  ///   - expected: The exact ordered values after adjacent duplicate commits are removed.
-  ///   - sourceLocation: The call site used for expectation failures.
   public func expect<Value: Equatable>(
     _ selection: KeyPath<
       SUT.State._VISORSelectors,
@@ -54,11 +49,6 @@ extension ObservationTest {
   }
 
   /// Requires the baseline and every completed commit to satisfy `predicate`.
-  ///
-  /// - Parameters:
-  ///   - selection: A key path into the generated State selector namespace.
-  ///   - predicate: The invariant required for the baseline and every commit.
-  ///   - sourceLocation: The call site used for expectation failures.
   public func expect<Value>(
     _ selection: KeyPath<
       SUT.State._VISORSelectors,

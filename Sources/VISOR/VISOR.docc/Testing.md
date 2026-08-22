@@ -131,11 +131,6 @@ Production Observation still supports a reference field; this restriction applie
 
 VISOR records one Swift Testing issue for an expectation mismatch or an observation-infrastructure failure. A running scope is poisoned after infrastructure failure so later operations cannot appear trustworthy. Examples include source termination, State identity replacement, overlapping scopes, journal exhaustion, and use of an ended handle.
 
-The mutation journal and outside-window diagnostic ring use fixed internal
-caps to keep accidental mutation storms memory-bounded. Exceeding a cap records
-an infrastructure issue and poisons the scope; the caps are safety invariants,
-not public test-tuning parameters.
-
 Cancellation remains cancellation, and an error thrown by the test body or performed domain operation remains that error. A result already produced by a result-bearing operation is not replaced with a fabricated infrastructure result.
 
 ## Generated test doubles

@@ -26,13 +26,6 @@ public struct RouterStack<
   // MARK: Lifecycle
 
   /// Creates a stack for an existing Router.
-  ///
-  /// - Parameters:
-  ///   - router: The Router bound to the stack path and presentations.
-  ///   - pushContent: Resolves pushed destination values into views.
-  ///   - sheetContent: Resolves sheet destination values into views.
-  ///   - fullScreenContent: Resolves full-screen destination values into views.
-  ///   - content: The stack's root content.
   public init(
     router: Router<Scene>,
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
@@ -48,14 +41,6 @@ public struct RouterStack<
   }
 
   /// Creates a stack for a cached top-level destination Router.
-  ///
-  /// - Parameters:
-  ///   - parentRouter: The Router that owns the top-level branch cache.
-  ///   - root: The branch whose cached Router backs the stack.
-  ///   - pushContent: Resolves pushed destination values into views.
-  ///   - sheetContent: Resolves sheet destination values into views.
-  ///   - fullScreenContent: Resolves full-screen destination values into views.
-  ///   - content: The stack's root content.
   public init(
     parentRouter: Router<Scene>,
     root: Scene.Root,

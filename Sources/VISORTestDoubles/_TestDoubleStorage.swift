@@ -6,17 +6,12 @@ import os
 /// consuming module. Use ``GenerateStub(_:)`` or ``GenerateSpy(_:)`` instead.
 nonisolated public struct _TestDoubleStorage<State: Sendable>: Sendable {
   /// Creates generated lock-backed storage.
-  ///
-  /// - Parameter initialState: The complete initial test-double state.
   public init(_ initialState: sending State) {
     lock = OSAllocatedUnfairLock(initialState: initialState)
   }
 
   /// Borrows the synchronised State for a read without creating a mutable
   /// snapshot of its copy-on-write storage.
-  ///
-  /// - Parameter operation: A synchronous read performed while holding the lock.
-  /// - Returns: The operation's Sendable result.
   public func withValue<Output: Sendable>(
     _ operation: @Sendable (borrowing State) -> Output
   ) -> Output {
@@ -31,11 +26,6 @@ nonisolated public struct _TestDoubleStorage<State: Sendable>: Sendable {
   /// `retiredValue` runs before `operation` and must select every value that
   /// the operation replaces. Values merely mutated in place, such as an Array
   /// history append, should not be selected.
-  ///
-  /// - Parameters:
-  ///   - retiredValue: Selects displaced references that must be released after unlocking.
-  ///   - operation: A synchronous mutation performed while holding the lock.
-  /// - Returns: The mutation's Sendable result.
   public func withMutation<Output: Sendable, Retired: Sendable>(
     retiring retiredValue: @Sendable (borrowing State) -> Retired,
     _ operation: @Sendable (inout State) -> Output
