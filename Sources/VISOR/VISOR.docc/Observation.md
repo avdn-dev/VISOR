@@ -251,7 +251,9 @@ observationTask = Task { @MainActor [weak self, dependency] in
 The sequence emits the atomic baseline and then the newest pending snapshot.
 Cancellation ends it normally; source termination and runtime failures throw
 `ObservationSourceError`. Each iterator is deliberately single-consumer and
-does not conform to `Sendable`.
+does not conform to `Sendable`. A source error is terminal for that channel;
+stop the consuming task and replace the owning producer/channel if the feature
+can recover. Opening a new iterator on the same source throws the same error.
 It is intentionally outside generated ViewModel readiness, acknowledgements,
 and `VISORTesting.perform` fences. Use `@Bound` or `@Reaction` inside a
 ViewModel. Keep lossless events on an explicitly buffered event contract.

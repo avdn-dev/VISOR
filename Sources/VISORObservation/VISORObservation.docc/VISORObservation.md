@@ -12,7 +12,9 @@ initial-plus-latest `AsyncSequence` without exposing producer controls.
 Each iterator owns an independent subscription. Iteration is single-consumer,
 coalesces intermediate revisions when its consumer is busy, and throws
 ``ObservationSourceError`` if the source can no longer provide coherent State.
-Task cancellation ends iteration normally.
+Task cancellation ends iteration normally. Source errors are terminal: stop
+the consumer and replace the producer-owned channel rather than opening another
+iterator on the same source.
 
 The `@ObservationState` macro keeps an ordinary stored property canonical while
 generating its stable source. Apply `@ObservationStateRequirements` when a

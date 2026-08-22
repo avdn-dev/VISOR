@@ -5,13 +5,11 @@ import os
 ///
 /// Cancellation is a normal sequence-lifecycle event and finishes iteration
 /// without throwing. These cases instead indicate that the source can no
-/// longer provide coherent snapshots.
+/// longer provide coherent snapshots. Every case is terminal for that source:
+/// stop its consumer and replace the producer-owned channel to recover.
 nonisolated public enum ObservationSourceError: Error, Equatable, Sendable {
   /// The source stopped without a normal producer-lifecycle completion.
   case terminatedUnexpectedly
-
-  /// The source exhausted its monotonically increasing revision space.
-  case revisionExhausted
 
   /// The observation runtime rejected an inconsistent operation.
   ///
@@ -25,8 +23,6 @@ extension ObservationSourceError: LocalizedError {
     switch self {
     case .terminatedUnexpectedly:
       "The observation source terminated unexpectedly."
-    case .revisionExhausted:
-      "The observation source exhausted its revision space."
     case .runtimeFailure(let detail):
       "The observation source runtime failed: \(detail)"
     }
@@ -291,6 +287,7 @@ nonisolated package enum _ObservationSourceFailure:
 {
   case unexpectedTermination
   case failed(String)
+  /// The current revision reached `UInt64.max`; no later publication can be ordered.
   case revisionExhausted
   case protocolViolation(String)
   case safetyDeadlineExceeded(
@@ -305,7 +302,8 @@ private extension ObservationSourceError {
     case .unexpectedTermination:
       self = .terminatedUnexpectedly
     case .revisionExhausted:
-      self = .revisionExhausted
+      self = .runtimeFailure(
+        detail: "The observation source exhausted its internal revision space.")
     case .failed(let detail), .protocolViolation(let detail):
       self = .runtimeFailure(detail: detail)
     case .safetyDeadlineExceeded(

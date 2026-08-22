@@ -63,6 +63,22 @@ struct ObservationSnapshotsTests {
       _ = try await iterator.next()
     }
   }
+
+  @Test
+  func `Revision exhaustion remains an internal runtime failure`() async throws {
+    let channel = ObservationChannel(0)
+    let iterator = channel.source.makeAsyncIterator()
+    #expect(try await iterator.next() == 0)
+
+    channel._visorTerminate(with: .revisionExhausted)
+
+    await #expect {
+      _ = try await iterator.next()
+    } throws: { error in
+      error as? ObservationSourceError == .runtimeFailure(
+        detail: "The observation source exhausted its internal revision space.")
+    }
+  }
 }
 
 private actor OrderedProducer {
