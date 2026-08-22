@@ -520,6 +520,10 @@ GalleryScreen()
   .environment(factory)
 ```
 
+Render the screen beneath a ``RouterHost`` for the same `AppScene`; a missing or
+differently typed Router is an invalid composition and fails during ViewModel
+creation.
+
 ## Destination
 
 ``Destination`` is the unified value accepted by `router.navigate(to:)` and

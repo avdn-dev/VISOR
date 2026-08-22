@@ -347,6 +347,12 @@ let factory: GalleryViewModel.Factory = .routed {
 }
 ```
 
+Every `@LazyViewModel` view that consumes this factory must render beneath a
+``RouterHost`` for the same `AppScene`. A missing or differently typed Router is
+a composition error and fails a precondition during ViewModel creation. In a
+preview, mount the matching host or inject a non-routed preview factory when the
+preview deliberately does not exercise navigation.
+
 The View sends `.openPhoto(id:)`; it does not resolve or call the Router itself.
 This is the preferred navigation path for feature code.
 

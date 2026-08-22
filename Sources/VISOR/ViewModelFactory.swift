@@ -75,6 +75,9 @@ public final class ViewModelFactory<VM: ViewModel> {
   /// Use this method for non-routed factories. `@LazyViewModel` supplies the
   /// generated Router bridge automatically for factories created with
   /// ``routed(_:)``.
+  ///
+  /// - Precondition: This factory was created with ``init(_:)``. Calling this
+  ///   method on a routed factory fails because no Router is supplied.
   public func makeViewModel() -> VM {
     _make(nil)
   }
@@ -84,6 +87,9 @@ public final class ViewModelFactory<VM: ViewModel> {
   /// This method is public only because attached macro expansions are
   /// type-checked in the consuming module. Call ``makeViewModel()`` from
   /// application code.
+  ///
+  /// - Precondition: A routed factory receives a non-nil Router whose
+  ///   `NavigationScene` matches the type declared by ``routed(_:)``.
   public func _visorMakeViewModel(router: AnyObject?) -> VM {
     _make(router)
   }

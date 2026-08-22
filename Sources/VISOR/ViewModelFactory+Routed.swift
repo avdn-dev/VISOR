@@ -15,6 +15,10 @@ extension ViewModelFactory {
   ///     GalleryViewModel(router: router, galleryService: galleryService)
   /// }
   /// ```
+  ///
+  /// - Important: The consuming `@LazyViewModel` view must be beneath a
+  ///   `RouterHost` whose `NavigationScene` matches `Scene`. A missing or
+  ///   differently typed Router is a composition error that fails a precondition.
   public static func routed<Scene: NavigationScene>(
     _ make: @escaping (Router<Scene>) -> VM
   ) -> ViewModelFactory<VM> {
