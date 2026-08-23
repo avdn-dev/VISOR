@@ -24,6 +24,45 @@ private actor Producer {
 @Suite("Public observation snapshots")
 struct ObservationSnapshotsTests {
   @Test
+  func `Testing wait returns for the baseline or a later matching snapshot`() async throws {
+    let channel = ObservationChannel(0)
+
+    try await channel.source.waitUntil { $0 == 0 }
+
+    let checkedBaseline = TestEventCounter()
+    let waiter = Task {
+      try await channel.source.waitUntil { value in
+        checkedBaseline.record()
+        return value == 1
+      }
+    }
+    await checkedBaseline.wait()
+
+    channel.publish(1)
+
+    try await waiter.value
+  }
+
+  @Test
+  func `Testing wait cooperates with test cancellation`() async {
+    let channel = ObservationChannel(0)
+    let checkedBaseline = TestEventCounter()
+    let waiter = Task {
+      try await channel.source.waitUntil { _ in
+        checkedBaseline.record()
+        return false
+      }
+    }
+    await checkedBaseline.wait()
+
+    waiter.cancel()
+
+    await #expect(throws: CancellationError.self) {
+      try await waiter.value
+    }
+  }
+
+  @Test
   func `Each iterator independently receives the baseline and next publication`() async throws {
     let channel = ObservationChannel(0)
     let first = channel.source.makeAsyncIterator()

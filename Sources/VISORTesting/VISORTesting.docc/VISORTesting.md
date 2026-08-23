@@ -21,6 +21,7 @@ without awaiting it is intentionally outside the action window.
 - ``observe(_:sourceLocation:_:)``
 - ``ObservationTest``
 - ``ObservationTestError``
+- ``VISORObservation/ObservationSource/waitUntil(_:)``
 
 ### History matching
 

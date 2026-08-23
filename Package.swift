@@ -48,7 +48,7 @@ let package = Package(
 
     .target(
       name: "VISORTesting",
-      dependencies: ["VISOR"]),
+      dependencies: ["VISOR", "VISORObservation"]),
 
     .target(
       name: "VISORTestDoubles",

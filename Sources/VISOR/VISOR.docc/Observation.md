@@ -258,6 +258,29 @@ It is intentionally outside generated ViewModel readiness, acknowledgements,
 and `VISORTesting.perform` fences. Use `@Bound` or `@Reaction` inside a
 ViewModel. Keep lossless events on an explicitly buffered event contract.
 
+### Testing producer snapshots
+
+For durable producer State, trigger the operation and use `VISORTesting`'s
+`waitUntil` helper to wait for the required snapshot:
+
+```swift
+@Test(.timeLimit(.minutes(1)))
+func `Refresh publishes ready status`() async throws {
+  service.refresh()
+
+  try await service.statusSnapshots.waitUntil {
+    $0.phase == .ready
+  }
+}
+```
+
+Each iterator opens with the source's atomic current baseline, so starting the
+wait after the operation does not introduce a registration race. The helper
+uses the source's standard `AsyncSequence` iteration and needs no polling,
+sleeps, `Task.yield()`, or Apple Observation. It has no private deadline: apply
+a Swift Testing time limit so cancellation bounds a missing publication. Use
+`VISORTesting.observe` instead for a ViewModel's routed State history.
+
 ## Source-backed ViewModels
 
 A VISOR ViewModel has this shape:
