@@ -189,30 +189,46 @@ After:
 final class ProfileViewModel {
   final class State {
     @Bound(
-      source: \ProfileViewModel.service.source,
+      source: \ProfileViewModel.service.profileSnapshots,
       selecting: \ProfileSnapshot.name)
-    private(set) var name = ""
+    private(set) var name: String
+
+    init(name: String) {
+      self.name = name
+    }
   }
 
-  let state = State()
   let service: ProfileService
-
-  init(service: ProfileService) {
-    self.service = service
-  }
 }
 ```
+
+`@ViewModel` generates the stable stored `let state` and the outer memberwise
+initialiser. Stored `let` dependencies without defaults become initialiser
+parameters. When a `State` initialiser parameter corresponds to an `@Bound`
+field, the generated initialiser reads each distinct source once and passes its
+complete snapshot or selected value into `State`. Bindings selecting the same
+source therefore begin from one coherent producer revision.
+
+Prefer this generated ownership whenever the declaration provides one
+unambiguous construction path. Author `let state` and a custom outer
+initialiser only when construction has additional inputs or side effects that
+the macro cannot express.
 
 The required changes are:
 
 - explicitly add `@MainActor` to the ViewModel;
 - keep `@Observable` on the ViewModel;
 - remove `@Observable` from nested State;
-- make State a plain `final class` held by a stored `let state`;
-- use declaration defaults or a normal custom State initialiser; and
+- make State a plain `final class` with declaration defaults or one normal
+  initialiser that lets `@ViewModel` generate stable ownership;
+- omit authored `state` storage and the outer memberwise initialiser when the
+  macro can generate them; and
 - replace positional observation markers with source-backed declarations.
 
-Consumer targets no longer need MainActor-by-default. Public ViewModels require public nested State and a public stored `let state` so the generated conformance remains visible.
+Consumer targets no longer need MainActor-by-default. Public ViewModels require
+a public nested State. The macro gives generated State ownership and the
+memberwise initialiser the ViewModel's access level; custom authored ownership
+must preserve that visibility explicitly.
 
 Existing hand-written `ViewModel` conformances must migrate as well. The v11
 protocol is MainActor-isolated and requires routed State conformance, stable
@@ -657,7 +673,8 @@ SwiftPM graph. Then verify all of the following:
 
 - production targets import only the products they directly use;
 - every ViewModel has explicit `@MainActor`, `@Observable`, `@ViewModel`, plain
-  final State, and stable stored `let state` declarations;
+  final State, and uses generated stable State/source initialisation unless
+  custom construction is genuinely required;
 - every producer publishes a stable latest-State snapshot and keeps its channel
   private;
 - every `Loadable` supplies a typed failure and its Content view renders each
