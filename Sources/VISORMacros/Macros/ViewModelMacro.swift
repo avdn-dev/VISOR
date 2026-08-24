@@ -76,6 +76,7 @@ private struct SourceReactionRecipe {
 
 private struct SourceObservationRecipeGroup {
   let source: ExprSyntax
+  let sourceComponents: [String]?
   var bounds: [SourceBoundRecipe] = []
   var reactions: [SourceReactionRecipe] = []
 }
@@ -127,10 +128,67 @@ private extension TypeSyntax {
   }
 
   var hasImplicitNilInitialValue: Bool {
-    self.is(OptionalTypeSyntax.self) ||
-      trimmedDescription.hasPrefix("Optional<") ||
-      trimmedDescription.hasSuffix("!")
+    if self.is(OptionalTypeSyntax.self) ||
+       self.is(ImplicitlyUnwrappedOptionalTypeSyntax.self)
+    {
+      return true
+    }
+    if let identifier = self.as(IdentifierTypeSyntax.self) {
+      return identifier.name.text == "Optional" &&
+        identifier.genericArgumentClause?.arguments.count == 1
+    }
+    guard
+      let member = self.as(MemberTypeSyntax.self),
+      member.name.text == "Optional",
+      member.genericArgumentClause?.arguments.count == 1,
+      let base = member.baseType.as(IdentifierTypeSyntax.self)
+    else {
+      return false
+    }
+    return base.name.text == "Swift" && base.genericArgumentClause == nil
   }
+
+  var isViewModelStateType: Bool {
+    guard let identifier = self.as(IdentifierTypeSyntax.self) else {
+      return false
+    }
+    return identifier.name.text == "State" &&
+      identifier.genericArgumentClause == nil
+  }
+}
+
+private extension ExprSyntax {
+  var isViewModelStateInitialiserReference: Bool {
+    if let reference = self.as(DeclReferenceExprSyntax.self) {
+      return reference.baseName.text == "State"
+    }
+    guard
+      let member = self.as(MemberAccessExprSyntax.self),
+      member.declName.baseName.text == "init",
+      let base = member.base?.as(DeclReferenceExprSyntax.self)
+    else {
+      return false
+    }
+    return base.baseName.text == "State"
+  }
+}
+
+private func keyPathPropertyComponents(
+  from expression: ExprSyntax,
+  ownerName: String
+) -> [String]? {
+  guard let keyPath = expression.as(KeyPathExprSyntax.self) else {
+    return nil
+  }
+  let components = keyPath.components.compactMap { component -> String? in
+    guard case .property(let property) = component.component else {
+      return nil
+    }
+    return property.declName.baseName.text
+  }
+  guard components.count == keyPath.components.count else { return nil }
+  guard components.first == ownerName else { return components }
+  return Array(components.dropFirst())
 }
 
 private func observationRoutingAttributes(
@@ -261,7 +319,7 @@ private extension ClassDeclSyntax {
           else {
             return false
           }
-          if binding.typeAnnotation?.type.trimmedDescription == "State" {
+          if binding.typeAnnotation?.type.isViewModelStateType == true {
             return true
           }
           guard
@@ -270,8 +328,7 @@ private extension ClassDeclSyntax {
           else {
             return false
           }
-          return ["State", "Self.State"].contains(
-            call.calledExpression.trimmedDescription)
+          return call.calledExpression.isViewModelStateInitialiserReference
         }
     }
   }
@@ -445,7 +502,7 @@ private extension ClassDeclSyntax {
       let internalName = parameter.secondName?.text
         ?? parameter.firstName.text
       if let bound = bounds[internalName] {
-        guard sourceAccessPath(
+        guard sourceAccessComponents(
           from: bound.source,
           dependencyNames: dependencyNames) != nil
         else {
@@ -462,21 +519,18 @@ private extension ClassDeclSyntax {
       }
     }
 
-    var sources: [(source: ExprSyntax, accessPath: String)] = []
+    var sources: [[String]] = []
     func sourceIndex(for argument: StateInitialisationArgument) -> Int? {
-      let spelling = argument.source.trimmedDescription
-      if let index = sources.firstIndex(where: {
-        $0.source.trimmedDescription == spelling
-      }) {
-        return index
-      }
-      guard let accessPath = sourceAccessPath(
+      guard let accessComponents = sourceAccessComponents(
         from: argument.source,
         dependencyNames: dependencyNames)
       else {
         return nil
       }
-      sources.append((source: argument.source, accessPath: accessPath))
+      if let index = sources.firstIndex(of: accessComponents) {
+        return index
+      }
+      sources.append(accessComponents)
       return sources.index(before: sources.endIndex)
     }
 
@@ -492,9 +546,9 @@ private extension ClassDeclSyntax {
       } ?? value)
     }
 
-    let reads = sources.enumerated().map { index, source in
+    let reads = sources.enumerated().map { index, accessComponents in
       "let _visorInitialSource\(index) = " +
-        "\(source.accessPath).currentSnapshot()"
+        "\(accessComponents.joined(separator: ".")).currentSnapshot()"
     }
     return StateInitialisation(
       snapshotReads: reads,
@@ -543,27 +597,20 @@ private extension ClassDeclSyntax {
     return true
   }
 
-  private func sourceAccessPath(
+  private func sourceAccessComponents(
     from expression: ExprSyntax,
     dependencyNames: Set<String>
-  ) -> String? {
-    guard let keyPath = expression.as(KeyPathExprSyntax.self) else {
-      return nil
-    }
-    let components = keyPath.components.compactMap { component -> String? in
-      guard case .property(let property) = component.component else {
-        return nil
-      }
-      return property.declName.baseName.text
-    }
+  ) -> [String]? {
     guard
-      components.count == keyPath.components.count,
+      let components = keyPathPropertyComponents(
+        from: expression,
+        ownerName: name.text),
       let dependency = components.first,
       dependencyNames.contains(dependency)
     else {
       return nil
     }
-    return components.joined(separator: ".")
+    return components
   }
 
   func hasStableOrSynthesisedState(state: ClassDeclSyntax) -> Bool {
@@ -810,13 +857,20 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
     var groups: [SourceObservationRecipeGroup] = []
 
     func groupIndex(for source: ExprSyntax) -> Int {
-      let spelling = source.trimmedDescription
-      if let index = groups.firstIndex(where: {
-        $0.source.trimmedDescription == spelling
-      }) {
+      let components = keyPathPropertyComponents(
+        from: source,
+        ownerName: viewModel.name.text)
+      if
+        let components,
+        let index = groups.firstIndex(where: {
+          $0.sourceComponents == components
+        })
+      {
         return index
       }
-      groups.append(SourceObservationRecipeGroup(source: source))
+      groups.append(SourceObservationRecipeGroup(
+        source: source,
+        sourceComponents: components))
       return groups.index(before: groups.endIndex)
     }
 

@@ -9,6 +9,13 @@ public protocol CatalogueServing {
   func currentStatus() -> String
 }
 
+@GenerateStub
+public protocol QualifiedDefaultServing {
+  var isEnabled: Swift.Bool { get }
+  var itemIDs: Swift.Array<Swift.Int> { get }
+  func selectedID() -> Swift.Optional<Swift.Int>
+}
+
 @GenerateSpy(.sendable)
 nonisolated public protocol EventRecording: Sendable {
   func record(_ value: Int)

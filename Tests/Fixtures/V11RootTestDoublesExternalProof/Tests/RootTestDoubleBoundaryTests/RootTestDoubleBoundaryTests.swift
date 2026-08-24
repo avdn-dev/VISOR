@@ -12,6 +12,15 @@ struct RootTestDoubleBoundaryTests {
   }
 
   @Test
+  func `A public stub defaults canonical Swift spellings across the module boundary`() {
+    let stub = StubQualifiedDefaultServing()
+
+    #expect(stub.isEnabled == false)
+    #expect(stub.itemIDs.isEmpty)
+    #expect(stub.selectedID() == nil)
+  }
+
+  @Test
   func `A public Sendable spy records concurrent calls across the module boundary`() async {
     let spy = SpyEventRecording()
 

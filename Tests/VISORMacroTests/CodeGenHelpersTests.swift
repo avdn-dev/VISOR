@@ -35,6 +35,40 @@ struct CodeGenHelpersTests {
     #expect(storageSnapshotStrategy(for: "String") == .none)
   }
 
+  @Test(arguments: [
+    ("Swift.Optional<String>", "nil"),
+    ("Swift.Bool", "false"),
+    ("Swift.Int64", "0"),
+    ("Swift.Double", "0.0"),
+    ("CoreGraphics.CGFloat", "0.0"),
+    ("Foundation.Decimal", "0"),
+    ("Swift.String", "\"\""),
+    ("Foundation.Data", "Data()"),
+    ("Swift.Array<String>", "[]"),
+    ("Swift.Dictionary<String, Int>", "[:]"),
+    ("Swift.Set<String>", "[]"),
+    ("Swift.Void", "()"),
+    ("_Concurrency.AsyncStream<Int>", "AsyncStream { $0.finish() }"),
+  ])
+  func `Recognises canonical qualified spellings for known defaults`(
+    input: String,
+    expected: String)
+  {
+    #expect(defaultValue(for: input) == expected)
+  }
+
+  @Test(arguments: [
+    "Feature.Bool",
+    "Feature.Array<Int>",
+    "Feature.Optional<Int>",
+    "Flag",
+  ])
+  func `Does not infer defaults for arbitrary modules or aliases`(
+    input: String)
+  {
+    #expect(defaultValue(for: input) == nil)
+  }
+
   @Test
   func `Disambiguates same-label overloads by parameter type`() {
     let prefixes = uniqueMethodPrefixes(for: [

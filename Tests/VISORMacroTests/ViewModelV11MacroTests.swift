@@ -79,7 +79,7 @@ import Testing
             public private(set) var count: Int
 
             @Bound(
-              source: \\SourceInitialisedViewModel.consumer.snapshotSource,
+              source: \\AlternateRoot.SourceInitialisedViewModel.consumer.snapshotSource,
               selecting: \\Snapshot.label)
             public private(set) var label: String
 
@@ -457,7 +457,7 @@ import Testing
     }
 
     @Test
-    func `Source entries are grouped with projections before reactions`() {
+    func `Equivalent source roots group projections before reactions`() {
       assertMacroExpansionSwiftTesting(
         """
         @MainActor
@@ -471,7 +471,7 @@ import Testing
             var count = 0
 
             @Bound(
-              source: \\SourceViewModel.service.source,
+              source: \\AlternateRoot.SourceViewModel.service.source,
               selecting: \\Snapshot.label)
             var label = ""
 
@@ -484,7 +484,7 @@ import Testing
           let status: StatusService
 
           @Reaction(
-            source: \\SourceViewModel.service.source,
+            source: \\AlternateRoot.SourceViewModel.service.source,
             selecting: \\Snapshot.count)
           func countChanged(_ count: Int) {}
 
@@ -1138,7 +1138,7 @@ import Testing
           enum Action {
             case refresh
           }
-          let state = State()
+          let state = State.init()
 
           func handle(action: Action) {}
         }
@@ -1152,7 +1152,7 @@ import Testing
             enum Action {
               case refresh
             }
-            let state = State()
+            let state = State.init()
 
             func handle(action: Action) {}
 

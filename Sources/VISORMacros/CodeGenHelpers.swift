@@ -5,6 +5,7 @@
 //  Extracted from SharedExtensions.swift
 //
 
+import SwiftParser
 import SwiftSyntax
 
 // MARK: - Attribute Name Constants
@@ -24,47 +25,101 @@ enum AttributeName {
 /// Used by generated stubs and spies to initialise generated properties.
 func defaultValue(for type: String) -> String? {
   let trimmed = storageValueType(from: type)
+  guard let type = parsedType(from: trimmed) else { return nil }
 
-  // Optional
-  if trimmed.hasSuffix("?") { return "nil" }
-  if trimmed.hasPrefix("Optional<") { return "nil" }
+  if type.is(OptionalTypeSyntax.self) { return "nil" }
+  if type.is(ArrayTypeSyntax.self) { return "[]" }
+  if type.is(DictionaryTypeSyntax.self) { return "[:]" }
+  if let tuple = type.as(TupleTypeSyntax.self), tuple.elements.isEmpty {
+    return "()"
+  }
 
-  // Bool
-  if trimmed == "Bool" { return "false" }
+  guard let nominal = type.nominalIdentity else { return nil }
+  let expectedModule: String
+  let expectedArgumentCount: Int
+  let value: String
 
-  // Numeric
-  let intTypes: Set<String> = ["Int", "Int8", "Int16", "Int32", "Int64",
-                                "UInt", "UInt8", "UInt16", "UInt32", "UInt64"]
-  if intTypes.contains(trimmed) { return "0" }
-  if trimmed == "Float" { return "0.0" }
-  if trimmed == "Double" { return "0.0" }
-  if trimmed == "CGFloat" { return "0.0" }
-  if trimmed == "Decimal" { return "0" }
+  switch nominal.name {
+  case "Optional":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "nil")
+  case "Bool":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "false")
+  case "Int", "Int8", "Int16", "Int32", "Int64",
+       "UInt", "UInt8", "UInt16", "UInt32", "UInt64":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "0")
+  case "Float", "Double":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "0.0")
+  case "CGFloat":
+    (expectedModule, expectedArgumentCount, value) =
+      ("CoreGraphics", 0, "0.0")
+  case "Decimal":
+    (expectedModule, expectedArgumentCount, value) = ("Foundation", 0, "0")
+  case "String":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "\"\"")
+  case "Data":
+    (expectedModule, expectedArgumentCount, value) =
+      ("Foundation", 0, "Data()")
+  case "Array":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "[]")
+  case "Dictionary":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 2, "[:]")
+  case "Set":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "[]")
+  case "Void":
+    (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "()")
+  case "AsyncStream":
+    (expectedModule, expectedArgumentCount, value) =
+      ("_Concurrency", 1, "AsyncStream { $0.finish() }")
+  default:
+    return nil
+  }
 
-  // String
-  if trimmed == "String" { return "\"\"" }
+  guard nominal.genericArgumentCount == expectedArgumentCount else {
+    return nil
+  }
+  guard nominal.module == nil || nominal.module == expectedModule else {
+    return nil
+  }
+  return value
+}
 
-  // Data
-  if trimmed == "Data" { return "Data()" }
+private func parsedType(from spelling: String) -> TypeSyntax? {
+  let source = Parser.parse(source: "typealias _VISORValue = \(spelling)")
+  guard
+    !source.hasError,
+    source.statements.count == 1,
+    let declaration = source.statements.first?.item.as(
+      TypeAliasDeclSyntax.self)
+  else {
+    return nil
+  }
+  return declaration.initializer.value
+}
 
-  // Array
-  if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") && !trimmed.contains(":") { return "[]" }
-  if trimmed.hasPrefix("Array<") { return "[]" }
-
-  // Dictionary
-  if trimmed.hasPrefix("[") && trimmed.contains(":") && trimmed.hasSuffix("]") { return "[:]" }
-  if trimmed.hasPrefix("Dictionary<") { return "[:]" }
-
-  // Set
-  if trimmed.hasPrefix("Set<") { return "[]" }
-
-  // Void
-  if trimmed == "Void" || trimmed == "()" { return "()" }
-
-  // AsyncStream
-  if trimmed.hasPrefix("AsyncStream<") { return "AsyncStream { $0.finish() }" }
-
-  return nil
+private extension TypeSyntax {
+  var nominalIdentity: (
+    module: String?,
+    name: String,
+    genericArgumentCount: Int
+  )? {
+    if let identifier = self.as(IdentifierTypeSyntax.self) {
+      return (
+        nil,
+        identifier.name.text,
+        identifier.genericArgumentClause?.arguments.count ?? 0)
+    }
+    guard
+      let member = self.as(MemberTypeSyntax.self),
+      let base = member.baseType.as(IdentifierTypeSyntax.self),
+      base.genericArgumentClause == nil
+    else {
+      return nil
+    }
+    return (
+      base.name.text,
+      member.name.text,
+      member.genericArgumentClause?.arguments.count ?? 0)
+  }
 }
 
 func returnDefaultValue(for method: ProtocolMethodInfo) -> String? {

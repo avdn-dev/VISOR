@@ -2,6 +2,9 @@ import Observation
 import RootObservationConsumer
 import VISOR
 
+private typealias NonisolatedSourceBackedRoot =
+  NonisolatedSourceBackedViewModel
+
 // Deliberately omits explicit deinitialisers so release compilation exercises
 // the @ViewModel and cascaded State optimiser workarounds.
 @MainActor
@@ -12,7 +15,7 @@ public final class NonisolatedSourceBackedViewModel {
     @Bound(source: \NonisolatedSourceBackedViewModel.consumer.source)
     public private(set) var revision: Int
 
-    @Bound(source: \NonisolatedSourceBackedViewModel.consumer.source)
+    @Bound(source: \NonisolatedSourceBackedRoot.consumer.source)
     public private(set) var mirroredRevision: Int
 
     @Bound(
@@ -36,7 +39,7 @@ public final class NonisolatedSourceBackedViewModel {
 
   public let consumer: RootObservationConsumer
 
-  @Reaction(source: \NonisolatedSourceBackedViewModel.consumer.source)
+  @Reaction(source: \NonisolatedSourceBackedRoot.consumer.source)
   private func revisionChanged(_ revision: Int) {
     updateState(\.reactedRevision, to: revision)
   }
