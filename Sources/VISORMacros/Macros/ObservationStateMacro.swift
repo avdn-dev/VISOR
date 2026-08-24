@@ -32,7 +32,18 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
         \(raw: property.channelName).source
       }
       """
-    return [channel, sequence]
+    let mutation: DeclSyntax = """
+      @discardableResult
+      private func \(raw: property.mutationName)<Result>(
+        _ mutation: (inout \(raw: property.valueType)) throws -> Result
+      ) rethrows -> Result {
+        var updatedValue = \(raw: property.name)
+        let result = try mutation(&updatedValue)
+        \(raw: property.name) = updatedValue
+        return result
+      }
+      """
+    return [channel, sequence, mutation]
   }
 
   public static func expansion(
@@ -163,6 +174,10 @@ private struct ObservationStateProperty {
 
   var channelName: String {
     "__visorObservationState\(name.capitalisedFirst)Channel"
+  }
+
+  var mutationName: String {
+    "withMutable\(name.capitalisedFirst)"
   }
 
   var channelBinding: String {
@@ -323,10 +338,12 @@ private func observationStateProperty(
   let propertyName = identifier.identifier.text
   let sequenceName = arguments.sequenceNaming.memberName(for: propertyName)
   let channelName = "__visorObservationState\(propertyName.capitalisedFirst)Channel"
+  let mutationName = "withMutable\(propertyName.capitalisedFirst)"
   guard validateGeneratedNames(
     stateName: propertyName,
     sequenceName: sequenceName,
     channelName: channelName,
+    mutationName: mutationName,
     declaration: declaration,
     in: context,
     shouldDiagnose: shouldDiagnose)
@@ -471,15 +488,18 @@ private func validateGeneratedNames(
   stateName: String,
   sequenceName: String,
   channelName: String?,
+  mutationName: String? = nil,
   declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
   shouldDiagnose: Bool
 ) -> Bool {
-  guard sequenceName != stateName else {
+  let generatedNames = [sequenceName] + [channelName, mutationName].compactMap { $0 }
+  var reservedNames = Set([stateName])
+  for name in generatedNames where !reservedNames.insert(name).inserted {
     diagnose(
       declaration,
       in: context,
-      with: .generatedNameCollision(sequenceName),
+      with: .generatedNameCollision(name),
       if: shouldDiagnose)
     return false
   }
@@ -488,8 +508,17 @@ private func validateGeneratedNames(
     excludingStateNamed: stateName,
     around: declaration,
     in: context)
-  if names.contains(sequenceName) || channelName.map(names.contains) == true {
-    let collision = names.contains(sequenceName) ? sequenceName : channelName ?? sequenceName
+  if names.contains(sequenceName)
+    || channelName.map(names.contains) == true
+    || mutationName.map(names.contains) == true
+  {
+    let collision = if names.contains(sequenceName) {
+      sequenceName
+    } else if let channelName, names.contains(channelName) {
+      channelName
+    } else {
+      mutationName ?? sequenceName
+    }
     diagnose(declaration, in: context, with: .generatedNameCollision(collision), if: shouldDiagnose)
     return false
   }

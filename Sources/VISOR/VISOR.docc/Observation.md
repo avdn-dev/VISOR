@@ -99,8 +99,11 @@ actor SyncService {
   @ObservationState
   private(set) var sync: SyncSnapshot = .initial
 
-  func apply(_ snapshot: SyncSnapshot) {
-    sync = snapshot
+  func complete(revision: Int) {
+    withMutableSync { sync in
+      sync.revision = revision
+      sync.phase = .complete
+    }
   }
 }
 
@@ -109,9 +112,25 @@ let current = await service.sync
 let snapshots = service.syncSnapshots
 ```
 
-The authored scalar is the canonical producer State: direct assignment and
-in-place value mutation both publish the resulting complete value
-synchronously. The macro synthesises one private channel and a nonisolated
+The authored scalar is the canonical producer State. Direct assignment and
+in-place value mutation both publish synchronously. For a coherent change to
+several fields, the macro also generates a private
+`withMutable<Property>(_:)` method. Its closure receives the current State as
+`inout` and publishes the completed value exactly once:
+
+```swift
+withMutableSync { sync in
+  sync.revision += 1
+  sync.phase = .complete
+}
+```
+
+The generated method returns the closure's result. If the closure throws, no
+replacement is assigned or published. As with every published snapshot, the
+State must not hide mutable reference aliases. Side effects that must observe
+committed State belong after the method returns.
+
+The macro synthesises one private channel and a nonisolated
 `ObservationSource` peer. It creates no task or additional subscription.
 Classes and actors are supported; value-type producers are rejected because a
 copied producer must not accidentally share one channel.

@@ -14,7 +14,9 @@ public final class RootObservationStateProducer: RootObservationStateProviding {
   public init() {}
 
   public func updateCount(_ count: Int) {
-    self.count = count
+    withMutableCount { value in
+      value = count
+    }
   }
 }
 

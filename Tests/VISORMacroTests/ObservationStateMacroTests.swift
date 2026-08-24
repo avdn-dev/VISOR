@@ -40,6 +40,16 @@ struct ObservationStateMacroTests {
           VISORObservation.ObservationSource<PlaybackSnapshot> {
           __visorObservationStatePlaybackChannel.source
         }
+
+        @discardableResult
+        private func withMutablePlayback<Result>(
+          _ mutation: (inout PlaybackSnapshot) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = playback
+          let result = try mutation(&updatedValue)
+          playback = updatedValue
+          return result
+        }
       }
       """,
       macros: macros)
@@ -76,6 +86,16 @@ struct ObservationStateMacroTests {
           VISORObservation.ObservationSource<Int> {
           __visorObservationStateCountChannel.source
         }
+
+        @discardableResult
+        private func withMutableCount<Result>(
+          _ mutation: (inout Int) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = count
+          let result = try mutation(&updatedValue)
+          count = updatedValue
+          return result
+        }
       }
       """,
       macros: macros)
@@ -111,6 +131,16 @@ struct ObservationStateMacroTests {
         nonisolated var permissionStatuses:
           VISORObservation.ObservationSource<PermissionSnapshot> {
           __visorObservationStateStatusChannel.source
+        }
+
+        @discardableResult
+        private func withMutableStatus<Result>(
+          _ mutation: (inout PermissionSnapshot) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = status
+          let result = try mutation(&updatedValue)
+          status = updatedValue
+          return result
         }
       }
       """,
@@ -163,6 +193,16 @@ struct ObservationStateMacroTests {
           VISORObservation.ObservationSource<FeatureFlagSnapshot> {
           __visorObservationStateFlagsChannel.source
         }
+
+        @discardableResult
+        private func withMutableFlags<Result>(
+          _ mutation: (inout FeatureFlagSnapshot) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = flags
+          let result = try mutation(&updatedValue)
+          flags = updatedValue
+          return result
+        }
         var appearance {
             @storageRestrictions(initializes: __visorObservationStateAppearanceChannel)
             init(initialValue) {
@@ -182,6 +222,16 @@ struct ObservationStateMacroTests {
         nonisolated var appearanceSnapshots:
           VISORObservation.ObservationSource<ThemeObservation> {
           __visorObservationStateAppearanceChannel.source
+        }
+
+        @discardableResult
+        private func withMutableAppearance<Result>(
+          _ mutation: (inout ThemeObservation) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = appearance
+          let result = try mutation(&updatedValue)
+          appearance = updatedValue
+          return result
         }
         var sounds {
             @storageRestrictions(initializes: __visorObservationStateSoundsChannel)
@@ -203,6 +253,16 @@ struct ObservationStateMacroTests {
           VISORObservation.ObservationSource<[CustomNudgeSound]> {
           __visorObservationStateSoundsChannel.source
         }
+
+        @discardableResult
+        private func withMutableSounds<Result>(
+          _ mutation: (inout [CustomNudgeSound]) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = sounds
+          let result = try mutation(&updatedValue)
+          sounds = updatedValue
+          return result
+        }
         var enabled {
             @storageRestrictions(initializes: __visorObservationStateEnabledChannel)
             init(initialValue) {
@@ -222,6 +282,16 @@ struct ObservationStateMacroTests {
         nonisolated var enabledValues:
           VISORObservation.ObservationSource<Bool> {
           __visorObservationStateEnabledChannel.source
+        }
+
+        @discardableResult
+        private func withMutableEnabled<Result>(
+          _ mutation: (inout Bool) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = enabled
+          let result = try mutation(&updatedValue)
+          enabled = updatedValue
+          return result
         }
         var retryCount {
             @storageRestrictions(initializes: __visorObservationStateRetryCountChannel)
@@ -243,6 +313,16 @@ struct ObservationStateMacroTests {
           VISORObservation.ObservationSource<Int> {
           __visorObservationStateRetryCountChannel.source
         }
+
+        @discardableResult
+        private func withMutableRetryCount<Result>(
+          _ mutation: (inout Int) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = retryCount
+          let result = try mutation(&updatedValue)
+          retryCount = updatedValue
+          return result
+        }
         var status {
             @storageRestrictions(initializes: __visorObservationStateStatusChannel)
             init(initialValue) {
@@ -262,6 +342,16 @@ struct ObservationStateMacroTests {
         nonisolated var statusSnapshots:
           VISORObservation.ObservationSource<String> {
           __visorObservationStateStatusChannel.source
+        }
+
+        @discardableResult
+        private func withMutableStatus<Result>(
+          _ mutation: (inout String) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = status
+          let result = try mutation(&updatedValue)
+          status = updatedValue
+          return result
         }
       }
       """,
@@ -328,6 +418,16 @@ struct ObservationStateMacroTests {
           __visorObservationStatePlaybackChannel.source
         }
 
+        @discardableResult
+        private func withMutablePlayback<Result>(
+          _ mutation: (inout PlaybackSnapshot) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = playback
+          let result = try mutation(&updatedValue)
+          playback = updatedValue
+          return result
+        }
+
         init() {
           playback = .stopped
         }
@@ -373,6 +473,16 @@ struct ObservationStateMacroTests {
         nonisolated var playbackSnapshots:
           VISORObservation.ObservationSource<PlaybackSnapshot> {
           __visorObservationStatePlaybackChannel.source
+        }
+
+        @discardableResult
+        private func withMutablePlayback<Result>(
+          _ mutation: (inout PlaybackSnapshot) throws -> Result
+        ) rethrows -> Result {
+          var updatedValue = playback
+          let result = try mutation(&updatedValue)
+          playback = updatedValue
+          return result
         }
       }
       """,
@@ -586,6 +696,30 @@ struct ObservationStateMacroTests {
       diagnostics: [
         DiagnosticSpec(
           message: "@ObservationState cannot generate 'count' because that member name is already in use",
+          line: 2,
+          column: 3),
+      ],
+      macros: macros)
+  }
+
+  @Test
+  func `The generated mutation gateway must have a free member name`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      final class Counter {
+        @ObservationState(observedAs: .named("withMutableCount"))
+        var count: Int = 0
+      }
+      """,
+      expandedSource: """
+      final class Counter {
+        var count: Int = 0
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message:
+            "@ObservationState cannot generate 'withMutableCount' because that member name is already in use",
           line: 2,
           column: 3),
       ],

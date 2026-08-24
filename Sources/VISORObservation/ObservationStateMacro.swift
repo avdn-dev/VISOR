@@ -37,7 +37,10 @@ public macro ObservationStateRequirements() = #externalMacro(
 /// public private(set) var playback: PlaybackSnapshot = .stopped
 ///
 /// func stop() {
-///   playback = .stopped
+///   withMutablePlayback {
+///     $0.phase = .stopped
+///     $0.progress = 0
+///   }
 /// }
 ///
 /// for try await snapshot in service.playbackSnapshots {
@@ -79,6 +82,11 @@ public macro ObservationStateRequirements() = #externalMacro(
 /// explicit ``ObservationChannel`` for classes whose initialiser can throw
 /// before initialisation completes; current Swift toolchains can miscompile
 /// partial cleanup for macro-owned storage in that case.
+///
+/// Concrete producers also receive a private `withMutable<Property>(_:)`
+/// method. Its closure receives a local `inout` value initialised from the
+/// current State and publishes the completed value exactly once when the
+/// closure returns. If the closure throws, no replacement is published.
 ///
 /// If the enclosing type also uses `@Observable`, place
 /// `@ObservationIgnored` immediately below `@ObservationState`. The compiler

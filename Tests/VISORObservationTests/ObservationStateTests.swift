@@ -9,6 +9,10 @@ private struct ObservationStateSnapshot: Equatable, Sendable {
   var label = "initial"
 }
 
+private enum ObservationStateMutationError: Error {
+  case expected
+}
+
 private enum InferredObservationFlag: Equatable, Sendable {
   case disabled
   case enabled
@@ -58,6 +62,24 @@ private final class ObservationStateProducer {
 
   func update(count: Int, label: String) {
     snapshot = ObservationStateSnapshot(count: count, label: label)
+  }
+
+  func mutate(count: Int, label: String) -> String {
+    withMutableSnapshot { snapshot in
+      snapshot.count = count
+      snapshot.label = label
+      return snapshot.label
+    }
+  }
+
+  func mutateOrThrow(count: Int, shouldThrow: Bool) throws -> Int {
+    try withMutableSnapshot { snapshot in
+      snapshot.count = count
+      if shouldThrow {
+        throw ObservationStateMutationError.expected
+      }
+      return snapshot.count
+    }
   }
 
   func increment() {
@@ -134,7 +156,9 @@ private actor ActorObservationStateProducer {
     label: "actor")
 
   func update(count: Int) {
-    snapshot.count = count
+    withMutableSnapshot { snapshot in
+      snapshot.count = count
+    }
   }
 }
 
@@ -145,8 +169,11 @@ private final class ObservableObservationStateProducer {
   @ObservationIgnored
   private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
 
-  func update(count: Int) {
-    snapshot.count = count
+  func update(count: Int, label: String) {
+    withMutableSnapshot { snapshot in
+      snapshot.count = count
+      snapshot.label = label
+    }
   }
 }
 
@@ -186,6 +213,41 @@ struct ObservationStateTests {
       try await snapshots.next()
         == ObservationStateSnapshot(count: 2, label: "updated"))
     #expect(producer.snapshot == ObservationStateSnapshot(count: 2, label: "updated"))
+  }
+
+  @Test
+  func `Generated mutation publishes one completed revision and returns its result`() throws {
+    let producer = ObservationStateProducer()
+    let source = producer.snapshotSnapshots
+    let before = try source._visorOpen()
+    before.subscription._visorCancel()
+
+    let label = producer.mutate(count: 2, label: "updated")
+
+    let after = try source._visorOpen()
+    after.subscription._visorCancel()
+    #expect(label == "updated")
+    #expect(after.baseline.revision == before.baseline.revision + 1)
+    #expect(after.baseline.snapshot == ObservationStateSnapshot(
+      count: 2,
+      label: "updated"))
+  }
+
+  @Test
+  func `A throwing generated value mutation publishes no revision`() throws {
+    let producer = ObservationStateProducer()
+    let source = producer.snapshotSnapshots
+    let before = try source._visorOpen()
+    before.subscription._visorCancel()
+
+    #expect(throws: ObservationStateMutationError.expected) {
+      try producer.mutateOrThrow(count: 2, shouldThrow: true)
+    }
+
+    let after = try source._visorOpen()
+    after.subscription._visorCancel()
+    #expect(after.baseline.revision == before.baseline.revision)
+    #expect(after.baseline.snapshot == ObservationStateSnapshot())
   }
 
   @Test
@@ -253,6 +315,11 @@ struct ObservationStateTests {
   func `Observation State participates in Apple Observation`() async {
     let producer = ObservableObservationStateProducer()
 
+    let changeCount = OSAllocatedUnfairLock(initialState: 0)
+    trackObservationStateChanges(
+      reading: { [weak producer] in _ = producer?.snapshot },
+      count: changeCount)
+
     await confirmation { changed in
       withObservationTracking {
         _ = producer.snapshot
@@ -260,10 +327,12 @@ struct ObservationStateTests {
         changed()
       }
 
-      producer.update(count: 3)
+      producer.update(count: 3, label: "complete")
     }
 
+    #expect(changeCount.withLock { $0 } == 1)
     #expect(producer.snapshot.count == 3)
+    #expect(producer.snapshot.label == "complete")
     #expect(producer.snapshotSnapshots.currentSnapshot().count == 3)
   }
 
@@ -289,5 +358,20 @@ struct ObservationStateTests {
     await lifecycle.wait(for: 2)
 
     #expect(weakConsumer == nil)
+  }
+}
+
+@MainActor
+private func trackObservationStateChanges(
+  reading snapshot: @escaping @MainActor @Sendable () -> Void,
+  count: OSAllocatedUnfairLock<Int>
+) {
+  withObservationTracking {
+    snapshot()
+  } onChange: {
+    count.withLock { $0 += 1 }
+    MainActor.assumeIsolated {
+      trackObservationStateChanges(reading: snapshot, count: count)
+    }
   }
 }

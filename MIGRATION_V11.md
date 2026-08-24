@@ -118,6 +118,25 @@ retains it for other fields, place `@ObservationIgnored` immediately below
 `@ObservationState` on this property. The generated accessors still participate
 in Apple Observation.
 
+For one action that changes several fields, use the generated private mutation
+gateway so consumers receive one coherent revision:
+
+```swift
+func finishLoading(name: String) {
+  withMutableProfile { profile in
+    profile.name = name
+    profile.phase = .loaded
+  }
+}
+```
+
+`withMutableProfile(_:)` passes a local `inout` value initialised from the
+current State to the closure and publishes once after it returns. It returns
+the closure's result; if the closure throws, VISOR assigns and publishes no
+replacement. As with every snapshot, State must not hide mutable reference
+aliases. Run callbacks and other side effects that require committed State
+after the gateway returns.
+
 The generated consumer name defaults to `<property>Snapshots`. Use
 `observedAs: .values` for genuinely scalar State, or
 `observedAs: .named("domainPlural")` only when a domain-specific plural is

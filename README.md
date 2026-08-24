@@ -97,9 +97,10 @@ final class ProfileService {
   }
 
   func refresh() async {
-    profile = ProfileSnapshot(
-      name: "Alice",
-      email: "alice@example.com")
+    withMutableProfile { profile in
+      profile.name = "Alice"
+      profile.email = "alice@example.com"
+    }
   }
 }
 
