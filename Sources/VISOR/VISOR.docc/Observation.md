@@ -398,6 +398,21 @@ Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounti
 
 While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host presents labelled progress instead of exposing partial feature content. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
 
+Supply both `pending` and `failure` views when a feature needs its own copy or
+layout:
+
+```swift
+@LazyViewModel(
+  ProfileViewModel.self,
+  pending: ProfilePreparationView(),
+  failure: ProfileUnavailableView())
+```
+
+The brief pre-construction state remains transparent. Custom pending UI should
+have a meaningful accessibility label, and custom failure UI should explain the
+unavailable state without becoming a dead end. VISOR does not pass the
+technical failure into either view.
+
 These failures mean VISOR can no longer guarantee a coherent State. Examples include a readiness deadline exceeded by an initial asynchronous reaction, unexpected source termination, duplicate production ownership, or an internal protocol violation. Ordinary cancellation and scene-policy pausing are lifecycle events, not failures.
 
 Domain failures such as an unavailable network request belong in ViewModel State and feature content, for example as a typed `Loadable.failure`. VISOR does not expose a manual infrastructure retry. With a pause policy, a later scene reactivation starts a fresh generation as part of the existing lifecycle, but that cannot repair a terminal source or programming error; a duplicate owner remains invalid until the competing mount is removed.

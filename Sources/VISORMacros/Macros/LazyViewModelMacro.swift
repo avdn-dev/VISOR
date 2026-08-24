@@ -5,6 +5,7 @@
 //  Created by Anh Nguyen on 5/2/2026.
 //
 
+import SwiftBasicFormat
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -12,6 +13,13 @@ import SwiftSyntaxMacros
 // MARK: - LazyViewModelMacro
 
 public struct LazyViewModelMacro: MemberMacro {
+
+  private struct Arguments {
+    let viewModelType: String
+    let observationPolicy: String
+    let pending: ExprSyntax?
+    let failure: ExprSyntax?
+  }
 
   // MARK: Public
 
@@ -29,9 +37,12 @@ public struct LazyViewModelMacro: MemberMacro {
       return []
     }
 
-    guard let (viewModelType, observationPolicy) = parseArguments(from: node, in: context) else {
+    guard let arguments = parseArguments(from: node, in: context) else {
       return []
     }
+
+    let viewModelType = arguments.viewModelType
+    let observationPolicy = arguments.observationPolicy
 
     let hasContent = structDecl.hasContentProperty
     let hasStateMember = structDecl.hasMemberNamed("state")
@@ -71,18 +82,42 @@ public struct LazyViewModelMacro: MemberMacro {
       members.append("var state: \(raw: viewModelType).State { viewModel.state }")
     }
 
-    members.append(contentsOf: [
-      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }",
+    members.append(
+      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }")
+
+    let ownedContent: ExprSyntax
+    if let pending = arguments.pending, let failure = arguments.failure {
+      ownedContent = """
+        VISOR._visorOwnedViewModelContent(
+            for: viewModel,
+            observationPolicy: \(raw: observationPolicy),
+            pending: {
+                \(pending)
+            },
+            failure: {
+                \(failure)
+            }
+        ) { _ in
+            content
+        }
+        """
+    } else {
+      ownedContent = """
+        VISOR._visorOwnedViewModelContent(
+            for: viewModel,
+            observationPolicy: \(raw: observationPolicy)
+        ) { _ in
+            content
+        }
+        """
+    }
+
+    members.append(
       """
       \(raw: prefix)var body: some View {
           Group {
               if let viewModel = _viewModel {
-                  VISOR._visorOwnedViewModelContent(
-                      for: viewModel,
-                      observationPolicy: \(raw: observationPolicy)
-                  ) { _ in
-                      content
-                  }
+                  \(ownedContent)
               } else {
                   Color.clear
               }
@@ -93,8 +128,7 @@ public struct LazyViewModelMacro: MemberMacro {
               }
           }
       }
-      """,
-    ])
+      """)
 
     return members
   }
@@ -104,7 +138,7 @@ public struct LazyViewModelMacro: MemberMacro {
   private static func parseArguments(
     from node: AttributeSyntax,
     in context: some MacroExpansionContext
-  ) -> (viewModelType: String, observationPolicy: String)? {
+  ) -> Arguments? {
     // Stage 1: Must have an argument list
     guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
@@ -132,6 +166,29 @@ public struct LazyViewModelMacro: MemberMacro {
       $0.label?.text == "observationPolicy"
     }?.expression.trimmedDescription ?? ".alwaysObserving"
 
-    return (viewModelType, observationPolicy)
+    let pending = arguments.dropFirst().first {
+      $0.label?.text == "pending"
+    }.map { normalisedExpression($0.expression) }
+    let failure = arguments.dropFirst().first {
+      $0.label?.text == "failure"
+    }.map { normalisedExpression($0.expression) }
+
+    guard (pending == nil) == (failure == nil) else {
+      context.diagnose(Diagnostic(
+        node: node,
+        message: VISORDiagnostic.lazyViewModelPresentationPairRequired))
+      return nil
+    }
+
+    return Arguments(
+      viewModelType: viewModelType,
+      observationPolicy: observationPolicy,
+      pending: pending,
+      failure: failure)
+  }
+
+  /// Re-indents source syntax without changing literal contents.
+  private static func normalisedExpression(_ expression: ExprSyntax) -> ExprSyntax {
+    expression.trimmed.formatted().cast(ExprSyntax.self)
   }
 }

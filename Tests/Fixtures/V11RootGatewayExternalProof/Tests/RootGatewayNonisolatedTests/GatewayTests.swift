@@ -73,7 +73,7 @@ struct RootGatewayNonisolatedTests {
 
   @MainActor
   @Test
-  func `Ordinary LazyViewModel selects source-backed ownership across the package boundary`() {
+  func `Custom LazyViewModel presentation crosses the package boundary`() {
     let view = NonisolatedSourceBackedView()
 
     requireViewConformance(view)

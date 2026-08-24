@@ -700,17 +700,38 @@ public func _visorOwnedViewModelContent<VM, Content>(
   observationPolicy: ObservationPolicy = .alwaysObserving,
   @ViewBuilder content: @escaping (VM) -> Content
 ) -> some View where VM: ViewModel, Content: View {
-  _ViewModelObservationHost(
-    viewModel: viewModel,
+  _visorOwnedViewModelContent(
+    for: viewModel,
     observationPolicy: observationPolicy,
-    content: content,
-    suspended: { Color.clear },
     pending: { ProgressView("Preparing Screen") },
     failure: {
       ContentUnavailableView(
         "Unable to Load",
         systemImage: "exclamationmark.triangle",
         description: Text("This screen could not be prepared."))
-    })
+    },
+    content: content)
+}
+
+/// Custom-presentation bridge used by generated `@LazyViewModel` bodies.
+///
+/// This overload is public only because attached macro expansions are
+/// type-checked in the consuming module.
+@MainActor
+public func _visorOwnedViewModelContent<VM, Content, Pending, Failure>(
+  for viewModel: VM,
+  observationPolicy: ObservationPolicy = .alwaysObserving,
+  @ViewBuilder pending: @escaping () -> Pending,
+  @ViewBuilder failure: @escaping () -> Failure,
+  @ViewBuilder content: @escaping (VM) -> Content
+) -> some View
+where VM: ViewModel, Content: View, Pending: View, Failure: View {
+  _ViewModelObservationHost(
+    viewModel: viewModel,
+    observationPolicy: observationPolicy,
+    content: content,
+    suspended: { Color.clear },
+    pending: pending,
+    failure: failure)
     .id(ObjectIdentifier(viewModel._visorObservationOwnership))
 }

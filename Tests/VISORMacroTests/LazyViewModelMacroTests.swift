@@ -136,6 +136,78 @@ struct LazyViewModelMacroTests {
       macros: testMacros)
   }
 
+  @Test
+  func `Custom pending and failure views flow into the runtime bridge`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(
+        MyVM.self,
+        observationPolicy: .pauseInBackground,
+        pending: ProgressView("Preparing profile"),
+        failure: ContentUnavailableView(
+          "Profile Unavailable",
+          systemImage: "person.crop.circle.badge.exclamationmark"))
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+
+          @Environment(\\._visorRouter) private var hostRouter
+
+          @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
+
+          @State private var _viewModel: MyVM?
+
+          var viewModel: MyVM {
+              guard let vm = _viewModel else {
+                  preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
+              }
+              return vm
+          }
+
+          var state: MyVM.State {
+              viewModel.state
+          }
+
+          var bindableState: Bindable<MyVM.State> {
+              Bindable(viewModel.state)
+          }
+
+          var body: some View {
+              Group {
+                  if let viewModel = _viewModel {
+                      VISOR._visorOwnedViewModelContent(
+                          for: viewModel,
+                          observationPolicy: .pauseInBackground,
+                          pending: {
+                              ProgressView("Preparing profile")
+                          },
+                          failure: {
+                              ContentUnavailableView(
+                                  "Profile Unavailable",
+                                  systemImage: "person.crop.circle.badge.exclamationmark")
+                          }
+                      ) { _ in
+                          content
+                      }
+                  } else {
+                      Color.clear
+                  }
+              }
+              .task {
+                  if _viewModel == nil {
+                      _viewModel = factory._visorMakeViewModel(router: hostRouter)
+                  }
+              }
+          }
+      }
+      """,
+      macros: testMacros)
+  }
+
   // MARK: - Access Modifier Propagation
 
   @Test
@@ -490,6 +562,30 @@ struct LazyViewModelMacroTests {
       """,
       diagnostics: [
         DiagnosticSpec(message: "@LazyViewModel requires (ViewModel.self) argument", line: 1, column: 1, severity: .error),
+      ],
+      macros: testMacros)
+  }
+
+  @Test
+  func `Error when only one custom presentation view is provided`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @LazyViewModel(MyViewModel.self, pending: ProgressView("Preparing"))
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      expandedSource: """
+      struct MyView: View {
+        var content: some View { Text("") }
+      }
+      """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "@LazyViewModel custom presentation requires both 'pending' and 'failure' views",
+          line: 1,
+          column: 1,
+          severity: .error),
       ],
       macros: testMacros)
   }

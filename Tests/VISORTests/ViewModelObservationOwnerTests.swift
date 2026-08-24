@@ -305,7 +305,7 @@ extension ViewModelObservationOwnerTests {
 
   @Test(.timeLimit(.minutes(1)))
   @MainActor
-  func `A mounted host replaces readiness progress with terminal failure UI`() async {
+  func `The custom bridge replaces readiness progress with terminal failure UI`() async {
     let service = OwnerService()
     service.terminateObservationForProof()
     let viewModel = OwnerSourceBackedViewModel(service: service)
@@ -314,24 +314,22 @@ extension ViewModelObservationOwnerTests {
     let contentAppeared = TestEventCounter()
 
     let root = AnyView(
-      _ViewModelObservationHost(
-        viewModel: viewModel,
-        observationPolicy: .alwaysObserving,
-        content: { _ in
-          Text("Ready")
-            .onAppear(perform: contentAppeared.record)
-        },
-        suspended: { Color.clear },
+      _visorOwnedViewModelContent(
+        for: viewModel,
         pending: {
-          ProgressView("Preparing Screen")
+          ProgressView("Preparing profile")
             .onAppear(perform: pendingAppeared.record)
         },
         failure: {
           ContentUnavailableView(
-            "Unable to Load",
-            systemImage: "exclamationmark.triangle")
+            "Profile Unavailable",
+            systemImage: "person.crop.circle.badge.exclamationmark")
             .onAppear(perform: failureAppeared.record)
-        }))
+        }
+      ) { _ in
+        Text("Ready")
+          .onAppear(perform: contentAppeared.record)
+      })
     let hostingView = NSHostingView(rootView: root)
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
 

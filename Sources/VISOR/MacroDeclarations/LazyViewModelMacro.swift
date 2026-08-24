@@ -5,6 +5,7 @@
 //  Created by Anh Nguyen on 5/2/2026.
 //
 
+import SwiftUI
 
 // MARK: - Single ViewModel Macro
 
@@ -41,6 +42,11 @@
 /// TextField("Name", text: bindableState[\.name])
 /// ```
 ///
+/// The default owner UI shows labelled progress while observation becomes
+/// ready and a generic unavailable state after an infrastructure failure. Use
+/// the custom-presentation overload when the feature needs its own copy or
+/// layout; ordinary domain failures still belong in ViewModel State.
+///
 /// - Parameters:
 ///   - viewModelType: The concrete ViewModel type owned by the generated view.
 ///   - observationPolicy: Controls whether observation pauses based on scene phase.
@@ -54,6 +60,29 @@
 public macro LazyViewModel<VM: ViewModel>(
   _ viewModelType: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving
+) = #externalMacro(
+  module: "VISORMacros",
+  type: "LazyViewModelMacro")
+
+/// Custom-presentation form of ``LazyViewModel(_:observationPolicy:)``.
+///
+/// The pending and failure views replace VISOR's defaults after the ViewModel
+/// has been created. The brief transparent pre-construction state is retained.
+/// Supply a meaningful accessibility label in custom pending UI, and make a
+/// custom failure view explain the unavailable state without creating a dead
+/// end.
+///
+/// - Parameters:
+///   - viewModelType: The concrete ViewModel type owned by the generated view.
+///   - observationPolicy: Controls whether observation pauses based on scene phase.
+///   - pending: UI shown while VISOR reconciles initial observation state.
+///   - failure: UI shown when VISOR can no longer guarantee coherent State.
+@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(hostRouter), named(scenePhase))
+public macro LazyViewModel<VM: ViewModel, Pending: View, Failure: View>(
+  _ viewModelType: VM.Type,
+  observationPolicy: ObservationPolicy = .alwaysObserving,
+  pending: Pending,
+  failure: Failure
 ) = #externalMacro(
   module: "VISORMacros",
   type: "LazyViewModelMacro")

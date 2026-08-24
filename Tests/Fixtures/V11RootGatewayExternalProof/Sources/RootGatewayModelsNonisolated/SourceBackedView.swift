@@ -5,7 +5,11 @@ import VISOR
 @MainActor
 @LazyViewModel(
   NonisolatedSourceBackedViewModel.self,
-  observationPolicy: .pauseInBackground)
+  observationPolicy: .pauseInBackground,
+  pending: ProgressView("Preparing source-backed screen"),
+  failure: ContentUnavailableView(
+    "Source-Backed Screen Unavailable",
+    systemImage: "exclamationmark.triangle"))
 public struct NonisolatedSourceBackedView: View {
   public init() {}
 
