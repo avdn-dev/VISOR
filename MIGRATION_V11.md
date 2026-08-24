@@ -548,6 +548,11 @@ Root destinations represent independently stateful top-level branches. Render
 them as tabs, sidebar rows, or another native selector without changing Router
 semantics.
 
+`RootDestination` refines `CaseIterable` in v11. A no-payload enum synthesises
+the requirement automatically. If a conformer implements `allCases` manually,
+it must list every supported root; Router snapshots that finite set to bound its
+never-evicted per-branch cache.
+
 For an application with one navigation stack, omit the `Root` associated type
 and bind the root Router directly:
 

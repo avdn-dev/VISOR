@@ -81,6 +81,16 @@ struct RootGatewayNonisolatedTests {
   }
 
   @MainActor
+  @Test
+  func `Finite root destinations preserve cached Router identity across the package boundary`() {
+    let router = Router<DocumentationScene>()
+
+    for root in DocumentationRootDestination.allCases {
+      #expect(router.childRouter(for: root) === router.childRouter(for: root))
+    }
+  }
+
+  @MainActor
   private func requireViewModelConformance<Subject: ViewModel>(_: Subject) {}
 
   @MainActor

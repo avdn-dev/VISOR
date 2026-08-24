@@ -53,7 +53,7 @@ nonisolated enum AppRoot: RootDestination {
 | ``PushDestination`` | `Hashable` | `NavigationStack` push |
 | ``SheetDestination`` | `Hashable`, `Identifiable` | `.sheet(item:)` |
 | ``FullScreenDestination`` | `Hashable`, `Identifiable` | Full-screen intent; adapts to `.sheet(item:)` on macOS |
-| ``RootDestination`` | `Hashable` | Top-level tabs, sidebar rows, or another application-owned selector |
+| ``RootDestination`` | `Hashable`, `CaseIterable` | Top-level tabs, sidebar rows, or another application-owned selector |
 
 ``SheetDestination`` and ``FullScreenDestination`` inherit from
 ``PresentableDestination``, which provides their shared `Hashable & Identifiable`
@@ -87,6 +87,13 @@ previous request. A presented child Router can still present another modal.
 
 `Hashable` lets push destinations participate in a navigation path; it does not
 make that path unique. Repeated equal push destinations are appended normally.
+
+`RootDestination.allCases` declares the complete finite set of independently
+stateful branches. A Router tree snapshots that set at creation and fails a
+diagnostic precondition for a root absent from it. This bounds the never-evicted
+child Router cache while preserving each declared branch's path. Prefer a
+no-payload enum; if you provide `allCases` manually, include every supported
+root.
 
 ### NavigationScene
 

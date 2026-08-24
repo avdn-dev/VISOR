@@ -261,6 +261,18 @@ struct RouterTests {
   // MARK: - childRouter caching
 
   @Test
+  func `Root destination set snapshots the declared finite value space`() {
+    let roots = RouterRootDestinationSet<ManuallyEnumeratedTestRoot>()
+    let singleStackRoots = RouterRootDestinationSet<NoRootDestination>()
+
+    #expect(roots.values.count == 2)
+    #expect(roots.contains(ManuallyEnumeratedTestRoot(rawValue: 0)))
+    #expect(roots.contains(ManuallyEnumeratedTestRoot(rawValue: 1)))
+    #expect(!roots.contains(ManuallyEnumeratedTestRoot(rawValue: 2)))
+    #expect(singleStackRoots.values.isEmpty)
+  }
+
+  @Test
   func `childRouter for root destination returns cached instance`() {
     let root = Router<TestScene>()
     let first = root.childRouter(for: .home)

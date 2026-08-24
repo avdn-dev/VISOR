@@ -36,10 +36,11 @@ public protocol FullScreenDestination: PresentableDestination {}
 ///
 /// Root destinations identify independently stateful navigation branches. The
 /// application decides whether to render them as tabs, sidebar rows, split-view
-/// selections, or another native platform navigation pattern. Keep this value
-/// space bounded because ``Router`` retains one child Router per root to
-/// preserve each branch's navigation state.
-public protocol RootDestination: Hashable, Sendable {}
+/// selections, or another native platform navigation pattern. `allCases`
+/// declares the complete finite value space because ``Router`` retains one
+/// child Router per root to preserve each branch's navigation state. Prefer a
+/// no-payload enum so Swift can synthesise `CaseIterable` correctly.
+public protocol RootDestination: CaseIterable, Hashable, Sendable {}
 
 /// The default root destination for navigation scenes with a single stack.
 public enum NoRootDestination: RootDestination {}

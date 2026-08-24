@@ -8,6 +8,12 @@ nonisolated enum TestRoot: Int, RootDestination {
   case settings = 1
 }
 
+nonisolated struct ManuallyEnumeratedTestRoot: RootDestination {
+  static let allCases = [Self(rawValue: 0), Self(rawValue: 1)]
+
+  let rawValue: Int
+}
+
 nonisolated enum TestPush: PushDestination {
   case detail(id: String)
   case nested

@@ -4,35 +4,35 @@ import RootObservationConsumer
 import SwiftUI
 import VISOR
 
-nonisolated enum DocumentationPush: PushDestination {
+nonisolated public enum DocumentationPush: PushDestination {
   case detail(id: String)
 }
 
-nonisolated enum DocumentationSheet: SheetDestination {
+nonisolated public enum DocumentationSheet: SheetDestination {
   case preferences
 
-  var id: Self { self }
+  public var id: Self { self }
 }
 
-nonisolated enum DocumentationFullScreen: FullScreenDestination {
+nonisolated public enum DocumentationFullScreen: FullScreenDestination {
   case onboarding
 
-  var id: Self { self }
+  public var id: Self { self }
 }
 
-nonisolated enum DocumentationRootDestination: String, RootDestination, CaseIterable, Identifiable {
+nonisolated public enum DocumentationRootDestination: String, RootDestination, Identifiable {
   case library
   case settings
 
-  var id: Self { self }
+  public var id: Self { self }
   var title: String { rawValue.capitalized }
 }
 
-nonisolated enum DocumentationScene: NavigationScene {
-  typealias Push = DocumentationPush
-  typealias Sheet = DocumentationSheet
-  typealias FullScreen = DocumentationFullScreen
-  typealias Root = DocumentationRootDestination
+nonisolated public enum DocumentationScene: NavigationScene {
+  public typealias Push = DocumentationPush
+  public typealias Sheet = DocumentationSheet
+  public typealias FullScreen = DocumentationFullScreen
+  public typealias Root = DocumentationRootDestination
 }
 
 @MainActor

@@ -62,8 +62,27 @@ private struct RouterDeepLinkConfiguration<Scene: NavigationScene> {
   let parsers: [DeepLinkParser<Scene>]
 }
 
+package struct RouterRootDestinationSet<Root: RootDestination>: Sendable {
+  package let values: Set<Root>
+
+  package init() {
+    values = Set(Root.allCases)
+  }
+
+  package func contains(_ root: Root) -> Bool {
+    values.contains(root)
+  }
+
+  func require(_ root: Root) {
+    precondition(
+      contains(root),
+      "Router received root destination '\(root)' that is absent from \(Root.self).allCases. RootDestination.allCases must list every supported root.")
+  }
+}
+
 @MainActor
 private final class RouterTreeContext<Scene: NavigationScene> {
+  let rootDestinations = RouterRootDestinationSet<Scene.Root>()
   weak var activeRouter: Router<Scene>?
   var deepLinkConfiguration: RouterDeepLinkConfiguration<Scene>?
 }
@@ -127,6 +146,9 @@ public final class Router<Scene: NavigationScene> {
     self.logger = logger
     self.treeContext = parent?.treeContext ?? RouterTreeContext()
     isActive = false
+    if let rootDestination {
+      treeContext.rootDestinations.require(rootDestination)
+    }
   }
 
   // MARK: - Navigation State
@@ -135,7 +157,14 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// The setter remains public so application-owned tab and split-view
   /// selectors can bind to it. Use ``select(root:)`` for imperative changes.
-  public var selectedRoot: Scene.Root?
+  /// A non-`nil` value must appear in `Scene.Root.allCases`.
+  public var selectedRoot: Scene.Root? {
+    willSet {
+      if let newValue {
+        treeContext.rootDestinations.require(newValue)
+      }
+    }
+  }
 
   /// The navigation stack path for push destinations.
   ///
@@ -382,7 +411,10 @@ public final class Router<Scene: NavigationScene> {
   // MARK: - Child Management
 
   /// Creates or returns the cached child Router for a top-level destination.
+  ///
+  /// - Precondition: `root` appears in `Scene.Root.allCases`.
   public func childRouter(for root: Scene.Root) -> Router {
+    treeContext.rootDestinations.require(root)
     if let existing = rootChildren[root] {
       return existing
     }
@@ -483,8 +515,9 @@ public final class Router<Scene: NavigationScene> {
 
   private let logger: Logger?
   /// Cached child Routers keyed by top-level destination. The cache is
-  /// intentionally never evicted so each destination preserves its navigation
-  /// state while another destination is selected.
+  /// bounded by the tree's snapshotted Root.allCases and intentionally never
+  /// evicted so each destination preserves its navigation state while another
+  /// destination is selected.
   @ObservationIgnored private var rootChildren: [Scene.Root: Router] = [:]
   @ObservationIgnored private let treeContext: RouterTreeContext<Scene>
   @ObservationIgnored private var isMounted = false
