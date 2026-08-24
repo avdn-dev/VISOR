@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -17,16 +15,13 @@ concurrency:
 jobs:
   build:
     runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
 
       - name: Build documentation
-        run: |
-          swift package --allow-writing-to-directory docs \
-            generate-documentation --target VISOR \
-            --output-path docs \
-            --transform-for-static-hosting \
-            --hosting-base-path VISOR
+        run: scripts/validate.sh documentation docs
 
       - name: Fix GitHub Pages SPA routing
         run: cp docs/index.html docs/404.html
@@ -39,6 +34,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

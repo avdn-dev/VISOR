@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Test release configuration
-        run: swift test -c release
+        run: scripts/validate.sh root release
 
   external-boundaries:
     name: External boundaries (${{ matrix.name }})
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Test release boundary
-        run: swift test -c release --package-path "${{ matrix.package }}"
+        run: scripts/validate.sh external release "${{ matrix.package }}"
 
   api-boundaries:
     name: API boundaries
@@ -56,6 +56,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Verify inaccessible APIs remain inaccessible
-        run: |
-          sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
-          sh Tests/Fixtures/V11RootTestingExternalProof/verify-selector-contracts.sh
+        run: scripts/validate.sh api
