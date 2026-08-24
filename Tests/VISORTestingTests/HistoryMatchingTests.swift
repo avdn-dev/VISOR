@@ -17,7 +17,6 @@ struct HistoryMatchingTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }
@@ -53,7 +52,6 @@ struct HistoryMatchingTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }
@@ -92,7 +90,6 @@ struct HistoryMatchingTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }

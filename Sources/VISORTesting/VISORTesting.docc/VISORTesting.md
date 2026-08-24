@@ -14,11 +14,19 @@ at a time.
 participating sources before expectations inspect the journal. Work launched
 without awaiting it is intentionally outside the action window.
 
+Each `perform` window retains at most 8,000 raw State commits by default across
+all fields, including equal-value writes. Use
+``observe(_:maximumCommitCountPerAction:sourceLocation:_:)`` to choose a larger
+positive bound for an intentional high-volume action. Exceeding the bound fails
+the complete window closed and poisons the scope rather than returning partial
+history.
+
 ## Topics
 
 ### Observation scopes
 
 - ``observe(_:sourceLocation:_:)``
+- ``observe(_:maximumCommitCountPerAction:sourceLocation:_:)``
 - ``ObservationTest``
 - ``ObservationTestError``
 - ``VISORObservation/ObservationSource/waitUntil(_:)``

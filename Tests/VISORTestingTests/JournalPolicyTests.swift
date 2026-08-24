@@ -44,6 +44,37 @@ struct JournalPolicyTests {
 
   @Test
   @MainActor
+  func `Zero commit limit reports the observe call site without entering the body`() async throws {
+    let sut = TestingViewModel()
+    var issues: [(message: String, location: SourceLocation)] = []
+    var enteredBody = false
+    let observeLocation = SourceLocation(
+      fileID: "JournalPolicyTests/invalid-limit",
+      filePath: "/JournalPolicyTests/invalid-limit.swift",
+      line: 1_234,
+      column: 56)
+
+    try await _observeWithJournalPolicyForProof(
+      sut,
+      sourceLocation: observeLocation,
+      logicalCommitLimit: 0,
+      issueRecorder: { message, location in
+        issues.append((message, location))
+      }
+    ) { _ in
+      enteredBody = true
+    }
+
+    #expect(issues.count == 1)
+    #expect(issues.first?.message ==
+      "maximumCommitCountPerAction must be greater than zero")
+    #expect(issues.first?.location == observeLocation)
+    #expect(!enteredBody)
+    #expect(sut.state._visorMutationRecorder == nil)
+  }
+
+  @Test
+  @MainActor
   func `Overflow fails the complete window once and suppresses later operations`() async throws {
     let sut = TestingViewModel()
     var infrastructureIssues: [String] = []
@@ -80,7 +111,7 @@ struct JournalPolicyTests {
     }
 
     #expect(infrastructureIssues == [
-      "VISOR failed while recording an action window: active State journal exceeded its logical commit guard"
+      "VISOR failed while recording an action window: the action window exceeded the configured maximumCommitCountPerAction of 2 raw State commits"
     ])
     #expect(issueLocation == performLocation)
     #expect(!laterOperationRan)

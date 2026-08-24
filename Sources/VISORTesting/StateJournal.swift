@@ -18,10 +18,13 @@ enum JournalWindowState: Equatable {
 }
 
 enum StateJournalFailure: Error, CustomStringConvertible {
-  case logicalCommitGuardExceeded
+  case maximumCommitCountPerActionExceeded(limit: Int)
 
   var description: String {
-    "active State journal exceeded its logical commit guard"
+    switch self {
+    case .maximumCommitCountPerActionExceeded(let limit):
+      "the action window exceeded the configured maximumCommitCountPerAction of \(limit) raw State commits"
+    }
   }
 }
 
@@ -31,13 +34,13 @@ final class StateJournal: _StateMutationRecorder {
   // copy-on-write stress window retains 4,352 raw commits. This limit leaves
   // headroom for ordinary tests while still bounding runaway cheap-value
   // mutation storms.
-  static let defaultActiveCommitLimit = 8_192
+  static let defaultMaximumCommitCountPerAction = 8_000
   static let defaultOutsideWindowCapacity = 32
 
   private(set) var entries: [JournalEntry] = []
   private var baselines: [ObjectIdentifier: Any] = [:]
   private(set) var hasClosedWindow = false
-  private let activeCommitLimit: Int
+  private let maximumCommitCountPerAction: Int
   private var outsideWindowRing: OutsideWindowMutationRing
   private var windowState = JournalWindowState.outside
   private var nextActionOrdinal: UInt64 = 1
@@ -49,12 +52,12 @@ final class StateJournal: _StateMutationRecorder {
     (@MainActor (any Error, SourceLocation) -> Void)?
 
   init(
-    activeCommitLimit: Int = defaultActiveCommitLimit,
+    maximumCommitCountPerAction: Int,
     outsideWindowCapacity: Int = defaultOutsideWindowCapacity,
     issueRecorder: @escaping ObservationTestIssueRecorder
   ) {
-    precondition(activeCommitLimit > 0)
-    self.activeCommitLimit = activeCommitLimit
+    precondition(maximumCommitCountPerAction > 0)
+    self.maximumCommitCountPerAction = maximumCommitCountPerAction
     self.issueRecorder = issueRecorder
     outsideWindowRing = OutsideWindowMutationRing(
       capacity: outsideWindowCapacity)
@@ -173,12 +176,13 @@ final class StateJournal: _StateMutationRecorder {
       break
     }
 
-    guard entries.count < activeCommitLimit else {
+    guard entries.count < maximumCommitCountPerAction else {
       let sourceLocation = activeSourceLocation
       abandon()
       if let sourceLocation {
         failureHandler?(
-          StateJournalFailure.logicalCommitGuardExceeded,
+          StateJournalFailure.maximumCommitCountPerActionExceeded(
+            limit: maximumCommitCountPerAction),
           sourceLocation)
       }
       return

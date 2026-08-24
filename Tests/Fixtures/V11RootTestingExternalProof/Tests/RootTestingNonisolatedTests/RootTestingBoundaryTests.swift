@@ -18,7 +18,7 @@ struct RootTestingBoundaryTests {
     let service = RootTestingService(initialValue: 1)
     let sut = NonisolatedRootTestingViewModel(service: service)
 
-    try await observe(sut) { test in
+    try await observe(sut, maximumCommitCountPerAction: 4) { test in
       #expect(sut.state.sourceValue == 1)
       #expect(sut.state.reactedValue == 1)
 

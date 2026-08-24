@@ -24,7 +24,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         infrastructureIssues.append((message, location))
       }
@@ -74,7 +73,6 @@ struct ObservationLifecycleTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       sourceLocation: observeLocation,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }
@@ -111,7 +109,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }
@@ -173,7 +170,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, _ in
         issues.append(message)
       }
@@ -219,7 +215,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut!,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, location in
         issues.append((message, location))
       }
@@ -253,7 +248,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, _ in
         issues.append(message)
       }
@@ -287,7 +281,6 @@ struct ObservationLifecycleTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8_192,
       issueRecorder: { message, _ in
         issues.append(message)
       }

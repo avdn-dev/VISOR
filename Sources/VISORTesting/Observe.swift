@@ -10,6 +10,9 @@ import VISOR
 /// joins, preventing a replacement scope from receiving retired writes.
 ///
 /// The supplied ``ObservationTest`` handle is valid only inside `body`.
+/// Each `perform` window records at most 8,000 raw State commits by default.
+/// Use ``observe(_:maximumCommitCountPerAction:sourceLocation:_:)`` for an
+/// intentional action that needs a larger bounded history.
 /// - Throws: Cancellation or an error thrown by `body`.
 @MainActor
 public func observe<SUT: ViewModel>(
@@ -17,11 +20,40 @@ public func observe<SUT: ViewModel>(
   sourceLocation: SourceLocation = #_sourceLocation,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
 ) async throws {
+  try await observe(
+    sut,
+    maximumCommitCountPerAction:
+      StateJournal.defaultMaximumCommitCountPerAction,
+    sourceLocation: sourceLocation,
+    body)
+}
+
+/// Starts a generated observation session with an explicit bound on the raw
+/// State commits retained for each `perform` window.
+///
+/// The limit counts routed writes across every State field, including writes
+/// that assign an equal value. Exceeding it fails the complete action window
+/// closed and poisons the observation scope.
+///
+/// - Parameters:
+///   - sut: The view model whose generated State is observed.
+///   - maximumCommitCountPerAction: A positive per-action history bound. Choose
+///     a value appropriate for an intentional high-volume action.
+///   - sourceLocation: The call site reported for setup and teardown failures.
+///   - body: The observation scope entered after every source is reconciled.
+/// - Throws: Cancellation or an error thrown by `body`.
+@MainActor
+public func observe<SUT: ViewModel>(
+  _ sut: SUT,
+  maximumCommitCountPerAction: Int,
+  sourceLocation: SourceLocation = #_sourceLocation,
+  _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
+) async throws {
   try await observeImplementation(
     sut,
     sourceLocation: sourceLocation,
     beforePauseDrain: {},
-    activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
+    maximumCommitCountPerAction: maximumCommitCountPerAction,
     deadlinePolicy: .production,
     issueRecorder: { message, sourceLocation in
       Issue.record(
@@ -42,7 +74,8 @@ package func _observeForProof<SUT: ViewModel>(
     sut,
     sourceLocation: sourceLocation,
     beforePauseDrain: beforePauseDrain,
-    activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
+    maximumCommitCountPerAction:
+      StateJournal.defaultMaximumCommitCountPerAction,
     deadlinePolicy: .production,
     issueRecorder: { message, sourceLocation in
       Issue.record(
@@ -56,7 +89,8 @@ package func _observeForProof<SUT: ViewModel>(
 package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
   _ sut: SUT,
   sourceLocation: SourceLocation = #_sourceLocation,
-  logicalCommitLimit: Int,
+  logicalCommitLimit: Int =
+    StateJournal.defaultMaximumCommitCountPerAction,
   outsideWindowCapacity: Int = StateJournal.defaultOutsideWindowCapacity,
   issueRecorder: @escaping ObservationTestIssueRecorder,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
@@ -65,7 +99,7 @@ package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
     sut,
     sourceLocation: sourceLocation,
     beforePauseDrain: {},
-    activeJournalCommitLimit: logicalCommitLimit,
+    maximumCommitCountPerAction: logicalCommitLimit,
     outsideWindowCapacity: outsideWindowCapacity,
     deadlinePolicy: .production,
     issueRecorder: issueRecorder,
@@ -87,7 +121,8 @@ package func _observeWithDeadlinePolicyForProof<SUT: ViewModel>(
     sut,
     sourceLocation: sourceLocation,
     beforePauseDrain: beforePauseDrain,
-    activeJournalCommitLimit: StateJournal.defaultActiveCommitLimit,
+    maximumCommitCountPerAction:
+      StateJournal.defaultMaximumCommitCountPerAction,
     deadlinePolicy: deadlinePolicy,
     didFinishTeardown: _visorDidFinishTeardown,
     issueRecorder: issueRecorder,
@@ -99,7 +134,7 @@ private func observeImplementation<SUT: ViewModel>(
   _ sut: SUT,
   sourceLocation: SourceLocation,
   beforePauseDrain: @escaping @MainActor @Sendable () async -> Void,
-  activeJournalCommitLimit: Int,
+  maximumCommitCountPerAction: Int,
   outsideWindowCapacity: Int = StateJournal.defaultOutsideWindowCapacity,
   deadlinePolicy: _ObservationDeadlinePolicy,
   didFinishTeardown:
@@ -107,6 +142,13 @@ private func observeImplementation<SUT: ViewModel>(
   issueRecorder: @escaping ObservationTestIssueRecorder,
   _ body: @MainActor (ObservationTest<SUT>) async throws -> Void
 ) async throws {
+  guard maximumCommitCountPerAction > 0 else {
+    issueRecorder(
+      "maximumCommitCountPerAction must be greater than zero",
+      sourceLocation)
+    return
+  }
+
   let state = sut.state
   guard state._visorMutationRecorder == nil else {
     issueRecorder(
@@ -116,7 +158,7 @@ private func observeImplementation<SUT: ViewModel>(
   }
 
   let journal = StateJournal(
-    activeCommitLimit: activeJournalCommitLimit,
+    maximumCommitCountPerAction: maximumCommitCountPerAction,
     outsideWindowCapacity: outsideWindowCapacity,
     issueRecorder: issueRecorder)
   // The dormant recorder reserves this State identity before startup's first
