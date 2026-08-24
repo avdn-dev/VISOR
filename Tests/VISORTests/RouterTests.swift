@@ -851,6 +851,21 @@ struct RouterTests {
   }
 
   @Test
+  func `Push-only scene and stack require no modal destinations`() {
+    let root = Router<PushOnlyTestScene>()
+
+    let stack = RouterStack(
+      router: root,
+      pushContent: { _ in EmptyView() }
+    ) {
+      EmptyView()
+    }
+
+    _ = stack
+    #expect(root.level == 0)
+  }
+
+  @Test
   func `RouterHost can mount a cached root destination without a stack`() {
     let root = Router<TestScene>()
 

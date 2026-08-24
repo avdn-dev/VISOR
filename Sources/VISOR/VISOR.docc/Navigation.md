@@ -108,16 +108,19 @@ nonisolated enum AppScene: NavigationScene {
 }
 ```
 
-`Root` is optional. A single-stack application omits it and receives
-``NoRootDestination`` as the default:
+`Sheet`, `FullScreen`, and `Root` are optional. A push-only, single-stack
+application declares only its push destination. It receives
+``NoModalDestination`` for both presentation styles and
+``NoRootDestination`` for its root:
 
 ```swift
 nonisolated enum SingleStackScene: NavigationScene {
   typealias Push = AppPush
-  typealias Sheet = AppSheet
-  typealias FullScreen = AppFullScreen
 }
 ```
+
+Declare a modal associated type only when the scene routes that presentation
+style.
 
 This scene is the generic parameter used by ``Router``, ``RouterHost``,
 ``RouterStack``, ``NavigationButton``, and ``Destination``. Its conformance is
@@ -237,6 +240,17 @@ RouterStack(
   pushContent: pushContent(for:),
   sheetContent: sheetContent(for:),
   fullScreenContent: fullScreenContent(for:)
+) {
+  HomeScreen()
+}
+```
+
+For a push-only scene, omit the modal resolvers:
+
+```swift
+RouterStack(
+  router: router,
+  pushContent: pushContent(for:)
 ) {
   HomeScreen()
 }

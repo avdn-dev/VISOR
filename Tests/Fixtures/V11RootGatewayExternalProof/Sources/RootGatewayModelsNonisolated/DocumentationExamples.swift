@@ -35,6 +35,10 @@ nonisolated public enum DocumentationScene: NavigationScene {
   public typealias Root = DocumentationRootDestination
 }
 
+nonisolated public enum DocumentationPushOnlyScene: NavigationScene {
+  public typealias Push = DocumentationPush
+}
+
 @MainActor
 func openDocumentationDeepLink(
   _ url: URL,
@@ -183,6 +187,24 @@ struct DocumentationRoot: View {
           router: router,
           consumer: RootObservationConsumer(initialValue: 0))
       })
+  }
+}
+
+@MainActor
+struct DocumentationPushOnlyRoot: View {
+  @State private var router = Router<DocumentationPushOnlyScene>()
+
+  var body: some View {
+    RouterStack(
+      router: router,
+      pushContent: { destination in
+        switch destination {
+        case .detail(let id): Text("Detail \(id)")
+        }
+      }
+    ) {
+      Text("Library")
+    }
   }
 }
 

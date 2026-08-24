@@ -595,6 +595,23 @@ RouterStack(
 }
 ```
 
+When the scene has no routed sheets or full-screen presentations, omit those
+associated types as well. They default to `NoModalDestination`, and the
+push-only `RouterStack` initialiser omits both modal content closures:
+
+```swift
+nonisolated enum AppScene: NavigationScene {
+  typealias Push = AppPush
+}
+
+RouterStack(
+  router: router,
+  pushContent: { destination in pushView(for: destination) }
+) {
+  RootView()
+}
+```
+
 Declare `NavigationScene` conformances `nonisolated`. The protocol requires a
 `SendableMetatype` so typed destinations and deep-link parsers remain usable
 outside MainActor isolation.

@@ -45,10 +45,22 @@ public protocol RootDestination: CaseIterable, Hashable, Sendable {}
 /// The default root destination for navigation scenes with a single stack.
 public enum NoRootDestination: RootDestination {}
 
+/// The default modal destination for navigation scenes without routed presentations.
+///
+/// Its sole case is unavailable, so application code cannot construct a sheet or
+/// full-screen destination when the corresponding associated type uses this default.
+public enum NoModalDestination: SheetDestination, FullScreenDestination {
+  @available(*, unavailable, message: "No modal destination can be constructed.")
+  case unavailable
+
+  public var id: Self { self }
+}
+
 // MARK: - NavigationScene
 
-/// Groups the destination types into a single generic parameter. `Root` defaults
-/// to ``NoRootDestination`` for single-stack applications.
+/// Groups the destination types into a single generic parameter. `Sheet` and
+/// `FullScreen` default to ``NoModalDestination``, while `Root` defaults to
+/// ``NoRootDestination`` for single-stack applications.
 ///
 /// Conform an enum to this protocol to define all navigation destinations for your app:
 /// ```swift
@@ -64,10 +76,10 @@ public protocol NavigationScene: SendableMetatype {
   associatedtype Push: PushDestination
 
   /// Values that can be presented as sheets in this scene.
-  associatedtype Sheet: SheetDestination
+  associatedtype Sheet: SheetDestination = NoModalDestination
 
   /// Values that can be presented with full-screen intent in this scene.
-  associatedtype FullScreen: FullScreenDestination
+  associatedtype FullScreen: FullScreenDestination = NoModalDestination
 
   /// Independently stateful top-level branches in this scene.
   associatedtype Root: RootDestination = NoRootDestination

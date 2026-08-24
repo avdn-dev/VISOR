@@ -4,7 +4,7 @@ This downstream Swift 6.2 package verifies that the public
 `VISORObservation` and `VISOR` APIs compile without package, SPI, or testable
 access. It covers both nonisolated and MainActor-by-default consumers in debug
 and release, including generated State routing, source-backed ViewModels,
-`@LazyViewModel`, and public channel iteration.
+`@LazyViewModel`, push-only navigation scenes, and public channel iteration.
 
 `verify-access-control.sh` separately proves that generated descriptor shells
 remain usable while recipe, session, source-control, and erased-field internals

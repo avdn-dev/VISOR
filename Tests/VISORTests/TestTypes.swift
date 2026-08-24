@@ -46,6 +46,10 @@ nonisolated enum SingleStackTestScene: NavigationScene {
   typealias FullScreen = TestFullScreen
 }
 
+nonisolated enum PushOnlyTestScene: NavigationScene {
+  typealias Push = TestPush
+}
+
 nonisolated enum IdentifiedTestSheet: SheetDestination {
   case editor(documentID: String, revision: Int)
 

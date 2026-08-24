@@ -108,6 +108,48 @@ public struct RouterStack<
   private let onDeepLinkOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
 }
 
+// MARK: - Push-Only RouterStack
+
+public extension RouterStack where
+  Scene.Sheet == NoModalDestination,
+  Scene.FullScreen == NoModalDestination,
+  SheetView == EmptyView,
+  FullScreenView == EmptyView
+{
+  /// Creates a push-only stack for an existing Router.
+  init(
+    router: Router<Scene>,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
+    @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.init(
+      router: router,
+      onDeepLinkOutcome: onDeepLinkOutcome,
+      pushContent: pushContent,
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() },
+      content: content)
+  }
+
+  /// Creates a push-only stack for a cached top-level destination Router.
+  init(
+    parentRouter: Router<Scene>,
+    root: Scene.Root,
+    onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
+    @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
+    @ViewBuilder content: () -> Content
+  ) {
+    self.init(
+      router: parentRouter.childRouter(for: root),
+      onDeepLinkOutcome: onDeepLinkOutcome,
+      pushContent: pushContent,
+      sheetContent: { _ in EmptyView() },
+      fullScreenContent: { _ in EmptyView() },
+      content: content)
+  }
+}
+
 // MARK: - RouterStackContent
 
 private struct RouterStackContent<
