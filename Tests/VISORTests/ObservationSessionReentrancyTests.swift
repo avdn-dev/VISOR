@@ -73,7 +73,9 @@ struct ObservationSessionReentrancyTests {
           handlers: [],
         )._visorErase()
       ],
-      _visorBeforePauseDrain: { await pauseGate.run() },
+      _visorBeforePauseDrain: {
+        await pauseGate.run(pauseGate.prepare())
+      },
     )
     try await session._visorStart()
 
@@ -92,7 +94,7 @@ struct ObservationSessionReentrancyTests {
     } catch let failure as _ObservationSourceFailure {
       guard case .protocolViolation = failure else {
         Issue.record("Expected a protocol violation, got \(failure)")
-        pauseGate.finish()
+        pauseGate.setTerminalResult(.success(()))
         return
       }
     }
@@ -101,7 +103,7 @@ struct ObservationSessionReentrancyTests {
     #expect(secondOperationCount == 0)
     #expect(session._visorIsReady == false)
 
-    pauseGate.finish()
+    pauseGate.setTerminalResult(.success(()))
     try await firstPause.value
 
     #expect(firstOperationCount == 1)
@@ -308,7 +310,7 @@ struct ObservationSessionReentrancyTests {
         handlers: [
           { [otherGate] value in
             if value == 1 {
-              await otherGate.run()
+              await otherGate.run(otherGate.prepare())
             }
           }
         ],
@@ -340,7 +342,7 @@ struct ObservationSessionReentrancyTests {
     await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
-    otherGate.finish()
+    otherGate.setTerminalResult(.success(()))
     await stopReturned.wait()
     #expect(!otherSession._visorIsReady)
     #expect(otherChannel.source._visorActiveSubscriptionCount == 0)
@@ -466,7 +468,7 @@ struct ObservationSessionReentrancyTests {
         handlers: [
           { [otherGate] value in
             if value == 1 {
-              await otherGate.run()
+              await otherGate.run(otherGate.prepare())
             }
           }
         ],
@@ -486,7 +488,7 @@ struct ObservationSessionReentrancyTests {
     await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
-    otherGate.finish()
+    otherGate.setTerminalResult(.success(()))
     await stopReturned.wait()
     #expect(!session._visorIsReady)
     #expect(firstChannel.source._visorActiveSubscriptionCount == 0)

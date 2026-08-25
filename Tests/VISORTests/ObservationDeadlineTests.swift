@@ -1,94 +1,11 @@
 import Dispatch
-import os
 import Testing
 import VISOR
 import VISORObservation
 import VISORTesting
 
-// MARK: - DeadlineSleeper
-
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
-
-@MainActor
-private final class DeadlineSleeper {
-
-  // MARK: Lifecycle
-
-  deinit { }
-
-  // MARK: Internal
-
-  private(set) var armCount = 0
-
-  func sleep(for _: Duration) async throws {
-    let id = nextID
-    nextID += 1
-    armCount += 1
-    let completed = armWaiters.filter { $0.target <= armCount }
-    armWaiters.removeAll { $0.target <= armCount }
-    for waiter in completed {
-      waiter.continuation.resume()
-    }
-
-    try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation {
-        (continuation: CheckedContinuation<Void, any Error>) in
-        if Task.isCancelled {
-          continuation.resume(throwing: CancellationError())
-          return
-        }
-        pending.append(Pending(id: id, continuation: continuation))
-      }
-    } onCancel: {
-      Task { @MainActor [weak self] in
-        self?.cancel(id: id)
-      }
-    }
-  }
-
-  func waitUntilArmed(_ target: Int) async {
-    guard armCount < target else { return }
-    await withCheckedContinuation { continuation in
-      armWaiters.append(ArmWaiter(
-        target: target,
-        continuation: continuation,
-      ))
-    }
-  }
-
-  func fire(_ id: Int) {
-    guard let index = pending.firstIndex(where: { $0.id == id }) else {
-      return
-    }
-    let continuation = pending.remove(at: index).continuation
-    continuation.resume()
-  }
-
-  // MARK: Private
-
-  private struct Pending {
-    let id: Int
-    let continuation: CheckedContinuation<Void, any Error>
-  }
-
-  private struct ArmWaiter {
-    let target: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
-
-  private var pending = [Pending]()
-  private var armWaiters = [ArmWaiter]()
-  private var nextID = 0
-
-  private func cancel(id: Int) {
-    guard let index = pending.firstIndex(where: { $0.id == id }) else {
-      return
-    }
-    let continuation = pending.remove(at: index).continuation
-    continuation.resume(throwing: CancellationError())
-  }
-}
 
 // MARK: - DeadlineFailureLog
 
@@ -146,176 +63,6 @@ private final class DeadlineTaskCanceller {
   }
 }
 
-// MARK: - ConcurrentDeadlineSleeper
-
-nonisolated private final class ConcurrentDeadlineSleeper: Sendable {
-
-  // MARK: Internal
-
-  @concurrent
-  func sleep(for _: Duration) async throws {
-    try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation {
-        (continuation: CheckedContinuation<Void, any Error>) in
-        let registration: (
-          isCancelled: Bool,
-          isFired: Bool,
-        ) =
-          lock.withLock { state in
-            if Task.isCancelled {
-              return (true, false)
-            }
-            if state.isFired {
-              state.isFired = false
-              return (false, true)
-            }
-            precondition(state.pending == nil)
-            state.pending = continuation
-            return (false, false)
-          }
-        if registration.isCancelled {
-          continuation.resume(throwing: CancellationError())
-          return
-        }
-        if registration.isFired {
-          continuation.resume()
-        }
-      }
-    } onCancel: {
-      let continuation = lock.withLock { state in
-        state.pending.take()
-      }
-      continuation?.resume(throwing: CancellationError())
-    }
-  }
-
-  func fire() {
-    let continuation: CheckedContinuation<Void, any Error>? =
-      lock.withLock { state in
-        guard let continuation = state.pending.take() else {
-          state.isFired = true
-          return nil
-        }
-        return continuation
-      }
-    continuation?.resume()
-  }
-
-  // MARK: Private
-
-  private struct State: Sendable {
-    var pending: CheckedContinuation<Void, any Error>?
-    var isFired = false
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
-
-}
-
-// MARK: - ArmedWatchdogController
-
-nonisolated private final class ArmedWatchdogController: Sendable {
-
-  // MARK: Internal
-
-  var armCount: Int {
-    lock.withLock { $0.armIDs.count }
-  }
-
-  func makeWatchdog(
-    for _: Duration
-  ) -> _ObservationDeadlinePolicy.ArmedWatchdog {
-    let id = lock.withLock { state in
-      let id = state.nextID
-      state.nextID += 1
-      state.arms[id] = Arm()
-      state.armIDs.append(id)
-      return id
-    }
-    return { try await self.wait(for: id) }
-  }
-
-  func armID(at index: Int) -> Int {
-    lock.withLock { state in
-      precondition(state.armIDs.indices.contains(index))
-      return state.armIDs[index]
-    }
-  }
-
-  func fire(_ id: Int) {
-    let continuation: CheckedContinuation<Void, any Error>? =
-      lock.withLock { state in
-        guard var arm = state.arms[id] else { return nil }
-        guard let continuation = arm.continuation else {
-          arm.isFired = true
-          state.arms[id] = arm
-          return nil
-        }
-        state.arms.removeValue(forKey: id)
-        return continuation
-      }
-    continuation?.resume()
-  }
-
-  // MARK: Private
-
-  private enum Registration {
-    case suspended
-    case fired
-    case cancelled
-  }
-
-  private struct Arm: Sendable {
-    var isFired = false
-    var continuation: CheckedContinuation<Void, any Error>?
-  }
-
-  private struct State: Sendable {
-    var nextID = 0
-    var arms = [Int: Arm]()
-    var armIDs = [Int]()
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
-
-  @concurrent
-  private func wait(for id: Int) async throws {
-    try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation {
-        (continuation: CheckedContinuation<Void, any Error>) in
-        let registration: Registration = lock.withLock { state in
-          if Task.isCancelled {
-            state.arms.removeValue(forKey: id)
-            return .cancelled
-          }
-          guard var arm = state.arms[id] else { return .cancelled }
-          if arm.isFired {
-            state.arms.removeValue(forKey: id)
-            return .fired
-          }
-          arm.continuation = continuation
-          state.arms[id] = arm
-          return .suspended
-        }
-        switch registration {
-        case .suspended:
-          break
-        case .fired:
-          continuation.resume()
-        case .cancelled:
-          continuation.resume(throwing: CancellationError())
-        }
-      }
-    } onCancel: {
-      let continuation = lock.withLock { state in
-        state.arms.removeValue(forKey: id)?.continuation
-      }
-      continuation?.resume(throwing: CancellationError())
-    }
-  }
-
-}
-
 // MARK: - MainActorDeadlineBlocker
 
 nonisolated private final class MainActorDeadlineBlocker: Sendable {
@@ -337,40 +84,20 @@ nonisolated private final class MainActorDeadlineBlocker: Sendable {
       self.waitUntilStarted()
       operation()
       self.releaseAfterDeadlineResolution()
-      let waiters = self.completion.withLock { state in
-        state.didFinish = true
-        let waiters = state.waiters
-        state.waiters.removeAll(keepingCapacity: false)
-        return waiters
-      }
-      for waiter in waiters { waiter.resume() }
+      self.completion.record()
     }
   }
 
   func waitUntilConductorFinishes() async {
-    await withCheckedContinuation { continuation in
-      let didFinish = completion.withLock { state in
-        if state.didFinish { return true }
-        state.waiters.append(continuation)
-        return false
-      }
-      if didFinish { continuation.resume() }
-    }
+    await completion.wait()
   }
 
   // MARK: Private
 
-  private struct CompletionState: Sendable {
-    var didFinish = false
-    var waiters = [CheckedContinuation<Void, Never>]()
-  }
-
   private let started = DispatchSemaphore(value: 0)
   private let deadlineResolved = DispatchSemaphore(value: 0)
   private let release = DispatchSemaphore(value: 0)
-  private let completion = OSAllocatedUnfairLock(
-    initialState: CompletionState()
-  )
+  private let completion = TestEventCounter()
 
   private func waitUntilStarted() {
     started.wait()
@@ -385,11 +112,16 @@ nonisolated private final class MainActorDeadlineBlocker: Sendable {
 
 @MainActor
 private func deadlinePolicy(
-  _ sleeper: DeadlineSleeper
+  _ sleeper: ManualSleeper
 ) -> _ObservationDeadlinePolicy {
-  _ObservationDeadlinePolicy { duration in
-    try await sleeper.sleep(for: duration)
-  }
+  _ObservationDeadlinePolicy(
+    readiness: .zero,
+    openingFence: .zero,
+    closingFence: .zero,
+    fence: .zero,
+    teardownJoin: .zero,
+    _visorWatchdogFactory: sleeper.makeSleep,
+  )
 }
 
 // MARK: - ObservationDeadlineTests
@@ -400,14 +132,17 @@ struct ObservationDeadlineTests {
   @MainActor
   func `A due watchdog wins while MainActor is synchronously occupied`() async {
     let channel = ObservationChannel(0)
-    let sleeper = ConcurrentDeadlineSleeper()
+    let sleeper = ManualSleeper()
     let blocker = MainActorDeadlineBlocker()
     let failures = DeadlineFailureLog()
     var handlerFinished = false
     let policy = _ObservationDeadlinePolicy(
-      sleeper: { duration in
-        try await sleeper.sleep(for: duration)
-      },
+      readiness: .zero,
+      openingFence: .zero,
+      closingFence: .zero,
+      fence: .zero,
+      teardownJoin: .zero,
+      _visorWatchdogFactory: sleeper.makeSleep,
       _visorDidResolveDeadline: { phase in
         if phase == .readiness {
           blocker.recordDeadlineResolution()
@@ -429,7 +164,9 @@ struct ObservationDeadlineTests {
       _visorDeadlinePolicy: policy,
     )
 
-    blocker.startConducting { sleeper.fire() }
+    blocker.startConducting {
+      sleeper.wake(sleeper.preparedSleep(at: 0))
+    }
     let startup = Task { @MainActor in
       try await session._visorStart()
     }
@@ -454,7 +191,7 @@ struct ObservationDeadlineTests {
   @MainActor
   func `A due fence deadline skips its synchronous source checkpoint`() async throws {
     let channel = ObservationChannel(0)
-    let sleeper = ArmedWatchdogController()
+    let sleeper = ManualSleeper()
     let blocker = MainActorDeadlineBlocker()
     let failures = DeadlineFailureLog()
     var actionRan = false
@@ -465,7 +202,7 @@ struct ObservationDeadlineTests {
       closingFence: .seconds(10),
       fence: .seconds(10),
       teardownJoin: .seconds(10),
-      _visorWatchdogFactory: sleeper.makeWatchdog,
+      _visorWatchdogFactory: sleeper.makeSleep,
       _visorDidResolveDeadline: { phase in
         if phase == .openingFence {
           blocker.recordDeadlineResolution()
@@ -483,10 +220,10 @@ struct ObservationDeadlineTests {
     )
 
     try await session._visorStart()
-    let armsBeforeFence = sleeper.armCount
+    let sleepsBeforeFence = sleeper.sleepCount
     blocker.startConducting {
-      let fenceID = sleeper.armID(at: armsBeforeFence)
-      sleeper.fire(fenceID)
+      let fenceSleep = sleeper.preparedSleep(at: sleepsBeforeFence)
+      sleeper.wake(fenceSleep)
     }
     let opening = Task { @MainActor in
       try await session._visorWithPause(
@@ -525,7 +262,7 @@ struct ObservationDeadlineTests {
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [{ _ in await readinessGate.run() }],
+          handlers: [{ _ in await readinessGate.run(readinessGate.prepare()) }],
         )._visorErase()
       ],
       _visorOnFailure: failures.record,
@@ -543,7 +280,7 @@ struct ObservationDeadlineTests {
     } catch let failure as _ObservationSourceFailure {
       guard case .failed(let detail) = failure else {
         Issue.record("Expected a typed watchdog failure, got \(failure)")
-        readinessGate.finish()
+        readinessGate.setTerminalResult(.success(()))
         return
       }
       #expect(detail.contains(
@@ -554,7 +291,7 @@ struct ObservationDeadlineTests {
     }
 
     #expect(failures.failures.count == 1)
-    readinessGate.finish()
+    readinessGate.setTerminalResult(.success(()))
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
     await stopped.wait()
@@ -565,13 +302,13 @@ struct ObservationDeadlineTests {
   func `Readiness deadline fails closed and eventually completes one teardown`() async {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [{ _ in await readinessGate.run() }],
+          handlers: [{ _ in await readinessGate.run(readinessGate.prepare()) }],
         )._visorErase()
       ],
       _visorOnFailure: failures.record,
@@ -582,10 +319,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    sleeper.fire(0)
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
+    let readinessSleep = await sleeper.waitUntilPrepared(1)
+    sleeper.wake(readinessSleep)
+    let teardownSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: _ObservationSourceFailure.self) {
       try await startup.value
@@ -602,7 +339,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    readinessGate.finish()
+    readinessGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(session._visorIsStopped)
     #expect(channel.source._visorActiveSubscriptionCount == 0)
@@ -614,14 +351,14 @@ struct ObservationDeadlineTests {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
     let fenceGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(source: channel.source, handlers: [])._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
-      _visorBeforePauseDrain: { await fenceGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
+      _visorBeforePauseDrain: { await fenceGate.run(fenceGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -630,8 +367,8 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     _ = try await startup.value
 
     let opening = Task { @MainActor in
@@ -641,10 +378,10 @@ struct ObservationDeadlineTests {
       )
     }
     await fenceGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
-    await sleeper.waitUntilArmed(3)
-    sleeper.fire(2)
+    let openingSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(openingSleep)
+    let teardownSleep = await sleeper.waitUntilPrepared(3)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: _ObservationSourceFailure.self) {
       _ = try await opening.value
@@ -659,7 +396,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    fenceGate.finish()
+    fenceGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
@@ -670,14 +407,14 @@ struct ObservationDeadlineTests {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
     let fenceGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(source: channel.source, handlers: [])._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
-      _visorBeforePauseDrain: { await fenceGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
+      _visorBeforePauseDrain: { await fenceGate.run(fenceGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -686,8 +423,8 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     _ = try await startup.value
 
     let closing = Task { @MainActor in
@@ -697,10 +434,10 @@ struct ObservationDeadlineTests {
       )
     }
     await fenceGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
-    await sleeper.waitUntilArmed(3)
-    sleeper.fire(2)
+    let closingSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(closingSleep)
+    let teardownSleep = await sleeper.waitUntilPrepared(3)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: _ObservationSourceFailure.self) {
       _ = try await closing.value
@@ -715,7 +452,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    fenceGate.finish()
+    fenceGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
@@ -726,7 +463,7 @@ struct ObservationDeadlineTests {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
     let handlerGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let stopped = TestEventCounter()
     let session = _ObservationSession(
@@ -734,11 +471,11 @@ struct ObservationDeadlineTests {
         _ObservationLane(
           source: channel.source,
           handlers: [{ value in
-            if value == 1 { await handlerGate.run() }
+            if value == 1 { await handlerGate.run(handlerGate.prepare()) }
           }],
         )._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -747,18 +484,20 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     _ = try await startup.value
-    let armsBeforeTeardown = sleeper.armCount
+    let sleepsBeforeTeardown = sleeper.sleepCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
     let stop = Task { @MainActor in
       await session._visorStopWithinDeadline()
     }
-    await sleeper.waitUntilArmed(armsBeforeTeardown + 1)
-    sleeper.fire(armsBeforeTeardown)
+    let teardownSleep = await sleeper.waitUntilPrepared(
+      sleepsBeforeTeardown + 1
+    )
+    sleeper.wake(teardownSleep)
 
     let didJoin = await stop.value
     #expect(!didJoin)
@@ -773,7 +512,7 @@ struct ObservationDeadlineTests {
     ])
 
     session._visorWhenStopped { stopped.record() }
-    handlerGate.finish()
+    handlerGate.setTerminalResult(.success(()))
     await stopped.wait()
 
     #expect(session._visorIsStopped)
@@ -785,13 +524,13 @@ struct ObservationDeadlineTests {
   func `Caller cancellation before expiry stays cancellation`() async {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [{ _ in await readinessGate.run() }],
+          handlers: [{ _ in await readinessGate.run(readinessGate.prepare()) }],
         )._visorErase()
       ],
       _visorOnFailure: failures.record,
@@ -802,10 +541,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
+    _ = await sleeper.waitUntilPrepared(1)
     startup.cancel()
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
+    let teardownSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: CancellationError.self) {
       try await startup.value
@@ -814,7 +553,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    readinessGate.finish()
+    readinessGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
@@ -824,7 +563,7 @@ struct ObservationDeadlineTests {
   func `A latched first cause survives re-entrant caller cancellation`() async {
     let channel = ObservationChannel(0)
     channel._visorTerminate(with: .failed("first failure"))
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let canceller = DeadlineTaskCanceller()
     let session = _ObservationSession(
@@ -864,18 +603,18 @@ struct ObservationDeadlineTests {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
     let handlerGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
           handlers: [{ value in
-            if value == 1 { await handlerGate.run() }
+            if value == 1 { await handlerGate.run(handlerGate.prepare()) }
           }],
         )._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -884,10 +623,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     try await startup.value
-    let armsBeforeTeardown = sleeper.armCount
+    let sleepsBeforeTeardown = sleeper.sleepCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
@@ -897,23 +636,25 @@ struct ObservationDeadlineTests {
     let secondStop = Task { @MainActor in
       await session._visorStopWithinDeadline()
     }
-    await sleeper.waitUntilArmed(armsBeforeTeardown + 1)
+    let teardownSleep = await sleeper.waitUntilPrepared(
+      sleepsBeforeTeardown + 1
+    )
 
     // Both callers use the one session coordinator: there is one watchdog and
     // one true-join callback, not one observer task per caller.
-    #expect(sleeper.armCount == armsBeforeTeardown + 1)
-    sleeper.fire(armsBeforeTeardown)
+    #expect(sleeper.sleepCount == sleepsBeforeTeardown + 1)
+    sleeper.wake(teardownSleep)
     #expect(await firstStop.value == false)
     #expect(await secondStop.value == false)
 
-    let armsAfterDeadline = sleeper.armCount
+    let sleepsAfterDeadline = sleeper.sleepCount
     #expect(await session._visorStopWithinDeadline() == false)
-    #expect(sleeper.armCount == armsAfterDeadline)
+    #expect(sleeper.sleepCount == sleepsAfterDeadline)
     #expect(failures.failures.count == 1)
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    handlerGate.finish()
+    handlerGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(session._visorIsStopped)
   }
@@ -926,18 +667,18 @@ struct ObservationDeadlineTests {
     let readinessGate = ControllableOperation<Void, Never>()
     let handlerGate = ControllableOperation<Void, Never>()
     let arrivalBarrier = TestEventCounter()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
           handlers: [{ value in
-            if value == 1 { await handlerGate.run() }
+            if value == 1 { await handlerGate.run(handlerGate.prepare()) }
           }],
         )._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -946,10 +687,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     try await startup.value
-    let armsBeforeTeardown = sleeper.armCount
+    let sleepsBeforeTeardown = sleeper.sleepCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
@@ -960,14 +701,16 @@ struct ObservationDeadlineTests {
       }
     }
     await arrivalBarrier.wait(for: waiterCount)
-    await sleeper.waitUntilArmed(armsBeforeTeardown + 1)
+    let teardownSleep = await sleeper.waitUntilPrepared(
+      sleepsBeforeTeardown + 1
+    )
 
     for index in stops.indices where index.isMultiple(of: 3) {
       stops[index].cancel()
     }
 
-    #expect(sleeper.armCount == armsBeforeTeardown + 1)
-    sleeper.fire(armsBeforeTeardown)
+    #expect(sleeper.sleepCount == sleepsBeforeTeardown + 1)
+    sleeper.wake(teardownSleep)
     for stop in stops {
       #expect(await stop.value == false)
     }
@@ -980,13 +723,13 @@ struct ObservationDeadlineTests {
       )
     ])
 
-    let armsAfterDeadline = sleeper.armCount
+    let sleepsAfterDeadline = sleeper.sleepCount
     #expect(await session._visorStopWithinDeadline() == false)
-    #expect(sleeper.armCount == armsAfterDeadline)
+    #expect(sleeper.sleepCount == sleepsAfterDeadline)
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    handlerGate.finish()
+    handlerGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(session._visorIsStopped)
     #expect(channel.source._visorActiveSubscriptionCount == 0)
@@ -998,18 +741,18 @@ struct ObservationDeadlineTests {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
     let handlerGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
           handlers: [{ value in
-            if value == 1 { await handlerGate.run() }
+            if value == 1 { await handlerGate.run(handlerGate.prepare()) }
           }],
         )._visorErase()
       ],
-      _visorBeforeReady: { await readinessGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -1018,28 +761,30 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    readinessGate.finish()
+    _ = await sleeper.waitUntilPrepared(1)
+    readinessGate.setTerminalResult(.success(()))
     try await startup.value
-    let armsBeforeTeardown = sleeper.armCount
+    let sleepsBeforeTeardown = sleeper.sleepCount
 
     channel.publish(1)
     await handlerGate.waitUntilStarted()
     let stop = Task { @MainActor in
       await session._visorStopWithinDeadline()
     }
-    await sleeper.waitUntilArmed(armsBeforeTeardown + 1)
+    let teardownSleep = await sleeper.waitUntilPrepared(
+      sleepsBeforeTeardown + 1
+    )
 
     // Task.cancel() runs registered cancellation handlers before returning;
     // firing afterwards deterministically linearises cancellation first.
     stop.cancel()
-    sleeper.fire(armsBeforeTeardown)
+    sleeper.wake(teardownSleep)
     #expect(await stop.value == false)
     #expect(failures.failures.isEmpty)
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    handlerGate.finish()
+    handlerGate.setTerminalResult(.success(()))
     await stopped.wait()
     #expect(session._visorIsStopped)
   }
@@ -1049,13 +794,13 @@ struct ObservationDeadlineTests {
   func `A re-entrant callback cannot replace or duplicate the first cause`() async {
     let channel = ObservationChannel(0)
     let readinessGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = ReentrantDeadlineFailureLog()
     let session = _ObservationSession(
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [{ _ in await readinessGate.run() }],
+          handlers: [{ _ in await readinessGate.run(readinessGate.prepare()) }],
         )._visorErase()
       ],
       _visorOnFailure: failures.record,
@@ -1067,10 +812,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    sleeper.fire(0)
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
+    let readinessSleep = await sleeper.waitUntilPrepared(1)
+    sleeper.wake(readinessSleep)
+    let teardownSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: _ObservationSourceFailure.self) {
       try await startup.value
@@ -1085,7 +830,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    readinessGate.finish()
+    readinessGate.setTerminalResult(.success(()))
     await stopped.wait()
   }
 
@@ -1094,7 +839,7 @@ struct ObservationDeadlineTests {
   func `Deadline diagnostics retain a bounded source prefix`() async {
     let channels = (0..<10).map { ObservationChannel($0) }
     let readinessGate = ControllableOperation<Void, Never>()
-    let sleeper = DeadlineSleeper()
+    let sleeper = ManualSleeper()
     let failures = DeadlineFailureLog()
     let session = _ObservationSession(
       lanes: channels.map { channel in
@@ -1104,7 +849,7 @@ struct ObservationDeadlineTests {
         )
         ._visorErase()
       },
-      _visorBeforeReady: { await readinessGate.run() },
+      _visorBeforeReady: { await readinessGate.run(readinessGate.prepare()) },
       _visorOnFailure: failures.record,
       _visorDeadlinePolicy: deadlinePolicy(sleeper),
     )
@@ -1113,10 +858,10 @@ struct ObservationDeadlineTests {
       try await session._visorStart()
     }
     await readinessGate.waitUntilStarted()
-    await sleeper.waitUntilArmed(1)
-    sleeper.fire(0)
-    await sleeper.waitUntilArmed(2)
-    sleeper.fire(1)
+    let readinessSleep = await sleeper.waitUntilPrepared(1)
+    sleeper.wake(readinessSleep)
+    let teardownSleep = await sleeper.waitUntilPrepared(2)
+    sleeper.wake(teardownSleep)
 
     await #expect(throws: _ObservationSourceFailure.self) {
       try await startup.value
@@ -1131,7 +876,7 @@ struct ObservationDeadlineTests {
 
     let stopped = TestEventCounter()
     session._visorWhenStopped { stopped.record() }
-    readinessGate.finish()
+    readinessGate.setTerminalResult(.success(()))
     await stopped.wait()
   }
 }

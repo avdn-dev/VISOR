@@ -155,14 +155,14 @@ struct ObservationLifecycleTests {
     let task = Task { @MainActor in
       try await observe(sut) { test in
         await test.perform {
-          await gate.run()
+          await gate.run(gate.prepare())
         }
       }
     }
 
     await gate.waitUntilStarted()
     task.cancel()
-    gate.finish()
+    gate.setTerminalResult(.success(()))
 
     await #expect(throws: CancellationError.self) {
       try await task.value
@@ -187,7 +187,7 @@ struct ObservationLifecycleTests {
     ) { test in
       let first = Task { @MainActor in
         await test.perform {
-          await gate.run()
+          await gate.run(gate.prepare())
           await service.publish(1)
         }
       }
@@ -200,7 +200,7 @@ struct ObservationLifecycleTests {
       #expect(issues == [
         "A perform window is already active for this State"
       ])
-      gate.finish()
+      gate.setTerminalResult(.success(()))
       await first.value
       test.expect(\.sourceValue, hasExactChanges: [1])
     }

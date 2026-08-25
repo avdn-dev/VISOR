@@ -110,7 +110,9 @@ final class TestingViewModel {
   )
   private func sourceChanged(_ value: Int) async {
     if value == 10 {
-      await reactionGate?.run()
+      if let reactionGate {
+        await reactionGate.run(reactionGate.prepare())
+      }
     }
     updateState(\.reactedValue, to: value)
   }

@@ -16,31 +16,33 @@ struct ConcurrencyPrimitivesTests {
   func `A controllable operation returns its supplied value`() async throws {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
-    let invocation = Task { try await operation.run() }
+    let invocation = operation.prepare()
+    let task = Task { try await operation.run(invocation) }
     await operation.waitUntilStarted()
 
     // When
-    operation.resume(returning: 42)
+    operation.resolve(invocation, with: .success(42))
 
     // Then
-    #expect(try await invocation.value == 42)
+    #expect(try await task.value == 42)
     await operation.waitUntilFinished()
-    #expect(operation.completionCount == 1)
+    #expect(operation.finishedCount == 1)
   }
 
   @Test @MainActor
   func `A controllable operation throws its supplied failure`() async {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
-    let invocation = Task { try await operation.run() }
+    let invocation = operation.prepare()
+    let task = Task { try await operation.run(invocation) }
     await operation.waitUntilStarted()
 
     // When
-    operation.resume(throwing: .expected)
+    operation.resolve(invocation, with: .failure(.expected))
 
     // Then
     await #expect(throws: ControlledOperationError.expected) {
-      try await invocation.value
+      try await task.value
     }
   }
 
@@ -48,35 +50,40 @@ struct ConcurrencyPrimitivesTests {
   func `A result queued before invocation completes the next call`() async throws {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
+    let invocation = operation.prepare()
 
     // When
-    operation.resume(returning: 42)
+    operation.resolve(invocation, with: .success(42))
 
     // Then
-    #expect(try await operation.run() == 42)
-    #expect(operation.completionCount == 1)
+    #expect(try await operation.run(invocation) == 42)
+    #expect(operation.finishedCount == 1)
   }
 
   @Test @MainActor
   func `Cooperative cancellation is acknowledged and finishes the invocation`() async {
     // Given
     let operation = ControllableOperation<Void, CancellationError>()
-    let invocation = Task {
-      try await operation.run(cancellingWith: CancellationError())
+    let invocation = operation.prepare()
+    let task = Task {
+      try await operation.run(
+        invocation,
+        onCancellation: .failure(CancellationError()),
+      )
     }
     await operation.waitUntilStarted()
 
     // When
-    invocation.cancel()
+    task.cancel()
     await operation.waitUntilCancelled()
     await operation.waitUntilFinished()
 
     // Then
     await #expect(throws: CancellationError.self) {
-      try await invocation.value
+      try await task.value
     }
-    #expect(operation.cancellationCount == 1)
-    #expect(operation.completionCount == 1)
+    #expect(operation.cancelledCount == 1)
+    #expect(operation.finishedCount == 1)
   }
 
   @Test @MainActor
@@ -84,22 +91,23 @@ struct ConcurrencyPrimitivesTests {
     // Given
     let operation = ControllableOperation<Void, Never>()
     let didFinish = TestEventCounter()
-    let invocation = Task {
-      await operation.run()
+    let invocation = operation.prepare()
+    let task = Task {
+      await operation.run(invocation)
       didFinish.record()
     }
     await operation.waitUntilStarted()
 
     // When
-    invocation.cancel()
+    task.cancel()
     await operation.waitUntilCancelled()
 
     // Then
     #expect(didFinish.count == 0)
 
     // When
-    operation.finish()
-    await invocation.value
+    operation.setTerminalResult(.success(()))
+    await task.value
 
     // Then
     #expect(didFinish.count == 1)
@@ -109,17 +117,18 @@ struct ConcurrencyPrimitivesTests {
   func `Cancellation can cooperatively complete a non-throwing invocation`() async {
     // Given
     let operation = ControllableOperation<Bool, Never>()
-    let invocation = Task {
-      await operation.run(completingOnCancellationWith: false)
+    let invocation = operation.prepare()
+    let task = Task {
+      await operation.run(invocation, onCancellation: .success(false))
     }
     await operation.waitUntilStarted()
 
     // When
-    invocation.cancel()
+    task.cancel()
     await operation.waitUntilCancelled()
 
     // Then
-    #expect(await invocation.value == false)
+    #expect(await task.value == false)
     await operation.waitUntilFinished()
   }
 
@@ -127,39 +136,98 @@ struct ConcurrencyPrimitivesTests {
   func `Specific calls can complete independently`() async throws {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
-    let first = Task { try await operation.run() }
-    let second = Task { try await operation.run() }
-    await operation.waitUntilStarted(callCount: 2)
+    let firstInvocation = operation.prepare()
+    let secondInvocation = operation.prepare()
+    let first = Task { try await operation.run(firstInvocation) }
+    let second = Task { try await operation.run(secondInvocation) }
+    await operation.waitUntilStarted(2)
 
     // When
-    operation.resume(call: 2, returning: 20)
-    operation.resume(call: 1, returning: 10)
+    operation.resolve(secondInvocation, with: .success(20))
+    operation.resolve(firstInvocation, with: .success(10))
 
     // Then
     #expect(try await first.value == 10)
     #expect(try await second.value == 20)
-    await operation.waitUntilFinished(callCount: 2)
+    await operation.waitUntilFinished(2)
+  }
+
+  @Test
+  func `A prepared invocation fixes identity and metadata before asynchronous start`() async throws {
+    // Given
+    let operation = ControllableOperation<Int, ControlledOperationError>()
+
+    // When
+    let invocation = operation.prepare(metadata: Duration.seconds(3))
+    operation.resolve(invocation, with: .success(42))
+    let result = try await Task.detached {
+      try await operation.run(invocation)
+    }.value
+
+    // Then
+    #expect(invocation.ordinal == 1)
+    #expect(invocation.metadata == .seconds(3))
+    #expect(operation.startedCount == 1)
+    #expect(result == 42)
+  }
+
+  @Test
+  func `A deadline can fire after synchronous preparation and before task start`() async throws {
+    // Given
+    let sleeper = ManualSleeper()
+
+    // When
+    let operation = sleeper.makeSleep(for: .seconds(3))
+    let sleep = sleeper.preparedSleep(at: 0)
+    sleeper.wake(sleep)
+
+    // Then
+    #expect(sleeper.sleepCount == 1)
+    #expect(sleep.metadata == .seconds(3))
+    try await Task.detached { try await operation() }.value
+  }
+
+  @Test
+  func `A deadline sleep can be selected by duration`() async throws {
+    // Given
+    let sleeper = ManualSleeper()
+    let shortSleepOperation = sleeper.makeSleep(for: .seconds(1))
+    let longSleepOperation = sleeper.makeSleep(for: .seconds(5))
+    let shortOperation = Task { try await shortSleepOperation() }
+    let longOperation = Task { try await longSleepOperation() }
+
+    // When
+    let longSleep = await sleeper.waitUntilPrepared(for: .seconds(5))
+    let shortSleep = await sleeper.waitUntilPrepared(for: .seconds(1))
+    sleeper.wake(longSleep)
+    sleeper.wake(shortSleep)
+
+    // Then
+    try await shortOperation.value
+    try await longOperation.value
   }
 
   @Test @MainActor
   func `A terminal result completes current and future calls`() async throws {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
-    let first = Task { try await operation.run() }
+    let firstInvocation = operation.prepare()
+    let first = Task { try await operation.run(firstInvocation) }
     await operation.waitUntilStarted()
 
     // When
-    operation.completeAll(returning: 7)
+    operation.setTerminalResult(.success(7))
 
     // Then
     #expect(try await first.value == 7)
 
     // When
-    let second = try await operation.run()
+    let secondInvocation = operation.prepare()
+    let second = try await operation.run(secondInvocation)
 
     // Then
     #expect(second == 7)
-    #expect(operation.callCount == 2)
+    #expect(operation.startedCount == 2)
   }
 
   @Test @MainActor

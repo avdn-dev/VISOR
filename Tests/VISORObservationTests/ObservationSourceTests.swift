@@ -463,7 +463,7 @@ struct ObservationSourceTests {
       project: { .deliver($0) },
       receive: { [model, gate] value in
         if value == 1 {
-          await gate.run()
+          await gate.run(gate.prepare())
         }
         model.receive(value)
       },
@@ -478,7 +478,7 @@ struct ObservationSourceTests {
 
     await gate.waitUntilStarted()
     #expect(model.current == 0)
-    gate.finish()
+    gate.setTerminalResult(.success(()))
 
     let checkpoint = try await fence.value
     #expect(model.current == 1)
@@ -497,7 +497,7 @@ struct ObservationSourceTests {
       project: { .deliver($0) },
       receive: { [slowModel, gate] value in
         if value == 1 {
-          await gate.run()
+          await gate.run(gate.prepare())
         }
         slowModel.receive(value)
       },
@@ -526,7 +526,7 @@ struct ObservationSourceTests {
     #expect(fastModel.current == 2)
     #expect(slowModel.current == 0)
 
-    gate.finish()
+    gate.setTerminalResult(.success(()))
     let slowSettled = try await slow.checkpointAndPause()
     #expect(slowModel.current == 2)
 

@@ -9,6 +9,7 @@
 import AppKit
 import SwiftUI
 import Testing
+import VISORTesting
 @testable import VISOR
 
 @MainActor
@@ -17,42 +18,27 @@ private final class NavigationLifecycleProbe {
   // MARK: Internal
 
   func record(_ event: NavigationLifecycleEvent) {
-    let count = counts[event, default: 0] + 1
-    counts[event] = count
-
-    let waiting = waiters.removeValue(forKey: event) ?? []
-    var remaining = [Waiter]()
-    for waiter in waiting {
-      if count >= waiter.count {
-        waiter.continuation.resume()
-      } else {
-        remaining.append(waiter)
-      }
-    }
-    if !remaining.isEmpty {
-      waiters[event] = remaining
-    }
+    counter(for: event).record()
   }
 
   func wait(for event: NavigationLifecycleEvent, count: Int = 1) async {
-    guard counts[event, default: 0] < count else { return }
-    await withCheckedContinuation { continuation in
-      waiters[event, default: []].append(Waiter(
-        count: count,
-        continuation: continuation,
-      ))
-    }
+    await counter(for: event).wait(for: count)
   }
 
   // MARK: Private
 
-  private struct Waiter {
-    let count: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
+  private var counters = [NavigationLifecycleEvent: TestEventCounter]()
 
-  private var counts = [NavigationLifecycleEvent: Int]()
-  private var waiters = [NavigationLifecycleEvent: [Waiter]]()
+  private func counter(
+    for event: NavigationLifecycleEvent
+  ) -> TestEventCounter {
+    if let counter = counters[event] {
+      return counter
+    }
+    let counter = TestEventCounter()
+    counters[event] = counter
+    return counter
+  }
 
 }
 

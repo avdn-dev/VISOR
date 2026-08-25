@@ -489,6 +489,23 @@ The selector is `\.count`, not `\.state.count`. `hasExactChanges: []` explicitly
 
 There is no direct replacement for v10's `eventually:` assertion. Await the operation that owns completion, then assert its complete State history or final invariant. Fire-and-forget work after an action returns is deliberately outside the action window.
 
+Use `ControllableOperation` for an asynchronous dependency whose completion a
+test controls. When more than one invocation may overlap, reserve stable tokens
+before scheduling the work rather than addressing calls by integer:
+
+```swift
+let invocation = operation.prepare(metadata: request)
+let task = Task { try await operation.run(invocation) }
+
+operation.resolve(invocation, with: .success(response))
+```
+
+The operation is `Sendable` and isolation-neutral. Every call must use a
+prepared invocation; parameterless `run`, integer-addressed `resume`,
+success/failure convenience overloads, `finish`, and `completeAll` are removed.
+Resolve one invocation with `resolve(_:with:)`, or use `setTerminalResult(_:)`
+when the result must apply to every current and future invocation.
+
 Direct and dynamically erased outer reference values cannot participate in strict history matching. Migrate historical assertions to stable value snapshots; production composition may still keep a reference field where its own nested Observation boundary is sufficient.
 
 ## 9. Move generated doubles to VISORTestDoubles

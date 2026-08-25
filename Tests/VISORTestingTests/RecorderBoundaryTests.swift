@@ -85,48 +85,6 @@ private final class NilRecorderProbeViewModel {
 
 }
 
-// MARK: - RecorderBoundaryRendezvous
-
-@MainActor
-private final class RecorderBoundaryRendezvous {
-
-  // MARK: Lifecycle
-
-  init(onBothArrived: @escaping @MainActor () -> Void) {
-    self.onBothArrived = onBothArrived
-  }
-
-  deinit { }
-
-  // MARK: Internal
-
-  func arriveAndWait() async {
-    arrivalCount += 1
-    precondition(arrivalCount <= 2)
-
-    if arrivalCount == 2 {
-      onBothArrived()
-      let waiters = waiters
-      self.waiters.removeAll()
-      for waiter in waiters {
-        waiter.resume()
-      }
-      return
-    }
-
-    await withCheckedContinuation { continuation in
-      waiters.append(continuation)
-    }
-  }
-
-  // MARK: Private
-
-  private var arrivalCount = 0
-  private var waiters = [CheckedContinuation<Void, Never>]()
-  private let onBothArrived: @MainActor () -> Void
-
-}
-
 // MARK: - RecorderBoundaryResults
 
 @MainActor
@@ -157,9 +115,7 @@ struct RecorderBoundaryTests {
     let first = TestingViewModel(service: service)
     let second = TestingViewModel(service: service)
     let results = RecorderBoundaryResults()
-    let rendezvous = RecorderBoundaryRendezvous {
-      results.activeObservationCount = service.activeObservationCount
-    }
+    let rendezvous = TestBarrier(participantCount: 2)
 
     let firstScope = Task { @MainActor in
       try await _observeWithJournalPolicyForProof(
@@ -170,6 +126,7 @@ struct RecorderBoundaryTests {
         },
       ) { test in
         await rendezvous.arriveAndWait()
+        results.activeObservationCount = service.activeObservationCount
         await test.perform(.setCount(11))
         results.firstRawCommitCount = test._rawCommitCount(\.count)
         test.expect(\.count, hasExactChanges: [11])
@@ -184,6 +141,7 @@ struct RecorderBoundaryTests {
         },
       ) { test in
         await rendezvous.arriveAndWait()
+        results.activeObservationCount = service.activeObservationCount
         await test.perform(.setCount(22))
         results.secondRawCommitCount = test._rawCommitCount(\.count)
         test.expect(\.count, hasExactChanges: [22])

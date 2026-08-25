@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Testing
 import VISOR
+import VISORTesting
 
 #if os(macOS)
 @MainActor
@@ -20,22 +21,16 @@ private final class RouterInputProbe {
 
   func record(_ routerID: ObjectIdentifier) {
     routerIDs.append(routerID)
-    let waiters = waiters
-    self.waiters.removeAll()
-    for waiter in waiters {
-      waiter.resume()
-    }
+    recorded.record()
   }
 
   func wait(for count: Int) async {
-    while routerIDs.count < count {
-      await withCheckedContinuation { waiters.append($0) }
-    }
+    await recorded.wait(for: count)
   }
 
   // MARK: Private
 
-  private var waiters = [CheckedContinuation<Void, Never>]()
+  private let recorded = TestEventCounter()
 
 }
 

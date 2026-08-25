@@ -141,7 +141,7 @@ struct ObservationSessionContractTests {
       _ObservationLane(
         source: integer.source,
         handlers: [{ value in
-          if value == 1 { await gate.run() }
+          if value == 1 { await gate.run(gate.prepare()) }
           log.integer = value
         }],
       )._visorErase(),
@@ -164,7 +164,7 @@ struct ObservationSessionContractTests {
 
     text.publish("two")
     #expect(log.text == "one")
-    gate.finish()
+    gate.setTerminalResult(.success(()))
     try await fence.value
 
     try await session._visorWithPause {

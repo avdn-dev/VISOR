@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import VISOR
 import VISORObservation
+import VISORTesting
 
 // MARK: - IntegrationSnapshot
 
@@ -46,28 +47,18 @@ private final class IntegrationEvent {
 
   func record(_ value: Int) {
     values.append(value)
-    let completed = waiters.filter { $0.value == value }
-    waiters.removeAll { $0.value == value }
-    for waiter in completed {
-      waiter.continuation.resume()
-    }
+    recorded.record()
   }
 
   func wait(for value: Int) async {
-    guard !values.contains(value) else { return }
-    await withCheckedContinuation { continuation in
-      waiters.append(Waiter(value: value, continuation: continuation))
+    while !values.contains(value) {
+      await recorded.wait(for: values.count + 1)
     }
   }
 
   // MARK: Private
 
-  private struct Waiter {
-    let value: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
-
-  private var waiters = [Waiter]()
+  private let recorded = TestEventCounter()
 
 }
 

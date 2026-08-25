@@ -21,6 +21,11 @@ positive bound for an intentional high-volume action. Exceeding the bound fails
 the complete window closed and poisons the scope rather than returning partial
 history.
 
+Use ``ControllableOperation`` for asynchronous dependencies whose ordering a
+test must control. Prepare an invocation when its identity or metadata must be
+fixed before its task is scheduled, then pass that token to `run` and
+`resolve`. The operation is `Sendable` and has no actor-isolation requirement.
+
 ## Topics
 
 ### Observation scopes
