@@ -10,6 +10,10 @@ the protocol's access level and isolation. Use the `.sendable` trait only when
 the protocol is `Sendable`; the generated double then uses checked, lock-backed
 storage without holding its lock across asynchronous work.
 
+Anonymous parameters receive generated local bindings. Escaped labels and
+parameter names retain valid source spelling in the generated witness while
+compound generated names use their canonical identifier.
+
 Importing `VISORTestDoubles` also imports Apple Observation, which the macros
 need when they emit an observable peer in the declaration's source file.
 

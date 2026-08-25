@@ -327,6 +327,84 @@ struct GenerateSpyMacroTests {
   }
 
   @Test
+  func `Generates spy with an anonymous parameter`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol EventRecording {
+        func record(_: Int, argument1: String)
+      }
+      """,
+      expandedSource: """
+        protocol EventRecording {
+          func record(_: Int, argument1: String)
+        }
+
+        @Observable
+        final class SpyEventRecording: EventRecording {
+          // -- record --
+          var recordCallCount = 0
+          var recordReceivedArguments: (argument1Generated: Int, argument1: String)?
+          var recordReceivedInvocations: [(argument1Generated: Int, argument1: String)] = []
+          @ObservationIgnored
+          var recordImplementation: ((Int, String) -> Void)?
+          func record(_ argument1Generated: Int, argument1: String) {
+            recordCallCount += 1
+            recordReceivedArguments = (argument1Generated, argument1)
+            recordReceivedInvocations.append((argument1Generated, argument1))
+            calls.append(.record(argument1Generated: argument1Generated, argument1: argument1))
+            recordImplementation?(argument1Generated, argument1)
+          }
+          enum Call {
+            case record(argument1Generated: Int, argument1: String)
+          }
+          var calls: [Call] = []
+        }
+        """,
+      macros: testMacros,
+    )
+  }
+
+  @Test
+  func `Generates spy with escaped parameter identifiers`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol KeywordRecording {
+        func store(`repeat` `default`: String)
+      }
+      """,
+      expandedSource: """
+        protocol KeywordRecording {
+          func store(`repeat` `default`: String)
+        }
+
+        @Observable
+        final class SpyKeywordRecording: KeywordRecording {
+          // -- store --
+          var storeCallCount = 0
+          var storeReceivedDefault: String?
+          var storeReceivedInvocations: [String] = []
+          @ObservationIgnored
+          var storeImplementation: ((String) -> Void)?
+          func store(`repeat` `default`: String) {
+            storeCallCount += 1
+            storeReceivedDefault = `default`
+            storeReceivedInvocations.append(`default`)
+            calls.append(.store(default: `default`))
+            storeImplementation?(`default`)
+          }
+          enum Call {
+            case store(default: String)
+          }
+          var calls: [Call] = []
+        }
+        """,
+      macros: testMacros,
+    )
+  }
+
+  @Test
   func `Generates spy with optional and fatalError for unknown return type`() {
     assertMacroExpansionSwiftTesting(
       """

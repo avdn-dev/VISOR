@@ -26,10 +26,33 @@ struct ProtocolObservationStateInfo {
 // MARK: - ParameterInfo
 
 struct ParameterInfo {
+
+  // MARK: Lifecycle
+
+  init(
+    externalLabel: String?,
+    internalName: String,
+    type: String,
+    isInout: Bool,
+    externalLabelComponent: String? = nil,
+    internalNameComponent: String? = nil,
+  ) {
+    self.externalLabel = externalLabel
+    self.internalName = internalName
+    self.type = type
+    self.isInout = isInout
+    self.externalLabelComponent = externalLabelComponent ?? externalLabel
+    self.internalNameComponent = internalNameComponent ?? internalName
+  }
+
+  // MARK: Internal
+
   let externalLabel: String?
   let internalName: String
   let type: String
   let isInout: Bool
+  let externalLabelComponent: String?
+  let internalNameComponent: String
 }
 
 // MARK: - ThrowsEffect
@@ -218,12 +241,37 @@ struct ProtocolAnalysis {
           in: funcDecl
         )
 
-        let params = funcDecl.signature.parameterClause.parameters.map { param in
-          let externalLabel = param.firstName.tokenKind == .wildcard ? nil : param.firstName.text
-          let internalName = param.secondName?.text ?? param.firstName.text
+        let parameters = funcDecl.signature.parameterClause.parameters
+        var allocatedInternalNames = Set(parameters.compactMap { parameter in
+          Self.boundNameToken(for: parameter).map(Self.identifierComponent(for:))
+        })
+        let params = parameters.enumerated().map { index, param in
+          let externalLabelToken = param.firstName.tokenKind == .wildcard
+            ? nil
+            : param.firstName
+          let internalNameToken = Self.boundNameToken(for: param)
+          let internalNameComponent: String
+          let internalName: String
+          if let internalNameToken {
+            internalNameComponent = Self.identifierComponent(for: internalNameToken)
+            internalName = internalNameToken.text
+          } else {
+            internalNameComponent = Self.allocateParameterName(
+              at: index,
+              allocatedNames: &allocatedInternalNames,
+            )
+            internalName = internalNameComponent
+          }
           let type = typeAliasHandler.protocolQualifiedTypeName(for: param.type)
           let isInout = param.type.hasInoutSpecifier
-          return ParameterInfo(externalLabel: externalLabel, internalName: internalName, type: type, isInout: isInout)
+          return ParameterInfo(
+            externalLabel: externalLabelToken?.text,
+            internalName: internalName,
+            type: type,
+            isInout: isInout,
+            externalLabelComponent: externalLabelToken.map(Self.identifierComponent(for:)),
+            internalNameComponent: internalNameComponent,
+          )
         }
 
         let isAsync = funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil
@@ -297,6 +345,33 @@ struct ProtocolAnalysis {
   var unsupportedRequirementKinds = [String]()
 
   // MARK: Private
+
+  private static func boundNameToken(
+    for parameter: FunctionParameterSyntax
+  ) -> TokenSyntax? {
+    if let secondName = parameter.secondName {
+      return secondName.tokenKind == .wildcard ? nil : secondName
+    }
+    return parameter.firstName.tokenKind == .wildcard
+      ? nil
+      : parameter.firstName
+  }
+
+  private static func identifierComponent(for token: TokenSyntax) -> String {
+    token.identifier?.name ?? token.text
+  }
+
+  private static func allocateParameterName(
+    at index: Int,
+    allocatedNames: inout Set<String>,
+  ) -> String {
+    var candidate = "argument\(index + 1)"
+    while allocatedNames.contains(candidate) {
+      candidate += "Generated"
+    }
+    allocatedNames.insert(candidate)
+    return candidate
+  }
 
   private mutating func recordUnsupportedRequirement(_ kind: String) {
     guard !unsupportedRequirementKinds.contains(kind) else { return }

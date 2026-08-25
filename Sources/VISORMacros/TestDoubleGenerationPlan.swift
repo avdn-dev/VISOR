@@ -64,7 +64,7 @@ struct TestDoubleCallCasePlan {
   var declaration: String {
     guard !parameters.isEmpty else { return "case \(name)" }
     let associatedValues = parameters.map {
-      "\($0.parameter.internalName): \($0.storageType)"
+      "\($0.parameter.internalNameComponent): \($0.storageType)"
     }.joined(separator: ", ")
     return "case \(name)(\(associatedValues))"
   }
@@ -72,7 +72,7 @@ struct TestDoubleCallCasePlan {
   var invocation: String {
     guard !parameters.isEmpty else { return ".\(name)" }
     let arguments = parameters.map {
-      "\($0.parameter.internalName): \($0.valueExpression)"
+      "\($0.parameter.internalNameComponent): \($0.valueExpression)"
     }.joined(separator: ", ")
     return ".\(name)(\(arguments))"
   }
@@ -432,7 +432,7 @@ struct TestDoubleGenerationPlan {
     }
 
     let tupleType = "(" + parameters.map {
-      "\($0.parameter.internalName): \($0.storageType)"
+      "\($0.parameter.internalNameComponent): \($0.storageType)"
     }.joined(separator: ", ") + ")"
     let wrappedType = containsFunction ? "(\(tupleType))" : tupleType
     guard
@@ -502,7 +502,7 @@ struct TestDoubleGenerationPlan {
       )
     }
 
-    let snapshotName = "_visor\(parameter.internalName.capitalisedFirst)Snapshot"
+    let snapshotName = "_visor\(parameter.internalNameComponent.capitalisedFirst)Snapshot"
     let snapshotDeclaration: String? =
       if parameter.isInout {
         "let \(snapshotName) = \(parameter.internalName)"
@@ -534,7 +534,7 @@ struct TestDoubleGenerationPlan {
         return "&\(parameter.internalName)"
       }
       if isSendable, storageSnapshotStrategy(for: parameter.type) == .consume {
-        return "_visor\(parameter.internalName.capitalisedFirst)Snapshot"
+        return "_visor\(parameter.internalNameComponent.capitalisedFirst)Snapshot"
       }
       return parameter.internalName
     }.joined(separator: ", ")

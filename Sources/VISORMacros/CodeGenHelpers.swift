@@ -198,7 +198,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   var prefixes = methods.map { method -> String in
     guard nameCounts[method.name, default: 0] > 1 else { return method.name }
     let suffix = method.parameters.map { param in
-      if let label = param.externalLabel {
+      if let label = param.externalLabelComponent {
         return label.capitalisedFirst
       }
       return param.type.filter(\.isLetter).capitalisedFirst

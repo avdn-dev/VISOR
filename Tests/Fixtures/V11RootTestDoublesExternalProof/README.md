@@ -2,7 +2,8 @@
 
 This downstream package verifies public and package generated peers across
 real target boundaries in debug and release. It covers ordinary and Sendable
-stubs and spies, collision-safe generated names, protocol isolation, and
+stubs and spies, collision-safe generated names, anonymous and escaped
+parameter bindings, protocol isolation, and
 synchronised call recording.
 
 The model targets intentionally import only `VISORTestDoubles`. This proves the

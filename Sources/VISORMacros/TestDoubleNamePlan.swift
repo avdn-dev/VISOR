@@ -176,7 +176,7 @@ struct TestDoubleNamePlan {
       let receivedArguments: String?
       let receivedInvocations: String?
       if storableParameters.count == 1, let parameter = storableParameters.first {
-        let preferred = "\(methodPrefix)Received\(parameter.internalName.capitalisedFirst)"
+        let preferred = "\(methodPrefix)Received\(parameter.internalNameComponent.capitalisedFirst)"
         receivedArgument = Self.allocate(
           preferred: preferred,
           fallback: "\(preferred)Generated",
@@ -241,7 +241,7 @@ struct TestDoubleNamePlan {
       }
       let callCase = Self.allocateCallCase(
         preferred: method.name,
-        labels: callParameters.map(\.internalName),
+        labels: callParameters.map(\.internalNameComponent),
         methodPrefix: methodPrefix,
         methodName: methodName,
         signatures: &callCaseSignatures,
