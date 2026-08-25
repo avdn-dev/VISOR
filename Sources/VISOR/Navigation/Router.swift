@@ -422,7 +422,7 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// ```swift
   /// try router.configureDeepLinks(scheme: "myapp", parsers: [
-  ///   .equal(to: ["profile"], destination: .root(.profile)),
+  ///   .matching(components: ["profile"], destination: .root(.profile)),
   /// ])
   /// ```
   ///

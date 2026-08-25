@@ -449,12 +449,12 @@ Configure deep-link handling with a URL scheme and ordered parsers:
 
 ```swift
 try router.configureDeepLinks(scheme: "myapp", parsers: [
-  .equal(to: ["profile"], destination: .root(.profile)),
+  .matching(components: ["profile"], destination: .root(.profile)),
 
   DeepLinkParser { request in
-    guard request.components.first == "item" else { return .noMatch }
-    guard request.components.count == 2,
-          let decodedID = request.components[1].removingPercentEncoding,
+    guard request.routeComponents.first == "item" else { return .noMatch }
+    guard request.routeComponents.count == 2,
+          let decodedID = request.routeComponents[1].removingPercentEncoding,
           let id = UUID(uuidString: decodedID)
     else { return .invalid }
     return .destination(.push(.detail(id: id.uuidString)))
@@ -467,7 +467,9 @@ Configuration validates the scheme before mutating Router state. Handle
 with an ASCII letter and may then contain ASCII letters, digits, `+`, `-`, or
 `.`. Do not include `://`.
 
-``DeepLinkRequest`` exposes the original URL and its host-plus-path components.
+``DeepLinkRequest`` exposes the original URL and its
+``DeepLinkRequest/routeComponents``. These contain the host followed by the
+path segments.
 It omits the structural leading path separator and accepts one conventional
 trailing separator, so both `myapp://profile` and `myapp:///profile/` produce
 `["profile"]`. Literal repeated or interior separators are preserved as empty
@@ -515,7 +517,7 @@ try router.configureDeepLinks(scheme: "https", parsers: [
     guard request.url.host()?.caseInsensitiveCompare("links.example.com")
             == .orderedSame
     else { return .noMatch }
-    guard request.components == ["links.example.com", "profile"]
+    guard request.routeComponents == ["links.example.com", "profile"]
     else { return .noMatch }
     return .destination(.root(.profile))
   },

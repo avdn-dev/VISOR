@@ -66,15 +66,16 @@ func openDocumentationDeepLink(
   with router: Router<DocumentationScene>,
 ) throws -> DeepLinkOutcome<DocumentationScene> {
   try router.configureDeepLinks(scheme: "documentation", parsers: [
+    .matching(components: ["library"], destination: .root(.library)),
     DeepLinkParser { request in
-      guard request.components.first == "detail" else { return .noMatch }
+      guard request.routeComponents.first == "detail" else { return .noMatch }
       guard
-        request.components.count == 2,
-        let id = request.components[1].removingPercentEncoding,
+        request.routeComponents.count == 2,
+        let id = request.routeComponents[1].removingPercentEncoding,
         !id.isEmpty
       else { return .invalid }
       return .destination(.push(.detail(id: id)))
-    }
+    },
   ])
   return router.openDeepLink(url)
 }

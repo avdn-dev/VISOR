@@ -11,7 +11,7 @@ import Foundation
 
 /// A URL and its route components after Router scheme validation.
 ///
-/// Components contain the URL host followed by its path segments and preserve
+/// Route components contain the URL host followed by its path segments and preserve
 /// percent encoding and empty interior segments. Custom parsers are responsible
 /// for validating component counts, decoding values exactly once, and rejecting
 /// malformed identifiers.
@@ -42,7 +42,7 @@ public struct DeepLinkRequest: Hashable, Sendable {
       components.append(host)
     }
     components.append(contentsOf: pathSegments)
-    self.components = components
+    routeComponents = components
   }
 
   // MARK: Public
@@ -50,8 +50,8 @@ public struct DeepLinkRequest: Hashable, Sendable {
   /// The original URL. Validate expected hosts and query items before using them.
   public let url: URL
 
-  /// The host and path segments used for ordered route matching.
-  public let components: [String]
+  /// The host followed by the path segments used for ordered route matching.
+  public let routeComponents: [String]
 
   /// Whether the path has no empty interior route segments.
   ///
@@ -95,11 +95,11 @@ nonisolated extension DeepLinkParseResult: Sendable { }
 ///
 /// ```swift
 /// try router.configureDeepLinks(scheme: "myapp", parsers: [
-///   .equal(to: ["profile"], destination: .root(.profile)),
+///   .matching(components: ["profile"], destination: .root(.profile)),
 ///   DeepLinkParser { request in
-///     guard request.components.first == "item" else { return .noMatch }
-///     guard request.components.count == 2,
-///           let id = UUID(uuidString: request.components[1])
+///     guard request.routeComponents.first == "item" else { return .noMatch }
+///     guard request.routeComponents.count == 2,
+///           let id = UUID(uuidString: request.routeComponents[1])
 ///     else { return .invalid }
 ///     return .destination(.push(.detail(id: id)))
 ///   }
@@ -133,18 +133,18 @@ public struct DeepLinkParser<Scene: NavigationScene>: Sendable {
 
 extension DeepLinkParser {
 
-  /// Match URLs whose deep link components equal the given path exactly.
+  /// Matches URLs whose route components equal the given components exactly.
   ///
   /// ```swift
   /// // Matches "myapp://profile" or "myapp:///profile"
-  /// .equal(to: ["profile"], destination: .root(.profile))
+  /// .matching(components: ["profile"], destination: .root(.profile))
   /// ```
-  public static func equal(
-    to components: [String],
+  public static func matching(
+    components: [String],
     destination: Destination<Scene>,
   ) -> DeepLinkParser {
     DeepLinkParser { request in
-      request.components == components ? .destination(destination) : .noMatch
+      request.routeComponents == components ? .destination(destination) : .noMatch
     }
   }
 }

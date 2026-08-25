@@ -608,6 +608,7 @@ deprecated aliases or compatibility overloads:
 | `select(tab:)` | `select(root:)` |
 | `selectAndPush(tab:destination:)` | `selectAndPush(root:destination:)` |
 | `NavigationContainer` | `RouterStack` for a stack; `RouterHost` for an application-owned container |
+| `DeepLinkParser.equal(to:destination:)` | `DeepLinkParser.matching(components:destination:)` |
 
 Root destinations represent independently stateful top-level branches. Render
 them as tabs, sidebar rows, or another native selector without changing Router
@@ -688,7 +689,8 @@ tree's configuration. Code that expected a copied per-child handler should
 remove that assumption.
 
 The public parse-only `deepLinkHandler` is removed. Pass a
-`DeepLinkRequest` to custom parsers and return `.noMatch`, `.invalid`, or
+`DeepLinkRequest` to custom parsers, inspect its `routeComponents`, and return
+`.noMatch`, `.invalid`, or
 `.destination(...)`. Open URLs through `openDeepLink(_:)`, whose
 `DeepLinkOutcome` distinguishes handled, unconfigured, scheme-mismatched,
 unmatched, invalid, and inactive requests. Validate component counts, decode

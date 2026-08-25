@@ -142,7 +142,7 @@ struct RouterEdgeCaseTests {
     let modal = child.childRouter()
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings))
+      .matching(components: ["settings"], destination: .root(.settings))
     ])
 
     let url = try #require(URL(string: "test://settings"))
@@ -156,7 +156,7 @@ struct RouterEdgeCaseTests {
   func `Child created after configureDeepLinks inherits configuration`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings))
+      .matching(components: ["settings"], destination: .root(.settings))
     ])
 
     // Child created after configuration should read the shared tree context.
@@ -326,12 +326,12 @@ struct RouterEdgeCaseTests {
     let modal = child.childRouter()
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .root(.home))
+      .matching(components: ["home"], destination: .root(.home))
     ])
 
     // Second call overwrites
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings))
+      .matching(components: ["settings"], destination: .root(.settings))
     ])
 
     let homeURL = try #require(URL(string: "test://home"))
