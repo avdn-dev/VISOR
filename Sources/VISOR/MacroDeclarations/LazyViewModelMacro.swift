@@ -28,8 +28,9 @@ import SwiftUI
 /// }
 /// ```
 ///
-/// The `@LazyViewModel` view owns the VM. The Content view is a pure function of
-/// state + onAction, trivially previewable with static state and no factory.
+/// Generated `@State` retains one ViewModel for the annotated view's SwiftUI
+/// structural identity. The Content view is a pure function of state +
+/// onAction, trivially previewable with static state and no factory.
 ///
 /// **Read-only state:** Use the generated `state` alias for reading:
 /// ```swift
@@ -48,7 +49,7 @@ import SwiftUI
 /// layout; ordinary domain failures still belong in ViewModel State.
 ///
 /// - Parameters:
-///   - viewModelType: The concrete ViewModel type owned by the generated view.
+///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.
 ///   - observationPolicy: Controls whether observation pauses based on scene phase.
 ///     Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
 ///     view models driving high-frequency work that wastes resources when the UI is not visible.
@@ -84,7 +85,7 @@ public macro LazyViewModel<VM: ViewModel>(
 /// end.
 ///
 /// - Parameters:
-///   - viewModelType: The concrete ViewModel type owned by the generated view.
+///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.
 ///   - observationPolicy: Controls whether observation pauses based on scene phase.
 ///   - pending: UI shown while VISOR reconciles initial observation state.
 ///   - failure: UI shown when VISOR can no longer guarantee coherent State.

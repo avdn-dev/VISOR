@@ -411,6 +411,8 @@ This keeps production Observation invalidation and test-history capture on the s
 
 `@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before exposing `content`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
 
+ViewModel retention, observation-session ownership, and producer ownership are separate lifetimes. Generated `@State` retains the ViewModel for the annotated view's SwiftUI structural identity. Within that identity, the host's structured task owns the observation session. Pausing or ending that session does not stop producer-owned channels or domain work; their owner manages that lifetime separately.
+
 Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounting two owners for the same ViewModel identity is rejected rather than creating duplicate subscriptions.
 
 ### Readiness and infrastructure failure
@@ -456,8 +458,6 @@ Choose how the generated owner responds to scene phase:
 ```
 
 The default is `.alwaysObserving`. A pause policy revokes readiness, withdraws gated content, and cancels the generated source session. On reactivation, a fresh generation reconciles the latest snapshots before content returns. Use a pause policy when the gated content owns high-frequency renderer or presentation work that should also stop off-screen.
-
-Producer-owned domain work has its own lifetime. VISOR does not infer that a service should stop because one view paused.
 
 ## Deliberate boundaries
 
