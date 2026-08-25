@@ -32,6 +32,7 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/airbnb/swift", exact: "1.2.0"),
     .package(url: "https://github.com/swiftlang/swift-syntax.git", "602.0.0"..<"604.0.0"),
     .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
   ],

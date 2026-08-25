@@ -43,6 +43,39 @@ run_tests() {
   esac
 }
 
+run_style_check() {
+  run_stage "Airbnb Swift style" \
+    swift package --allow-writing-to-package-directory format \
+      --lint \
+      --paths \
+      Package.swift \
+      Sources \
+      Tests/VISORMacroTests \
+      Tests/VISORObservationTests \
+      Tests/VISORTestDoublesTests \
+      Tests/VISORTestingTests \
+      Tests/VISORTests \
+      Tests/Fixtures/V11RootGatewayExternalProof/Package.swift \
+      Tests/Fixtures/V11RootGatewayExternalProof/Sources \
+      Tests/Fixtures/V11RootGatewayExternalProof/Tests \
+      Tests/Fixtures/V11RootTestingExternalProof/Package.swift \
+      Tests/Fixtures/V11RootTestingExternalProof/Sources \
+      Tests/Fixtures/V11RootTestingExternalProof/Tests \
+      Tests/Fixtures/V11RootTestDoublesExternalProof/Package.swift \
+      Tests/Fixtures/V11RootTestDoublesExternalProof/Sources \
+      Tests/Fixtures/V11RootTestDoublesExternalProof/Tests
+}
+
+run_root_tests() {
+  test_configuration=$1
+
+  case "$test_configuration" in
+    release|all) run_style_check ;;
+  esac
+
+  run_tests "Root" "$test_configuration"
+}
+
 run_api_contracts() {
   run_stage "Gateway access-control contracts" \
     sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
@@ -116,7 +149,7 @@ run_documentation() {
 }
 
 run_complete_validation() {
-  run_tests "Root" all
+  run_root_tests all
 
   for proof_package in \
     Tests/Fixtures/V11RootGatewayExternalProof \
@@ -149,7 +182,7 @@ case "$mode" in
       usage
       exit 2
     fi
-    run_tests "Root" "$1"
+    run_root_tests "$1"
     ;;
   external)
     if [ "$#" -ne 2 ]; then
