@@ -393,9 +393,9 @@ struct MyApp: App {
 }
 ```
 
-Move the Router into `App` state only when multiple windows should deliberately
-share one navigation tree. Sharing by default breaks per-window selection,
-stack and presentation state expected on macOS and iPadOS.
+Keep the Router window-specific. Share domain models across windows when
+needed, and direct navigation intents to the intended window's Router; sharing
+one Router would couple per-window selection, stack, and presentation state.
 
 ## Modal Completion and Dismissal
 
