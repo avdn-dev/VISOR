@@ -7,8 +7,8 @@ and release, including generated State routing, source-backed ViewModels,
 `@LazyViewModel`, push-only navigation scenes, and public channel iteration.
 
 `verify-access-control.sh` separately proves that generated descriptor shells
-remain usable while recipe, session, source-control, and erased-field internals
-remain inaccessible.
+remain usable while Router hierarchy state, recipe, session, source-control,
+and erased-field internals remain inaccessible.
 
 ```sh
 swift test --package-path Tests/Fixtures/V11RootGatewayExternalProof

@@ -183,18 +183,6 @@ public final class Router<Scene: NavigationScene> {
   /// imperative changes.
   public var navigationPath = [Scene.Push]()
 
-  /// The depth level of this router (0 = root).
-  public let level: Int
-
-  /// The top-level destination this Router is associated with.
-  ///
-  /// Root and modal Routers have no root destination.
-  public let rootDestination: Scene.Root?
-
-  /// Whether this Router is the active visible target for root navigation
-  /// actions and deep links.
-  public private(set) var isActive: Bool
-
   /// The currently selected top-level destination.
   ///
   /// The setter remains public so application-owned tab and split-view
@@ -448,6 +436,18 @@ public final class Router<Scene: NavigationScene> {
   }
 
   // MARK: Package
+
+  /// The depth level of this router (0 = root).
+  package let level: Int
+
+  /// The top-level destination this Router is associated with.
+  ///
+  /// Root and modal Routers have no root destination.
+  package let rootDestination: Scene.Root?
+
+  /// Whether this Router is the active visible target for root navigation
+  /// actions and deep links.
+  package private(set) var isActive: Bool
 
   /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
   package weak let parent: Router?

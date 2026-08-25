@@ -681,6 +681,11 @@ application behaviour. `presentingSheet` and `presentingFullScreen` are now
 read-only state; use the corresponding present and dismiss methods rather than
 assigning modal state directly.
 
+`Router.level`, `Router.rootDestination`, and `Router.isActive` are internal
+hierarchy bookkeeping in v11 and are no longer public. There is no replacement;
+drive application behaviour through mounted `RouterHost` and `RouterStack`
+state and the results returned by navigation actions.
+
 Deep-link configuration is shared by the whole Router tree. Configure it once
 with `try configureDeepLinks(scheme:parsers:)`; existing and future child
 Routers read the same latest configuration. The method rejects an empty or

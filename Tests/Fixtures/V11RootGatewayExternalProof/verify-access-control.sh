@@ -53,6 +53,12 @@ verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_FIELD_ELIGIBILITY 
 verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_NAME name
 verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_IDENTITY identity
 verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ERASED_READ read
+verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ROUTER_LEVEL level
+verify_inaccessible \
+  RootGatewayAccessControlProbe \
+  VISOR_PROBE_ROUTER_ROOT_DESTINATION \
+  rootDestination
+verify_inaccessible RootGatewayAccessControlProbe VISOR_PROBE_ROUTER_IS_ACTIVE isActive
 
 verify_get_only() {
   flag=$1

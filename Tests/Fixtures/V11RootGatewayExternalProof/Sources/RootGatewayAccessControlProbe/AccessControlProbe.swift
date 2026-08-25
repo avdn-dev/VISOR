@@ -83,4 +83,16 @@ public func compileRootGatewayAccessBoundary() {
   #if VISOR_PROBE_FULL_SCREEN_SETTER
   router.presentingFullScreen = .value
   #endif
+
+  #if VISOR_PROBE_ROUTER_LEVEL
+  _ = router.level
+  #endif
+
+  #if VISOR_PROBE_ROUTER_ROOT_DESTINATION
+  _ = router.rootDestination
+  #endif
+
+  #if VISOR_PROBE_ROUTER_IS_ACTIVE
+  _ = router.isActive
+  #endif
 }
