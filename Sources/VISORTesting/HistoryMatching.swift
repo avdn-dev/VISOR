@@ -2,35 +2,43 @@ import Testing
 import VISOR
 
 extension ObservationTest {
+
+  // MARK: Public
+
   /// Requires the complete distinct post-baseline trace to equal `expected`.
   public func expect<Value: Equatable>(
     _ selection: KeyPath<
       SUT.State._VISORSelectors,
-      _StateField<SUT.State, Value>
+      _StateField<SUT.State, Value>,
     >,
     hasExactChanges expected: [Value],
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) {
-    guard let journal = journalForExpectation(
-      sourceLocation: sourceLocation
-    ) else { return }
+    guard
+      let journal = journalForExpectation(
+        sourceLocation: sourceLocation
+      )
+    else { return }
 
     let field = SUT.State._visorSelectors[keyPath: selection]
-    guard let history = strictHistory(
-      for: field,
-      in: journal,
-      sourceLocation: sourceLocation
-    ) else { return }
+    guard
+      let history = strictHistory(
+        for: field,
+        in: journal,
+        sourceLocation: sourceLocation,
+      )
+    else { return }
 
     guard !containsAdjacentDuplicate(in: expected) else {
       recordIssue(
         "hasExactChanges cannot contain adjacent duplicate values for '\(field.name)'",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return
     }
 
     var previous = history.baseline
-    var actual: [Value] = []
+    var actual = [Value]()
 
     for value in history.commits {
       if value != previous {
@@ -42,8 +50,10 @@ extension ObservationTest {
     guard actual == expected else {
       recordIssue(
         journal.addingOutsideWindowDiagnosticContext(
-          to: "Expected exact changes \(String(describing: expected)) for '\(field.name)', got \(String(describing: actual))"),
-        sourceLocation: sourceLocation)
+          to: "Expected exact changes \(String(describing: expected)) for '\(field.name)', got \(String(describing: actual))"
+        ),
+        sourceLocation: sourceLocation,
+      )
       return
     }
   }
@@ -52,27 +62,33 @@ extension ObservationTest {
   public func expect<Value>(
     _ selection: KeyPath<
       SUT.State._VISORSelectors,
-      _StateField<SUT.State, Value>
+      _StateField<SUT.State, Value>,
     >,
     alwaysSatisfies predicate: @MainActor (Value) -> Bool,
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) {
-    guard let journal = journalForExpectation(
-      sourceLocation: sourceLocation
-    ) else { return }
+    guard
+      let journal = journalForExpectation(
+        sourceLocation: sourceLocation
+      )
+    else { return }
 
     let field = SUT.State._visorSelectors[keyPath: selection]
-    guard let history = strictHistory(
-      for: field,
-      in: journal,
-      sourceLocation: sourceLocation
-    ) else { return }
+    guard
+      let history = strictHistory(
+        for: field,
+        in: journal,
+        sourceLocation: sourceLocation,
+      )
+    else { return }
 
     guard predicate(history.baseline) else {
       recordIssue(
         journal.addingOutsideWindowDiagnosticContext(
-          to: "The baseline for '\(field.name)' did not always satisfy the predicate"),
-        sourceLocation: sourceLocation)
+          to: "The baseline for '\(field.name)' did not always satisfy the predicate"
+        ),
+        sourceLocation: sourceLocation,
+      )
       return
     }
 
@@ -80,22 +96,27 @@ extension ObservationTest {
       guard predicate(value) else {
         recordIssue(
           journal.addingOutsideWindowDiagnosticContext(
-            to: "A committed value for '\(field.name)' did not always satisfy the predicate"),
-          sourceLocation: sourceLocation)
+            to: "A committed value for '\(field.name)' did not always satisfy the predicate"
+          ),
+          sourceLocation: sourceLocation,
+        )
         return
       }
     }
   }
 
+  // MARK: Private
+
   private func strictHistory<Value>(
     for field: _StateField<SUT.State, Value>,
     in journal: StateJournal,
-    sourceLocation: SourceLocation
+    sourceLocation: SourceLocation,
   ) -> (baseline: Value, commits: [Value])? {
     guard let erasedBaseline = journal.baseline(for: field.identity) else {
       recordIssue(
         "VISOR could not recover the typed baseline for '\(field.name)'",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return nil
     }
 
@@ -107,25 +128,28 @@ extension ObservationTest {
     else {
       recordIssue(
         "Strict State history does not support an outer reference value for field '\(field.name)'",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return nil
     }
 
     guard let baseline = erasedBaseline as? Value else {
       recordIssue(
         "VISOR could not recover the typed baseline for '\(field.name)'",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return nil
     }
 
-    var commits: [Value] = []
+    var commits = [Value]()
     commits.reserveCapacity(fieldEntries.count)
 
     for entry in fieldEntries {
       guard let value = entry.newValue as? Value else {
         recordIssue(
           "VISOR could not recover a typed commit for '\(field.name)'",
-          sourceLocation: sourceLocation)
+          sourceLocation: sourceLocation,
+        )
         return nil
       }
       commits.append(value)
@@ -138,8 +162,8 @@ extension ObservationTest {
     type(of: value) is AnyObject.Type
   }
 
-  private func containsAdjacentDuplicate<Value: Equatable>(
-    in values: [Value]
+  private func containsAdjacentDuplicate(
+    in values: [some Equatable]
   ) -> Bool {
     zip(values, values.dropFirst()).contains { $0 == $1 }
   }

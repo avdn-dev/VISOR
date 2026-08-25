@@ -3,15 +3,25 @@ import VISOR
 import VISORObservation
 import VISORTesting
 
+// MARK: - StartupHandoffFailureLog
+
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
 
 @MainActor
 private final class StartupHandoffFailureLog {
-  var failures: [_ObservationSourceFailure] = []
 
-  deinit {}
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
+  var failures = [_ObservationSourceFailure]()
+
 }
+
+// MARK: - ObservationSessionStartupHandoffTests
 
 @Suite("Observation session startup hand-off")
 struct ObservationSessionStartupHandoffTests {
@@ -25,12 +35,14 @@ struct ObservationSessionStartupHandoffTests {
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [])._visorErase(),
+          handlers: [],
+        )._visorErase()
       ],
       _visorAfterStartupHandoff: {
         handoffStarted.record()
         await handoffGate.wait()
-      })
+      },
+    )
 
     let startup = Task { @MainActor in
       try await session._visorStart()
@@ -71,8 +83,8 @@ struct ObservationSessionStartupHandoffTests {
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: []
-        )._visorErase(),
+          handlers: [],
+        )._visorErase()
       ],
       _visorAfterStartupHandoff: {
         channel._visorTerminate()
@@ -81,7 +93,8 @@ struct ObservationSessionStartupHandoffTests {
       _visorOnFailure: { failure in
         log.failures.append(failure)
         failureObserved.record()
-      })
+      },
+    )
 
     await #expect(throws: _ObservationSourceFailure.unexpectedTermination) {
       try await session._visorStart()

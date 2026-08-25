@@ -33,7 +33,7 @@ import VISORObservation
 @attached(peer)
 public macro Bound<Root, Snapshot: Sendable, Value>(
   source: KeyPath<Root, ObservationSource<Snapshot>>,
-  selecting selection: KeyPath<Snapshot, Value>
+  selecting selection: KeyPath<Snapshot, Value>,
 ) = #externalMacro(module: "VISORMacros", type: "BoundMacro")
 
 /// Projects every complete source value into the annotated State field.

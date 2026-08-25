@@ -3,13 +3,24 @@ import Testing
 import VISOR
 import VISORObservation
 
+// MARK: - LeakSnapshot
+
 private struct LeakSnapshot: Sendable {
   let count: Int
 }
 
+// MARK: - LeakService
+
 @MainActor
 private final class LeakService {
-  private let channel: ObservationChannel<LeakSnapshot>
+
+  // MARK: Lifecycle
+
+  init(count: Int = 0) {
+    channel = ObservationChannel(LeakSnapshot(count: count))
+  }
+
+  // MARK: Internal
 
   var source: ObservationSource<LeakSnapshot> {
     channel.source
@@ -19,42 +30,54 @@ private final class LeakService {
     source._visorActiveSubscriptionCount
   }
 
-  init(count: Int = 0) {
-    channel = ObservationChannel(LeakSnapshot(count: count))
-  }
-
   func publish(count: Int) {
     channel.publish(LeakSnapshot(count: count))
   }
+
+  // MARK: Private
+
+  private let channel: ObservationChannel<LeakSnapshot>
+
 }
+
+// MARK: - LeakSourceViewModel
 
 @MainActor
 @Observable
 @ViewModel
 private final class LeakSourceViewModel {
+
+  // MARK: Lifecycle
+
+  init(service: LeakService) {
+    self.service = service
+  }
+
+  // MARK: Internal
+
   final class State {
     @Bound(
       source: \LeakSourceViewModel.service.source,
-      selecting: \LeakSnapshot.count)
+      selecting: \LeakSnapshot.count,
+    )
     private(set) var count = -1
   }
 
   let state = State()
   let service: LeakService
 
-  init(service: LeakService) {
-    self.service = service
-  }
 }
+
+// MARK: - LeakAsyncActionViewModel
 
 @MainActor
 @Observable
 @ViewModel
 private final class LeakAsyncActionViewModel {
-  enum LoadFailure: Error, Equatable {}
+  enum LoadFailure: Error, Equatable { }
 
   final class State {
-    private(set) var items: Loadable<[String], LoadFailure> = .loading
+    private(set) var items = Loadable<[String], LoadFailure>.loading
   }
 
   enum Action {
@@ -72,6 +95,8 @@ private final class LeakAsyncActionViewModel {
   }
 }
 
+// MARK: - MemoryLeakTests
+
 @Suite("V11 memory ownership")
 @MainActor
 struct MemoryLeakTests {
@@ -81,7 +106,8 @@ struct MemoryLeakTests {
     var viewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
     weak let weakViewModel = viewModel
     let session = _ObservationSession(
-      recipes: viewModel!._visorMakeObservationRecipes())
+      recipes: try #require(viewModel?._visorMakeObservationRecipes())
+    )
 
     try await session._visorStart()
     #expect(service.activeObservationCount == 1)
@@ -99,7 +125,8 @@ struct MemoryLeakTests {
     var viewModel: LeakSourceViewModel? = LeakSourceViewModel(service: service)
     weak let weakViewModel = viewModel
     let session = _ObservationSession(
-      recipes: viewModel!._visorMakeObservationRecipes())
+      recipes: try #require(viewModel?._visorMakeObservationRecipes())
+    )
 
     try await session._visorStart()
     viewModel = nil
@@ -117,9 +144,11 @@ struct MemoryLeakTests {
     weak let weakFirst = firstViewModel
     weak let weakSecond = secondViewModel
     let firstSession = _ObservationSession(
-      recipes: firstViewModel!._visorMakeObservationRecipes())
+      recipes: try #require(firstViewModel?._visorMakeObservationRecipes())
+    )
     let secondSession = _ObservationSession(
-      recipes: secondViewModel!._visorMakeObservationRecipes())
+      recipes: try #require(secondViewModel?._visorMakeObservationRecipes())
+    )
 
     try await firstSession._visorStart()
     try await secondSession._visorStart()
@@ -142,18 +171,18 @@ struct MemoryLeakTests {
     var viewModel: LeakAsyncActionViewModel? = LeakAsyncActionViewModel()
     weak let weakViewModel = viewModel
 
-    await viewModel!.handle(.load)
-    #expect(viewModel!.state.items == .loaded(["done"]))
+    await viewModel?.handle(.load)
+    #expect(viewModel?.state.items == .loaded(["done"]))
 
     viewModel = nil
     #expect(weakViewModel == nil)
   }
 
   @Test
-  func `A child Router does not retain its parent`() {
+  func `A child Router does not retain its parent`() throws {
     var root: Router<TestScene>? = Router<TestScene>()
     weak let weakRoot = root
-    let child = root!.childRouter(for: .home)
+    let child = try #require(root?.childRouter(for: .home))
 
     child.push(.detail(id: "1"))
     root = nil

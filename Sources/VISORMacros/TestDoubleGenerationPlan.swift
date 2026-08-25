@@ -6,6 +6,31 @@
 // MARK: - TestDoubleStoredPropertyPlan
 
 struct TestDoubleStoredPropertyPlan {
+
+  // MARK: Lifecycle
+
+  init(
+    name: String,
+    exposedType: String,
+    storageType: String,
+    storageDefaultExpression: String,
+    ordinaryInitialiser: String?,
+    isObservationIgnored: Bool,
+    observationState: ProtocolObservationStateInfo? = nil,
+    observationChannelName: String? = nil,
+  ) {
+    self.name = name
+    self.exposedType = exposedType
+    self.storageType = storageType
+    self.storageDefaultExpression = storageDefaultExpression
+    self.ordinaryInitialiser = ordinaryInitialiser
+    self.isObservationIgnored = isObservationIgnored
+    self.observationState = observationState
+    self.observationChannelName = observationChannelName
+  }
+
+  // MARK: Internal
+
   let name: String
   let exposedType: String
   let storageType: String
@@ -19,25 +44,6 @@ struct TestDoubleStoredPropertyPlan {
     observationState != nil
   }
 
-  init(
-    name: String,
-    exposedType: String,
-    storageType: String,
-    storageDefaultExpression: String,
-    ordinaryInitialiser: String?,
-    isObservationIgnored: Bool,
-    observationState: ProtocolObservationStateInfo? = nil,
-    observationChannelName: String? = nil)
-  {
-    self.name = name
-    self.exposedType = exposedType
-    self.storageType = storageType
-    self.storageDefaultExpression = storageDefaultExpression
-    self.ordinaryInitialiser = ordinaryInitialiser
-    self.isObservationIgnored = isObservationIgnored
-    self.observationState = observationState
-    self.observationChannelName = observationChannelName
-  }
 }
 
 // MARK: - TestDoubleRecordedParameterPlan
@@ -75,6 +81,9 @@ struct TestDoubleCallCasePlan {
 // MARK: - TestDoubleMethodGenerationPlan
 
 struct TestDoubleMethodGenerationPlan {
+
+  // MARK: Internal
+
   let method: ProtocolMethodInfo
   let names: TestDoubleMethodNamePlan
   let storedProperties: [TestDoubleStoredPropertyPlan]
@@ -104,6 +113,8 @@ struct TestDoubleMethodGenerationPlan {
     }?.name
   }
 
+  // MARK: Private
+
   private var receivedProperties: [TestDoubleStoredPropertyPlan] {
     storedProperties.filter { property in
       property.name == names.receivedArgument
@@ -116,15 +127,8 @@ struct TestDoubleMethodGenerationPlan {
 // MARK: - TestDoubleGenerationPlan
 
 struct TestDoubleGenerationPlan {
-  let kind: TestDoubleKind
-  let protocolName: String
-  let typeName: String
-  let access: String
-  let isSendable: Bool
-  let names: TestDoubleNamePlan
-  let protocolProperties: [TestDoubleStoredPropertyPlan]
-  let methods: [TestDoubleMethodGenerationPlan]
-  let callLogProperty: TestDoubleStoredPropertyPlan?
+
+  // MARK: Lifecycle
 
   init(
     kind: TestDoubleKind,
@@ -132,8 +136,8 @@ struct TestDoubleGenerationPlan {
     access: String,
     analysis: ProtocolAnalysis,
     names: TestDoubleNamePlan,
-    isSendable: Bool)
-  {
+    isSendable: Bool,
+  ) {
     self.kind = kind
     self.protocolName = protocolName
     typeName = "\(kind.generatedTypePrefix)\(protocolName)"
@@ -144,19 +148,22 @@ struct TestDoubleGenerationPlan {
       Self.protocolProperty(
         property,
         observationChannelName: names.observationStateChannels[property.name],
-        isSendable: isSendable)
+        isSendable: isSendable,
+      )
     }
     methods = zip(analysis.methods, names.methods).map { method, methodNames in
       Self.methodPlan(
         method,
         names: methodNames,
         kind: kind,
-        isSendable: isSendable)
+        isSendable: isSendable,
+      )
     }
 
-    if kind == .spy, !analysis.methods.isEmpty,
-       let callLogName = names.callLog,
-       let callTypeName = names.callType
+    if
+      kind == .spy, !analysis.methods.isEmpty,
+      let callLogName = names.callLog,
+      let callTypeName = names.callType
     {
       callLogProperty = TestDoubleStoredPropertyPlan(
         name: callLogName,
@@ -164,11 +171,24 @@ struct TestDoubleGenerationPlan {
         storageType: "[\(callTypeName)]",
         storageDefaultExpression: "[]",
         ordinaryInitialiser: "[]",
-        isObservationIgnored: false)
+        isObservationIgnored: false,
+      )
     } else {
       callLogProperty = nil
     }
   }
+
+  // MARK: Internal
+
+  let kind: TestDoubleKind
+  let protocolName: String
+  let typeName: String
+  let access: String
+  let isSendable: Bool
+  let names: TestDoubleNamePlan
+  let protocolProperties: [TestDoubleStoredPropertyPlan]
+  let methods: [TestDoubleMethodGenerationPlan]
+  let callLogProperty: TestDoubleStoredPropertyPlan?
 
   var allStoredProperties: [TestDoubleStoredPropertyPlan] {
     protocolProperties
@@ -184,17 +204,19 @@ struct TestDoubleGenerationPlan {
     names.storage ?? "_testDoubleStorage"
   }
 
+  // MARK: Private
+
   private static func methodPlan(
     _ method: ProtocolMethodInfo,
     names: TestDoubleMethodNamePlan,
     kind: TestDoubleKind,
-    isSendable: Bool)
-    -> TestDoubleMethodGenerationPlan
-  {
+    isSendable: Bool,
+  ) -> TestDoubleMethodGenerationPlan {
     let returnProperty = returnProperty(
       method,
       name: names.returnStorage,
-      isSendable: isSendable)
+      isSendable: isSendable,
+    )
 
     guard kind == .spy else {
       return TestDoubleMethodGenerationPlan(
@@ -205,7 +227,8 @@ struct TestDoubleGenerationPlan {
         returnProperty: returnProperty,
         implementationProperty: nil,
         callCase: nil,
-        implementationInvocationArguments: "")
+        implementationInvocationArguments: "",
+      )
     }
 
     let receivedParameters = method.parameters
@@ -217,14 +240,17 @@ struct TestDoubleGenerationPlan {
     let receivedProperties = receivedProperties(
       for: receivedParameters,
       names: names,
-      isSendable: isSendable)
+      isSendable: isSendable,
+    )
     let implementationProperty = implementationProperty(
       method,
       name: names.implementation,
-      isSendable: isSendable)
+      isSendable: isSendable,
+    )
     let callCase = TestDoubleCallCasePlan(
       name: names.callCase ?? method.name,
-      parameters: callParameters)
+      parameters: callParameters,
+    )
 
     let callCountProperty = TestDoubleStoredPropertyPlan(
       name: names.callCount ?? "\(names.prefix)CallCount",
@@ -232,7 +258,8 @@ struct TestDoubleGenerationPlan {
       storageType: "Int",
       storageDefaultExpression: "0",
       ordinaryInitialiser: "0",
-      isObservationIgnored: false)
+      isObservationIgnored: false,
+    )
     let storedProperties = [callCountProperty]
       + receivedProperties
       + [returnProperty, implementationProperty].compactMap { $0 }
@@ -247,15 +274,16 @@ struct TestDoubleGenerationPlan {
       callCase: callCase,
       implementationInvocationArguments: implementationInvocationArguments(
         for: method,
-        isSendable: isSendable))
+        isSendable: isSendable,
+      ),
+    )
   }
 
   private static func protocolProperty(
     _ property: ProtocolPropertyInfo,
     observationChannelName: String?,
-    isSendable: Bool)
-    -> TestDoubleStoredPropertyPlan
-  {
+    isSendable: Bool,
+  ) -> TestDoubleStoredPropertyPlan {
     if let customDefault = property.defaultValueExpression {
       return TestDoubleStoredPropertyPlan(
         name: property.name,
@@ -265,7 +293,8 @@ struct TestDoubleGenerationPlan {
         ordinaryInitialiser: customDefault,
         isObservationIgnored: isSendable && isFunctionType(property.type),
         observationState: property.observationState,
-        observationChannelName: observationChannelName)
+        observationChannelName: observationChannelName,
+      )
     }
 
     if let knownDefault = defaultValue(for: property.type) {
@@ -277,7 +306,8 @@ struct TestDoubleGenerationPlan {
         ordinaryInitialiser: knownDefault,
         isObservationIgnored: isSendable && isFunctionType(property.type),
         observationState: property.observationState,
-        observationChannelName: observationChannelName)
+        observationChannelName: observationChannelName,
+      )
     }
 
     return TestDoubleStoredPropertyPlan(
@@ -288,15 +318,15 @@ struct TestDoubleGenerationPlan {
       ordinaryInitialiser: "nil",
       isObservationIgnored: isSendable && isFunctionType(property.type),
       observationState: property.observationState,
-      observationChannelName: observationChannelName)
+      observationChannelName: observationChannelName,
+    )
   }
 
   private static func returnProperty(
     _ method: ProtocolMethodInfo,
     name: String?,
-    isSendable: Bool)
-    -> TestDoubleStoredPropertyPlan?
-  {
+    isSendable: Bool,
+  ) -> TestDoubleStoredPropertyPlan? {
     guard let name else { return nil }
     guard !method.isRethrowing else { return nil }
     guard !methodReferencesGenericParameters(method, in: method.returnType) else { return nil }
@@ -313,7 +343,8 @@ struct TestDoubleGenerationPlan {
           storageType: "Result<Void, \(failureType)>",
           storageDefaultExpression: ".success(())",
           ordinaryInitialiser: ".success(())",
-          isObservationIgnored: false)
+          isObservationIgnored: false,
+        )
       }
 
       let returnType = isSendable ? storageValueType(from: rawReturnType) : rawReturnType
@@ -325,7 +356,8 @@ struct TestDoubleGenerationPlan {
           storageType: resultType,
           storageDefaultExpression: ".success(\(initialValue))",
           ordinaryInitialiser: ".success(\(initialValue))",
-          isObservationIgnored: false)
+          isObservationIgnored: false,
+        )
       }
       return TestDoubleStoredPropertyPlan(
         name: name,
@@ -333,7 +365,8 @@ struct TestDoubleGenerationPlan {
         storageType: "\(resultType)?",
         storageDefaultExpression: "nil",
         ordinaryInitialiser: nil,
-        isObservationIgnored: false)
+        isObservationIgnored: false,
+      )
     }
 
     guard let rawReturnType = method.returnType else { return nil }
@@ -345,7 +378,8 @@ struct TestDoubleGenerationPlan {
         storageType: returnType,
         storageDefaultExpression: initialValue,
         ordinaryInitialiser: initialValue,
-        isObservationIgnored: isSendable && isFunctionType(returnType))
+        isObservationIgnored: isSendable && isFunctionType(returnType),
+      )
     }
     return TestDoubleStoredPropertyPlan(
       name: name,
@@ -353,15 +387,15 @@ struct TestDoubleGenerationPlan {
       storageType: "\(returnType)?",
       storageDefaultExpression: "nil",
       ordinaryInitialiser: nil,
-      isObservationIgnored: isSendable && isFunctionType(returnType))
+      isObservationIgnored: isSendable && isFunctionType(returnType),
+    )
   }
 
   private static func receivedProperties(
     for parameters: [TestDoubleRecordedParameterPlan],
     names: TestDoubleMethodNamePlan,
-    isSendable: Bool)
-    -> [TestDoubleStoredPropertyPlan]
-  {
+    isSendable: Bool,
+  ) -> [TestDoubleStoredPropertyPlan] {
     guard !parameters.isEmpty else { return [] }
     let containsFunction = parameters.contains { isFunctionType($0.storageType) }
     let ignored = containsFunction
@@ -371,8 +405,9 @@ struct TestDoubleGenerationPlan {
       let wrappedType = isFunctionType(type) || (isSendable && type.hasPrefix("any "))
         ? "(\(type))"
         : type
-      guard let receivedArgument = names.receivedArgument,
-            let receivedInvocations = names.receivedInvocations
+      guard
+        let receivedArgument = names.receivedArgument,
+        let receivedInvocations = names.receivedInvocations
       else {
         return []
       }
@@ -383,14 +418,16 @@ struct TestDoubleGenerationPlan {
           storageType: "\(wrappedType)?",
           storageDefaultExpression: "nil",
           ordinaryInitialiser: nil,
-          isObservationIgnored: ignored),
+          isObservationIgnored: ignored,
+        ),
         TestDoubleStoredPropertyPlan(
           name: receivedInvocations,
           exposedType: "[\(wrappedType)]",
           storageType: "[\(wrappedType)]",
           storageDefaultExpression: "[]",
           ordinaryInitialiser: "[]",
-          isObservationIgnored: ignored),
+          isObservationIgnored: ignored,
+        ),
       ]
     }
 
@@ -398,8 +435,9 @@ struct TestDoubleGenerationPlan {
       "\($0.parameter.internalName): \($0.storageType)"
     }.joined(separator: ", ") + ")"
     let wrappedType = containsFunction ? "(\(tupleType))" : tupleType
-    guard let receivedArguments = names.receivedArguments,
-          let receivedInvocations = names.receivedInvocations
+    guard
+      let receivedArguments = names.receivedArguments,
+      let receivedInvocations = names.receivedInvocations
     else {
       return []
     }
@@ -410,23 +448,24 @@ struct TestDoubleGenerationPlan {
         storageType: "\(wrappedType)?",
         storageDefaultExpression: "nil",
         ordinaryInitialiser: nil,
-        isObservationIgnored: ignored),
+        isObservationIgnored: ignored,
+      ),
       TestDoubleStoredPropertyPlan(
         name: receivedInvocations,
         exposedType: "[\(wrappedType)]",
         storageType: "[\(wrappedType)]",
         storageDefaultExpression: "[]",
         ordinaryInitialiser: "[]",
-        isObservationIgnored: ignored),
+        isObservationIgnored: ignored,
+      ),
     ]
   }
 
   private static func implementationProperty(
     _ method: ProtocolMethodInfo,
     name: String?,
-    isSendable: Bool)
-    -> TestDoubleStoredPropertyPlan?
-  {
+    isSendable: Bool,
+  ) -> TestDoubleStoredPropertyPlan? {
     guard let name else { return nil }
     let closureType = implementationClosureType(for: method, isSendable: isSendable)
     return TestDoubleStoredPropertyPlan(
@@ -435,19 +474,21 @@ struct TestDoubleGenerationPlan {
       storageType: closureType,
       storageDefaultExpression: "nil",
       ordinaryInitialiser: nil,
-      isObservationIgnored: true)
+      isObservationIgnored: true,
+    )
   }
 
   private static func recordedParameter(
     _ parameter: ParameterInfo,
     method: ProtocolMethodInfo,
-    isSendable: Bool)
-    -> TestDoubleRecordedParameterPlan?
-  {
-    guard let storageType = testDoubleStorageType(
-      for: parameter,
-      method: method,
-      isSendable: isSendable)
+    isSendable: Bool,
+  ) -> TestDoubleRecordedParameterPlan? {
+    guard
+      let storageType = testDoubleStorageType(
+        for: parameter,
+        method: method,
+        isSendable: isSendable,
+      )
     else {
       return nil
     }
@@ -457,36 +498,37 @@ struct TestDoubleGenerationPlan {
         parameter: parameter,
         storageType: storageType,
         valueExpression: parameter.internalName,
-        snapshotDeclaration: nil)
+        snapshotDeclaration: nil,
+      )
     }
 
     let snapshotName = "_visor\(parameter.internalName.capitalisedFirst)Snapshot"
-    let snapshotDeclaration: String?
-    if parameter.isInout {
-      snapshotDeclaration = "let \(snapshotName) = \(parameter.internalName)"
-    } else {
-      snapshotDeclaration = switch storageSnapshotStrategy(for: parameter.type) {
-      case .copy:
-        "let \(snapshotName) = copy \(parameter.internalName)"
-      case .consume:
-        "let \(snapshotName) = consume \(parameter.internalName)"
-      case .none:
-        nil
+    let snapshotDeclaration: String? =
+      if parameter.isInout {
+        "let \(snapshotName) = \(parameter.internalName)"
+      } else {
+        switch storageSnapshotStrategy(for: parameter.type) {
+        case .copy:
+          "let \(snapshotName) = copy \(parameter.internalName)"
+        case .consume:
+          "let \(snapshotName) = consume \(parameter.internalName)"
+        case .none:
+          nil
+        }
       }
-    }
 
     return TestDoubleRecordedParameterPlan(
       parameter: parameter,
       storageType: storageType,
       valueExpression: snapshotDeclaration == nil ? parameter.internalName : snapshotName,
-      snapshotDeclaration: snapshotDeclaration)
+      snapshotDeclaration: snapshotDeclaration,
+    )
   }
 
   private static func implementationInvocationArguments(
     for method: ProtocolMethodInfo,
-    isSendable: Bool)
-    -> String
-  {
+    isSendable: Bool,
+  ) -> String {
     method.parameters.map { parameter in
       if parameter.isInout {
         return "&\(parameter.internalName)"
@@ -502,9 +544,8 @@ struct TestDoubleGenerationPlan {
 // MARK: - Shared Planning Helpers
 
 func unconstrainedGenericParameterNamesRequiringSendableStorage(
-  in method: ProtocolMethodInfo)
-  -> [String]
-{
+  in method: ProtocolMethodInfo
+) -> [String] {
   let referencedNames = method.parameters
     .filter { !isNonEscapingFunctionType($0.type) }
     .flatMap { genericParameterNamesReferenced(by: method, in: $0.type) }
@@ -518,9 +559,8 @@ func unconstrainedGenericParameterNamesRequiringSendableStorage(
 func testDoubleStorageType(
   for parameter: ParameterInfo,
   method: ProtocolMethodInfo,
-  isSendable: Bool)
-  -> String?
-{
+  isSendable: Bool,
+) -> String? {
   guard isSendable else {
     return spyStorageType(for: parameter, method: method)
   }
@@ -538,9 +578,8 @@ func testDoubleStorageType(
 
 func implementationClosureType(
   for method: ProtocolMethodInfo,
-  isSendable: Bool)
-  -> String
-{
+  isSendable: Bool,
+) -> String {
   let parameters = method.parameters.map { stripEscaping(from: $0.type) }.joined(separator: ", ")
   var effects = ""
   if method.isAsync { effects += " async" }
@@ -552,14 +591,14 @@ func implementationClosureType(
 }
 
 func generateImplementationBodyLines(
-  for plan: TestDoubleMethodGenerationPlan)
-  -> [String]
-{
+  for plan: TestDoubleMethodGenerationPlan
+) -> [String] {
   guard let implementationName = plan.implementationProperty?.name else {
     return generateFallbackBodyLines(
       method: plan.method,
       returnStorageName: plan.returnProperty?.name,
-      style: .explicitReturn)
+      style: .explicitReturn,
+    )
   }
 
   let method = plan.method
@@ -584,6 +623,7 @@ func generateImplementationBodyLines(
   lines.append(contentsOf: generateFallbackBodyLines(
     method: method,
     returnStorageName: plan.returnProperty?.name,
-    style: .explicitReturn))
+    style: .explicitReturn,
+  ))
   return lines
 }

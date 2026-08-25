@@ -16,9 +16,8 @@ public struct DefaultValueMacro: PeerMacro {
   public static func expansion(
     of _: AttributeSyntax,
     providingPeersOf _: some DeclSyntaxProtocol,
-    in _: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in _: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     []
   }
 }

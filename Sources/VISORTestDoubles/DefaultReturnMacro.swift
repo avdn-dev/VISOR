@@ -6,4 +6,5 @@
 @attached(peer)
 public macro DefaultReturn<T>(_ defaultReturn: T) = #externalMacro(
   module: "VISORMacros",
-  type: "DefaultValueMacro")
+  type: "DefaultValueMacro",
+)

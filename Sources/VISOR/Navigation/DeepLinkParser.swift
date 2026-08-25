@@ -16,6 +16,9 @@ import Foundation
 /// for validating component counts, decoding values exactly once, and rejecting
 /// malformed identifiers.
 public struct DeepLinkRequest: Hashable, Sendable {
+
+  // MARK: Lifecycle
+
   /// Creates a request from an external URL without decoding its route values.
   public init(url: URL) {
     self.url = url
@@ -31,9 +34,9 @@ public struct DeepLinkRequest: Hashable, Sendable {
       pathSegments.removeLast()
     }
 
-    self.isStructurallyValid = !pathSegments.contains(where: \.isEmpty)
+    isStructurallyValid = !pathSegments.contains(where: \.isEmpty)
 
-    var components: [String] = []
+    var components = [String]()
     components.reserveCapacity(1 + pathSegments.count)
     if let host = url.host() {
       components.append(host)
@@ -41,6 +44,8 @@ public struct DeepLinkRequest: Hashable, Sendable {
     components.append(contentsOf: pathSegments)
     self.components = components
   }
+
+  // MARK: Public
 
   /// The original URL. Validate expected hosts and query items before using them.
   public let url: URL
@@ -69,9 +74,17 @@ public enum DeepLinkParseResult<Scene: NavigationScene> {
   case destination(Destination<Scene>)
 }
 
-nonisolated extension DeepLinkParseResult: Equatable {}
-nonisolated extension DeepLinkParseResult: Hashable {}
-nonisolated extension DeepLinkParseResult: Sendable {}
+// MARK: Equatable
+
+nonisolated extension DeepLinkParseResult: Equatable { }
+
+// MARK: Hashable
+
+nonisolated extension DeepLinkParseResult: Hashable { }
+
+// MARK: Sendable
+
+nonisolated extension DeepLinkParseResult: Sendable { }
 
 // MARK: - DeepLinkParser
 
@@ -100,7 +113,7 @@ public struct DeepLinkParser<Scene: NavigationScene>: Sendable {
   public init(
     _ parse: @escaping @Sendable (DeepLinkRequest) -> DeepLinkParseResult<Scene>
   ) {
-    self.parseRequest = parse
+    parseRequest = parse
   }
 
   // MARK: Public
@@ -128,9 +141,8 @@ extension DeepLinkParser {
   /// ```
   public static func equal(
     to components: [String],
-    destination: Destination<Scene>)
-    -> DeepLinkParser
-  {
+    destination: Destination<Scene>,
+  ) -> DeepLinkParser {
     DeepLinkParser { request in
       request.components == components ? .destination(destination) : .noMatch
     }

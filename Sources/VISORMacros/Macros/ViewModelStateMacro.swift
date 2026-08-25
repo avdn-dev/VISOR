@@ -2,6 +2,8 @@ import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 
+// MARK: - ViewModelStateMacro
+
 public struct ViewModelStateMacro:
   MemberMacro,
   MemberAttributeMacro,
@@ -11,14 +13,15 @@ public struct ViewModelStateMacro:
     of _: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     conformingTo _: [TypeSyntax],
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
     guard let state = declaration.as(ClassDeclSyntax.self) else { return [] }
     if !state.conditionalDeinitialisers.isEmpty {
       for deinitialiser in state.conditionalDeinitialisers {
         context.diagnose(Diagnostic(
           node: Syntax(deinitialiser),
-          message: VISORDiagnostic.conditionalDeinitialiserUnsupported))
+          message: VISORDiagnostic.conditionalDeinitialiserUnsupported,
+        ))
       }
       return []
     }
@@ -33,10 +36,10 @@ public struct ViewModelStateMacro:
     let fieldDescriptors: [DeclSyntax] = fields.map { field in
       let keyPath = "\\\(stateName).\(field.name)"
       return """
-      private static let _visorField_\(raw: field.name) = VISOR._StateField(
-        "\(raw: field.name)",
-        keyPath: \(raw: keyPath))
-      """
+        private static let _visorField_\(raw: field.name) = VISOR._StateField(
+          "\(raw: field.name)",
+          keyPath: \(raw: keyPath))
+        """
     }
 
     let selectorMembers = fields.compactMap { field -> String? in
@@ -133,13 +136,14 @@ public struct ViewModelStateMacro:
     of _: AttributeSyntax,
     attachedTo declaration: some DeclGroupSyntax,
     providingAttributesFor member: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [AttributeSyntax] {
     guard let state = declaration.as(ClassDeclSyntax.self) else { return [] }
     if !state.conditionalDeinitialisers.isEmpty {
       return []
     }
-    if let variable = member.as(VariableDeclSyntax.self),
+    if
+      let variable = member.as(VariableDeclSyntax.self),
       let diagnostic = variable.unsupportedStateFieldDiagnostic()
     {
       context.diagnose(Diagnostic(node: Syntax(variable), message: diagnostic))
@@ -159,7 +163,8 @@ public struct ViewModelStateMacro:
         changes = [
           .replace(
             oldNode: Syntax(setterModifier),
-            newNode: Syntax(setterModifier.with(\.name, .keyword(.private)))),
+            newNode: Syntax(setterModifier.with(\.name, .keyword(.private))),
+          )
         ]
       } else {
         let position = field.declaration.bindingSpecifier.position
@@ -167,7 +172,8 @@ public struct ViewModelStateMacro:
           .replaceText(
             range: position..<position,
             with: "private(set) ",
-            in: Syntax(field.declaration)),
+            in: Syntax(field.declaration),
+          )
         ]
       }
       context.diagnose(Diagnostic(
@@ -176,8 +182,10 @@ public struct ViewModelStateMacro:
         fixIts: [
           FixIt(
             message: StateFieldFixIt.restrictStateSetter,
-            changes: changes),
-        ]))
+            changes: changes,
+          )
+        ],
+      ))
       return []
     }
 
@@ -191,7 +199,7 @@ public struct ViewModelStateMacro:
     attachedTo declaration: some DeclGroupSyntax,
     providingExtensionsOf type: some TypeSyntaxProtocol,
     conformingTo _: [TypeSyntax],
-    in _: some MacroExpansionContext
+    in _: some MacroExpansionContext,
   ) throws -> [ExtensionDeclSyntax] {
     guard
       let state = declaration.as(ClassDeclSyntax.self),
@@ -202,12 +210,16 @@ public struct ViewModelStateMacro:
     }
     return [
       try ExtensionDeclSyntax(
-        "extension \(type): nonisolated Observation.Observable {}"),
+        "extension \(type): nonisolated Observation.Observable {}"
+      ),
       try ExtensionDeclSyntax(
-        "extension \(type): VISOR._ViewModelState {}"),
+        "extension \(type): VISOR._ViewModelState {}"
+      ),
     ]
   }
 }
+
+// MARK: - StateFieldPolicyDiagnostic
 
 private enum StateFieldPolicyDiagnostic: String, DiagnosticMessage {
   case unrestrictedPublicSetter
@@ -220,19 +232,25 @@ private enum StateFieldPolicyDiagnostic: String, DiagnosticMessage {
     MessageID(domain: "VISOR", id: rawValue)
   }
 
-  var severity: DiagnosticSeverity { .error }
+  var severity: DiagnosticSeverity {
+    .error
+  }
 }
+
+// MARK: - ViewModelStateFieldMacro
 
 public struct ViewModelStateFieldMacro: AccessorMacro, PeerMacro {
   public static func expansion(
     of _: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in _: some MacroExpansionContext
+    in _: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
-    guard let field = stateFieldSpec(
-      from: declaration,
-      allowingObservationIgnored: true
-    ) else { return [] }
+    guard
+      let field = stateFieldSpec(
+        from: declaration,
+        allowingObservationIgnored: true,
+      )
+    else { return [] }
     return ["""
       private var _\(raw: field.name)\(raw: field.typeText)\(raw: field.initialiserText)
       """]
@@ -241,12 +259,14 @@ public struct ViewModelStateFieldMacro: AccessorMacro, PeerMacro {
   public static func expansion(
     of _: AttributeSyntax,
     providingAccessorsOf declaration: some DeclSyntaxProtocol,
-    in _: some MacroExpansionContext
+    in _: some MacroExpansionContext,
   ) throws -> [AccessorDeclSyntax] {
-    guard let field = stateFieldSpec(
-      from: declaration,
-      allowingObservationIgnored: true
-    ) else { return [] }
+    guard
+      let field = stateFieldSpec(
+        from: declaration,
+        allowingObservationIgnored: true,
+      )
+    else { return [] }
     let name = field.name
 
     let initialiser: AccessorDeclSyntax = """

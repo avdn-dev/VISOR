@@ -31,7 +31,7 @@ import VISORObservation
 @attached(peer)
 public macro Reaction<Root, Snapshot: Sendable, Value>(
   source: KeyPath<Root, ObservationSource<Snapshot>>,
-  selecting selection: KeyPath<Snapshot, Value>
+  selecting selection: KeyPath<Snapshot, Value>,
 ) = #externalMacro(module: "VISORMacros", type: "ReactionMacro")
 
 /// Invokes the annotated method for every complete source value.

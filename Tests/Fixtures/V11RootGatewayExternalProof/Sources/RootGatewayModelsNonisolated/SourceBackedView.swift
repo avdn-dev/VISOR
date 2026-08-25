@@ -9,9 +9,11 @@ import VISOR
   pending: ProgressView("Preparing source-backed screen"),
   failure: ContentUnavailableView(
     "Source-Backed Screen Unavailable",
-    systemImage: "exclamationmark.triangle"))
+    systemImage: "exclamationmark.triangle",
+  ),
+)
 public struct NonisolatedSourceBackedView: View {
-  public init() {}
+  public init() { }
 
   public var content: some View {
     Text("Revision \(state.revision)")

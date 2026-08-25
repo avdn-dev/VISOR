@@ -3,73 +3,107 @@ import Testing
 import VISOR
 import VISORObservation
 
-public struct RecipeSnapshot: Sendable {
-  public let count: Int
-  public let label: String
+// MARK: - RecipeSnapshot
 
+public struct RecipeSnapshot: Sendable {
   public init(count: Int, label: String) {
     self.count = count
     self.label = label
   }
+
+  public let count: Int
+  public let label: String
+
 }
+
+// MARK: - RecipeService
 
 @MainActor
 public final class RecipeService {
-  private let channel: ObservationChannel<RecipeSnapshot>
 
-  public var source: ObservationSource<RecipeSnapshot> {
-    channel.source
-  }
+  // MARK: Lifecycle
 
   public init(_ snapshot: RecipeSnapshot) {
     channel = ObservationChannel(snapshot)
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Public
+
+  public var source: ObservationSource<RecipeSnapshot> {
+    channel.source
+  }
+
+  // MARK: Private
+
+  private let channel: ObservationChannel<RecipeSnapshot>
+
 }
+
+// MARK: - SourceRecipeViewModel
 
 @MainActor
 @Observable
 @ViewModel
 public final class SourceRecipeViewModel {
-  public final class State {
-    @Bound(
-      source: \SourceRecipeViewModel.service.source,
-      selecting: \RecipeSnapshot.count)
-    public private(set) var count = 0
 
-    @Bound(
-      source: \SourceRecipeViewModel.aliasService.source,
-      selecting: \RecipeSnapshot.label)
-    public private(set) var label = "unprojected"
-
-    public private(set) var reactedCount = -1
-    public private(set) var labelSeenByReaction = "unreacted"
-
-    public init() {}
-
-    deinit {}
-  }
-
-  public let state = State()
-  public let service: RecipeService
-  public let aliasService: RecipeService
+  // MARK: Lifecycle
 
   public init(service: RecipeService) {
     self.service = service
     aliasService = service
   }
 
+  deinit { }
+
+  // MARK: Public
+
+  public final class State {
+
+    // MARK: Lifecycle
+
+    public init() { }
+
+    deinit { }
+
+    // MARK: Public
+
+    @Bound(
+      source: \SourceRecipeViewModel.service.source,
+      selecting: \RecipeSnapshot.count,
+    )
+    public private(set) var count = 0
+
+    @Bound(
+      source: \SourceRecipeViewModel.aliasService.source,
+      selecting: \RecipeSnapshot.label,
+    )
+    public private(set) var label = "unprojected"
+
+    public private(set) var reactedCount = -1
+    public private(set) var labelSeenByReaction = "unreacted"
+
+  }
+
+  public let state = State()
+  public let service: RecipeService
+  public let aliasService: RecipeService
+
+  // MARK: Private
+
   @Reaction(
     source: \SourceRecipeViewModel.service.source,
-    selecting: \RecipeSnapshot.count)
+    selecting: \RecipeSnapshot.count,
+  )
   private func countChanged(_ count: Int) {
     updateState(\.reactedCount, to: count)
     updateState(\.labelSeenByReaction, to: state.label)
   }
 
-  deinit {}
 }
+
+// MARK: - ViewModelV11RuntimeTests
 
 @Suite("V11 ViewModel runtime expansion")
 @MainActor

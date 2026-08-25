@@ -1,14 +1,20 @@
 import Observation
+import os
 import SwiftUI
 import Testing
 import VISOR
-import os
 
-struct GatewayNonEquatableValue {}
+// MARK: - GatewayNonEquatableValue
+
+struct GatewayNonEquatableValue { }
+
+// MARK: - GatewayMutationError
 
 enum GatewayMutationError: Error, Equatable {
   case expected
 }
+
+// MARK: - GatewayMutableValue
 
 struct GatewayMutableValue: Equatable {
   var rawValue: Int
@@ -27,26 +33,50 @@ struct GatewayMutableValue: Equatable {
   }
 }
 
-final class GatewayIdentityReference {}
+// MARK: - GatewayIdentityReference
+
+final class GatewayIdentityReference { }
+
+// MARK: - GatewayEquatableReference
 
 final class GatewayEquatableReference: Equatable {
-  var rawValue: Int
+
+  // MARK: Lifecycle
 
   init(rawValue: Int) {
     self.rawValue = rawValue
   }
 
-  static func == (
+  // MARK: Internal
+
+  var rawValue: Int
+
+  static func ==(
     lhs: GatewayEquatableReference,
-    rhs: GatewayEquatableReference
+    rhs: GatewayEquatableReference,
   ) -> Bool {
     lhs.rawValue == rhs.rawValue
   }
 }
 
+// MARK: - GatewayState
+
 @MainActor
 @VISOR._ViewModelState
 final class GatewayState {
+
+  // MARK: Lifecycle
+
+  init(identifier: String = "initial") {
+    self.identifier = identifier
+  }
+
+  // MARK: Internal
+
+  struct Settings: Equatable {
+    var revision = 0
+  }
+
   var count = 0
   var settings = Settings()
   var nonEquatableValue = GatewayNonEquatableValue()
@@ -54,23 +84,22 @@ final class GatewayState {
   var identityReference = GatewayIdentityReference()
   var equatableReference = GatewayEquatableReference(rawValue: 0)
   var identifier: String
-  private var hiddenRevision = 0
-
-  struct Settings: Equatable {
-    var revision = 0
-  }
-
-  init(identifier: String = "initial") {
-    self.identifier = identifier
-  }
 
   func incrementHiddenRevision() {
     hiddenRevision += 1
   }
+
+  // MARK: Private
+
+  private var hiddenRevision = 0
+
 }
 
+// MARK: - GatewayNotificationProbe
+
 nonisolated private final class GatewayNotificationProbe: Sendable {
-  private let storage = OSAllocatedUnfairLock(initialState: 0)
+
+  // MARK: Internal
 
   var count: Int {
     storage.withLock { $0 }
@@ -79,6 +108,11 @@ nonisolated private final class GatewayNotificationProbe: Sendable {
   func record() {
     storage.withLock { $0 += 1 }
   }
+
+  // MARK: Private
+
+  private let storage = OSAllocatedUnfairLock(initialState: 0)
+
 }
 
 @MainActor
@@ -94,19 +128,23 @@ private func installGatewayNotificationProbe<Value>(
   return probe
 }
 
+// MARK: - GatewayRecorder
+
 @MainActor
 private final class GatewayRecorder: _StateMutationRecorder {
-  private(set) var fields: [String] = []
+  private(set) var fields = [String]()
 
   func record(
     fieldID _: ObjectIdentifier,
     fieldName: String,
     oldValue _: Any,
-    newValue _: Any
+    newValue _: Any,
   ) {
     fields.append(fieldName)
   }
 }
+
+// MARK: - StateGatewayTests
 
 @Suite("V11 State gateway foundation")
 @MainActor
@@ -142,7 +180,8 @@ struct StateGatewayTests {
         "count",
         "count",
         "hiddenRevision",
-      ])
+      ]
+    )
   }
 
   @Test

@@ -26,7 +26,7 @@ public struct RouterHost<
   Content: View,
   PushView: View,
   SheetView: View,
-  FullScreenView: View
+  FullScreenView: View,
 >: View {
 
   // MARK: Lifecycle
@@ -38,7 +38,7 @@ public struct RouterHost<
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.router = router
     self.content = content()
@@ -56,7 +56,7 @@ public struct RouterHost<
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.init(
       router: parentRouter.childRouter(for: root),
@@ -64,7 +64,8 @@ public struct RouterHost<
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
-      content: content)
+      content: content,
+    )
   }
 
   // MARK: Public
@@ -76,15 +77,16 @@ public struct RouterHost<
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
-      onDeepLinkOutcome: onDeepLinkOutcome)
-      .environment(router)
-      .environment(\._visorRouter, router)
-      .onAppear(perform: router.activate)
-      .onDisappear(perform: router.deactivate)
-      .onOpenURL { url in
-        router.receiveDeepLink(url, onOutcome: onDeepLinkOutcome)
-      }
-      .id(ObjectIdentifier(router))
+      onDeepLinkOutcome: onDeepLinkOutcome,
+    )
+    .environment(router)
+    .environment(\._visorRouter, router)
+    .onAppear(perform: router.activate)
+    .onDisappear(perform: router.deactivate)
+    .onOpenURL { url in
+      router.receiveDeepLink(url, onOutcome: onDeepLinkOutcome)
+    }
+    .id(ObjectIdentifier(router))
   }
 
   // MARK: Private
@@ -105,10 +107,11 @@ private struct RouterHostContent<
   Content: View,
   PushView: View,
   SheetView: View,
-  FullScreenView: View
+  FullScreenView: View,
 >: View {
 
   @Bindable var router: Router<Scene>
+
   let content: Content
   let pushContent: (Scene.Push) -> PushView
   let sheetContent: (Scene.Sheet) -> SheetView
@@ -123,7 +126,7 @@ private struct RouterHostContent<
           onDeepLinkOutcome: onDeepLinkOutcome,
           pushContent: pushContent,
           sheetContent: sheetContent,
-          fullScreenContent: fullScreenContent
+          fullScreenContent: fullScreenContent,
         ) {
           sheetContent(presentation.destination)
         }
@@ -134,7 +137,7 @@ private struct RouterHostContent<
           onDeepLinkOutcome: onDeepLinkOutcome,
           pushContent: pushContent,
           sheetContent: sheetContent,
-          fullScreenContent: fullScreenContent
+          fullScreenContent: fullScreenContent,
         ) {
           fullScreenContent(presentation.destination)
         }
@@ -144,11 +147,11 @@ private struct RouterHostContent<
 
 // MARK: - Platform-Adaptive Presentation
 
-private extension View {
+extension View {
   @ViewBuilder
-  func adaptiveFullScreenPresentation<Item: Identifiable, PresentedContent: View>(
+  fileprivate func adaptiveFullScreenPresentation<Item: Identifiable>(
     item: Binding<Item?>,
-    @ViewBuilder content: @escaping (Item) -> PresentedContent
+    @ViewBuilder content: @escaping (Item) -> some View,
   ) -> some View {
     #if os(macOS)
     sheet(item: item) { content($0) }

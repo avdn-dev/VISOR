@@ -6,7 +6,7 @@ private func isAllowedSequentialCut(
   first: Int,
   second: Int,
   previous: Int,
-  current: Int
+  current: Int,
 ) -> Bool {
   (first == previous && second == previous)
     || (first == current && second == previous)
@@ -26,8 +26,11 @@ private func snapshots(
   let second = try observations[1]._visorUnwrap(as: Int.self)
   return (
     first: first.baseline.snapshot,
-    second: second.baseline.snapshot)
+    second: second.baseline.snapshot,
+  )
 }
+
+// MARK: - ObservationLockStressTests
 
 @Suite("V11 observation lock contention")
 struct ObservationLockStressTests {
@@ -44,7 +47,8 @@ struct ObservationLockStressTests {
           await barrier.arriveAndWait()
           for publication in 0..<publicationsPerWorker {
             channel.publish(
-              worker * publicationsPerWorker + publication + 1)
+              worker * publicationsPerWorker + publication + 1
+            )
           }
         }
       }
@@ -54,7 +58,8 @@ struct ObservationLockStressTests {
     defer { opened.subscription._visorCancel() }
     #expect(
       opened.baseline.revision
-        == UInt64(workerCount * publicationsPerWorker))
+        == UInt64(workerCount * publicationsPerWorker)
+    )
     #expect(opened.baseline.snapshot != 0)
   }
 
@@ -67,7 +72,8 @@ struct ObservationLockStressTests {
     let workersPerChannel = 4
     let publicationsPerWorker = 250
     let barrier = TestBarrier(
-      participantCount: channels.count * workersPerChannel)
+      participantCount: channels.count * workersPerChannel
+    )
 
     #expect(first.source._visorGroupIdentity == second.source._visorGroupIdentity)
     #expect(second.source._visorGroupIdentity == third.source._visorGroupIdentity)
@@ -82,7 +88,8 @@ struct ObservationLockStressTests {
                 channelIndex * 1_000_000
                   + worker * publicationsPerWorker
                   + publication
-                  + 1)
+                  + 1
+              )
             }
           }
         }
@@ -90,7 +97,8 @@ struct ObservationLockStressTests {
     }
 
     let observations = try _ObservationRuntime._visorPrepareAll(
-      channels.map { $0.source._visorErase() })
+      channels.map { $0.source._visorErase() }
+    )
     defer {
       for observation in observations {
         observation._visorCancel()
@@ -101,7 +109,8 @@ struct ObservationLockStressTests {
       let typed = try observation._visorUnwrap(as: Int.self)
       #expect(
         typed.baseline.revision
-          == UInt64(workersPerChannel * publicationsPerWorker))
+          == UInt64(workersPerChannel * publicationsPerWorker)
+      )
     }
   }
 
@@ -170,7 +179,9 @@ struct ObservationLockStressTests {
           first: captured.first,
           second: captured.second,
           previous: current - 1,
-          current: current))
+          current: current,
+        )
+      )
     }
 
     #expect(first.source._visorActiveSubscriptionCount == 0)
@@ -224,7 +235,9 @@ struct ObservationLockStressTests {
           first: firstCheckpoint.envelope.snapshot,
           second: secondCheckpoint.envelope.snapshot,
           previous: current - 1,
-          current: current))
+          current: current,
+        )
+      )
 
       let firstEnvelope = try firstOpened.subscription
         ._visorClaimForDirectReconciliation(firstCheckpoint)

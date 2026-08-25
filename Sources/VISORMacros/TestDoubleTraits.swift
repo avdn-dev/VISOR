@@ -13,9 +13,8 @@ struct TestDoubleTraits {
   static func parse(
     from node: AttributeSyntax,
     macroName: String,
-    in context: some MacroExpansionContext)
-    -> TestDoubleTraits?
-  {
+    in context: some MacroExpansionContext,
+  ) -> TestDoubleTraits? {
     guard case .argumentList(let arguments) = node.arguments else {
       return TestDoubleTraits()
     }
@@ -27,7 +26,9 @@ struct TestDoubleTraits {
           node: Syntax(argument),
           message: TestDoubleDiagnostic.unsupportedTrait(
             trait: argument.expression.trimmedDescription,
-            macroName: macroName)))
+            macroName: macroName,
+          ),
+        ))
         return nil
       }
 
@@ -36,7 +37,9 @@ struct TestDoubleTraits {
           node: Syntax(argument),
           message: TestDoubleDiagnostic.unsupportedTrait(
             trait: argument.expression.trimmedDescription,
-            macroName: macroName)))
+            macroName: macroName,
+          ),
+        ))
         return nil
       }
 
@@ -44,14 +47,16 @@ struct TestDoubleTraits {
       guard trait == "sendable" else {
         context.diagnose(Diagnostic(
           node: Syntax(argument),
-          message: TestDoubleDiagnostic.unsupportedTrait(trait: trait, macroName: macroName)))
+          message: TestDoubleDiagnostic.unsupportedTrait(trait: trait, macroName: macroName),
+        ))
         return nil
       }
 
       guard !traits.isSendable else {
         context.diagnose(Diagnostic(
           node: Syntax(argument),
-          message: TestDoubleDiagnostic.duplicateTrait(trait: trait, macroName: macroName)))
+          message: TestDoubleDiagnostic.duplicateTrait(trait: trait, macroName: macroName),
+        ))
         return nil
       }
       traits.isSendable = true

@@ -4,6 +4,8 @@ import Testing
 import VISOR
 import VISORTesting
 
+// MARK: - RootSelectorProbeViewModel
+
 @MainActor
 @Observable
 @ViewModel
@@ -13,12 +15,19 @@ final class RootSelectorProbeViewModel {
   }
 
   final class State {
-    private var hidden = 0
+
+    // MARK: Internal
+
     var details = Details()
 
     var doubledCount: Int {
       details.count * 2
     }
+
+    // MARK: Private
+
+    private var hidden = 0
+
   }
 
   let state = State()
@@ -84,6 +93,7 @@ func probeProjectingOverload(
   test.expect(
     \.details,
     projecting: \.count,
-    hasExactChanges: [1])
+    hasExactChanges: [1],
+  )
 }
 #endif

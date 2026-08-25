@@ -1,50 +1,58 @@
 import Observation
+import os
 import Testing
 import VISORTesting
 @testable import VISORObservation
-import os
+
+// MARK: - ObservationStateSnapshot
 
 private struct ObservationStateSnapshot: Equatable, Sendable {
   var count = 0
   var label = "initial"
 }
 
+// MARK: - ObservationStateMutationError
+
 private enum ObservationStateMutationError: Error {
   case expected
 }
+
+// MARK: - InferredObservationFlag
 
 private enum InferredObservationFlag: Equatable, Sendable {
   case disabled
   case enabled
 }
 
+// MARK: - InferredObservationAppearance
+
 private struct InferredObservationAppearance: Equatable, Sendable {
   var allowsCustomAppearance = false
 }
+
+// MARK: - InferredObservationItem
 
 private struct InferredObservationItem: Equatable, Sendable {
   let identifier: Int
 }
 
+// MARK: - InferredObservationStateProducer
+
 private final class InferredObservationStateProducer {
-  @ObservationState
-  private(set) var flag = InferredObservationFlag.disabled
+  @ObservationState private(set) var flag = InferredObservationFlag.disabled
 
-  @ObservationState
-  private(set) var appearance = InferredObservationAppearance(
-    allowsCustomAppearance: false)
+  @ObservationState private(set) var appearance = InferredObservationAppearance(
+    allowsCustomAppearance: false
+  )
 
-  @ObservationState
-  private(set) var items = [InferredObservationItem]()
+  @ObservationState private(set) var items = [InferredObservationItem]()
 
   @ObservationState(observedAs: .values)
   private(set) var enabled = false
 
-  @ObservationState
-  private(set) var retryCount = -1
+  @ObservationState private(set) var retryCount = -1
 
-  @ObservationState
-  private(set) var status = "ready"
+  @ObservationState private(set) var status = "ready"
 
   func update() {
     flag = .enabled
@@ -56,9 +64,10 @@ private final class InferredObservationStateProducer {
   }
 }
 
+// MARK: - ObservationStateProducer
+
 private final class ObservationStateProducer {
-  @ObservationState
-  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
+  @ObservationState private(set) var snapshot = ObservationStateSnapshot()
 
   func update(count: Int, label: String) {
     snapshot = ObservationStateSnapshot(count: count, label: label)
@@ -87,6 +96,8 @@ private final class ObservationStateProducer {
   }
 }
 
+// MARK: - ObservationStateInitialiserProbe
+
 private enum ObservationStateInitialiserProbe {
   static let count = OSAllocatedUnfairLock(initialState: 0)
 
@@ -96,34 +107,48 @@ private enum ObservationStateInitialiserProbe {
   }
 }
 
+// MARK: - ExactlyOnceObservationStateProducer
+
 private final class ExactlyOnceObservationStateProducer {
-  @ObservationState
-  var snapshot: ObservationStateSnapshot = ObservationStateInitialiserProbe.makeSnapshot()
+  @ObservationState var snapshot: ObservationStateSnapshot = ObservationStateInitialiserProbe.makeSnapshot()
 }
 
+// MARK: - ReinitialisedObservationStateProducer
+
 private final class ReinitialisedObservationStateProducer {
-  @ObservationState
-  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
+
+  // MARK: Lifecycle
 
   init(snapshot: ObservationStateSnapshot) {
     self.snapshot = snapshot
   }
+
+  // MARK: Internal
+
+  @ObservationState private(set) var snapshot = ObservationStateSnapshot()
+
 }
+
+// MARK: - AttributeInitialValueProducer
 
 private final class AttributeInitialValueProducer {
   @ObservationState(observedAs: .values)
   private(set) var optional: Int? = nil
 
-  @ObservationState
-  private(set) var items: [Int] = []
+  @ObservationState private(set) var items = [Int]()
 }
+
+// MARK: - SnapshotConsumer
 
 @MainActor
 private final class SnapshotConsumer {
+
+  // MARK: Lifecycle
+
   init(
     source: ObservationSource<Int>,
-    lifecycle: TestEventCounter)
-  {
+    lifecycle: TestEventCounter,
+  ) {
     self.lifecycle = lifecycle
     task = Task { [weak self, source, lifecycle] in
       do {
@@ -143,17 +168,21 @@ private final class SnapshotConsumer {
     task?.cancel()
   }
 
+  // MARK: Private
+
   private let lifecycle: TestEventCounter
   private var task: Task<Void, Never>?
 
   private func receive() { }
 }
 
+// MARK: - ActorObservationStateProducer
+
 private actor ActorObservationStateProducer {
-  @ObservationState
-  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot(
+  @ObservationState private(set) var snapshot = ObservationStateSnapshot(
     count: 1,
-    label: "actor")
+    label: "actor",
+  )
 
   func update(count: Int) {
     withMutableSnapshot { snapshot in
@@ -162,12 +191,13 @@ private actor ActorObservationStateProducer {
   }
 }
 
+// MARK: - ObservableObservationStateProducer
+
 @MainActor
 @Observable
 private final class ObservableObservationStateProducer {
   @ObservationState
-  @ObservationIgnored
-  private(set) var snapshot: ObservationStateSnapshot = ObservationStateSnapshot()
+  @ObservationIgnored private(set) var snapshot = ObservationStateSnapshot()
 
   func update(count: Int, label: String) {
     withMutableSnapshot { snapshot in
@@ -176,6 +206,8 @@ private final class ObservableObservationStateProducer {
     }
   }
 }
+
+// MARK: - ObservationStateTests
 
 @Suite("Producer observation state")
 struct ObservationStateTests {
@@ -211,7 +243,8 @@ struct ObservationStateTests {
 
     #expect(
       try await snapshots.next()
-        == ObservationStateSnapshot(count: 2, label: "updated"))
+        == ObservationStateSnapshot(count: 2, label: "updated")
+    )
     #expect(producer.snapshot == ObservationStateSnapshot(count: 2, label: "updated"))
   }
 
@@ -230,7 +263,8 @@ struct ObservationStateTests {
     #expect(after.baseline.revision == before.baseline.revision + 1)
     #expect(after.baseline.snapshot == ObservationStateSnapshot(
       count: 2,
-      label: "updated"))
+      label: "updated",
+    ))
   }
 
   @Test
@@ -318,7 +352,8 @@ struct ObservationStateTests {
     let changeCount = OSAllocatedUnfairLock(initialState: 0)
     trackObservationStateChanges(
       reading: { [weak producer] in _ = producer?.snapshot },
-      count: changeCount)
+      count: changeCount,
+    )
 
     await confirmation { changed in
       withObservationTracking {
@@ -350,7 +385,8 @@ struct ObservationStateTests {
     let lifecycle = TestEventCounter()
     var consumer: SnapshotConsumer? = SnapshotConsumer(
       source: channel.source,
-      lifecycle: lifecycle)
+      lifecycle: lifecycle,
+    )
     weak let weakConsumer = consumer
 
     await lifecycle.wait()
@@ -364,7 +400,7 @@ struct ObservationStateTests {
 @MainActor
 private func trackObservationStateChanges(
   reading snapshot: @escaping @MainActor @Sendable () -> Void,
-  count: OSAllocatedUnfairLock<Int>
+  count: OSAllocatedUnfairLock<Int>,
 ) {
   withObservationTracking {
     snapshot()

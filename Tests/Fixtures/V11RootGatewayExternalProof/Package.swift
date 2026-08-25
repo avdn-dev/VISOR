@@ -2,20 +2,22 @@
 
 import PackageDescription
 
-let visor: Target.Dependency = .product(
+let visor = Target.Dependency.product(
   name: "VISOR",
-  package: "visor")
-let visorObservation: Target.Dependency = .product(
+  package: "visor",
+)
+let visorObservation = Target.Dependency.product(
   name: "VISORObservation",
-  package: "visor")
+  package: "visor",
+)
 
 let package = Package(
   name: "V11RootGatewayExternalProof",
   platforms: [
-    .macOS(.v14),
+    .macOS(.v14)
   ],
   dependencies: [
-    .package(path: "../../.."),
+    .package(path: "../../..")
   ],
   targets: [
     .target(
@@ -24,7 +26,8 @@ let package = Package(
         "RootObservationConsumer",
         visor,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .target(
       name: "RootGatewayModelsMainActor",
       dependencies: [
@@ -32,18 +35,21 @@ let package = Package(
         visor,
       ],
       packageAccess: false,
-      swiftSettings: [.defaultIsolation(MainActor.self)]),
+      swiftSettings: [.defaultIsolation(MainActor.self)],
+    ),
     .target(
       name: "RootGatewayAccessControlProbe",
       dependencies: [
         "RootGatewayModelsNonisolated",
         visor,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .target(
       name: "RootObservationConsumer",
       dependencies: [visor, visorObservation],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .target(
       name: "RootObservationAccessControlProbe",
       dependencies: [
@@ -52,7 +58,8 @@ let package = Package(
         visor,
         visorObservation,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .testTarget(
       name: "RootGatewayNonisolatedTests",
       dependencies: [
@@ -60,7 +67,8 @@ let package = Package(
         "RootObservationConsumer",
         visor,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .testTarget(
       name: "RootGatewayMainActorTests",
       dependencies: [
@@ -69,9 +77,12 @@ let package = Package(
         visor,
       ],
       packageAccess: false,
-      swiftSettings: [.defaultIsolation(MainActor.self)]),
+      swiftSettings: [.defaultIsolation(MainActor.self)],
+    ),
     .testTarget(
       name: "RootObservationConsumerTests",
       dependencies: ["RootObservationConsumer", visorObservation],
-      packageAccess: false),
-  ])
+      packageAccess: false,
+    ),
+  ],
+)

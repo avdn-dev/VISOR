@@ -16,13 +16,13 @@ public struct ReactionMacro: PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in context: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     guard context.isDirectViewModelContext else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.invalidSourceReactionPlacement))
+        message: VISORDiagnostic.invalidSourceReactionPlacement,
+      ))
       return []
     }
     guard
@@ -35,7 +35,8 @@ public struct ReactionMacro: PeerMacro {
     else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.invalidSourceReactionDeclaration))
+        message: VISORDiagnostic.invalidSourceReactionDeclaration,
+      ))
       return []
     }
     return []

@@ -4,9 +4,10 @@ import VISOR
 /// Ordinary `@LazyViewModel` expansion under MainActor-by-default settings.
 @LazyViewModel(
   MainActorSourceBackedViewModel.self,
-  observationPolicy: .pauseWhenInactive)
+  observationPolicy: .pauseWhenInactive,
+)
 public struct MainActorSourceBackedView: View {
-  public init() {}
+  public init() { }
 
   public var content: some View {
     Text("Revision \(state.revision)")

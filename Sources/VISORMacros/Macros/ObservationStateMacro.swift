@@ -2,22 +2,26 @@ import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 
+// MARK: - ObservationStateMacro
+
 public struct ObservationStateMacro: AccessorMacro, PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
     if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
       diagnoseMissingObservationStateRequirementsIfNeeded(declaration, in: context)
       return []
     }
 
-    guard let property = observationStateProperty(
-      from: declaration,
-      attribute: attribute,
-      in: context,
-      diagnose: false)
+    guard
+      let property = observationStateProperty(
+        from: declaration,
+        attribute: attribute,
+        in: context,
+        diagnose: false,
+      )
     else {
       return []
     }
@@ -49,17 +53,19 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
     providingAccessorsOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [AccessorDeclSyntax] {
     if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
       return []
     }
 
-    guard let property = observationStateProperty(
-      from: declaration,
-      attribute: attribute,
-      in: context,
-      diagnose: true)
+    guard
+      let property = observationStateProperty(
+        from: declaration,
+        attribute: attribute,
+        in: context,
+        diagnose: true,
+      )
     else {
       return []
     }
@@ -105,11 +111,13 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
   }
 }
 
+// MARK: - ObservationStateRequirementMacro
+
 public struct ObservationStateRequirementMacro: PeerMacro {
   public static func expansion(
-    of attribute: AttributeSyntax,
+    of _: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
     if context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true {
       diagnoseMissingObservationStateRequirementsIfNeeded(declaration, in: context)
@@ -121,17 +129,20 @@ public struct ObservationStateRequirementMacro: PeerMacro {
   }
 }
 
+// MARK: - ObservationStateRequirementsMacro
+
 public struct ObservationStateRequirementsMacro: MemberMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     conformingTo _: [TypeSyntax],
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
     guard let protocolDeclaration = declaration.as(ProtocolDeclSyntax.self) else {
       context.diagnose(Diagnostic(
         node: node,
-        message: ObservationStateDiagnostic.invalidProtocol))
+        message: ObservationStateDiagnostic.invalidProtocol,
+      ))
       return []
     }
 
@@ -139,30 +150,35 @@ public struct ObservationStateRequirementsMacro: MemberMacro {
       guard
         let variable = member.decl.as(VariableDeclSyntax.self),
         let attribute = variable.attributes.visorAttribute(
-          named: AttributeName.observationState),
+          named: AttributeName.observationState
+        ),
         let requirement = observationStateRequirement(
           from: variable,
           attribute: attribute,
           in: context,
           diagnose: true,
-          assumeProtocolOwner: true)
+          assumeProtocolOwner: true,
+        )
       else {
         return nil
       }
 
-      let sequence: DeclSyntax = """
+      return """
         \(raw: requirement.sequenceModifiers)var \(raw: requirement.sequenceName): VISORObservation.ObservationSource<\(raw: requirement.valueType)> { get }
         """
-      return sequence
     }
   }
 }
+
+// MARK: - ObservationStateRequirement
 
 private struct ObservationStateRequirement {
   let valueType: String
   let sequenceName: String
   let sequenceModifiers: String
 }
+
+// MARK: - ObservationStateProperty
 
 private struct ObservationStateProperty {
   let name: String
@@ -200,9 +216,10 @@ private func observationStateRequirement(
   attribute: AttributeSyntax,
   in context: any MacroExpansionContext,
   diagnose: Bool,
-  assumeProtocolOwner: Bool = false
+  assumeProtocolOwner: Bool = false,
 ) -> ObservationStateRequirement? {
-  guard assumeProtocolOwner
+  guard
+    assumeProtocolOwner
     || context.lexicalContext.first?.is(ProtocolDeclSyntax.self) == true
   else {
     return nil
@@ -223,23 +240,27 @@ private func observationStateRequirement(
     return nil
   }
 
-  guard let arguments = parseArguments(
-    attribute,
-    declaration: declaration,
-    in: context,
-    shouldDiagnose: diagnose)
+  guard
+    let arguments = parseArguments(
+      attribute,
+      declaration: declaration,
+      in: context,
+      shouldDiagnose: diagnose,
+    )
   else {
     return nil
   }
   let propertyName = identifier.identifier.text
   let sequenceName = arguments.sequenceNaming.memberName(for: propertyName)
-  guard validateGeneratedNames(
-    stateName: propertyName,
-    sequenceName: sequenceName,
-    channelName: nil,
-    declaration: declaration,
-    in: context,
-    shouldDiagnose: diagnose)
+  guard
+    validateGeneratedNames(
+      stateName: propertyName,
+      sequenceName: sequenceName,
+      channelName: nil,
+      declaration: declaration,
+      in: context,
+      shouldDiagnose: diagnose,
+    )
   else {
     return nil
   }
@@ -247,12 +268,13 @@ private func observationStateRequirement(
   return ObservationStateRequirement(
     valueType: type.trimmedDescription,
     sequenceName: sequenceName,
-    sequenceModifiers: protocolSequenceModifiers(from: variable))
+    sequenceModifiers: protocolSequenceModifiers(from: variable),
+  )
 }
 
 private func diagnoseMissingObservationStateRequirementsIfNeeded(
   _ declaration: some DeclSyntaxProtocol,
-  in context: any MacroExpansionContext
+  in context: any MacroExpansionContext,
 ) {
   guard
     let owner = context.lexicalContext.first?.as(ProtocolDeclSyntax.self),
@@ -262,14 +284,15 @@ private func diagnoseMissingObservationStateRequirementsIfNeeded(
   }
   context.diagnose(Diagnostic(
     node: Syntax(declaration),
-    message: ObservationStateDiagnostic.missingObservationStateRequirements))
+    message: ObservationStateDiagnostic.missingObservationStateRequirements,
+  ))
 }
 
 private func observationStateProperty(
   from declaration: some DeclSyntaxProtocol,
   attribute: AttributeSyntax,
   in context: any MacroExpansionContext,
-  diagnose shouldDiagnose: Bool
+  diagnose shouldDiagnose: Bool,
 ) -> ObservationStateProperty? {
   let owner = context.lexicalContext.first
   let hasReferenceOwner = owner?.is(ClassDeclSyntax.self) == true
@@ -310,7 +333,8 @@ private func observationStateProperty(
       declaration,
       in: context,
       with: .uninferableConcreteType,
-      if: shouldDiagnose)
+      if: shouldDiagnose,
+    )
     return nil
   }
 
@@ -320,11 +344,13 @@ private func observationStateProperty(
     return nil
   }
 
-  guard let arguments = parseArguments(
-    attribute,
-    declaration: declaration,
-    in: context,
-    shouldDiagnose: shouldDiagnose)
+  guard
+    let arguments = parseArguments(
+      attribute,
+      declaration: declaration,
+      in: context,
+      shouldDiagnose: shouldDiagnose,
+    )
   else {
     return nil
   }
@@ -339,14 +365,16 @@ private func observationStateProperty(
   let sequenceName = arguments.sequenceNaming.memberName(for: propertyName)
   let channelName = "__visorObservationState\(propertyName.capitalisedFirst)Channel"
   let mutationName = "withMutable\(propertyName.capitalisedFirst)"
-  guard validateGeneratedNames(
-    stateName: propertyName,
-    sequenceName: sequenceName,
-    channelName: channelName,
-    mutationName: mutationName,
-    declaration: declaration,
-    in: context,
-    shouldDiagnose: shouldDiagnose)
+  guard
+    validateGeneratedNames(
+      stateName: propertyName,
+      sequenceName: sequenceName,
+      channelName: channelName,
+      mutationName: mutationName,
+      declaration: declaration,
+      in: context,
+      shouldDiagnose: shouldDiagnose,
+    )
   else {
     return nil
   }
@@ -357,7 +385,8 @@ private func observationStateProperty(
     sequenceName: sequenceName,
     sequenceModifiers: sequenceModifiers(from: variable),
     hasAuthoredInitialiser: hasAuthoredInitialiser,
-    participatesInAppleObservation: observableOwner)
+    participatesInAppleObservation: observableOwner,
+  )
 }
 
 /// Infers only types that are unambiguous from the authored syntax without
@@ -439,10 +468,11 @@ private func explicitTypeReference(from expression: ExprSyntax) -> String? {
     return specialisation.trimmedDescription
   }
 
-  if let member = expression.as(MemberAccessExprSyntax.self),
-     let base = member.base,
-     explicitTypeReference(from: base) != nil,
-     isTypeNameComponent(member.declName.baseName.text)
+  if
+    let member = expression.as(MemberAccessExprSyntax.self),
+    let base = member.base,
+    explicitTypeReference(from: base) != nil,
+    isTypeNameComponent(member.declName.baseName.text)
   {
     return member.trimmedDescription
   }
@@ -470,14 +500,16 @@ private func parseArguments(
   _ attribute: AttributeSyntax,
   declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
-  shouldDiagnose: Bool
+  shouldDiagnose: Bool,
 ) -> ObservationStateArguments? {
   switch ObservationStateArguments.parse(from: attribute) {
   case .success(let arguments):
     return arguments
+
   case .failure(.invalidArguments):
     diagnose(declaration, in: context, with: .invalidArguments, if: shouldDiagnose)
     return nil
+
   case .failure(.invalidCustomName):
     diagnose(declaration, in: context, with: .invalidCustomName, if: shouldDiagnose)
     return nil
@@ -491,7 +523,7 @@ private func validateGeneratedNames(
   mutationName: String? = nil,
   declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
-  shouldDiagnose: Bool
+  shouldDiagnose: Bool,
 ) -> Bool {
   let generatedNames = [sequenceName] + [channelName, mutationName].compactMap { $0 }
   var reservedNames = Set([stateName])
@@ -500,25 +532,29 @@ private func validateGeneratedNames(
       declaration,
       in: context,
       with: .generatedNameCollision(name),
-      if: shouldDiagnose)
+      if: shouldDiagnose,
+    )
     return false
   }
 
   let names = enclosingMemberNames(
     excludingStateNamed: stateName,
     around: declaration,
-    in: context)
-  if names.contains(sequenceName)
+    in: context,
+  )
+  if
+    names.contains(sequenceName)
     || channelName.map(names.contains) == true
     || mutationName.map(names.contains) == true
   {
-    let collision = if names.contains(sequenceName) {
-      sequenceName
-    } else if let channelName, names.contains(channelName) {
-      channelName
-    } else {
-      mutationName ?? sequenceName
-    }
+    let collision =
+      if names.contains(sequenceName) {
+        sequenceName
+      } else if let channelName, names.contains(channelName) {
+        channelName
+      } else {
+        mutationName ?? sequenceName
+      }
     diagnose(declaration, in: context, with: .generatedNameCollision(collision), if: shouldDiagnose)
     return false
   }
@@ -528,7 +564,7 @@ private func validateGeneratedNames(
 private func enclosingMemberNames(
   excludingStateNamed stateName: String,
   around declaration: some DeclSyntaxProtocol,
-  in context: any MacroExpansionContext
+  in context: any MacroExpansionContext,
 ) -> Set<String> {
   let ancestorMembers: MemberBlockItemListSyntax? = {
     var ancestor = Syntax(declaration).parent
@@ -541,31 +577,33 @@ private func enclosingMemberNames(
     return nil
   }()
 
-  let members: MemberBlockItemListSyntax?
-  if let ancestorMembers {
-    members = ancestorMembers
-  } else if let type = context.lexicalContext.first?.as(ClassDeclSyntax.self) {
-    members = type.memberBlock.members
-  } else if let type = context.lexicalContext.first?.as(ActorDeclSyntax.self) {
-    members = type.memberBlock.members
-  } else if let type = context.lexicalContext.first?.as(ProtocolDeclSyntax.self) {
-    members = type.memberBlock.members
-  } else {
-    members = nil
-  }
+  let members: MemberBlockItemListSyntax? =
+    if let ancestorMembers {
+      ancestorMembers
+    } else if let type = context.lexicalContext.first?.as(ClassDeclSyntax.self) {
+      type.memberBlock.members
+    } else if let type = context.lexicalContext.first?.as(ActorDeclSyntax.self) {
+      type.memberBlock.members
+    } else if let type = context.lexicalContext.first?.as(ProtocolDeclSyntax.self) {
+      type.memberBlock.members
+    } else {
+      nil
+    }
 
   var names = Set<String>()
   for member in members ?? [] {
-    if let variable = member.decl.as(VariableDeclSyntax.self),
-       variable.bindings.count == 1,
-       let binding = variable.bindings.first,
-       let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
+    if
+      let variable = member.decl.as(VariableDeclSyntax.self),
+      variable.bindings.count == 1,
+      let binding = variable.bindings.first,
+      let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
     {
       let name = identifier.identifier.text
       names.insert(name)
-      if name != stateName,
-         let attribute = variable.attributes.visorAttribute(named: AttributeName.observationState),
-         case .success(let arguments) = ObservationStateArguments.parse(from: attribute)
+      if
+        name != stateName,
+        let attribute = variable.attributes.visorAttribute(named: AttributeName.observationState),
+        case .success(let arguments) = ObservationStateArguments.parse(from: attribute)
       {
         names.insert(arguments.sequenceNaming.memberName(for: name))
       }
@@ -596,7 +634,7 @@ private func sequenceModifiers(from variable: VariableDeclSyntax) -> String {
     guard modifier.detail == nil else { return nil }
     switch modifier.name.tokenKind {
     case .keyword(.public), .keyword(.package), .keyword(.fileprivate),
-      .keyword(.private):
+         .keyword(.private):
       return "\(modifier.trimmedDescription) "
     case .keyword(.open):
       return "public "
@@ -662,8 +700,9 @@ private func hasRequiredObservationIgnoredPlacement(
     guard let attribute = element.as(AttributeSyntax.self) else { return nil }
     return attribute.attributeName.trimmedDescription.split(separator: ".").last.map(String.init)
   }
-  guard let stateIndex = names.firstIndex(of: AttributeName.observationState),
-        names.indices.contains(stateIndex + 1)
+  guard
+    let stateIndex = names.firstIndex(of: AttributeName.observationState),
+    names.indices.contains(stateIndex + 1)
   else {
     return false
   }
@@ -673,7 +712,7 @@ private func hasRequiredObservationIgnoredPlacement(
 private func diagnoseInvalidDeclaration(
   _ declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
-  if shouldDiagnose: Bool
+  if shouldDiagnose: Bool,
 ) {
   diagnose(declaration, in: context, with: .invalidDeclaration, if: shouldDiagnose)
 }
@@ -681,24 +720,27 @@ private func diagnoseInvalidDeclaration(
 private func diagnoseMissingObservationIgnored(
   _ declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
-  if shouldDiagnose: Bool
+  if shouldDiagnose: Bool,
 ) {
   diagnose(
     declaration,
     in: context,
     with: .missingObservationIgnored,
-    if: shouldDiagnose)
+    if: shouldDiagnose,
+  )
 }
 
 private func diagnose(
   _ declaration: some DeclSyntaxProtocol,
   in context: any MacroExpansionContext,
   with message: ObservationStateDiagnostic,
-  if shouldDiagnose: Bool
+  if shouldDiagnose: Bool,
 ) {
   guard shouldDiagnose else { return }
   context.diagnose(Diagnostic(node: Syntax(declaration), message: message))
 }
+
+// MARK: - ObservationStateDiagnostic
 
 private enum ObservationStateDiagnostic: DiagnosticMessage {
   case invalidDeclaration
@@ -709,6 +751,8 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
   case generatedNameCollision(String)
   case invalidProtocol
   case missingObservationStateRequirements
+
+  // MARK: Internal
 
   var message: String {
     switch self {
@@ -732,18 +776,21 @@ private enum ObservationStateDiagnostic: DiagnosticMessage {
   }
 
   var diagnosticID: MessageID {
-    let id = switch self {
-    case .invalidDeclaration: "invalidDeclaration"
-    case .uninferableConcreteType: "uninferableConcreteType"
-    case .invalidArguments: "invalidArguments"
-    case .invalidCustomName: "invalidCustomName"
-    case .missingObservationIgnored: "missingObservationIgnored"
-    case .generatedNameCollision: "generatedNameCollision"
-    case .invalidProtocol: "invalidProtocol"
-    case .missingObservationStateRequirements: "missingObservationStateRequirements"
-    }
+    let id =
+      switch self {
+      case .invalidDeclaration: "invalidDeclaration"
+      case .uninferableConcreteType: "uninferableConcreteType"
+      case .invalidArguments: "invalidArguments"
+      case .invalidCustomName: "invalidCustomName"
+      case .missingObservationIgnored: "missingObservationIgnored"
+      case .generatedNameCollision: "generatedNameCollision"
+      case .invalidProtocol: "invalidProtocol"
+      case .missingObservationStateRequirements: "missingObservationStateRequirements"
+      }
     return MessageID(domain: "VISOR", id: id)
   }
 
-  var severity: DiagnosticSeverity { .error }
+  var severity: DiagnosticSeverity {
+    .error
+  }
 }

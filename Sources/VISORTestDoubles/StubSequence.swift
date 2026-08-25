@@ -1,15 +1,20 @@
+// MARK: - StubSequenceDiagnostics
+
 package nonisolated enum StubSequenceDiagnostics {
   package static func exhaustedMessage<Value>(for valueType: Value.Type) -> String {
     "StubSequence<\(String(reflecting: valueType))> exhausted. Add another value before calling next()."
   }
 }
 
+// MARK: - StubSequence
+
 /// A value-semantic queue of deterministic return values for a generated stub.
 ///
 /// Values are stored in reverse order once and removed with `popLast()`, so
 /// each call to ``next(file:line:)`` is amortised O(1).
 public nonisolated struct StubSequence<Value> {
-  private var remainingValues: [Value]
+
+  // MARK: Lifecycle
 
   /// Creates a sequence from values returned in array order.
   public init(_ values: [Value]) {
@@ -21,6 +26,8 @@ public nonisolated struct StubSequence<Value> {
     remainingValues = Array(rest.reversed())
     remainingValues.append(first)
   }
+
+  // MARK: Public
 
   /// Whether every configured value has been consumed.
   public var isEmpty: Bool {
@@ -38,14 +45,20 @@ public nonisolated struct StubSequence<Value> {
   /// diagnostic naming `Value` and the call site.
   public mutating func next(
     file: StaticString = #filePath,
-    line: UInt = #line
+    line: UInt = #line,
   ) -> Value {
     guard let value = remainingValues.popLast() else {
       fatalError(
         StubSequenceDiagnostics.exhaustedMessage(for: Value.self),
-        file: (file),
-        line: line)
+        file: file,
+        line: line,
+      )
     }
     return value
   }
+
+  // MARK: Private
+
+  private var remainingValues: [Value]
+
 }

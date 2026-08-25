@@ -39,7 +39,8 @@ public actor TestBarrier {
     await withCheckedContinuation {
       arrivalWaiters.append(ArrivalWaiter(
         expectedCount: expectedCount,
-        continuation: $0))
+        continuation: $0,
+      ))
     }
   }
 

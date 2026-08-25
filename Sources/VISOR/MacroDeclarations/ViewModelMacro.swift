@@ -63,11 +63,14 @@
 @attached(
   member,
   names:
-    named(Factory),
-    named(_visorObservationOwnership), named(_visorBuildObservationRecipe),
-    arbitrary)
+  named(Factory),
+  named(_visorObservationOwnership),
+  named(_visorBuildObservationRecipe),
+  arbitrary
+)
 @attached(memberAttribute)
 @attached(extension, conformances: ViewModel)
 public macro ViewModel() = #externalMacro(
   module: "VISORMacros",
-  type: "ViewModelMacro")
+  type: "ViewModelMacro",
+)

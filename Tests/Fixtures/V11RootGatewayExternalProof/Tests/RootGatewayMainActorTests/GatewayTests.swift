@@ -6,19 +6,27 @@ import SwiftUI
 import Testing
 import VISOR
 
-private let downstreamObservationPolicy: ObservationPolicy = .pauseWhenInactive
+private let downstreamObservationPolicy = ObservationPolicy.pauseWhenInactive
+
+// MARK: - QualifiedLazySourceBackedView
 
 @LazyViewModel(
   RootGatewayModelsMainActor.MainActorSourceBackedViewModel.self,
-  observationPolicy: downstreamObservationPolicy)
+  observationPolicy: downstreamObservationPolicy,
+)
 private struct QualifiedLazySourceBackedView: View {
   var content: some View {
     Text("Revision \(state.revision)")
   }
 }
 
+// MARK: - RootGatewayMainActorTests
+
 @Suite("Root State gateway from a MainActor-by-default target")
 struct RootGatewayMainActorTests {
+
+  // MARK: Internal
+
   @Test
   func `Every supported write spelling uses the generated State`() {
     typealias State = MainActorGatewayState
@@ -95,7 +103,9 @@ struct RootGatewayMainActorTests {
     requireViewConformance(view.body)
   }
 
-  private func requireViewModelConformance<Subject: ViewModel>(_: Subject) {}
+  // MARK: Private
 
-  private func requireViewConformance<Subject: View>(_: Subject) {}
+  private func requireViewModelConformance(_: some ViewModel) { }
+
+  private func requireViewConformance(_: some View) { }
 }

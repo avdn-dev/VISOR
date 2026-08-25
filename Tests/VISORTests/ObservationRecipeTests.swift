@@ -2,15 +2,25 @@ import Testing
 import VISOR
 import VISORObservation
 
+// MARK: - ObservationRecipeLog
+
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
 
 @MainActor
 private final class ObservationRecipeLog {
-  var entries: [String] = []
 
-  deinit {}
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
+  var entries = [String]()
+
 }
+
+// MARK: - ObservationRecipeTests
 
 @Suite("Observation recipe aggregation")
 struct ObservationRecipeTests {
@@ -24,11 +34,13 @@ struct ObservationRecipeTests {
     visitor.add(
       source: channel.source,
       projections: [{ value in log.entries.append("first projection \(value)") }],
-      initialReactions: [{ value in log.entries.append("first reaction \(value)") }])
+      initialReactions: [{ value in log.entries.append("first reaction \(value)") }],
+    )
     visitor.add(
       source: channel.source,
       projections: [{ value in log.entries.append("second projection \(value)") }],
-      initialReactions: [{ value in log.entries.append("second reaction \(value)") }])
+      initialReactions: [{ value in log.entries.append("second reaction \(value)") }],
+    )
 
     #expect(visitor.recipes.count == 1)
 

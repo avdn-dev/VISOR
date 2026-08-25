@@ -4,8 +4,11 @@ import Testing
 import VISOR
 import VISORTesting
 
+// MARK: - RecorderBoundaryDescriptionCounter
+
 private final class RecorderBoundaryDescriptionCounter: Sendable {
-  private let storage = OSAllocatedUnfairLock(initialState: 0)
+
+  // MARK: Internal
 
   var value: Int {
     storage.withLock { $0 }
@@ -14,56 +17,88 @@ private final class RecorderBoundaryDescriptionCounter: Sendable {
   func increment() {
     storage.withLock { $0 += 1 }
   }
+
+  // MARK: Private
+
+  private let storage = OSAllocatedUnfairLock(initialState: 0)
+
 }
 
+// MARK: - RecorderBoundaryPayload
+
 private final class RecorderBoundaryPayload: CustomStringConvertible {
-  private let counter: RecorderBoundaryDescriptionCounter
-  private let value: Int
+
+  // MARK: Lifecycle
 
   init(
     value: Int,
-    counter: RecorderBoundaryDescriptionCounter
+    counter: RecorderBoundaryDescriptionCounter,
   ) {
     self.value = value
     self.counter = counter
   }
 
+  // MARK: Internal
+
   var description: String {
     counter.increment()
     return "RecorderBoundaryPayload(\(value))"
   }
+
+  // MARK: Private
+
+  private let counter: RecorderBoundaryDescriptionCounter
+  private let value: Int
+
 }
+
+// MARK: - NilRecorderProbeViewModel
 
 @MainActor
 @Observable
 @ViewModel
 private final class NilRecorderProbeViewModel {
-  final class State {
-    var payload: RecorderBoundaryPayload
 
-    init(payload: RecorderBoundaryPayload) {
-      self.payload = payload
-    }
-  }
-
-  let state: State
+  // MARK: Lifecycle
 
   init(payload: RecorderBoundaryPayload) {
     state = State(payload: payload)
   }
+
+  // MARK: Internal
+
+  final class State {
+
+    // MARK: Lifecycle
+
+    init(payload: RecorderBoundaryPayload) {
+      self.payload = payload
+    }
+
+    // MARK: Internal
+
+    var payload: RecorderBoundaryPayload
+
+  }
+
+  let state: State
+
 }
+
+// MARK: - RecorderBoundaryRendezvous
 
 @MainActor
 private final class RecorderBoundaryRendezvous {
-  private var arrivalCount = 0
-  private var waiters: [CheckedContinuation<Void, Never>] = []
-  private let onBothArrived: @MainActor () -> Void
+
+  // MARK: Lifecycle
 
   init(onBothArrived: @escaping @MainActor () -> Void) {
     self.onBothArrived = onBothArrived
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Internal
 
   func arriveAndWait() async {
     arrivalCount += 1
@@ -83,18 +118,35 @@ private final class RecorderBoundaryRendezvous {
       waiters.append(continuation)
     }
   }
+
+  // MARK: Private
+
+  private var arrivalCount = 0
+  private var waiters = [CheckedContinuation<Void, Never>]()
+  private let onBothArrived: @MainActor () -> Void
+
 }
+
+// MARK: - RecorderBoundaryResults
 
 @MainActor
 private final class RecorderBoundaryResults {
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
   var activeObservationCount = 0
   var firstRawCommitCount = 0
   var secondRawCommitCount = 0
-  var firstInfrastructureIssues: [String] = []
-  var secondInfrastructureIssues: [String] = []
+  var firstInfrastructureIssues = [String]()
+  var secondInfrastructureIssues = [String]()
 
-  deinit {}
 }
+
+// MARK: - RecorderBoundaryTests
 
 @Suite("Per-State recorder boundary")
 struct RecorderBoundaryTests {
@@ -115,7 +167,7 @@ struct RecorderBoundaryTests {
         logicalCommitLimit: 8,
         issueRecorder: { message, _ in
           results.firstInfrastructureIssues.append(message)
-        }
+        },
       ) { test in
         await rendezvous.arriveAndWait()
         await test.perform(.setCount(11))
@@ -129,7 +181,7 @@ struct RecorderBoundaryTests {
         logicalCommitLimit: 8,
         issueRecorder: { message, _ in
           results.secondInfrastructureIssues.append(message)
-        }
+        },
       ) { test in
         await rendezvous.arriveAndWait()
         await test.perform(.setCount(22))
@@ -156,8 +208,8 @@ struct RecorderBoundaryTests {
   func `Nested same-State observe is rejected without disturbing the first scope`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    var firstInfrastructureIssues: [String] = []
-    var secondInfrastructureIssues: [String] = []
+    var firstInfrastructureIssues = [String]()
+    var secondInfrastructureIssues = [String]()
     var secondBodyEntered = false
 
     try await _observeWithJournalPolicyForProof(
@@ -165,14 +217,14 @@ struct RecorderBoundaryTests {
       logicalCommitLimit: 8,
       issueRecorder: { message, _ in
         firstInfrastructureIssues.append(message)
-      }
+      },
     ) { firstTest in
       try await _observeWithJournalPolicyForProof(
         sut,
         logicalCommitLimit: 8,
         issueRecorder: { message, _ in
           secondInfrastructureIssues.append(message)
-        }
+        },
       ) { _ in
         secondBodyEntered = true
       }
@@ -195,16 +247,18 @@ struct RecorderBoundaryTests {
 
   @Test
   @MainActor
-  func `Nil recorder retires the old reference without describing a test snapshot`() {
+  func `Nil recorder retires the old reference without describing a test snapshot`() throws {
     let descriptionCounter = RecorderBoundaryDescriptionCounter()
     var initialPayload: RecorderBoundaryPayload? = RecorderBoundaryPayload(
       value: 1,
-      counter: descriptionCounter)
+      counter: descriptionCounter,
+    )
     let retiredPayload = WeakReference(initialPayload)
-    let sut = NilRecorderProbeViewModel(payload: initialPayload!)
+    let sut = NilRecorderProbeViewModel(payload: try #require(initialPayload))
     let replacement = RecorderBoundaryPayload(
       value: 2,
-      counter: descriptionCounter)
+      counter: descriptionCounter,
+    )
 
     initialPayload = nil
     #expect(retiredPayload.value != nil)

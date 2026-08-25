@@ -2,15 +2,21 @@ import Testing
 import VISORObservation
 import VISORTesting
 
+// MARK: - Producer
+
 private actor Producer {
-  private let channel: ObservationChannel<Int>
-  nonisolated let source: ObservationSource<Int>
+
+  // MARK: Lifecycle
 
   init(initial: Int) {
     let channel = ObservationChannel(initial)
     self.channel = channel
     source = channel.source
   }
+
+  // MARK: Internal
+
+  nonisolated let source: ObservationSource<Int>
 
   func publish(_ value: Int) {
     channel.publish(value)
@@ -19,7 +25,14 @@ private actor Producer {
   func terminate() {
     channel._visorTerminate()
   }
+
+  // MARK: Private
+
+  private let channel: ObservationChannel<Int>
+
 }
+
+// MARK: - ObservationSnapshotsTests
 
 @Suite("Public observation snapshots")
 struct ObservationSnapshotsTests {
@@ -115,15 +128,17 @@ struct ObservationSnapshotsTests {
       _ = try await iterator.next()
     } throws: { error in
       error as? ObservationSourceError == .runtimeFailure(
-        detail: "The observation source exhausted its internal revision space.")
+        detail: "The observation source exhausted its internal revision space."
+      )
     }
   }
 }
 
+// MARK: - OrderedProducer
+
 private actor OrderedProducer {
-  private var value = 0
-  private let channel: ObservationChannel<Int>
-  nonisolated let source: ObservationSource<Int>
+
+  // MARK: Lifecycle
 
   init() {
     let channel = ObservationChannel(0)
@@ -131,44 +146,59 @@ private actor OrderedProducer {
     source = channel.source
   }
 
+  // MARK: Internal
+
+  nonisolated let source: ObservationSource<Int>
+
   func advance() {
     value += 1
     channel.publish(value)
   }
+
+  // MARK: Private
+
+  private var value = 0
+  private let channel: ObservationChannel<Int>
+
 }
+
+// MARK: - Projection
 
 private enum Projection<Output: Sendable>: Sendable {
   case deliver(Output)
   case acknowledgeOnly
 }
 
+// MARK: - Consumer
+
 @MainActor
 private final class Consumer<Input: Sendable, Output: Sendable> {
-  private let subscription: _ObservationSubscription<Input>
-  private let project: @Sendable (Input) -> Projection<Output>
-  private let receive: @MainActor @Sendable (Output) async -> Void
-  private var worker: Task<Void, any Error>!
+
+  // MARK: Lifecycle
 
   private init(
     subscription: _ObservationSubscription<Input>,
     project: @escaping @Sendable (Input) -> Projection<Output>,
-    receive: @escaping @MainActor @Sendable (Output) async -> Void
+    receive: @escaping @MainActor @Sendable (Output) async -> Void,
   ) {
     self.subscription = subscription
     self.project = project
     self.receive = receive
   }
 
+  // MARK: Internal
+
   static func start(
     source: ObservationSource<Input>,
     project: @escaping @Sendable (Input) -> Projection<Output>,
-    receive: @escaping @MainActor @Sendable (Output) async -> Void
+    receive: @escaping @MainActor @Sendable (Output) async -> Void,
   ) async throws -> Consumer {
     let opened = try source._visorOpen()
     let consumer = Consumer(
       subscription: opened.subscription,
       project: project,
-      receive: receive)
+      receive: receive,
+    )
 
     do {
       try Task.checkCancellation()
@@ -202,6 +232,15 @@ private final class Consumer<Input: Sendable, Output: Sendable> {
     await worker.result
   }
 
+  // MARK: Private
+
+  private let subscription: _ObservationSubscription<Input>
+  private let project: @Sendable (Input) -> Projection<Output>
+  private let receive: @MainActor @Sendable (Output) async -> Void
+  // The private factory starts the worker before returning the consumer.
+  // swiftlint:disable:next implicitly_unwrapped_optional
+  private var worker: Task<Void, any Error>!
+
   private func startWorker() {
     worker = Task { @MainActor [subscription, project, receive] in
       while let envelope = try await subscription._visorNext() {
@@ -228,16 +267,20 @@ private final class Consumer<Input: Sendable, Output: Sendable> {
   }
 }
 
+// MARK: - Model
+
 @MainActor
 private final class Model {
   var current = -1
-  var received: [Int] = []
+  var received = [Int]()
 
   func receive(_ value: Int) {
     current = value
     received.append(value)
   }
 }
+
+// MARK: - ObservationSourceTests
 
 @Suite("V11 cooperative observation source")
 struct ObservationSourceTests {
@@ -248,7 +291,8 @@ struct ObservationSourceTests {
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
 
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
@@ -273,7 +317,8 @@ struct ObservationSourceTests {
       let consumer = try await Consumer.start(
         source: producer.source,
         project: { .deliver($0) },
-        receive: { [model] in model.receive($0) })
+        receive: { [model] in model.receive($0) },
+      )
       await publication
 
       let startup = try await consumer.checkpointAndPause()
@@ -309,7 +354,8 @@ struct ObservationSourceTests {
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
 
@@ -334,7 +380,8 @@ struct ObservationSourceTests {
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
 
     let startup = try await consumer.checkpointAndPause()
     await producer.publish(1)
@@ -357,7 +404,8 @@ struct ObservationSourceTests {
       let consumer = try await Consumer.start(
         source: producer.source,
         project: { .deliver($0) },
-        receive: { [model] in model.receive($0) })
+        receive: { [model] in model.receive($0) },
+      )
       let startup = try await consumer.checkpointAndPause()
       try consumer.resume(after: startup)
 
@@ -387,7 +435,8 @@ struct ObservationSourceTests {
       project: { value in
         value.isMultiple(of: 2) ? .deliver(value * 10) : .acknowledgeOnly
       },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
 
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
@@ -417,7 +466,8 @@ struct ObservationSourceTests {
           await gate.run()
         }
         model.receive(value)
-      })
+      },
+    )
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
 
@@ -450,11 +500,13 @@ struct ObservationSourceTests {
           await gate.run()
         }
         slowModel.receive(value)
-      })
+      },
+    )
     let fast = try await Consumer.start(
       source: channel.source,
       project: { .deliver($0) },
-      receive: { [fastModel] in fastModel.receive($0) })
+      receive: { [fastModel] in fastModel.receive($0) },
+    )
 
     let slowStartup = try await slow.checkpointAndPause()
     let fastStartup = try await fast.checkpointAndPause()
@@ -483,21 +535,25 @@ struct ObservationSourceTests {
     await fast.cancelAndJoin()
     await slow.cancelAndJoin()
   }
+
   @Test
   func `Grouped channels retain distinct sources in one producer domain`() {
     let lifecycle = ObservationChannel(0)
     let waveform = ObservationChannel(
       "quiet",
-      groupedWith: lifecycle)
+      groupedWith: lifecycle,
+    )
     let independent = ObservationChannel(false)
 
     #expect(lifecycle.source._visorIdentity != waveform.source._visorIdentity)
     #expect(
       lifecycle.source._visorGroupIdentity
-        == waveform.source._visorGroupIdentity)
+        == waveform.source._visorGroupIdentity
+    )
     #expect(
       lifecycle.source._visorGroupIdentity
-        != independent.source._visorGroupIdentity)
+        != independent.source._visorGroupIdentity
+    )
   }
 
   @Test
@@ -505,7 +561,8 @@ struct ObservationSourceTests {
     let first = ObservationChannel(1)
     let second = ObservationChannel(
       "ready",
-      groupedWith: first)
+      groupedWith: first,
+    )
 
     let prepared = try _ObservationRuntime._visorPrepareAll([
       first.source._visorErase(),
@@ -531,7 +588,8 @@ struct ObservationSourceTests {
     let first = ObservationChannel(0)
     let second = ObservationChannel(
       "old",
-      groupedWith: first)
+      groupedWith: first,
+    )
 
     first.publish(1)
     let prepared = try _ObservationRuntime._visorPrepareAll([
@@ -554,7 +612,8 @@ struct ObservationSourceTests {
     let first = ObservationChannel(1)
     let second = ObservationChannel(
       "ready",
-      groupedWith: first)
+      groupedWith: first,
+    )
     let prepared = try _ObservationRuntime._visorPrepareAll([
       first.source._visorErase(),
       second.source._visorErase(),
@@ -612,7 +671,8 @@ struct ObservationSourceTests {
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
 
@@ -628,7 +688,8 @@ struct ObservationSourceTests {
     let consumer = try await Consumer.start(
       source: producer.source,
       project: { .deliver($0) },
-      receive: { [model] in model.receive($0) })
+      receive: { [model] in model.receive($0) },
+    )
     let startup = try await consumer.checkpointAndPause()
     try consumer.resume(after: startup)
 

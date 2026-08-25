@@ -3,21 +3,16 @@ import Observation
 import os
 import VISORObservation
 
+// MARK: - _ViewModelObservationRequestSignal
+
 /// A coalescing wake-up signal for the owner's latest desired policy state.
 ///
 /// The lock protects only synchronous bookkeeping. Continuations are removed
 /// under the lock and resumed afterwards, so no suspension or resumed work can
 /// execute while the critical section is held.
 nonisolated private final class _ViewModelObservationRequestSignal: Sendable {
-  private typealias Waiter = CheckedContinuation<Bool, Never>
 
-  private struct State: Sendable {
-    var hasPendingRequest = false
-    var isFinished = false
-    var waiter: Waiter?
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
+  // MARK: Internal
 
   func yield() {
     let waiter: Waiter? = lock.withLock { state in
@@ -62,7 +57,22 @@ nonisolated private final class _ViewModelObservationRequestSignal: Sendable {
     }
     waiter?.resume(returning: false)
   }
+
+  // MARK: Private
+
+  private typealias Waiter = CheckedContinuation<Bool, Never>
+
+  private struct State: Sendable {
+    var hasPendingRequest = false
+    var isFinished = false
+    var waiter: Waiter?
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
+
 }
+
+// MARK: - _ViewModelObservationOwnerFailure
 
 nonisolated package enum _ViewModelObservationOwnerFailure:
   Equatable,
@@ -74,7 +84,8 @@ nonisolated package enum _ViewModelObservationOwnerFailure:
 
 nonisolated private let _viewModelObservationOwnerLogger = Logger(
   subsystem: "VISOR",
-  category: "ViewModelObservationOwner")
+  category: "ViewModelObservationOwner",
+)
 
 nonisolated private func reportViewModelObservationOwnerFailure(
   _ failure: _ViewModelObservationOwnerFailure
@@ -82,12 +93,17 @@ nonisolated private func reportViewModelObservationOwnerFailure(
   switch failure {
   case .duplicateOwner:
     _viewModelObservationOwnerLogger.error(
-      "Rejected a duplicate production observation owner")
+      "Rejected a duplicate production observation owner"
+    )
+
   case .infrastructure(let failure):
     _viewModelObservationOwnerLogger.error(
-      "Observation generation failed: \(String(describing: failure), privacy: .public)")
+      "Observation generation failed: \(String(describing: failure), privacy: .public)"
+    )
   }
 }
+
+// MARK: - _ViewModelObservationOwner
 
 /// The structured production owner hidden by `_ViewModelObservationHost`.
 ///
@@ -97,93 +113,26 @@ nonisolated private func reportViewModelObservationOwnerFailure(
 @MainActor
 @Observable
 package final class _ViewModelObservationOwner<VM: ViewModel> {
-  private struct ActivationEpoch: Equatable {
-    let id = UUID()
-  }
 
-  private struct Generation {
-    let id: UUID
-    let activationEpoch: ActivationEpoch
-    let session: _ObservationSession
-  }
-
-  package private(set) var _visorIsReady = false
-
-  package private(set) var _visorFailure:
-    _ViewModelObservationOwnerFailure?
-
-  @ObservationIgnored
-  package private(set) var _visorGenerationCount = 0
-
-  @ObservationIgnored
-  private let didBecomeReady: @MainActor @Sendable () -> Void
-
-  @ObservationIgnored
-  private let didFail:
-    @MainActor @Sendable (_ViewModelObservationOwnerFailure) -> Void
-
-  @ObservationIgnored
-  private let willStartGeneration: @MainActor @Sendable () -> Void
-
-  @ObservationIgnored
-  private let didStopGeneration: @MainActor @Sendable () -> Void
-
-  @ObservationIgnored
-  private let didClaimOwnership: @MainActor @Sendable () async -> Void
-
-  @ObservationIgnored
-  private let didEnterOwnershipWait: @MainActor @Sendable () -> Void
-
-  @ObservationIgnored
-  private let deadlinePolicy: _ObservationDeadlinePolicy
-
-  @ObservationIgnored
-  private var generation: Generation?
-
-  @ObservationIgnored
-  private var ownership: _ViewModelObservationOwnership?
-
-  @ObservationIgnored
-  private var desiredIsEnabled = false
-
-  @ObservationIgnored
-  private var activationEpoch: ActivationEpoch?
-
-  @ObservationIgnored
-  private var failedActivationEpoch: ActivationEpoch?
-
-  @ObservationIgnored
-  private var isRunning = false
-
-  @ObservationIgnored
-  private var requestSignal: _ViewModelObservationRequestSignal?
-
-  @ObservationIgnored
-  private var failedGenerationID: UUID?
-
-  @ObservationIgnored
-  private var reportedGenerationFailureID: UUID?
-
-  @ObservationIgnored
-  private var generationAwaitingEventualJoinID: UUID?
+  // MARK: Lifecycle
 
   package init(
     _visorDidBecomeReady:
-      @escaping @MainActor @Sendable () -> Void = {},
+    @escaping @MainActor @Sendable () -> Void = { },
     _visorDidFail:
-      @escaping @MainActor @Sendable
-        (_ViewModelObservationOwnerFailure) -> Void = {
-          reportViewModelObservationOwnerFailure($0)
-        },
+    @escaping @MainActor @Sendable
+    (_ViewModelObservationOwnerFailure) -> Void = {
+      reportViewModelObservationOwnerFailure($0)
+    },
     _visorWillStartGeneration:
-      @escaping @MainActor @Sendable () -> Void = {},
+    @escaping @MainActor @Sendable () -> Void = { },
     _visorDidStopGeneration:
-      @escaping @MainActor @Sendable () -> Void = {},
+    @escaping @MainActor @Sendable () -> Void = { },
     _visorDidClaimOwnership:
-      @escaping @MainActor @Sendable () async -> Void = {},
+    @escaping @MainActor @Sendable () async -> Void = { },
     _visorDidEnterOwnershipWait:
-      @escaping @MainActor @Sendable () -> Void = {},
-    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production
+    @escaping @MainActor @Sendable () -> Void = { },
+    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production,
   ) {
     didBecomeReady = _visorDidBecomeReady
     didFail = _visorDidFail
@@ -194,19 +143,29 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     deadlinePolicy = _visorDeadlinePolicy
   }
 
-  // Works around a Swift 6.2.4 release optimiser crash for explicitly
-  // MainActor-isolated classes.
-  deinit {}
+  /// Works around a Swift 6.2.4 release optimiser crash for explicitly
+  /// MainActor-isolated classes.
+  deinit { }
+
+  // MARK: Package
+
+  package private(set) var _visorIsReady = false
+
+  package private(set) var _visorFailure:
+    _ViewModelObservationOwnerFailure?
+
+  @ObservationIgnored package private(set) var _visorGenerationCount = 0
 
   package func _visorCanExposeContent(
     for viewModel: VM,
-    isEnabled: Bool
+    isEnabled: Bool,
   ) -> Bool {
     isEnabled
       && _visorIsReady
       && ownership === viewModel._visorObservationOwnership
       && viewModel._visorObservationOwnership._visorIsActionable(
-        ownerID: ObjectIdentifier(self))
+        ownerID: ObjectIdentifier(self)
+      )
   }
 
   /// Runs the single structured root for one SwiftUI host lifetime.
@@ -217,7 +176,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
   /// that supervisor reports the eventual true join.
   package func _visorRun(
     viewModel: VM,
-    initiallyEnabled: Bool
+    initiallyEnabled: Bool,
   ) async {
     let candidate = viewModel._visorObservationOwnership
     let ownerID = ObjectIdentifier(self)
@@ -238,7 +197,8 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     let claim = await withTaskCancellationHandler {
       let claim = await candidate._visorClaim(
         self,
-        _visorDidEnterWait: didEnterOwnershipWait)
+        _visorDidEnterWait: didEnterOwnershipWait,
+      )
       guard case .claimed = claim else { return claim }
 
       ownership = candidate
@@ -301,9 +261,61 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     requestSignal?.yield()
   }
 
+  // MARK: Private
+
+  private struct ActivationEpoch: Equatable {
+    let id = UUID()
+  }
+
+  private struct Generation {
+    let id: UUID
+    let activationEpoch: ActivationEpoch
+    let session: _ObservationSession
+  }
+
+  @ObservationIgnored private let didBecomeReady: @MainActor @Sendable () -> Void
+
+  @ObservationIgnored private let didFail:
+    @MainActor @Sendable (_ViewModelObservationOwnerFailure) -> Void
+
+  @ObservationIgnored private let willStartGeneration: @MainActor @Sendable () -> Void
+
+  @ObservationIgnored private let didStopGeneration: @MainActor @Sendable () -> Void
+
+  @ObservationIgnored private let didClaimOwnership: @MainActor @Sendable () async -> Void
+
+  @ObservationIgnored private let didEnterOwnershipWait: @MainActor @Sendable () -> Void
+
+  @ObservationIgnored private let deadlinePolicy: _ObservationDeadlinePolicy
+
+  @ObservationIgnored private var generation: Generation?
+
+  @ObservationIgnored private var ownership: _ViewModelObservationOwnership?
+
+  @ObservationIgnored private var desiredIsEnabled = false
+
+  @ObservationIgnored private var activationEpoch: ActivationEpoch?
+
+  @ObservationIgnored private var failedActivationEpoch: ActivationEpoch?
+
+  @ObservationIgnored private var isRunning = false
+
+  @ObservationIgnored private var requestSignal: _ViewModelObservationRequestSignal?
+
+  @ObservationIgnored private var failedGenerationID: UUID?
+
+  @ObservationIgnored private var reportedGenerationFailureID: UUID?
+
+  @ObservationIgnored private var generationAwaitingEventualJoinID: UUID?
+
+  private var activationPermitsGeneration: Bool {
+    guard desiredIsEnabled, let activationEpoch else { return false }
+    return failedActivationEpoch != activationEpoch
+  }
+
   private func runRequestLoop(
     viewModel: VM,
-    requests: _ViewModelObservationRequestSignal
+    requests: _ViewModelObservationRequestSignal,
   ) async {
     while !Task.isCancelled {
       // A deadline may let this control loop stop waiting while the single
@@ -323,11 +335,12 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 
   private func runGeneration(
     viewModel: VM,
-    requests: _ViewModelObservationRequestSignal
+    requests: _ViewModelObservationRequestSignal,
   ) async {
-    guard activationPermitsGeneration,
-          let generationActivationEpoch = activationEpoch,
-          !Task.isCancelled
+    guard
+      activationPermitsGeneration,
+      let generationActivationEpoch = activationEpoch,
+      !Task.isCancelled
     else {
       return
     }
@@ -343,23 +356,27 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
       _visorOnFailure: { [weak self] failure in
         self?.recordTerminalFailure(
           .infrastructure(failure),
-          generationID: generationID)
+          generationID: generationID,
+        )
         requests.yield()
       },
-      _visorDeadlinePolicy: deadlinePolicy)
+      _visorDeadlinePolicy: deadlinePolicy,
+    )
     generation = Generation(
       id: generationID,
       activationEpoch: generationActivationEpoch,
-      session: session)
+      session: session,
+    )
     _visorGenerationCount += 1
 
     do {
       try await session._visorStart()
       try Task.checkCancellation()
-      guard generation?.id == generationID,
-            desiredIsEnabled,
-            activationEpoch == generationActivationEpoch,
-            !session._visorIsStopping
+      guard
+        generation?.id == generationID,
+        desiredIsEnabled,
+        activationEpoch == generationActivationEpoch,
+        !session._visorIsStopping
       else {
         throw CancellationError()
       }
@@ -378,14 +395,16 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
       if let failure = session._visorFailure {
         recordTerminalFailure(
           .infrastructure(failure),
-          generationID: generationID)
+          generationID: generationID,
+        )
       }
     } catch is CancellationError {
       // Cancellation is the ordinary owner and scene-pause path.
     } catch {
       recordTerminalFailure(
         .infrastructure(.failed(String(describing: error))),
-        generationID: generationID)
+        generationID: generationID,
+      )
     }
 
     // Readiness is revoked before cancellation becomes visible to children.
@@ -398,7 +417,8 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     } else {
       deferGenerationCompletionUntilEventualJoin(
         session: session,
-        generationID: generationID)
+        generationID: generationID,
+      )
       reportGenerationFailureIfNeeded(generationID: generationID)
     }
   }
@@ -416,7 +436,8 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     } else {
       deferGenerationCompletionUntilEventualJoin(
         session: generation.session,
-        generationID: generation.id)
+        generationID: generation.id,
+      )
       reportGenerationFailureIfNeeded(generationID: generation.id)
     }
     return didJoin
@@ -430,7 +451,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 
   private func deferGenerationCompletionUntilEventualJoin(
     session: _ObservationSession,
-    generationID: UUID
+    generationID: UUID,
   ) {
     guard generationAwaitingEventualJoinID != generationID else { return }
     generationAwaitingEventualJoinID = generationID
@@ -451,9 +472,10 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
   }
 
   private func reportGenerationFailureIfNeeded(generationID: UUID) {
-    guard failedGenerationID == generationID,
-          reportedGenerationFailureID != generationID,
-          let failure = _visorFailure
+    guard
+      failedGenerationID == generationID,
+      reportedGenerationFailureID != generationID,
+      let failure = _visorFailure
     else { return }
     reportedGenerationFailureID = generationID
     didFail(failure)
@@ -461,11 +483,12 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 
   private func recordTerminalFailure(
     _ failure: _ViewModelObservationOwnerFailure,
-    generationID: UUID
+    generationID: UUID,
   ) {
-    guard let generation,
-          generation.id == generationID,
-          failedGenerationID != generationID
+    guard
+      let generation,
+      generation.id == generationID,
+      failedGenerationID != generationID
     else {
       return
     }
@@ -475,8 +498,4 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     _visorFailure = failure
   }
 
-  private var activationPermitsGeneration: Bool {
-    guard desiredIsEnabled, let activationEpoch else { return false }
-    return failedActivationEpoch != activationEpoch
-  }
 }

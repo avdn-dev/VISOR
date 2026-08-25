@@ -14,12 +14,12 @@ public struct GenerateTestDoublesStubMacro: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in context: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     try TestDoubleGenerator(kind: .stub).expand(
       node,
       declaration: declaration,
-      in: context)
+      in: context,
+    )
   }
 }

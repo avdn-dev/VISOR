@@ -2,12 +2,16 @@ import Foundation
 import os
 import VISORObservation
 
+// MARK: - _ObservationDeadlinePhase
+
 nonisolated package enum _ObservationDeadlinePhase: Equatable, Sendable {
   case readiness
   case openingFence
   case closingFence
   case fence
   case teardownJoin
+
+  // MARK: Internal
 
   var diagnosticName: String {
     switch self {
@@ -25,24 +29,13 @@ nonisolated package enum _ObservationDeadlinePhase: Equatable, Sendable {
   }
 }
 
+// MARK: - _ObservationDeadlinePolicy
+
 /// Package-only policy seam for deterministic control-plane deadline proofs.
 /// Consumer domain clocks never enter this policy.
 nonisolated package struct _ObservationDeadlinePolicy: Sendable {
-  package typealias Sleeper =
-    @concurrent @Sendable (_ duration: Duration) async throws -> Void
-  package typealias ArmedWatchdog =
-    @concurrent @Sendable () async throws -> Void
-  package typealias WatchdogFactory =
-    @Sendable (_ duration: Duration) -> ArmedWatchdog
 
-  let readiness: Duration
-  let openingFence: Duration
-  let closingFence: Duration
-  let fence: Duration
-  let teardownJoin: Duration
-  let makeWatchdog: WatchdogFactory
-  let didResolveDeadline:
-    @Sendable (_ phase: _ObservationDeadlinePhase) -> Void
+  // MARK: Lifecycle
 
   package init(
     readiness: Duration,
@@ -52,7 +45,7 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
     teardownJoin: Duration,
     sleeper: @escaping Sleeper,
     _visorDidResolveDeadline:
-      @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in }
+    @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in },
   ) {
     self.readiness = readiness
     self.openingFence = openingFence
@@ -73,7 +66,7 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
     teardownJoin: Duration,
     _visorWatchdogFactory: @escaping WatchdogFactory,
     _visorDidResolveDeadline:
-      @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in }
+    @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in },
   ) {
     self.readiness = readiness
     self.openingFence = openingFence
@@ -88,7 +81,7 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
     duration: Duration = .zero,
     sleeper: @escaping Sleeper,
     _visorDidResolveDeadline:
-      @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in }
+    @escaping @Sendable (_ phase: _ObservationDeadlinePhase) -> Void = { _ in },
   ) {
     self.init(
       readiness: duration,
@@ -97,23 +90,18 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
       fence: duration,
       teardownJoin: duration,
       sleeper: sleeper,
-      _visorDidResolveDeadline: _visorDidResolveDeadline)
+      _visorDidResolveDeadline: _visorDidResolveDeadline,
+    )
   }
 
-  func duration(for phase: _ObservationDeadlinePhase) -> Duration {
-    switch phase {
-    case .readiness:
-      readiness
-    case .openingFence:
-      openingFence
-    case .closingFence:
-      closingFence
-    case .fence:
-      fence
-    case .teardownJoin:
-      teardownJoin
-    }
-  }
+  // MARK: Package
+
+  package typealias Sleeper =
+    @concurrent @Sendable (_ duration: Duration) async throws -> Void
+  package typealias ArmedWatchdog =
+    @concurrent @Sendable () async throws -> Void
+  package typealias WatchdogFactory =
+    @Sendable (_ duration: Duration) -> ArmedWatchdog
 
   package static let production: Self = {
     // Production liveness is deliberately independent of every consumer or
@@ -134,9 +122,39 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
         return {
           try await clock.sleep(until: deadline)
         }
-      })
+      },
+    )
   }()
+
+  // MARK: Internal
+
+  let readiness: Duration
+  let openingFence: Duration
+  let closingFence: Duration
+  let fence: Duration
+  let teardownJoin: Duration
+  let makeWatchdog: WatchdogFactory
+  let didResolveDeadline:
+    @Sendable (_ phase: _ObservationDeadlinePhase) -> Void
+
+  func duration(for phase: _ObservationDeadlinePhase) -> Duration {
+    switch phase {
+    case .readiness:
+      readiness
+    case .openingFence:
+      openingFence
+    case .closingFence:
+      closingFence
+    case .fence:
+      fence
+    case .teardownJoin:
+      teardownJoin
+    }
+  }
+
 }
+
+// MARK: - _ObservationControlCompletion
 
 nonisolated enum _ObservationControlCompletion<Value: Sendable>:
   Sendable
@@ -145,6 +163,8 @@ nonisolated enum _ObservationControlCompletion<Value: Sendable>:
   case failure(_ObservationSourceFailure)
   case cancelled
 }
+
+// MARK: - _ObservationDeadlineRaceOutcome
 
 nonisolated enum _ObservationDeadlineRaceOutcome<Value: Sendable>:
   Sendable
@@ -155,31 +175,28 @@ nonisolated enum _ObservationDeadlineRaceOutcome<Value: Sendable>:
   case callerCancellation
 }
 
+// MARK: - _ObservationDeadlineRaceLatch
+
 /// A one-shot race latch. Its lock protects only non-suspending state changes;
 /// continuations are removed while locked and always resumed after unlocking.
 nonisolated private final class _ObservationDeadlineRaceLatch<Value: Sendable>:
   Sendable
 {
+
+  // MARK: Internal
+
   typealias Outcome = _ObservationDeadlineRaceOutcome<Value>
-  private typealias Waiter = CheckedContinuation<Outcome, Never>
-
-  private struct State: Sendable {
-    var outcome: Outcome?
-    var waiters: [UUID: Waiter] = [:]
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
 
   @discardableResult
   func resolve(_ outcome: Outcome) -> Bool {
     let resolution: (didWin: Bool, waiters: [Waiter]) =
       lock.withLock { state in
-      guard state.outcome == nil else { return (false, []) }
-      state.outcome = outcome
-      let waiters = Array(state.waiters.values)
-      state.waiters.removeAll(keepingCapacity: false)
-      return (true, waiters)
-    }
+        guard state.outcome == nil else { return (false, []) }
+        state.outcome = outcome
+        let waiters = Array(state.waiters.values)
+        state.waiters.removeAll(keepingCapacity: false)
+        return (true, waiters)
+      }
     for waiter in resolution.waiters {
       waiter.resume(returning: outcome)
     }
@@ -205,28 +222,34 @@ nonisolated private final class _ObservationDeadlineRaceLatch<Value: Sendable>:
   func hasResolved() -> Bool {
     lock.withLock { $0.outcome != nil }
   }
+
+  // MARK: Private
+
+  private typealias Waiter = CheckedContinuation<Outcome, Never>
+
+  private struct State: Sendable {
+    var outcome: Outcome?
+    var waiters = [UUID: Waiter]()
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
+
 }
 
-nonisolated struct _ObservationDeadlinePreparationAborted: Error {}
+// MARK: - _ObservationDeadlinePreparationAborted
+
+nonisolated struct _ObservationDeadlinePreparationAborted: Error { }
+
+// MARK: - _ObservationTeardownDeadlineCoordinator
 
 /// Coordinates every concurrent wait on one teardown deadline. Only one true
 /// join callback and one watchdog are retained, while all active callers are
 /// released together when that shared race resolves.
 nonisolated final class _ObservationTeardownDeadlineCoordinator: Sendable {
+
+  // MARK: Internal
+
   typealias Outcome = _ObservationDeadlineRaceOutcome<Void>
-  private typealias Waiter = CheckedContinuation<Outcome, Never>
-
-  private struct WaiterState: Sendable {
-    var isCancelled: Bool
-    var continuation: Waiter?
-  }
-
-  private struct State: Sendable {
-    var outcome: Outcome?
-    var waiters: [UUID: WaiterState] = [:]
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
 
   func registerWaiter(isCancelled: Bool) -> UUID {
     let id = UUID()
@@ -234,13 +257,14 @@ nonisolated final class _ObservationTeardownDeadlineCoordinator: Sendable {
       guard state.outcome == nil else { return }
       state.waiters[id] = WaiterState(
         isCancelled: isCancelled,
-        continuation: nil)
+        continuation: nil,
+      )
     }
     return id
   }
 
   func wait(for id: UUID) async -> Outcome {
-    let outcome = await withTaskCancellationHandler {
+    await withTaskCancellationHandler {
       await withCheckedContinuation { continuation in
         let immediate: Outcome? = lock.withLock { state in
           if let outcome = state.outcome {
@@ -264,7 +288,6 @@ nonisolated final class _ObservationTeardownDeadlineCoordinator: Sendable {
         state.waiters[id] = waiter
       }
     }
-    return outcome
   }
 
   @discardableResult
@@ -282,14 +305,30 @@ nonisolated final class _ObservationTeardownDeadlineCoordinator: Sendable {
     resolve(.watchdogFailure(failure), reportsDeadline: true)
   }
 
+  // MARK: Private
+
+  private typealias Waiter = CheckedContinuation<Outcome, Never>
+
+  private struct WaiterState: Sendable {
+    var isCancelled: Bool
+    var continuation: Waiter?
+  }
+
+  private struct State: Sendable {
+    var outcome: Outcome?
+    var waiters = [UUID: WaiterState]()
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
+
   private func resolve(
     _ outcome: Outcome,
-    reportsDeadline: Bool
+    reportsDeadline: Bool,
   ) -> (didWin: Bool, shouldReport: Bool) {
     let resolution: (
       didWin: Bool,
       shouldReport: Bool,
-      waiters: [Waiter]
+      waiters: [Waiter],
     ) = lock.withLock { state in
       guard state.outcome == nil else { return (false, false, []) }
       // Deadline eligibility and outcome publication share this one
@@ -313,21 +352,22 @@ nonisolated final class _ObservationTeardownDeadlineCoordinator: Sendable {
 extension _ObservationSession {
   func runWithDeadline<Value: Sendable>(
     phase: _ObservationDeadlinePhase,
-    operation: @escaping @MainActor () async throws -> Value
+    operation: @escaping @MainActor () async throws -> Value,
   ) async -> _ObservationControlCompletion<Value> {
     await runWithDeadline(
       phase: phase,
       synchronousPreparation: { _ in () },
-      operation: { _ in try await operation() })
+      operation: { _ in try await operation() },
+    )
   }
 
   func runWithDeadline<Preparation: Sendable, Value: Sendable>(
     phase: _ObservationDeadlinePhase,
     synchronousPreparation:
-      @MainActor (_ deadlineHasResolved: @Sendable () -> Bool) throws
-        -> Preparation,
+    @MainActor (_ deadlineHasResolved: @Sendable () -> Bool) throws
+      -> Preparation,
     operation:
-      @escaping @MainActor (Preparation) async throws -> Value
+    @escaping @MainActor (Preparation) async throws -> Value,
   ) async -> _ObservationControlCompletion<Value> {
     let race = _ObservationDeadlineRaceLatch<Value>()
     let duration = deadlinePolicy.duration(for: phase)
@@ -346,7 +386,8 @@ extension _ObservationSession {
         // The operation or its caller cancelled this losing watchdog.
       } catch {
         let failure = _ObservationSourceFailure.failed(
-          "The private observation watchdog failed while awaiting \(phase.diagnosticName): \(String(describing: error))")
+          "The private observation watchdog failed while awaiting \(phase.diagnosticName): \(String(describing: error))"
+        )
         guard race.resolve(.watchdogFailure(failure)) else { return }
         didResolveDeadline(phase)
         await self.controlPlaneFailed(failure)
@@ -356,7 +397,8 @@ extension _ObservationSession {
     let preparation: _ObservationControlCompletion<Preparation>
     do {
       preparation = .success(
-        try synchronousPreparation { race.hasResolved() })
+        try synchronousPreparation { race.hasResolved() }
+      )
     } catch is _ObservationDeadlinePreparationAborted {
       // The watchdog already owns the race. Do not publish a second outcome or
       // enter the asynchronous operation after synchronous preparation exits.
@@ -377,8 +419,10 @@ extension _ObservationSession {
       if race.resolve(.operation(.failure(failure))) {
         controlPlaneFailed(failure)
       }
+
     case .cancelled:
       race.resolve(.operation(.cancelled))
+
     case .success:
       break
     }
@@ -427,8 +471,10 @@ extension _ObservationSession {
           return .failure(failure)
         }
         return .cancelled
+
       case .failure(let operationFailure):
         return .failure(failure ?? operationFailure)
+
       case .success:
         if let failure {
           return .failure(failure)
@@ -449,7 +495,8 @@ extension _ObservationSession {
       operationTask.cancel()
       await watchdog.value
       return .failure(
-        failure ?? deadlineFailure(for: phase))
+        failure ?? deadlineFailure(for: phase)
+      )
 
     case .watchdogFailure(let watchdogFailure):
       operationTask.cancel()
@@ -478,7 +525,8 @@ extension _ObservationSession {
     // publish expiry; deadline reporting eligibility is then never sampled
     // from an artificially empty waiter set.
     let waiterID = coordinator.registerWaiter(
-      isCancelled: Task.isCancelled)
+      isCancelled: Task.isCancelled
+    )
 
     if shouldStartWatchdog {
       let duration = deadlinePolicy.duration(for: .teardownJoin)
@@ -497,7 +545,8 @@ extension _ObservationSession {
           // Joined teardown cancels this losing watchdog.
         } catch {
           let failure = _ObservationSourceFailure.failed(
-            "The private observation watchdog failed while awaiting teardown join: \(String(describing: error))")
+            "The private observation watchdog failed while awaiting teardown join: \(String(describing: error))"
+          )
           let resolution = coordinator.resolveWatchdogFailure(failure)
           guard resolution.didWin else { return }
           didResolveDeadline(.teardownJoin)
@@ -514,6 +563,7 @@ extension _ObservationSession {
     case .operation:
       finishTeardownDeadlineWait(coordinator)
       return true
+
     case .deadline, .watchdogFailure:
       if let watchdog = teardownDeadlineWatchdog {
         await watchdog.value
@@ -521,6 +571,7 @@ extension _ObservationSession {
       finishTeardownDeadlineWait(coordinator)
       markTeardownDeadlineWaitEnded()
       return false
+
     case .callerCancellation:
       preconditionFailure("Teardown races do not resolve as caller cancellation")
     }

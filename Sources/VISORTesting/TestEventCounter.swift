@@ -39,7 +39,8 @@ public final class TestEventCounter: Sendable {
         guard state.count < expectedCount else { return true }
         state.waiters.append(Waiter(
           expectedCount: expectedCount,
-          continuation: continuation))
+          continuation: continuation,
+        ))
         return false
       }
 

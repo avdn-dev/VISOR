@@ -61,7 +61,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
     case .sendableSpyUnconstrainedGenericValues(let methodName, let genericNames):
       sendableSpyUnconstrainedGenericValuesMessage(
         methodName: methodName,
-        genericNames: genericNames)
+        genericNames: genericNames,
+      )
     }
   }
 
@@ -118,9 +119,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
 
 private func sendableSpyUnconstrainedGenericValuesMessage(
   methodName: String,
-  genericNames: [String])
-  -> String
-{
+  genericNames: [String],
+) -> String {
   let formattedNames = genericNames.map { "'\($0)'" }.joined(separator: ", ")
   if genericNames.count == 1 {
     return "@GenerateSpy(.sendable) cannot record unconstrained generic value \(formattedNames) in '\(methodName)()'; constrain it to Sendable"

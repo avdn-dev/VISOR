@@ -7,19 +7,19 @@
 
 import Observation
 
-// MARK: - ViewModelFactory
+// MARK: - ViewModelFactoryDiagnostics
 
 package enum ViewModelFactoryDiagnostics {
-  package static func missingRouterMessage<VM: ViewModel>(for viewModelType: VM.Type) -> String {
+  package static func missingRouterMessage(for viewModelType: (some ViewModel).Type) -> String {
     "Could not create \(describe(viewModelType)): routed ViewModelFactory requires a router, " +
       "but EnvironmentValues._visorRouter was nil. Ensure the @LazyViewModel view is rendered " +
       "inside a RouterHost, or inject a non-routed factory if this ViewModel does not navigate."
   }
 
-  package static func routerTypeMismatchMessage<VM: ViewModel, Scene: NavigationScene>(
-    for viewModelType: VM.Type,
+  package static func routerTypeMismatchMessage<Scene: NavigationScene>(
+    for viewModelType: (some ViewModel).Type,
     expected: Router<Scene>.Type,
-    received router: AnyObject
+    received router: AnyObject,
   ) -> String {
     "Could not create \(describe(viewModelType)): routed ViewModelFactory expected \(describe(expected)) " +
       "but received \(describe(type(of: router))). Ensure the view is inside " +
@@ -30,6 +30,8 @@ package enum ViewModelFactoryDiagnostics {
     String(reflecting: type)
   }
 }
+
+// MARK: - ViewModelFactory
 
 /// Generic factory that lazily creates ViewModel instances via a stored closure.
 ///
@@ -47,11 +49,12 @@ package enum ViewModelFactoryDiagnostics {
 ///   stored properties are `@ObservationIgnored`.
 @MainActor @Observable
 public final class ViewModelFactory<VM: ViewModel> {
+
+  // MARK: Lifecycle
+
   // Workaround: Swift 6.2 SIL EarlyPerfInliner crash with -default-isolation MainActor + -O.
   // See Router.swift for details.
   nonisolated deinit { }
-
-  @ObservationIgnored private let _make: (AnyObject?) -> VM
 
   /// Create a factory that does not need a router.
   public init(_ make: @escaping () -> VM) {
@@ -64,11 +67,14 @@ public final class ViewModelFactory<VM: ViewModel> {
     _make = { router in
       guard let router else {
         preconditionFailure(
-          ViewModelFactoryDiagnostics.missingRouterMessage(for: VM.self))
+          ViewModelFactoryDiagnostics.missingRouterMessage(for: VM.self)
+        )
       }
       return make(router)
     }
   }
+
+  // MARK: Public
 
   /// Creates a ViewModel from this factory.
   ///
@@ -93,4 +99,9 @@ public final class ViewModelFactory<VM: ViewModel> {
   public func _visorMakeViewModel(router: AnyObject?) -> VM {
     _make(router)
   }
+
+  // MARK: Private
+
+  @ObservationIgnored private let _make: (AnyObject?) -> VM
+
 }

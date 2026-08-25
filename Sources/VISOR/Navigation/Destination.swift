@@ -5,6 +5,8 @@
 //  Created by Anh Nguyen on 17/2/2026.
 //
 
+// MARK: - Destination
+
 /// A unified destination for Router navigation and deep link dispatch.
 public enum Destination<Scene: NavigationScene> {
   /// Select the specified top-level destination.
@@ -17,6 +19,14 @@ public enum Destination<Scene: NavigationScene> {
   case fullScreen(Scene.FullScreen)
 }
 
-nonisolated extension Destination: Equatable {}
-nonisolated extension Destination: Hashable {}
-nonisolated extension Destination: Sendable {}
+// MARK: Equatable
+
+nonisolated extension Destination: Equatable { }
+
+// MARK: Hashable
+
+nonisolated extension Destination: Hashable { }
+
+// MARK: Sendable
+
+nonisolated extension Destination: Sendable { }

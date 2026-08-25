@@ -1,9 +1,13 @@
 import Testing
 import VISORTesting
 
+// MARK: - ControlledOperationError
+
 private enum ControlledOperationError: Error, Sendable {
   case expected
 }
+
+// MARK: - ConcurrencyPrimitivesTests
 
 @Suite("Concurrency test primitives")
 struct ConcurrencyPrimitivesTests {

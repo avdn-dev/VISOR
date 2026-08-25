@@ -1,13 +1,22 @@
 import Foundation
-import VISOR
 import Testing
+import VISOR
 
-// MARK: - Test ViewModels
+// MARK: - FactoryTestVM
 
 @MainActor
 @Observable
 @ViewModel
 private final class FactoryTestVM {
+
+  // MARK: Lifecycle
+
+  init(value: Int = 0) {
+    initialValue = value
+  }
+
+  // MARK: Internal
+
   final class State {
     var value = 0
   }
@@ -15,12 +24,9 @@ private final class FactoryTestVM {
   let state = State()
   let initialValue: Int
 
-  init(value: Int = 0) {
-    self.initialValue = value
-  }
 }
 
-// MARK: - ViewModelFactory Tests
+// MARK: - ViewModelFactoryTests
 
 @Suite("ViewModelFactory")
 @MainActor
@@ -40,8 +46,6 @@ struct ViewModelFactoryTests {
     let b = factory.makeViewModel()
     #expect(a !== b)
   }
-
-  // MARK: - Routed Factory Tests
 
   @Test
   func `Non-routed factory ignores router context`() {
@@ -79,7 +83,7 @@ struct ViewModelFactoryTests {
   @Test
   func `Routed factory with typed convenience receives router`() {
     let router = Router<TestScene>()
-    let factory: ViewModelFactory<RoutedTestVM> = .routed { (r: Router<TestScene>) in
+    let factory = ViewModelFactory<RoutedTestVM>.routed { (r: Router<TestScene>) in
       RoutedTestVM(routerID: ObjectIdentifier(r))
     }
     let result = factory._visorMakeViewModel(router: router)
@@ -100,7 +104,8 @@ struct ViewModelFactoryTests {
     let message = ViewModelFactoryDiagnostics.routerTypeMismatchMessage(
       for: RoutedTestVM.self,
       expected: Router<TestScene>.self,
-      received: NSObject())
+      received: NSObject(),
+    )
 
     #expect(message.contains("RoutedTestVM"))
     #expect(message.contains("Router"))

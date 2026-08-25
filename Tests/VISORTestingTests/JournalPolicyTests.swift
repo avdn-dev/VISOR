@@ -1,9 +1,13 @@
 import Testing
 import VISORTesting
 
+// MARK: - JournalActionError
+
 private enum JournalActionError: Error {
   case expected
 }
+
+// MARK: - JournalPolicyTests
 
 @Suite("Journal resource and diagnostic policy")
 struct JournalPolicyTests {
@@ -11,14 +15,14 @@ struct JournalPolicyTests {
   @MainActor
   func `Equal and cross-field writes consume raw commits at the exact guard boundary`() async throws {
     let sut = TestingViewModel()
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
 
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 4,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       await test.perform {
         sut.state.count = 0
@@ -46,13 +50,14 @@ struct JournalPolicyTests {
   @MainActor
   func `Zero commit limit reports the observe call site without entering the body`() async throws {
     let sut = TestingViewModel()
-    var issues: [(message: String, location: SourceLocation)] = []
+    var issues = [(message: String, location: SourceLocation)]()
     var enteredBody = false
     let observeLocation = SourceLocation(
       fileID: "JournalPolicyTests/invalid-limit",
       filePath: "/JournalPolicyTests/invalid-limit.swift",
       line: 1_234,
-      column: 56)
+      column: 56,
+    )
 
     try await _observeWithJournalPolicyForProof(
       sut,
@@ -60,7 +65,7 @@ struct JournalPolicyTests {
       logicalCommitLimit: 0,
       issueRecorder: { message, location in
         issues.append((message, location))
-      }
+      },
     ) { _ in
       enteredBody = true
     }
@@ -77,14 +82,15 @@ struct JournalPolicyTests {
   @MainActor
   func `Overflow fails the complete window once and suppresses later operations`() async throws {
     let sut = TestingViewModel()
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
     var issueLocation: SourceLocation?
     var laterOperationRan = false
     let performLocation = SourceLocation(
       fileID: "JournalPolicyTests/perform",
       filePath: "/JournalPolicyTests/perform.swift",
       line: 1_234,
-      column: 56)
+      column: 56,
+    )
 
     try await _observeWithJournalPolicyForProof(
       sut,
@@ -92,7 +98,7 @@ struct JournalPolicyTests {
       issueRecorder: { message, sourceLocation in
         infrastructureIssues.append(message)
         issueLocation = sourceLocation
-      }
+      },
     ) { test in
       await test.perform({
         sut.state.count = 1
@@ -126,14 +132,14 @@ struct JournalPolicyTests {
     let current = TestingReference()
     let firstProbe = WeakReference(first)
     let secondProbe = WeakReference(second)
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
 
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 2,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       await test.perform {
         sut.state.reference = first!
@@ -157,14 +163,14 @@ struct JournalPolicyTests {
   func `Earlier session failure wins when overflow follows`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
 
     try await _observeWithJournalPolicyForProof(
       sut,
       logicalCommitLimit: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       await test.perform {
         service.terminate()
@@ -184,7 +190,7 @@ struct JournalPolicyTests {
   @MainActor
   func `Overflow preserves the exact throwing action error`() async throws {
     let sut = TestingViewModel()
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
     var laterOperationRan = false
 
     try await _observeWithJournalPolicyForProof(
@@ -192,7 +198,7 @@ struct JournalPolicyTests {
       logicalCommitLimit: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       await #expect(throws: JournalActionError.expected) {
         try await test.perform {
@@ -217,7 +223,7 @@ struct JournalPolicyTests {
   @MainActor
   func `Overflow preserves a produced result and suppresses later work`() async throws {
     let sut = TestingViewModel()
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
     var result: Int?
     var predicateEvaluations = 0
     var laterOperationRan = false
@@ -227,7 +233,7 @@ struct JournalPolicyTests {
       logicalCommitLimit: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       result = try await test.perform {
         sut.state.count = 1
@@ -240,7 +246,8 @@ struct JournalPolicyTests {
         alwaysSatisfies: { _ in
           predicateEvaluations += 1
           return true
-        })
+        },
+      )
       await test.perform {
         laterOperationRan = true
       }
@@ -263,7 +270,7 @@ struct JournalPolicyTests {
     let committedProbe = WeakReference(committed)
     var endProbe: WeakReference<TestingReference>?
 
-    sut.state.reference = initial!
+    sut.state.reference = try #require(initial)
 
     try await observe(sut) { test in
       await test.perform {
@@ -303,7 +310,7 @@ struct JournalPolicyTests {
       sut,
       logicalCommitLimit: 8,
       outsideWindowCapacity: 3,
-      issueRecorder: { _, _ in }
+      issueRecorder: { _, _ in },
     ) { test in
       sut.state.count = 1
       sut.state.status = "second"
@@ -337,7 +344,7 @@ struct JournalPolicyTests {
       ])
       #expect(context.omittedEntryCount == 4)
 
-      await test.perform {}
+      await test.perform { }
       context = test._outsideWindowDiagnosticContextForProof
       #expect(context.entries.map(\.relation) == [
         .beforeAction(1),
@@ -358,7 +365,7 @@ struct JournalPolicyTests {
       sut,
       logicalCommitLimit: 16,
       outsideWindowCapacity: 16,
-      issueRecorder: { _, _ in }
+      issueRecorder: { _, _ in },
     ) { test in
       let startupContext = test._outsideWindowDiagnosticContextForProof
       #expect(sut.state.sourceValue == 7)
@@ -369,7 +376,7 @@ struct JournalPolicyTests {
         $0.relation == .beforeFirstAction
       })
 
-      await test.perform {}
+      await test.perform { }
 
       #expect(test._rawCommitFieldNames.isEmpty)
       test.expect(\.sourceValue, hasExactChanges: [])
@@ -393,7 +400,7 @@ struct JournalPolicyTests {
       sut,
       logicalCommitLimit: 8,
       outsideWindowCapacity: 3,
-      issueRecorder: { _, _ in }
+      issueRecorder: { _, _ in },
     ) { test in
       escapedTest = test
       sut.state.reference = first!
@@ -418,7 +425,7 @@ struct JournalPolicyTests {
   @MainActor
   func `Invalidated action tail is not reclassified as outside context`() async throws {
     let sut = TestingViewModel()
-    var infrastructureIssues: [String] = []
+    var infrastructureIssues = [String]()
 
     try await _observeWithJournalPolicyForProof(
       sut,
@@ -426,7 +433,7 @@ struct JournalPolicyTests {
       outsideWindowCapacity: 4,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
-      }
+      },
     ) { test in
       await test.perform {
         sut.state.count = 1

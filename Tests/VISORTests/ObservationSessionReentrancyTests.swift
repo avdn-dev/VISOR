@@ -3,34 +3,60 @@ import VISOR
 import VISORObservation
 import VISORTesting
 
+// MARK: - ReentrantSessionReference
+
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
 
 @MainActor
 private final class ReentrantSessionReference {
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
   weak var session: _ObservationSession?
 
-  deinit {}
 }
+
+// MARK: - ReentrantLaneReference
 
 @MainActor
 private final class ReentrantLaneReference<Value: Sendable> {
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
   weak var lane: _ObservationLane<Value>?
 
-  deinit {}
 }
+
+// MARK: - ReentrancyLog
 
 @MainActor
 private final class ReentrancyLog {
-  var values: [Int] = []
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
+  var values = [Int]()
   var pauseOperationCount = 0
   var pauseWasRejected = false
   var waitWasRejected = false
   var checkpointWasRejected = false
   var unexpectedPauseFailure: String?
 
-  deinit {}
 }
+
+// MARK: - ObservationSessionReentrancyTests
 
 @Suite("V11 observation session re-entrancy")
 struct ObservationSessionReentrancyTests {
@@ -44,9 +70,11 @@ struct ObservationSessionReentrancyTests {
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [])._visorErase(),
+          handlers: [],
+        )._visorErase()
       ],
-      _visorBeforePauseDrain: { await pauseGate.run() })
+      _visorBeforePauseDrain: { await pauseGate.run() },
+    )
     try await session._visorStart()
 
     let firstPause = Task { @MainActor in
@@ -80,7 +108,7 @@ struct ObservationSessionReentrancyTests {
     #expect(secondOperationCount == 0)
     #expect(session._visorIsReady)
 
-    try await session._visorWithPause {}
+    try await session._visorWithPause { }
     await session._visorStop()
   }
 
@@ -100,8 +128,9 @@ struct ObservationSessionReentrancyTests {
             }
             await request.value
             requestReturned.record()
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     reference.session = session
     try await session._visorStart()
@@ -141,8 +170,9 @@ struct ObservationSessionReentrancyTests {
               log.unexpectedPauseFailure = String(describing: error)
             }
             pauseReturned.record()
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     reference.session = session
     try await session._visorStart()
@@ -156,7 +186,7 @@ struct ObservationSessionReentrancyTests {
     #expect(session._visorIsReady)
 
     channel.publish(2)
-    try await session._visorWithPause {}
+    try await session._visorWithPause { }
     #expect(log.values == [0, 1, 2])
 
     await session._visorStop()
@@ -187,8 +217,9 @@ struct ObservationSessionReentrancyTests {
               log.unexpectedPauseFailure = String(describing: error)
             }
             waitReturned.record()
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     reference.session = session
     try await session._visorStart()
@@ -201,7 +232,7 @@ struct ObservationSessionReentrancyTests {
     #expect(session._visorIsReady)
 
     channel.publish(2)
-    try await session._visorWithPause {}
+    try await session._visorWithPause { }
     #expect(log.values == [0, 1, 2])
 
     await session._visorStop()
@@ -216,13 +247,15 @@ struct ObservationSessionReentrancyTests {
       lanes: [
         _ObservationLane(
           source: channel.source,
-          handlers: [])._visorErase(),
+          handlers: [],
+        )._visorErase()
       ],
       _visorBeforeReady: { [reference, requestReturned] in
         guard let session = reference.session else { return }
         await session._visorStop()
-            requestReturned.record()
-      })
+        requestReturned.record()
+      },
+    )
     reference.session = session
 
     await #expect(throws: CancellationError.self) {
@@ -249,8 +282,9 @@ struct ObservationSessionReentrancyTests {
             guard let session = reference.session else { return }
             await session._visorStop()
             requestReturned.record()
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     reference.session = session
 
@@ -276,8 +310,9 @@ struct ObservationSessionReentrancyTests {
             if value == 1 {
               await otherGate.run()
             }
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     try await otherSession._visorStart()
     otherChannel.publish(1)
@@ -295,8 +330,9 @@ struct ObservationSessionReentrancyTests {
             stopStarted.record()
             await otherSession._visorStop()
             stopReturned.record()
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase()
     ])
     try await session._visorStart()
 
@@ -309,7 +345,7 @@ struct ObservationSessionReentrancyTests {
     #expect(!otherSession._visorIsReady)
     #expect(otherChannel.source._visorActiveSubscriptionCount == 0)
 
-    try await session._visorWithPause {}
+    try await session._visorWithPause { }
     await session._visorStop()
   }
 
@@ -336,9 +372,10 @@ struct ObservationSessionReentrancyTests {
           } catch {
             log.unexpectedPauseFailure = String(describing: error)
           }
-            checkpointReturned.record()
-        },
-      ])
+          checkpointReturned.record()
+        }
+      ],
+    )
     reference.lane = lane
     let session = _ObservationSession(lanes: [lane._visorErase()])
     try await session._visorStart()
@@ -370,9 +407,10 @@ struct ObservationSessionReentrancyTests {
         { [reference, requestReturned] value in
           guard value == 1, let lane = reference.lane else { return }
           await lane._visorCancelAndJoin()
-        requestReturned.record()
-        },
-      ])
+          requestReturned.record()
+        }
+      ],
+    )
     reference.lane = lane
     let session = _ObservationSession(lanes: [lane._visorErase()])
     try await session._visorStart()
@@ -420,8 +458,9 @@ struct ObservationSessionReentrancyTests {
             } else if value == 2 {
               laterRevisionHandled.record()
             }
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase(),
       _ObservationLane(
         source: secondChannel.source,
         handlers: [
@@ -429,8 +468,9 @@ struct ObservationSessionReentrancyTests {
             if value == 1 {
               await otherGate.run()
             }
-          },
-        ])._visorErase(),
+          }
+        ],
+      )._visorErase(),
     ])
     reference.session = session
     try await session._visorStart()

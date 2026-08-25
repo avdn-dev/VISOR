@@ -19,6 +19,8 @@ nonisolated public enum DeepLinkConfigurationError: Error, Equatable, Sendable {
   case invalidScheme(String)
 }
 
+// MARK: LocalizedError
+
 extension DeepLinkConfigurationError: LocalizedError {
   /// A human-readable explanation suitable for configuration diagnostics.
   public var errorDescription: String? {
@@ -52,9 +54,19 @@ public enum DeepLinkOutcome<Scene: NavigationScene> {
   case inactive
 }
 
-nonisolated extension DeepLinkOutcome: Equatable {}
-nonisolated extension DeepLinkOutcome: Hashable {}
-nonisolated extension DeepLinkOutcome: Sendable {}
+// MARK: Equatable
+
+nonisolated extension DeepLinkOutcome: Equatable { }
+
+// MARK: Hashable
+
+nonisolated extension DeepLinkOutcome: Hashable { }
+
+// MARK: Sendable
+
+nonisolated extension DeepLinkOutcome: Sendable { }
+
+// MARK: - RouterDeepLinkConfiguration
 
 @MainActor
 private struct RouterDeepLinkConfiguration<Scene: NavigationScene> {
@@ -62,12 +74,14 @@ private struct RouterDeepLinkConfiguration<Scene: NavigationScene> {
   let parsers: [DeepLinkParser<Scene>]
 }
 
-package struct RouterRootDestinationSet<Root: RootDestination>: Sendable {
-  package let values: Set<Root>
+// MARK: - RouterRootDestinationSet
 
+package struct RouterRootDestinationSet<Root: RootDestination>: Sendable {
   package init() {
     values = Set(Root.allCases)
   }
+
+  package let values: Set<Root>
 
   package func contains(_ root: Root) -> Bool {
     values.contains(root)
@@ -76,9 +90,12 @@ package struct RouterRootDestinationSet<Root: RootDestination>: Sendable {
   func require(_ root: Root) {
     precondition(
       contains(root),
-      "Router received root destination '\(root)' that is absent from \(Root.self).allCases. RootDestination.allCases must list every supported root.")
+      "Router received root destination '\(root)' that is absent from \(Root.self).allCases. RootDestination.allCases must list every supported root.",
+    )
   }
 }
+
+// MARK: - RouterTreeContext
 
 @MainActor
 private final class RouterTreeContext<Scene: NavigationScene> {
@@ -87,17 +104,23 @@ private final class RouterTreeContext<Scene: NavigationScene> {
   var deepLinkConfiguration: RouterDeepLinkConfiguration<Scene>?
 }
 
+// MARK: - RouterSheetPresentation
+
 package struct RouterSheetPresentation<Scene: NavigationScene>: Identifiable {
   package let id: Scene.Sheet.ID
   package var destination: Scene.Sheet
   package let router: Router<Scene>
 }
 
+// MARK: - RouterFullScreenPresentation
+
 package struct RouterFullScreenPresentation<Scene: NavigationScene>: Identifiable {
   package let id: Scene.FullScreen.ID
   package var destination: Scene.FullScreen
   package let router: Router<Scene>
 }
+
+// MARK: - RouterModalPresentation
 
 private enum RouterModalPresentation<Scene: NavigationScene> {
   case sheet(RouterSheetPresentation<Scene>)
@@ -125,11 +148,11 @@ public final class Router<Scene: NavigationScene> {
   /// Creates a root router.
   /// Pass a logger to record rejected actions and deep-link outcomes.
   public init(logger: Logger? = nil) {
-    self.level = 0
-    self.rootDestination = nil
-    self.parent = nil
+    level = 0
+    rootDestination = nil
+    parent = nil
     self.logger = logger
-    self.treeContext = RouterTreeContext()
+    treeContext = RouterTreeContext()
     isActive = false
   }
 
@@ -138,20 +161,39 @@ public final class Router<Scene: NavigationScene> {
     level: Int,
     rootDestination: Scene.Root? = nil,
     parent: Router? = nil,
-    logger: Logger? = nil)
-  {
+    logger: Logger? = nil,
+  ) {
     self.level = level
     self.rootDestination = rootDestination
     self.parent = parent
     self.logger = logger
-    self.treeContext = parent?.treeContext ?? RouterTreeContext()
+    treeContext = parent?.treeContext ?? RouterTreeContext()
     isActive = false
     if let rootDestination {
       treeContext.rootDestinations.require(rootDestination)
     }
   }
 
-  // MARK: - Navigation State
+  // MARK: Public
+
+  /// The navigation stack path for push destinations.
+  ///
+  /// The setter remains public so a custom `NavigationStack` hosted by
+  /// ``RouterHost`` can bind to it. Use ``push(_:)`` and ``popToRoot()`` for
+  /// imperative changes.
+  public var navigationPath = [Scene.Push]()
+
+  /// The depth level of this router (0 = root).
+  public let level: Int
+
+  /// The top-level destination this Router is associated with.
+  ///
+  /// Root and modal Routers have no root destination.
+  public let rootDestination: Scene.Root?
+
+  /// Whether this Router is the active visible target for root navigation
+  /// actions and deep links.
+  public private(set) var isActive: Bool
 
   /// The currently selected top-level destination.
   ///
@@ -165,13 +207,6 @@ public final class Router<Scene: NavigationScene> {
       }
     }
   }
-
-  /// The navigation stack path for push destinations.
-  ///
-  /// The setter remains public so a custom `NavigationStack` hosted by
-  /// ``RouterHost`` can bind to it. Use ``push(_:)`` and ``popToRoot()`` for
-  /// imperative changes.
-  public var navigationPath: [Scene.Push] = []
 
   /// The currently presented sheet, if any.
   ///
@@ -191,24 +226,13 @@ public final class Router<Scene: NavigationScene> {
     fullScreenPresentation?.destination
   }
 
-  // MARK: - Hierarchy
-
-  /// The depth level of this router (0 = root).
-  public let level: Int
-
-  /// The top-level destination this Router is associated with.
-  ///
-  /// Root and modal Routers have no root destination.
-  public let rootDestination: Scene.Root?
-
-  /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
-  package weak let parent: Router?
-
-  /// Whether this Router is the active visible target for root navigation
-  /// actions and deep links.
-  public private(set) var isActive: Bool
-
-  // MARK: - Navigation Actions
+  /// Creates a preview Router with the given top-level destination selected.
+  /// - Returns: An inactive Router intended for preview composition.
+  public static func preview(root: Scene.Root? = nil) -> Router {
+    let router = Router()
+    router.selectedRoot = root
+    return router
+  }
 
   /// Push a destination onto the navigation stack. Root calls target the
   /// currently active visible Router; child calls remain local.
@@ -272,10 +296,13 @@ public final class Router<Scene: NavigationScene> {
     case .root(let root):
       select(root: root)
       return true
+
     case .push(let destination):
       return push(destination)
+
     case .sheet(let sheet):
       return present(sheet: sheet)
+
     case .fullScreen(let fullScreen):
       return present(fullScreen: fullScreen)
     }
@@ -327,46 +354,6 @@ public final class Router<Scene: NavigationScene> {
     return target.dismissFullScreenLocally()
   }
 
-  // MARK: - Active State
-
-  /// Marks this Router as mounted and makes it active unless one of its mounted
-  /// descendants is already the active visible node.
-  package func activate() {
-    log("activate (level \(level))")
-    isMounted = true
-    if let activeRouter = treeContext.activeRouter,
-       activeRouter !== self,
-       activeRouter.isMounted,
-       activeRouter.isDescendant(of: self)
-    {
-      isActive = false
-      return
-    }
-    if let previous = treeContext.activeRouter, previous !== self {
-      previous.isActive = false
-    }
-    treeContext.activeRouter = self
-    isActive = true
-  }
-
-  /// Mark this Router as unmounted and restore its nearest mounted ancestor.
-  /// A late disappearance cannot deactivate a newer active sibling.
-  package func deactivate() {
-    log("deactivate (level \(level))")
-    isMounted = false
-    isActive = false
-    guard treeContext.activeRouter === self else { return }
-
-    var replacement = parent
-    while let candidate = replacement, !candidate.isMounted {
-      replacement = candidate.parent
-    }
-    treeContext.activeRouter = replacement
-    replacement?.isActive = true
-  }
-
-  // MARK: - Deep Linking
-
   /// Validate and open a deep-link URL in this Router tree.
   ///
   /// A structurally invalid path is rejected before parser dispatch. Otherwise,
@@ -408,8 +395,6 @@ public final class Router<Scene: NavigationScene> {
     return reportDeepLinkOutcome(.unmatched)
   }
 
-  // MARK: - Child Management
-
   /// Creates or returns the cached child Router for a top-level destination.
   ///
   /// - Precondition: `root` appears in `Scene.Root.allCases`.
@@ -422,22 +407,50 @@ public final class Router<Scene: NavigationScene> {
       level: level + 1,
       rootDestination: root,
       parent: self,
-      logger: logger)
+      logger: logger,
+    )
     rootChildren[root] = child
     log("childRouter created for root \(root) at level \(child.level)")
     return child
   }
 
-  /// Creates a child Router for a modal's RouterStack.
-  package func childRouter() -> Router {
-    let child = Router(
-      level: level + 1,
-      rootDestination: nil,
-      parent: self,
-      logger: logger)
-    log("childRouter created (modal) at level \(child.level)")
-    return child
+  /// Configure deep link handling with a URL scheme and an ordered list of parsers.
+  ///
+  /// Configuration applies to this Router's entire tree. The URL's scheme must
+  /// match `scheme` (case-insensitive). Parsers are tried in order until one
+  /// returns a destination or reports invalid input.
+  ///
+  /// ```swift
+  /// try router.configureDeepLinks(scheme: "myapp", parsers: [
+  ///   .equal(to: ["profile"], destination: .root(.profile)),
+  /// ])
+  /// ```
+  ///
+  /// An empty parser list is valid and makes matching URLs return
+  /// ``DeepLinkOutcome/unmatched``.
+  ///
+  /// - Parameters:
+  ///   - scheme: The URL scheme, without `://`.
+  ///   - parsers: Parsers evaluated in declaration order.
+  /// - Throws: ``DeepLinkConfigurationError/invalidScheme(_:)`` when `scheme`
+  ///   is empty or violates URL scheme grammar.
+  public func configureDeepLinks(
+    scheme: String,
+    parsers: [DeepLinkParser<Scene>],
+  ) throws {
+    guard Self.isValidURLScheme(scheme) else {
+      throw DeepLinkConfigurationError.invalidScheme(scheme)
+    }
+    treeContext.deepLinkConfiguration = RouterDeepLinkConfiguration(
+      scheme: scheme.lowercased(),
+      parsers: parsers,
+    )
   }
+
+  // MARK: Package
+
+  /// The parent router. Weak to avoid retain cycles; `let` because it never changes after init.
+  package weak let parent: Router?
 
   package var sheetPresentation: RouterSheetPresentation<Scene>? {
     get {
@@ -467,48 +480,67 @@ public final class Router<Scene: NavigationScene> {
     }
   }
 
-  // MARK: - Preview
-
-  /// Creates a preview Router with the given top-level destination selected.
-  /// - Returns: An inactive Router intended for preview composition.
-  public static func preview(root: Scene.Root? = nil) -> Router {
-    let router = Router()
-    router.selectedRoot = root
-    return router
+  /// Only the mounted target handles SwiftUI's tree-wide `onOpenURL` delivery.
+  package var receivesDeepLinks: Bool {
+    rootRouter.currentNavigationActionTarget === self
   }
 
-  // MARK: - Deep Link Configuration
-
-  /// Configure deep link handling with a URL scheme and an ordered list of parsers.
-  ///
-  /// Configuration applies to this Router's entire tree. The URL's scheme must
-  /// match `scheme` (case-insensitive). Parsers are tried in order until one
-  /// returns a destination or reports invalid input.
-  ///
-  /// ```swift
-  /// try router.configureDeepLinks(scheme: "myapp", parsers: [
-  ///   .equal(to: ["profile"], destination: .root(.profile)),
-  /// ])
-  /// ```
-  ///
-  /// An empty parser list is valid and makes matching URLs return
-  /// ``DeepLinkOutcome/unmatched``.
-  ///
-  /// - Parameters:
-  ///   - scheme: The URL scheme, without `://`.
-  ///   - parsers: Parsers evaluated in declaration order.
-  /// - Throws: ``DeepLinkConfigurationError/invalidScheme(_:)`` when `scheme`
-  ///   is empty or violates URL scheme grammar.
-  public func configureDeepLinks(
-    scheme: String,
-    parsers: [DeepLinkParser<Scene>]
-  ) throws {
-    guard Self.isValidURLScheme(scheme) else {
-      throw DeepLinkConfigurationError.invalidScheme(scheme)
+  /// Marks this Router as mounted and makes it active unless one of its mounted
+  /// descendants is already the active visible node.
+  package func activate() {
+    log("activate (level \(level))")
+    isMounted = true
+    if
+      let activeRouter = treeContext.activeRouter,
+      activeRouter !== self,
+      activeRouter.isMounted,
+      activeRouter.isDescendant(of: self)
+    {
+      isActive = false
+      return
     }
-    treeContext.deepLinkConfiguration = RouterDeepLinkConfiguration(
-      scheme: scheme.lowercased(),
-      parsers: parsers)
+    if let previous = treeContext.activeRouter, previous !== self {
+      previous.isActive = false
+    }
+    treeContext.activeRouter = self
+    isActive = true
+  }
+
+  /// Mark this Router as unmounted and restore its nearest mounted ancestor.
+  /// A late disappearance cannot deactivate a newer active sibling.
+  package func deactivate() {
+    log("deactivate (level \(level))")
+    isMounted = false
+    isActive = false
+    guard treeContext.activeRouter === self else { return }
+
+    var replacement = parent
+    while let candidate = replacement, !candidate.isMounted {
+      replacement = candidate.parent
+    }
+    treeContext.activeRouter = replacement
+    replacement?.isActive = true
+  }
+
+  /// Creates a child Router for a modal's RouterStack.
+  package func childRouter() -> Router {
+    let child = Router(
+      level: level + 1,
+      rootDestination: nil,
+      parent: self,
+      logger: logger,
+    )
+    log("childRouter created (modal) at level \(child.level)")
+    return child
+  }
+
+  /// Handles an automatic URL delivery and reports its outcome to the host.
+  package func receiveDeepLink(
+    _ url: URL,
+    onOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void,
+  ) {
+    guard receivesDeepLinks else { return }
+    onOutcome(openDeepLink(url))
   }
 
   // MARK: Private
@@ -518,13 +550,47 @@ public final class Router<Scene: NavigationScene> {
   /// bounded by the tree's snapshotted Root.allCases and intentionally never
   /// evicted so each destination preserves its navigation state while another
   /// destination is selected.
-  @ObservationIgnored private var rootChildren: [Scene.Root: Router] = [:]
+  @ObservationIgnored private var rootChildren = [Scene.Root: Router]()
   @ObservationIgnored private let treeContext: RouterTreeContext<Scene>
   @ObservationIgnored private var isMounted = false
   private var modalPresentation: RouterModalPresentation<Scene>?
 
   private var rootRouter: Router {
     parent?.rootRouter ?? self
+  }
+
+  private var currentNavigationActionTarget: Router? {
+    let root = rootRouter
+    if let activeRouter = root.treeContext.activeRouter, activeRouter.isMounted {
+      return activeRouter
+    }
+    if
+      let selectedRoot = root.selectedRoot,
+      let selectedRouter = root.rootChildren[selectedRoot],
+      selectedRouter.isMounted
+    {
+      return selectedRouter
+    }
+    if root.isMounted {
+      return root
+    }
+    return nil
+  }
+
+  private nonisolated static func isValidURLScheme(_ scheme: String) -> Bool {
+    let scalars = scheme.unicodeScalars
+    guard let first = scalars.first, isASCIILetter(first) else { return false }
+    return scalars.dropFirst().allSatisfy { scalar in
+      isASCIILetter(scalar)
+        || (48...57).contains(scalar.value)
+        || scalar == "+"
+        || scalar == "-"
+        || scalar == "."
+    }
+  }
+
+  private nonisolated static func isASCIILetter(_ scalar: Unicode.Scalar) -> Bool {
+    (65...90).contains(scalar.value) || (97...122).contains(scalar.value)
   }
 
   private func isDescendant(of router: Router) -> Bool {
@@ -534,37 +600,6 @@ public final class Router<Scene: NavigationScene> {
       ancestor = candidate.parent
     }
     return false
-  }
-
-  /// Only the mounted target handles SwiftUI's tree-wide `onOpenURL` delivery.
-  package var receivesDeepLinks: Bool {
-    rootRouter.currentNavigationActionTarget === self
-  }
-
-  /// Handles an automatic URL delivery and reports its outcome to the host.
-  package func receiveDeepLink(
-    _ url: URL,
-    onOutcome: @MainActor (DeepLinkOutcome<Scene>) -> Void
-  ) {
-    guard receivesDeepLinks else { return }
-    onOutcome(openDeepLink(url))
-  }
-
-  private var currentNavigationActionTarget: Router? {
-    let root = rootRouter
-    if let activeRouter = root.treeContext.activeRouter, activeRouter.isMounted {
-      return activeRouter
-    }
-    if let selectedRoot = root.selectedRoot,
-       let selectedRouter = root.rootChildren[selectedRoot],
-       selectedRouter.isMounted
-    {
-      return selectedRouter
-    }
-    if root.isMounted {
-      return root
-    }
-    return nil
   }
 
   private func navigationActionTarget(for action: String) -> Router? {
@@ -579,9 +614,8 @@ public final class Router<Scene: NavigationScene> {
   }
 
   private func reportDeepLinkOutcome(
-    _ outcome: DeepLinkOutcome<Scene>)
-    -> DeepLinkOutcome<Scene>
-  {
+    _ outcome: DeepLinkOutcome<Scene>
+  ) -> DeepLinkOutcome<Scene> {
     switch outcome {
     case .handled:
       log("deep link outcome: handled")
@@ -606,8 +640,9 @@ public final class Router<Scene: NavigationScene> {
 
   private func presentSheetLocally(_ sheet: Scene.Sheet) {
     log("present sheet: \(sheet)")
-    if case .sheet(var presentation) = modalPresentation,
-       presentation.id == sheet.id
+    if
+      case .sheet(var presentation) = modalPresentation,
+      presentation.id == sheet.id
     {
       presentation.destination = sheet
       modalPresentation = .sheet(presentation)
@@ -615,14 +650,16 @@ public final class Router<Scene: NavigationScene> {
       modalPresentation = .sheet(RouterSheetPresentation(
         id: sheet.id,
         destination: sheet,
-        router: childRouter()))
+        router: childRouter(),
+      ))
     }
   }
 
   private func presentFullScreenLocally(_ fullScreen: Scene.FullScreen) {
     log("present fullScreen: \(fullScreen)")
-    if case .fullScreen(var presentation) = modalPresentation,
-       presentation.id == fullScreen.id
+    if
+      case .fullScreen(var presentation) = modalPresentation,
+      presentation.id == fullScreen.id
     {
       presentation.destination = fullScreen
       modalPresentation = .fullScreen(presentation)
@@ -630,7 +667,8 @@ public final class Router<Scene: NavigationScene> {
       modalPresentation = .fullScreen(RouterFullScreenPresentation(
         id: fullScreen.id,
         destination: fullScreen,
-        router: childRouter()))
+        router: childRouter(),
+      ))
     }
   }
 
@@ -664,22 +702,9 @@ public final class Router<Scene: NavigationScene> {
   }
 
   private func log(_ message: String) {
+    // OSLog's autoclosure requires explicit self for actor-isolated state.
+    // swiftformat:disable:next redundantSelf
     logger?.debug("Router[\(self.level)]: \(message)")
   }
 
-  private nonisolated static func isValidURLScheme(_ scheme: String) -> Bool {
-    let scalars = scheme.unicodeScalars
-    guard let first = scalars.first, isASCIILetter(first) else { return false }
-    return scalars.dropFirst().allSatisfy { scalar in
-      isASCIILetter(scalar)
-        || (48...57).contains(scalar.value)
-        || scalar == "+"
-        || scalar == "-"
-        || scalar == "."
-    }
-  }
-
-  private nonisolated static func isASCIILetter(_ scalar: Unicode.Scalar) -> Bool {
-    (65...90).contains(scalar.value) || (97...122).contains(scalar.value)
-  }
 }

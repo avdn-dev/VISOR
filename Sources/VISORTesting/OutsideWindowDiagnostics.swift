@@ -1,3 +1,5 @@
+// MARK: - _OutsideWindowMutationForProof
+
 package struct _OutsideWindowMutationForProof: Equatable {
   package enum Relation: Equatable {
     case beforeFirstAction
@@ -12,10 +14,14 @@ package struct _OutsideWindowMutationForProof: Equatable {
   package let relation: Relation
 }
 
+// MARK: - _OutsideWindowDiagnosticContextForProof
+
 package struct _OutsideWindowDiagnosticContextForProof: Equatable {
   package let entries: [_OutsideWindowMutationForProof]
   package let omittedEntryCount: UInt64
 }
+
+// MARK: - OutsideWindowMutationEntry
 
 struct OutsideWindowMutationEntry {
   let order: UInt64
@@ -24,28 +30,33 @@ struct OutsideWindowMutationEntry {
   var relation: _OutsideWindowMutationForProof.Relation
 }
 
+// MARK: - OutsideWindowMutationRing
+
 struct OutsideWindowMutationRing {
-  private var storage: [OutsideWindowMutationEntry?]
-  private var oldestIndex = 0
-  private(set) var count = 0
-  private(set) var omittedEntryCount: UInt64 = 0
-  private var nextOrder: UInt64 = 1
+
+  // MARK: Lifecycle
 
   init(capacity: Int) {
     precondition(capacity > 0)
     storage = Array(repeating: nil, count: capacity)
   }
 
+  // MARK: Internal
+
+  private(set) var count = 0
+  private(set) var omittedEntryCount: UInt64 = 0
+
   mutating func append(
     fieldID: ObjectIdentifier,
     fieldName: String,
-    relation: _OutsideWindowMutationForProof.Relation
+    relation: _OutsideWindowMutationForProof.Relation,
   ) {
     let entry = OutsideWindowMutationEntry(
       order: nextOrder,
       fieldID: fieldID,
       fieldName: fieldName,
-      relation: relation)
+      relation: relation,
+    )
     if nextOrder < .max {
       nextOrder += 1
     }
@@ -75,7 +86,7 @@ struct OutsideWindowMutationRing {
 
   mutating func reclassifyAfterAction(
     _ previous: UInt64,
-    asBefore next: UInt64
+    asBefore next: UInt64,
   ) {
     for index in storage.indices {
       guard var entry = storage[index] else { continue }
@@ -86,7 +97,7 @@ struct OutsideWindowMutationRing {
   }
 
   func snapshot() -> _OutsideWindowDiagnosticContextForProof {
-    var entries: [_OutsideWindowMutationForProof] = []
+    var entries = [_OutsideWindowMutationForProof]()
     entries.reserveCapacity(count)
 
     for offset in 0..<count {
@@ -96,12 +107,14 @@ struct OutsideWindowMutationRing {
         order: entry.order,
         fieldID: entry.fieldID,
         fieldName: entry.fieldName,
-        relation: entry.relation))
+        relation: entry.relation,
+      ))
     }
 
     return _OutsideWindowDiagnosticContextForProof(
       entries: entries,
-      omittedEntryCount: omittedEntryCount)
+      omittedEntryCount: omittedEntryCount,
+    )
   }
 
   mutating func removeAll() {
@@ -113,4 +126,11 @@ struct OutsideWindowMutationRing {
     omittedEntryCount = 0
     nextOrder = 1
   }
+
+  // MARK: Private
+
+  private var storage: [OutsideWindowMutationEntry?]
+  private var oldestIndex = 0
+  private var nextOrder: UInt64 = 1
+
 }

@@ -1,21 +1,33 @@
 import RootGatewayModelsNonisolated
 import VISOR
 
+// MARK: - ProbePush
+
 private enum ProbePush: PushDestination {
   case value
 }
 
+// MARK: - ProbeSheet
+
 private enum ProbeSheet: SheetDestination {
   case value
 
-  var id: Self { self }
+  var id: Self {
+    self
+  }
 }
+
+// MARK: - ProbeFullScreen
 
 private enum ProbeFullScreen: FullScreenDestination {
   case value
 
-  var id: Self { self }
+  var id: Self {
+    self
+  }
 }
+
+// MARK: - ProbeScene
 
 private enum ProbeScene: NavigationScene {
   typealias Push = ProbePush

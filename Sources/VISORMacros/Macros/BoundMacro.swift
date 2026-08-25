@@ -16,13 +16,13 @@ public struct BoundMacro: PeerMacro {
   public static func expansion(
     of attribute: AttributeSyntax,
     providingPeersOf declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in context: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     guard context.isDirectViewModelStateContext else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.invalidSourceBoundPlacement))
+        message: VISORDiagnostic.invalidSourceBoundPlacement,
+      ))
       return []
     }
     guard
@@ -33,7 +33,8 @@ public struct BoundMacro: PeerMacro {
     else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: VISORDiagnostic.invalidSourceBoundDeclaration))
+        message: VISORDiagnostic.invalidSourceBoundDeclaration,
+      ))
       return []
     }
     return []

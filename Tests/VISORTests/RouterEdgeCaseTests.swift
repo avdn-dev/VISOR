@@ -5,9 +5,9 @@
 //  Created by Anh Nguyen on 18/2/2026.
 //
 
-import VISOR
-import Testing
 import Foundation
+import Testing
+import VISOR
 
 // MARK: - Router Edge Case Tests
 
@@ -75,8 +75,6 @@ struct RouterEdgeCaseTests {
     #expect(router.navigationPath.isEmpty)
   }
 
-  // MARK: - Different sheet overwrites previous
-
   @Test
   func `Presenting different sheet overwrites previous`() {
     let router = Router<TestScene>()
@@ -86,8 +84,6 @@ struct RouterEdgeCaseTests {
     #expect(router.presentingSheet == .profile)
   }
 
-  // MARK: - Different fullScreen overwrites previous
-
   @Test
   func `Presenting different fullScreen overwrites previous`() {
     let router = Router<TestScene>()
@@ -96,8 +92,6 @@ struct RouterEdgeCaseTests {
     router.present(fullScreen: .tutorial)
     #expect(router.presentingFullScreen == .tutorial)
   }
-
-  // MARK: - Grandchild activate
 
   @Test
   func `Grandchild activate deactivates direct parent`() {
@@ -112,8 +106,6 @@ struct RouterEdgeCaseTests {
     #expect(!root.isActive)
   }
 
-  // MARK: - deactivate on root then activate restores
-
   @Test
   func `deactivate on root then activate restores`() {
     let root = Router<TestScene>()
@@ -126,8 +118,6 @@ struct RouterEdgeCaseTests {
     root.activate()
     #expect(root.isActive)
   }
-
-  // MARK: - Child state preserved across root switches
 
   @Test
   func `childRouter state preserved across root switches`() {
@@ -145,8 +135,6 @@ struct RouterEdgeCaseTests {
     #expect(settingsChild.navigationPath == [.detail(id: "settings-1")])
   }
 
-  // MARK: - Tree-wide deep-link configuration
-
   @Test
   func `Existing root and modal routers receive later configuration`() throws {
     let root = Router<TestScene>()
@@ -154,10 +142,10 @@ struct RouterEdgeCaseTests {
     let modal = child.childRouter()
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
 
-    let url = URL(string: "test://settings")!
+    let url = try #require(URL(string: "test://settings"))
     child.activate()
     #expect(child.openDeepLink(url) == .handled(.root(.settings)))
     modal.activate()
@@ -168,18 +156,16 @@ struct RouterEdgeCaseTests {
   func `Child created after configureDeepLinks inherits configuration`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
 
     // Child created after configuration should read the shared tree context.
     let child = root.childRouter(for: .settings)
     child.activate()
 
-    let result = child.openDeepLink(URL(string: "test://settings")!)
+    let result = child.openDeepLink(try #require(URL(string: "test://settings")))
     #expect(result == .handled(.root(.settings)))
   }
-
-  // MARK: - Exclusive modal presentation
 
   @Test
   func `Full-screen presentation replaces a sheet on the same Router`() {
@@ -228,7 +214,8 @@ struct RouterEdgeCaseTests {
     router.present(sheet: .editor(documentID: "document", revision: 2))
 
     #expect(
-      router.presentingSheet == .editor(documentID: "document", revision: 2))
+      router.presentingSheet == .editor(documentID: "document", revision: 2)
+    )
     #expect(router.sheetPresentation?.router === firstChild)
     #expect(router.sheetPresentation?.id == "document")
   }
@@ -286,8 +273,6 @@ struct RouterEdgeCaseTests {
     #expect(router.navigationPath == [.detail(id: "same"), .detail(id: "same")])
   }
 
-  // MARK: - popToRoot preserves presented modals
-
   @Test
   func `popToRoot preserves presented sheet`() {
     let router = Router<TestScene>()
@@ -299,8 +284,6 @@ struct RouterEdgeCaseTests {
     #expect(router.navigationPath.isEmpty)
     #expect(router.presentingSheet == .preferences)
   }
-
-  // MARK: - navigate(to:) covers all destination types
 
   @Test
   func `navigate(to: .push) appends to navigation path`() {
@@ -336,8 +319,6 @@ struct RouterEdgeCaseTests {
     #expect(root.selectedRoot == .settings)
   }
 
-  // MARK: - Multiple configureDeepLinks calls overwrite configuration
-
   @Test
   func `Multiple configureDeepLinks calls overwrite configuration`() throws {
     let root = Router<TestScene>()
@@ -345,28 +326,25 @@ struct RouterEdgeCaseTests {
     let modal = child.childRouter()
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .root(.home)),
+      .equal(to: ["home"], destination: .root(.home))
     ])
 
     // Second call overwrites
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
 
-    let homeURL = URL(string: "test://home")!
-    let settingsURL = URL(string: "test://settings")!
+    let homeURL = try #require(URL(string: "test://home"))
+    let settingsURL = try #require(URL(string: "test://settings"))
     for router in [root, child, modal] {
       router.activate()
       #expect(
         router.openDeepLink(homeURL) == .unmatched,
-        "First parser should be overwritten for every existing Router")
+        "First parser should be overwritten for every existing Router",
+      )
       #expect(router.openDeepLink(settingsURL) == .handled(.root(.settings)))
     }
   }
-
-  // MARK: - selectAndPush from deep hierarchy
-
-  // MARK: - No-op safety
 
   @Test
   func `popToRoot on empty path is no-op`() {
@@ -391,8 +369,6 @@ struct RouterEdgeCaseTests {
     router.dismissFullScreen()
     #expect(router.presentingFullScreen == nil)
   }
-
-  // MARK: - selectAndPush from deep hierarchy
 
   @Test
   func `selectAndPush from child targets the root destination Router`() {

@@ -1,10 +1,25 @@
 import SwiftParser
 import SwiftSyntax
 
+// MARK: - ObservationStateSequenceNaming
+
 enum ObservationStateSequenceNaming: Equatable {
   case snapshots
   case values
   case named(String)
+
+  // MARK: Internal
+
+  var attributeArgument: String? {
+    switch self {
+    case .snapshots:
+      nil
+    case .values:
+      "observedAs: .values"
+    case .named(let name):
+      "observedAs: .named(\"\(name)\")"
+    }
+  }
 
   func memberName(for stateName: String) -> String {
     switch self {
@@ -17,17 +32,9 @@ enum ObservationStateSequenceNaming: Equatable {
     }
   }
 
-  var attributeArgument: String? {
-    switch self {
-    case .snapshots:
-      nil
-    case .values:
-      "observedAs: .values"
-    case .named(let name):
-      "observedAs: .named(\"\(name)\")"
-    }
-  }
 }
+
+// MARK: - ObservationStateArguments
 
 struct ObservationStateArguments: Equatable {
   let initialValueExpression: String?
@@ -42,7 +49,7 @@ struct ObservationStateArguments: Equatable {
     }
 
     var initialValueExpression: String?
-    var sequenceNaming: ObservationStateSequenceNaming = .snapshots
+    var sequenceNaming = ObservationStateSequenceNaming.snapshots
     var foundSequenceNaming = false
 
     for expression in expressions {
@@ -72,9 +79,12 @@ struct ObservationStateArguments: Equatable {
 
     return .success(Self(
       initialValueExpression: initialValueExpression,
-      sequenceNaming: sequenceNaming))
+      sequenceNaming: sequenceNaming,
+    ))
   }
 }
+
+// MARK: - ObservationStateArgumentError
 
 enum ObservationStateArgumentError: Error, Equatable {
   case invalidArguments

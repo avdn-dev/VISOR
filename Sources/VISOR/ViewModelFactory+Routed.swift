@@ -28,7 +28,9 @@ extension ViewModelFactory {
           ViewModelFactoryDiagnostics.routerTypeMismatchMessage(
             for: VM.self,
             expected: Router<Scene>.self,
-            received: router))
+            received: router,
+          )
+        )
       }
       return make(router)
     })

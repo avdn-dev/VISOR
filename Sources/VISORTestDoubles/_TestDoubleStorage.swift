@@ -5,10 +5,15 @@ import os
 /// This is public only because macro expansions are type-checked in the
 /// consuming module. Use ``GenerateStub(_:)`` or ``GenerateSpy(_:)`` instead.
 nonisolated public struct _TestDoubleStorage<State: Sendable>: Sendable {
+
+  // MARK: Lifecycle
+
   /// Creates generated lock-backed storage.
   public init(_ initialState: sending State) {
     lock = OSAllocatedUnfairLock(initialState: initialState)
   }
+
+  // MARK: Public
 
   /// Borrows the synchronised State for a read without creating a mutable
   /// snapshot of its copy-on-write storage.
@@ -26,9 +31,9 @@ nonisolated public struct _TestDoubleStorage<State: Sendable>: Sendable {
   /// `retiredValue` runs before `operation` and must select every value that
   /// the operation replaces. Values merely mutated in place, such as an Array
   /// history append, should not be selected.
-  public func withMutation<Output: Sendable, Retired: Sendable>(
-    retiring retiredValue: @Sendable (borrowing State) -> Retired,
-    _ operation: @Sendable (inout State) -> Output
+  public func withMutation<Output: Sendable>(
+    retiring retiredValue: @Sendable (borrowing State) -> some Sendable,
+    _ operation: @Sendable (inout State) -> Output,
   ) -> Output {
     let result = lock.withLock { state in
       let retiredValue = retiredValue(state)
@@ -39,9 +44,11 @@ nonisolated public struct _TestDoubleStorage<State: Sendable>: Sendable {
     // no longer held. Their deinitialisers may synchronously re-enter the test
     // double. Retaining the complete State here would also share every Array
     // buffer and force copy-on-write on each history append.
-    withExtendedLifetime(result.retired) {}
+    withExtendedLifetime(result.retired) { }
     return result.output
   }
+
+  // MARK: Private
 
   private let lock: OSAllocatedUnfairLock<State>
 }

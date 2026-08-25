@@ -21,18 +21,20 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol Constructible {
-        init(value: Int)
-      }
-      """,
+        protocol Constructible {
+          init(value: Int)
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateStub does not support initialiser requirements",
           line: 1,
           column: 1,
-          severity: .error),
+          severity: .error,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -49,21 +51,23 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol ParentService {
-        func parentValue() -> Int
-      }
-      protocol ChildService: ParentService {
-        func childValue() -> Int
-      }
-      """,
+        protocol ParentService {
+          func parentValue() -> Int
+        }
+        protocol ChildService: ParentService {
+          func childValue() -> Int
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateSpy cannot analyse requirements inherited from 'ParentService'",
           line: 5,
           column: 1,
-          severity: .error),
+          severity: .error,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -76,18 +80,20 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      nonisolated protocol ConcurrentService: Sendable {
-        func value() -> Int
-      }
-      """,
+        nonisolated protocol ConcurrentService: Sendable {
+          func value() -> Int
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateStub requires the '.sendable' trait when the protocol inherits Sendable",
           line: 1,
           column: 1,
-          severity: .error),
+          severity: .error,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -100,18 +106,20 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol VariadicService {
-        func record(_ values: Int...)
-      }
-      """,
+        protocol VariadicService {
+          func record(_ values: Int...)
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateSpy does not support variadic method requirements",
           line: 1,
           column: 1,
-          severity: .error),
+          severity: .error,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -124,18 +132,20 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol AsyncPropertyService {
-        var value: Int { get async throws }
-      }
-      """,
+        protocol AsyncPropertyService {
+          var value: Int { get async throws }
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateStub does not support effectful property accessor requirements",
           line: 1,
           column: 1,
-          severity: .error),
+          severity: .error,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -148,17 +158,18 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol ReferenceService: AnyObject {
-        func reset()
-      }
-
-      @Observable
-      final class StubReferenceService: ReferenceService {
-        func reset() {
+        protocol ReferenceService: AnyObject {
+          func reset()
         }
-      }
-      """,
-      macros: correctnessMacros)
+
+        @Observable
+        final class StubReferenceService: ReferenceService {
+          func reset() {
+          }
+        }
+        """,
+      macros: correctnessMacros,
+    )
   }
 
   @Test
@@ -172,28 +183,30 @@ struct TestDoubleCorrectnessMacroTests {
       }
       """,
       expandedSource: """
-      protocol CollisionService {
-        var fetchReturnValue: String { get }
-        func fetch() -> Int
-      }
-
-      @Observable
-      final class StubCollisionService: CollisionService {
-        var fetchReturnValue: String = ""
-        var fetchReturnValueGenerated: Int = 0
-        func fetch() -> Int {
-            fetchReturnValueGenerated
+        protocol CollisionService {
+          var fetchReturnValue: String { get }
+          func fetch() -> Int
         }
-      }
-      """,
+
+        @Observable
+        final class StubCollisionService: CollisionService {
+          var fetchReturnValue: String = ""
+          var fetchReturnValueGenerated: Int = 0
+          func fetch() -> Int {
+              fetchReturnValueGenerated
+          }
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@GenerateStub: generated return-storage member 'fetchReturnValue' collides with another member; using 'fetchReturnValueGenerated'.",
           line: 1,
           column: 1,
-          severity: .warning),
+          severity: .warning,
+        )
       ],
-      macros: correctnessMacros)
+      macros: correctnessMacros,
+    )
   }
 }
 

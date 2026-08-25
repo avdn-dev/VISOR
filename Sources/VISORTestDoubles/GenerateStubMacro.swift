@@ -7,4 +7,5 @@
 @attached(peer, names: prefixed(Stub))
 public macro GenerateStub(_ traits: TestDoubleTrait...) = #externalMacro(
   module: "VISORMacros",
-  type: "GenerateTestDoublesStubMacro")
+  type: "GenerateTestDoublesStubMacro",
+)

@@ -2,6 +2,8 @@ import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 
+// MARK: - TestDoubleGeneratedNameRole
+
 enum TestDoubleGeneratedNameRole: String {
   case callCount = "call-count member"
   case receivedArgument = "received-argument member"
@@ -17,12 +19,16 @@ enum TestDoubleGeneratedNameRole: String {
   case observationChannel = "observation-State channel"
 }
 
+// MARK: - TestDoubleGeneratedNameRename
+
 struct TestDoubleGeneratedNameRename {
   let role: TestDoubleGeneratedNameRole
   let preferredName: String
   let generatedName: String
   let methodName: String?
 }
+
+// MARK: - TestDoubleMethodNamePlan
 
 struct TestDoubleMethodNamePlan {
   let prefix: String
@@ -35,20 +41,17 @@ struct TestDoubleMethodNamePlan {
   let callCase: String?
 }
 
+// MARK: - TestDoubleNamePlan
+
 struct TestDoubleNamePlan {
-  let methods: [TestDoubleMethodNamePlan]
-  let callType: String?
-  let callLog: String?
-  let storageType: String?
-  let storage: String?
-  let observationStateChannels: [String: String]
-  let renames: [TestDoubleGeneratedNameRename]
+
+  // MARK: Lifecycle
 
   init(
     kind: TestDoubleKind,
     analysis: ProtocolAnalysis,
-    isSendable: Bool)
-  {
+    isSendable: Bool,
+  ) {
     let methodPrefixes = uniqueMethodPrefixes(for: analysis.methods)
     let observationSequenceNames = analysis.properties.compactMap { property in
       property.observationState?.sequenceName(for: property.name)
@@ -58,7 +61,7 @@ struct TestDoubleNamePlan {
         + analysis.methods.map(\.name)
         + observationSequenceNames)
     var typeAllocator = GeneratedNameAllocator(reserving: analysis.typeAliasNames)
-    var renames: [TestDoubleGeneratedNameRename] = []
+    var renames = [TestDoubleGeneratedNameRename]()
 
     observationStateChannels = Dictionary(uniqueKeysWithValues: analysis.properties.compactMap { property in
       guard property.observationState != nil else { return nil }
@@ -71,7 +74,9 @@ struct TestDoubleNamePlan {
           role: .observationChannel,
           methodName: nil,
           allocator: &memberAllocator,
-          renames: &renames))
+          renames: &renames,
+        ),
+      )
     })
 
     if isSendable {
@@ -81,14 +86,16 @@ struct TestDoubleNamePlan {
         role: .storageType,
         methodName: nil,
         allocator: &typeAllocator,
-        renames: &renames)
+        renames: &renames,
+      )
       storage = Self.allocate(
         preferred: "_testDoubleStorage",
         fallback: "_generatedTestDoubleStorage",
         role: .storage,
         methodName: nil,
         allocator: &memberAllocator,
-        renames: &renames)
+        renames: &renames,
+      )
     } else {
       storageType = nil
       storage = nil
@@ -101,36 +108,40 @@ struct TestDoubleNamePlan {
         role: .callType,
         methodName: nil,
         allocator: &typeAllocator,
-        renames: &renames)
+        renames: &renames,
+      )
       callLog = Self.allocate(
         preferred: "calls",
         fallback: "recordedCalls",
         role: .callLog,
         methodName: nil,
         allocator: &memberAllocator,
-        renames: &renames)
+        renames: &renames,
+      )
     } else {
       callType = nil
       callLog = nil
     }
 
-    var callCaseSignatures: Set<CallCaseSignature> = []
-    var methodPlans: [TestDoubleMethodNamePlan] = []
+    var callCaseSignatures = Set<CallCaseSignature>()
+    var methodPlans = [TestDoubleMethodNamePlan]()
     methodPlans.reserveCapacity(analysis.methods.count)
 
     for (method, methodPrefix) in zip(analysis.methods, methodPrefixes) {
       let methodName = method.name
       let returnStorage = Self.preferredReturnStorageName(
         for: method,
-        methodPrefix: methodPrefix).map {
-          Self.allocate(
-            preferred: $0,
-            fallback: "\($0)Generated",
-            role: .returnStorage,
-            methodName: methodName,
-            allocator: &memberAllocator,
-            renames: &renames)
-        }
+        methodPrefix: methodPrefix,
+      ).map {
+        Self.allocate(
+          preferred: $0,
+          fallback: "\($0)Generated",
+          role: .returnStorage,
+          methodName: methodName,
+          allocator: &memberAllocator,
+          renames: &renames,
+        )
+      }
 
       guard kind == .spy else {
         methodPlans.append(TestDoubleMethodNamePlan(
@@ -141,7 +152,8 @@ struct TestDoubleNamePlan {
           receivedInvocations: nil,
           returnStorage: returnStorage,
           implementation: nil,
-          callCase: nil))
+          callCase: nil,
+        ))
         continue
       }
 
@@ -152,7 +164,8 @@ struct TestDoubleNamePlan {
         role: .callCount,
         methodName: methodName,
         allocator: &memberAllocator,
-        renames: &renames)
+        renames: &renames,
+      )
 
       let receivedParameters = method.parameters.filter { !$0.isInout }
       let storableParameters = receivedParameters.filter {
@@ -170,7 +183,8 @@ struct TestDoubleNamePlan {
           role: .receivedArgument,
           methodName: methodName,
           allocator: &memberAllocator,
-          renames: &renames)
+          renames: &renames,
+        )
         receivedArguments = nil
         let invocationsPreferred = "\(methodPrefix)ReceivedInvocations"
         receivedInvocations = Self.allocate(
@@ -179,7 +193,8 @@ struct TestDoubleNamePlan {
           role: .receivedInvocations,
           methodName: methodName,
           allocator: &memberAllocator,
-          renames: &renames)
+          renames: &renames,
+        )
       } else if storableParameters.count > 1 {
         receivedArgument = nil
         let preferred = "\(methodPrefix)ReceivedArguments"
@@ -189,7 +204,8 @@ struct TestDoubleNamePlan {
           role: .receivedArguments,
           methodName: methodName,
           allocator: &memberAllocator,
-          renames: &renames)
+          renames: &renames,
+        )
         let invocationsPreferred = "\(methodPrefix)ReceivedInvocations"
         receivedInvocations = Self.allocate(
           preferred: invocationsPreferred,
@@ -197,7 +213,8 @@ struct TestDoubleNamePlan {
           role: .receivedInvocations,
           methodName: methodName,
           allocator: &memberAllocator,
-          renames: &renames)
+          renames: &renames,
+        )
       } else {
         receivedArgument = nil
         receivedArguments = nil
@@ -213,7 +230,8 @@ struct TestDoubleNamePlan {
           role: .implementation,
           methodName: methodName,
           allocator: &memberAllocator,
-          renames: &renames)
+          renames: &renames,
+        )
       } else {
         implementation = nil
       }
@@ -227,7 +245,8 @@ struct TestDoubleNamePlan {
         methodPrefix: methodPrefix,
         methodName: methodName,
         signatures: &callCaseSignatures,
-        renames: &renames)
+        renames: &renames,
+      )
 
       methodPlans.append(TestDoubleMethodNamePlan(
         prefix: methodPrefix,
@@ -237,42 +256,56 @@ struct TestDoubleNamePlan {
         receivedInvocations: receivedInvocations,
         returnStorage: returnStorage,
         implementation: implementation,
-        callCase: callCase))
+        callCase: callCase,
+      ))
     }
 
     methods = methodPlans
     self.renames = renames
   }
 
+  // MARK: Internal
+
+  let methods: [TestDoubleMethodNamePlan]
+  let callType: String?
+  let callLog: String?
+  let storageType: String?
+  let storage: String?
+  let observationStateChannels: [String: String]
+  let renames: [TestDoubleGeneratedNameRename]
+
   func diagnose(
     protocolDecl: ProtocolDeclSyntax,
     macroName: String,
-    context: some MacroExpansionContext)
-  {
+    context: some MacroExpansionContext,
+  ) {
     for rename in renames {
-      let message: TestDoubleDiagnostic
-      if rename.role == .implementation, let methodName = rename.methodName {
-        message = .implementationNameCollision(
-          methodName: methodName,
-          preferredName: rename.preferredName,
-          generatedName: rename.generatedName,
-          macroName: macroName)
-      } else {
-        message = .generatedMemberNameCollision(
-          role: rename.role.rawValue,
-          preferredName: rename.preferredName,
-          generatedName: rename.generatedName,
-          macroName: macroName)
-      }
+      let message: TestDoubleDiagnostic =
+        if rename.role == .implementation, let methodName = rename.methodName {
+          .implementationNameCollision(
+            methodName: methodName,
+            preferredName: rename.preferredName,
+            generatedName: rename.generatedName,
+            macroName: macroName,
+          )
+        } else {
+          .generatedMemberNameCollision(
+            role: rename.role.rawValue,
+            preferredName: rename.preferredName,
+            generatedName: rename.generatedName,
+            macroName: macroName,
+          )
+        }
       context.diagnose(Diagnostic(node: Syntax(protocolDecl), message: message))
     }
   }
 
+  // MARK: Private
+
   private static func preferredReturnStorageName(
     for method: ProtocolMethodInfo,
-    methodPrefix: String)
-    -> String?
-  {
+    methodPrefix: String,
+  ) -> String? {
     guard !method.isRethrowing else { return nil }
     guard !methodReferencesGenericParameters(method, in: method.returnType) else { return nil }
     guard !methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType) else {
@@ -290,16 +323,16 @@ struct TestDoubleNamePlan {
     role: TestDoubleGeneratedNameRole,
     methodName: String?,
     allocator: inout GeneratedNameAllocator,
-    renames: inout [TestDoubleGeneratedNameRename])
-    -> String
-  {
+    renames: inout [TestDoubleGeneratedNameRename],
+  ) -> String {
     let generated = allocator.allocate(preferred: preferred, fallback: fallback)
     if generated != preferred {
       renames.append(TestDoubleGeneratedNameRename(
         role: role,
         preferredName: preferred,
         generatedName: generated,
-        methodName: methodName))
+        methodName: methodName,
+      ))
     }
     return generated
   }
@@ -310,9 +343,8 @@ struct TestDoubleNamePlan {
     methodPrefix: String,
     methodName: String,
     signatures: inout Set<CallCaseSignature>,
-    renames: inout [TestDoubleGeneratedNameRename])
-    -> String
-  {
+    renames: inout [TestDoubleGeneratedNameRename],
+  ) -> String {
     let preferredSignature = CallCaseSignature(name: preferred, labels: labels)
     guard signatures.contains(preferredSignature) else {
       signatures.insert(preferredSignature)
@@ -330,17 +362,23 @@ struct TestDoubleNamePlan {
       role: .callCase,
       preferredName: preferred,
       generatedName: generated,
-      methodName: methodName))
+      methodName: methodName,
+    ))
     return generated
   }
 }
 
+// MARK: - GeneratedNameAllocator
+
 private struct GeneratedNameAllocator {
-  private var reservedNames: Set<String>
+
+  // MARK: Lifecycle
 
   init(reserving names: [String]) {
     reservedNames = Set(names)
   }
+
+  // MARK: Internal
 
   mutating func allocate(preferred: String, fallback: String) -> String {
     guard reservedNames.contains(preferred) else {
@@ -357,7 +395,14 @@ private struct GeneratedNameAllocator {
     reservedNames.insert(candidate)
     return candidate
   }
+
+  // MARK: Private
+
+  private var reservedNames: Set<String>
+
 }
+
+// MARK: - CallCaseSignature
 
 private struct CallCaseSignature: Hashable {
   let name: String

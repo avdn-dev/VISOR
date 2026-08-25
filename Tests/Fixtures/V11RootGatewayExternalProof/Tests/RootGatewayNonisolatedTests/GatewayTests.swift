@@ -8,6 +8,9 @@ import VISOR
 
 @Suite("Root State gateway from a nonisolated target")
 struct RootGatewayNonisolatedTests {
+
+  // MARK: Internal
+
   @MainActor
   @Test
   func `Every supported write spelling uses the generated State`() {
@@ -90,9 +93,11 @@ struct RootGatewayNonisolatedTests {
     }
   }
 
-  @MainActor
-  private func requireViewModelConformance<Subject: ViewModel>(_: Subject) {}
+  // MARK: Private
 
   @MainActor
-  private func requireViewConformance<Subject: View>(_: Subject) {}
+  private func requireViewModelConformance(_: some ViewModel) { }
+
+  @MainActor
+  private func requireViewConformance(_: some View) { }
 }

@@ -5,6 +5,8 @@
 //  Created by Anh Nguyen on 13/2/2026.
 //
 
+// MARK: - Loadable
+
 /// A standalone enum for typed per-field loading semantics within State classes.
 ///
 /// Use inside a ViewModel's `State` class for any field that has loading, empty,
@@ -28,15 +30,29 @@ public enum Loadable<Value, Failure: Error> {
 
 nonisolated extension Loadable {
   /// The loaded value, or `nil` if not in the `.loaded` state.
-  public var value: Value? { if case .loaded(let v) = self { v } else { nil } }
+  public var value: Value? {
+    if case .loaded(let v) = self { v } else { nil }
+  }
+
   /// Whether the state is `.loading`.
-  public var isLoading: Bool { if case .loading = self { true } else { false } }
+  public var isLoading: Bool {
+    if case .loading = self { true } else { false }
+  }
+
   /// Whether the state is `.empty` (distinct from `.loaded` with an empty collection).
-  public var isEmpty: Bool { if case .empty = self { true } else { false } }
+  public var isEmpty: Bool {
+    if case .empty = self { true } else { false }
+  }
+
   /// Whether the state is `.failure`.
-  public var isFailure: Bool { if case .failure = self { true } else { false } }
+  public var isFailure: Bool {
+    if case .failure = self { true } else { false }
+  }
+
   /// The typed failure, or `nil` if not in the `.failure` state.
-  public var failure: Failure? { if case .failure(let failure) = self { failure } else { nil } }
+  public var failure: Failure? {
+    if case .failure(let failure) = self { failure } else { nil }
+  }
 
   /// Transform the loaded value, preserving `loading`/`empty`/`failure` states.
   public func map<NewValue>(_ transform: (Value) -> NewValue) -> Loadable<NewValue, Failure> {
@@ -73,6 +89,14 @@ nonisolated extension Loadable {
   }
 }
 
-nonisolated extension Loadable: Equatable where Value: Equatable, Failure: Equatable {}
-nonisolated extension Loadable: Hashable where Value: Hashable, Failure: Hashable {}
-nonisolated extension Loadable: Sendable where Value: Sendable, Failure: Sendable {}
+// MARK: Equatable
+
+nonisolated extension Loadable: Equatable where Value: Equatable, Failure: Equatable { }
+
+// MARK: Hashable
+
+nonisolated extension Loadable: Hashable where Value: Hashable, Failure: Hashable { }
+
+// MARK: Sendable
+
+nonisolated extension Loadable: Sendable where Value: Sendable, Failure: Sendable { }

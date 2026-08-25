@@ -1,6 +1,8 @@
 import Foundation
 import os
 
+// MARK: - _ViewModelObservationOwnershipClaim
+
 /// Result of attempting to acquire a ViewModel's observation identity lease.
 nonisolated package enum _ViewModelObservationOwnershipClaim {
   case claimed
@@ -8,37 +10,28 @@ nonisolated package enum _ViewModelObservationOwnershipClaim {
   case cancelled
 }
 
+// MARK: - _ViewModelObservationOwnership
+
 /// An inert identity token emitted by `@ViewModel`.
 ///
 /// Generated downstream code can construct and carry this token, but only
 /// VISOR can use it to claim production observation ownership. This type is
 /// public solely because attached macro expansions are checked downstream.
 public final class _ViewModelObservationOwnership: Sendable {
-  private typealias Waiter = CheckedContinuation<Bool, Never>
 
-  private struct State: Sendable {
-    var ownerID: ObjectIdentifier?
-    var isReleasing = false
-    var waiters: [UUID: Waiter] = [:]
-  }
-
-  private enum ImmediateClaim {
-    case claimed
-    case duplicateOwner
-    case wait
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
+  // MARK: Lifecycle
 
   /// Creates a fresh ownership identity for one ViewModel instance.
-  public init() {}
+  public init() { }
+
+  // MARK: Package
 
   /// Claims immediately unless another active owner holds the lease. When the
   /// holder is already releasing, waits for that specific joined hand-off.
   @MainActor
   package func _visorClaim(
     _ candidate: AnyObject,
-    _visorDidEnterWait: @MainActor @Sendable () -> Void = {}
+    _visorDidEnterWait: @MainActor @Sendable () -> Void = { },
   ) async -> _ViewModelObservationOwnershipClaim {
     let candidateID = ObjectIdentifier(candidate)
     while !Task.isCancelled {
@@ -64,8 +57,10 @@ public final class _ViewModelObservationOwnership: Sendable {
         return .duplicateOwner
       case .wait:
         guard !Task.isCancelled else { return .cancelled }
-        guard await waitForRelease(
-          _visorDidEnterWait: _visorDidEnterWait)
+        guard
+          await waitForRelease(
+            _visorDidEnterWait: _visorDidEnterWait
+          )
         else {
           return .cancelled
         }
@@ -107,6 +102,24 @@ public final class _ViewModelObservationOwnership: Sendable {
       waiter.resume(returning: true)
     }
   }
+
+  // MARK: Private
+
+  private typealias Waiter = CheckedContinuation<Bool, Never>
+
+  private struct State: Sendable {
+    var ownerID: ObjectIdentifier?
+    var isReleasing = false
+    var waiters = [UUID: Waiter]()
+  }
+
+  private enum ImmediateClaim {
+    case claimed
+    case duplicateOwner
+    case wait
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
 
   @MainActor
   private func waitForRelease(

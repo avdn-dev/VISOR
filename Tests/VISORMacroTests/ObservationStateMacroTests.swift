@@ -4,10 +4,8 @@ import Testing
 
 @Suite("ObservationState macro")
 struct ObservationStateMacroTests {
-  private let macros: [String: Macro.Type] = [
-    "ObservationState": ObservationStateMacro.self,
-    "ObservationStateRequirements": ObservationStateRequirementsMacro.self,
-  ]
+
+  // MARK: Internal
 
   @Test
   func `A stored State publishes assignments as snapshots`() {
@@ -19,40 +17,41 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Player {
-        public private(set) var playback: PlaybackSnapshot {
-            @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
-            init(initialValue) {
-              __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStatePlaybackChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStatePlaybackChannel.publish(newValue)
-            }
-        }
+        final class Player {
+          public private(set) var playback: PlaybackSnapshot {
+              @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
+              init(initialValue) {
+                __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStatePlaybackChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStatePlaybackChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStatePlaybackChannel:
-          VISORObservation.ObservationChannel<PlaybackSnapshot>
+          nonisolated(unsafe) private var __visorObservationStatePlaybackChannel:
+            VISORObservation.ObservationChannel<PlaybackSnapshot>
 
-        nonisolated public var playbackSnapshots:
-          VISORObservation.ObservationSource<PlaybackSnapshot> {
-          __visorObservationStatePlaybackChannel.source
-        }
+          nonisolated public var playbackSnapshots:
+            VISORObservation.ObservationSource<PlaybackSnapshot> {
+            __visorObservationStatePlaybackChannel.source
+          }
 
-        @discardableResult
-        private func withMutablePlayback<Result>(
-          _ mutation: (inout PlaybackSnapshot) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = playback
-          let result = try mutation(&updatedValue)
-          playback = updatedValue
-          return result
+          @discardableResult
+          private func withMutablePlayback<Result>(
+            _ mutation: (inout PlaybackSnapshot) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = playback
+            let result = try mutation(&updatedValue)
+            playback = updatedValue
+            return result
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -65,40 +64,41 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Counter {
-        var count: Int {
-            @storageRestrictions(initializes: __visorObservationStateCountChannel)
-            init(initialValue) {
-              __visorObservationStateCountChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateCountChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateCountChannel.publish(newValue)
-            }
-        }
+        final class Counter {
+          var count: Int {
+              @storageRestrictions(initializes: __visorObservationStateCountChannel)
+              init(initialValue) {
+                __visorObservationStateCountChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateCountChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateCountChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateCountChannel:
-          VISORObservation.ObservationChannel<Int>
+          nonisolated(unsafe) private var __visorObservationStateCountChannel:
+            VISORObservation.ObservationChannel<Int>
 
-        nonisolated var countValues:
-          VISORObservation.ObservationSource<Int> {
-          __visorObservationStateCountChannel.source
-        }
+          nonisolated var countValues:
+            VISORObservation.ObservationSource<Int> {
+            __visorObservationStateCountChannel.source
+          }
 
-        @discardableResult
-        private func withMutableCount<Result>(
-          _ mutation: (inout Int) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = count
-          let result = try mutation(&updatedValue)
-          count = updatedValue
-          return result
+          @discardableResult
+          private func withMutableCount<Result>(
+            _ mutation: (inout Int) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = count
+            let result = try mutation(&updatedValue)
+            count = updatedValue
+            return result
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -111,40 +111,41 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Permissions {
-        var status: PermissionSnapshot {
-            @storageRestrictions(initializes: __visorObservationStateStatusChannel)
-            init(initialValue) {
-              __visorObservationStateStatusChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateStatusChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateStatusChannel.publish(newValue)
-            }
-        }
+        final class Permissions {
+          var status: PermissionSnapshot {
+              @storageRestrictions(initializes: __visorObservationStateStatusChannel)
+              init(initialValue) {
+                __visorObservationStateStatusChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateStatusChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateStatusChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateStatusChannel:
-          VISORObservation.ObservationChannel<PermissionSnapshot>
+          nonisolated(unsafe) private var __visorObservationStateStatusChannel:
+            VISORObservation.ObservationChannel<PermissionSnapshot>
 
-        nonisolated var permissionStatuses:
-          VISORObservation.ObservationSource<PermissionSnapshot> {
-          __visorObservationStateStatusChannel.source
-        }
+          nonisolated var permissionStatuses:
+            VISORObservation.ObservationSource<PermissionSnapshot> {
+            __visorObservationStateStatusChannel.source
+          }
 
-        @discardableResult
-        private func withMutableStatus<Result>(
-          _ mutation: (inout PermissionSnapshot) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = status
-          let result = try mutation(&updatedValue)
-          status = updatedValue
-          return result
+          @discardableResult
+          private func withMutableStatus<Result>(
+            _ mutation: (inout PermissionSnapshot) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = status
+            let result = try mutation(&updatedValue)
+            status = updatedValue
+            return result
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -172,190 +173,191 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class FormattedProducer {
-        var flags {
-            @storageRestrictions(initializes: __visorObservationStateFlagsChannel)
-            init(initialValue) {
-              __visorObservationStateFlagsChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateFlagsChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateFlagsChannel.publish(newValue)
-            }
-        }
+        final class FormattedProducer {
+          var flags {
+              @storageRestrictions(initializes: __visorObservationStateFlagsChannel)
+              init(initialValue) {
+                __visorObservationStateFlagsChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateFlagsChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateFlagsChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateFlagsChannel:
-          VISORObservation.ObservationChannel<FeatureFlagSnapshot>
+          nonisolated(unsafe) private var __visorObservationStateFlagsChannel:
+            VISORObservation.ObservationChannel<FeatureFlagSnapshot>
 
-        nonisolated var flagsSnapshots:
-          VISORObservation.ObservationSource<FeatureFlagSnapshot> {
-          __visorObservationStateFlagsChannel.source
-        }
+          nonisolated var flagsSnapshots:
+            VISORObservation.ObservationSource<FeatureFlagSnapshot> {
+            __visorObservationStateFlagsChannel.source
+          }
 
-        @discardableResult
-        private func withMutableFlags<Result>(
-          _ mutation: (inout FeatureFlagSnapshot) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = flags
-          let result = try mutation(&updatedValue)
-          flags = updatedValue
-          return result
-        }
-        var appearance {
-            @storageRestrictions(initializes: __visorObservationStateAppearanceChannel)
-            init(initialValue) {
-              __visorObservationStateAppearanceChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateAppearanceChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateAppearanceChannel.publish(newValue)
-            }
-        }
+          @discardableResult
+          private func withMutableFlags<Result>(
+            _ mutation: (inout FeatureFlagSnapshot) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = flags
+            let result = try mutation(&updatedValue)
+            flags = updatedValue
+            return result
+          }
+          var appearance {
+              @storageRestrictions(initializes: __visorObservationStateAppearanceChannel)
+              init(initialValue) {
+                __visorObservationStateAppearanceChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateAppearanceChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateAppearanceChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateAppearanceChannel:
-          VISORObservation.ObservationChannel<ThemeObservation>
+          nonisolated(unsafe) private var __visorObservationStateAppearanceChannel:
+            VISORObservation.ObservationChannel<ThemeObservation>
 
-        nonisolated var appearanceSnapshots:
-          VISORObservation.ObservationSource<ThemeObservation> {
-          __visorObservationStateAppearanceChannel.source
-        }
+          nonisolated var appearanceSnapshots:
+            VISORObservation.ObservationSource<ThemeObservation> {
+            __visorObservationStateAppearanceChannel.source
+          }
 
-        @discardableResult
-        private func withMutableAppearance<Result>(
-          _ mutation: (inout ThemeObservation) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = appearance
-          let result = try mutation(&updatedValue)
-          appearance = updatedValue
-          return result
-        }
-        var sounds {
-            @storageRestrictions(initializes: __visorObservationStateSoundsChannel)
-            init(initialValue) {
-              __visorObservationStateSoundsChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateSoundsChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateSoundsChannel.publish(newValue)
-            }
-        }
+          @discardableResult
+          private func withMutableAppearance<Result>(
+            _ mutation: (inout ThemeObservation) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = appearance
+            let result = try mutation(&updatedValue)
+            appearance = updatedValue
+            return result
+          }
+          var sounds {
+              @storageRestrictions(initializes: __visorObservationStateSoundsChannel)
+              init(initialValue) {
+                __visorObservationStateSoundsChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateSoundsChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateSoundsChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateSoundsChannel:
-          VISORObservation.ObservationChannel<[CustomNudgeSound]>
+          nonisolated(unsafe) private var __visorObservationStateSoundsChannel:
+            VISORObservation.ObservationChannel<[CustomNudgeSound]>
 
-        nonisolated var soundsSnapshots:
-          VISORObservation.ObservationSource<[CustomNudgeSound]> {
-          __visorObservationStateSoundsChannel.source
-        }
+          nonisolated var soundsSnapshots:
+            VISORObservation.ObservationSource<[CustomNudgeSound]> {
+            __visorObservationStateSoundsChannel.source
+          }
 
-        @discardableResult
-        private func withMutableSounds<Result>(
-          _ mutation: (inout [CustomNudgeSound]) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = sounds
-          let result = try mutation(&updatedValue)
-          sounds = updatedValue
-          return result
-        }
-        var enabled {
-            @storageRestrictions(initializes: __visorObservationStateEnabledChannel)
-            init(initialValue) {
-              __visorObservationStateEnabledChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateEnabledChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateEnabledChannel.publish(newValue)
-            }
-        }
+          @discardableResult
+          private func withMutableSounds<Result>(
+            _ mutation: (inout [CustomNudgeSound]) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = sounds
+            let result = try mutation(&updatedValue)
+            sounds = updatedValue
+            return result
+          }
+          var enabled {
+              @storageRestrictions(initializes: __visorObservationStateEnabledChannel)
+              init(initialValue) {
+                __visorObservationStateEnabledChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateEnabledChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateEnabledChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateEnabledChannel:
-          VISORObservation.ObservationChannel<Bool>
+          nonisolated(unsafe) private var __visorObservationStateEnabledChannel:
+            VISORObservation.ObservationChannel<Bool>
 
-        nonisolated var enabledValues:
-          VISORObservation.ObservationSource<Bool> {
-          __visorObservationStateEnabledChannel.source
-        }
+          nonisolated var enabledValues:
+            VISORObservation.ObservationSource<Bool> {
+            __visorObservationStateEnabledChannel.source
+          }
 
-        @discardableResult
-        private func withMutableEnabled<Result>(
-          _ mutation: (inout Bool) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = enabled
-          let result = try mutation(&updatedValue)
-          enabled = updatedValue
-          return result
-        }
-        var retryCount {
-            @storageRestrictions(initializes: __visorObservationStateRetryCountChannel)
-            init(initialValue) {
-              __visorObservationStateRetryCountChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateRetryCountChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateRetryCountChannel.publish(newValue)
-            }
-        }
+          @discardableResult
+          private func withMutableEnabled<Result>(
+            _ mutation: (inout Bool) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = enabled
+            let result = try mutation(&updatedValue)
+            enabled = updatedValue
+            return result
+          }
+          var retryCount {
+              @storageRestrictions(initializes: __visorObservationStateRetryCountChannel)
+              init(initialValue) {
+                __visorObservationStateRetryCountChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateRetryCountChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateRetryCountChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateRetryCountChannel:
-          VISORObservation.ObservationChannel<Int>
+          nonisolated(unsafe) private var __visorObservationStateRetryCountChannel:
+            VISORObservation.ObservationChannel<Int>
 
-        nonisolated var retryCountSnapshots:
-          VISORObservation.ObservationSource<Int> {
-          __visorObservationStateRetryCountChannel.source
-        }
+          nonisolated var retryCountSnapshots:
+            VISORObservation.ObservationSource<Int> {
+            __visorObservationStateRetryCountChannel.source
+          }
 
-        @discardableResult
-        private func withMutableRetryCount<Result>(
-          _ mutation: (inout Int) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = retryCount
-          let result = try mutation(&updatedValue)
-          retryCount = updatedValue
-          return result
-        }
-        var status {
-            @storageRestrictions(initializes: __visorObservationStateStatusChannel)
-            init(initialValue) {
-              __visorObservationStateStatusChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStateStatusChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStateStatusChannel.publish(newValue)
-            }
-        }
+          @discardableResult
+          private func withMutableRetryCount<Result>(
+            _ mutation: (inout Int) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = retryCount
+            let result = try mutation(&updatedValue)
+            retryCount = updatedValue
+            return result
+          }
+          var status {
+              @storageRestrictions(initializes: __visorObservationStateStatusChannel)
+              init(initialValue) {
+                __visorObservationStateStatusChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStateStatusChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStateStatusChannel.publish(newValue)
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStateStatusChannel:
-          VISORObservation.ObservationChannel<String>
+          nonisolated(unsafe) private var __visorObservationStateStatusChannel:
+            VISORObservation.ObservationChannel<String>
 
-        nonisolated var statusSnapshots:
-          VISORObservation.ObservationSource<String> {
-          __visorObservationStateStatusChannel.source
-        }
+          nonisolated var statusSnapshots:
+            VISORObservation.ObservationSource<String> {
+            __visorObservationStateStatusChannel.source
+          }
 
-        @discardableResult
-        private func withMutableStatus<Result>(
-          _ mutation: (inout String) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = status
-          let result = try mutation(&updatedValue)
-          status = updatedValue
-          return result
+          @discardableResult
+          private func withMutableStatus<Result>(
+            _ mutation: (inout String) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = status
+            let result = try mutation(&updatedValue)
+            status = updatedValue
+            return result
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -368,18 +370,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Producer {
-        var snapshot = makeSnapshot()
-      }
-      """,
+        final class Producer {
+          var snapshot = makeSnapshot()
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState cannot infer the concrete State type from this initialiser; add an explicit type annotation",
+          "@ObservationState cannot infer the concrete State type from this initialiser; add an explicit type annotation",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -396,44 +400,45 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      actor Player {
-        nonisolated public private(set) var playback: PlaybackSnapshot {
-            @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
-            init(initialValue) {
-              __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              __visorObservationStatePlaybackChannel.source.currentSnapshot()
-            }
-            set {
-              __visorObservationStatePlaybackChannel.publish(newValue)
-            }
-        }
+        actor Player {
+          nonisolated public private(set) var playback: PlaybackSnapshot {
+              @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
+              init(initialValue) {
+                __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
+              }
+              get {
+                __visorObservationStatePlaybackChannel.source.currentSnapshot()
+              }
+              set {
+                __visorObservationStatePlaybackChannel.publish(newValue)
+              }
+          }
 
-        nonisolated private let __visorObservationStatePlaybackChannel:
-          VISORObservation.ObservationChannel<PlaybackSnapshot>
+          nonisolated private let __visorObservationStatePlaybackChannel:
+            VISORObservation.ObservationChannel<PlaybackSnapshot>
 
-        nonisolated public var playbackSnapshots:
-          VISORObservation.ObservationSource<PlaybackSnapshot> {
-          __visorObservationStatePlaybackChannel.source
-        }
+          nonisolated public var playbackSnapshots:
+            VISORObservation.ObservationSource<PlaybackSnapshot> {
+            __visorObservationStatePlaybackChannel.source
+          }
 
-        @discardableResult
-        private func withMutablePlayback<Result>(
-          _ mutation: (inout PlaybackSnapshot) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = playback
-          let result = try mutation(&updatedValue)
-          playback = updatedValue
-          return result
-        }
+          @discardableResult
+          private func withMutablePlayback<Result>(
+            _ mutation: (inout PlaybackSnapshot) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = playback
+            let result = try mutation(&updatedValue)
+            playback = updatedValue
+            return result
+          }
 
-        init() {
-          playback = .stopped
+          init() {
+            playback = .stopped
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -448,45 +453,46 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      @Observable
-      final class Player {
-        @ObservationIgnored
-        var playback: PlaybackSnapshot {
-            @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
-            init(initialValue) {
-              __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
-            }
-            get {
-              access(keyPath: \\.playback)
-              return __visorObservationStatePlaybackChannel.source.currentSnapshot()
-            }
-            set {
-              withMutation(keyPath: \\.playback) {
-                __visorObservationStatePlaybackChannel.publish(newValue)
+        @Observable
+        final class Player {
+          @ObservationIgnored
+          var playback: PlaybackSnapshot {
+              @storageRestrictions(initializes: __visorObservationStatePlaybackChannel)
+              init(initialValue) {
+                __visorObservationStatePlaybackChannel = VISORObservation.ObservationChannel(initialValue)
               }
-            }
-        }
+              get {
+                access(keyPath: \\.playback)
+                return __visorObservationStatePlaybackChannel.source.currentSnapshot()
+              }
+              set {
+                withMutation(keyPath: \\.playback) {
+                  __visorObservationStatePlaybackChannel.publish(newValue)
+                }
+              }
+          }
 
-        nonisolated(unsafe) private var __visorObservationStatePlaybackChannel:
-          VISORObservation.ObservationChannel<PlaybackSnapshot>
+          nonisolated(unsafe) private var __visorObservationStatePlaybackChannel:
+            VISORObservation.ObservationChannel<PlaybackSnapshot>
 
-        nonisolated var playbackSnapshots:
-          VISORObservation.ObservationSource<PlaybackSnapshot> {
-          __visorObservationStatePlaybackChannel.source
-        }
+          nonisolated var playbackSnapshots:
+            VISORObservation.ObservationSource<PlaybackSnapshot> {
+            __visorObservationStatePlaybackChannel.source
+          }
 
-        @discardableResult
-        private func withMutablePlayback<Result>(
-          _ mutation: (inout PlaybackSnapshot) throws -> Result
-        ) rethrows -> Result {
-          var updatedValue = playback
-          let result = try mutation(&updatedValue)
-          playback = updatedValue
-          return result
+          @discardableResult
+          private func withMutablePlayback<Result>(
+            _ mutation: (inout PlaybackSnapshot) throws -> Result
+          ) rethrows -> Result {
+            var updatedValue = playback
+            let result = try mutation(&updatedValue)
+            playback = updatedValue
+            return result
+          }
         }
-      }
-      """,
-      macros: macros)
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -501,20 +507,22 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      @Observable
-      final class Player {
-        @ObservationIgnored
-        var playback: PlaybackSnapshot = .stopped
-      }
-      """,
+        @Observable
+        final class Player {
+          @ObservationIgnored
+          var playback: PlaybackSnapshot = .stopped
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState properties in an @Observable type require @ObservationIgnored immediately below @ObservationState",
+          "@ObservationState properties in an @Observable type require @ObservationIgnored immediately below @ObservationState",
           line: 3,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -528,15 +536,16 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      protocol CounterService {
-        var count: Int { get }
+        protocol CounterService {
+          var count: Int { get }
 
-          nonisolated var countValues: VISORObservation.ObservationSource<Int> {
-              get
-          }
-      }
-      """,
-      macros: macros)
+            nonisolated var countValues: VISORObservation.ObservationSource<Int> {
+                get
+            }
+        }
+        """,
+      macros: macros,
+    )
   }
 
   @Test
@@ -549,18 +558,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Player {
-        var playback: ObservationSource<PlaybackSnapshot>
-      }
-      """,
+        final class Player {
+          var playback: ObservationSource<PlaybackSnapshot>
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
+          "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -573,18 +584,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Counter {
-        var count: Int
-      }
-      """,
+        final class Counter {
+          var count: Int
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
+          "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -597,18 +610,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Counter {
-        lazy var count: Int = 0
-      }
-      """,
+        final class Counter {
+          lazy var count: Int = 0
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
+          "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -622,18 +637,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      protocol CounterService {
-        var count: Int { get set }
-      }
-      """,
+        protocol CounterService {
+          var count: Int { get set }
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
+          "@ObservationState requires mutable class or actor State with an explicit or inferable concrete type and no initial: argument, or a get-only protocol State",
           line: 3,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -646,18 +663,20 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      protocol CounterService {
-        var count: Int { get }
-      }
-      """,
+        protocol CounterService {
+          var count: Int { get }
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "protocol @ObservationState requirements require @ObservationStateRequirements on the enclosing protocol",
+          "protocol @ObservationState requirements require @ObservationStateRequirements on the enclosing protocol",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -668,15 +687,17 @@ struct ObservationStateMacroTests {
       final class Counter {}
       """,
       expandedSource: """
-      final class Counter {}
-      """,
+        final class Counter {}
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@ObservationStateRequirements can only be attached to a protocol",
           line: 1,
-          column: 1),
+          column: 1,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -689,17 +710,19 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Counter {
-        var count: Int = 0
-      }
-      """,
+        final class Counter {
+          var count: Int = 0
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message: "@ObservationState cannot generate 'count' because that member name is already in use",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
 
   @Test
@@ -712,18 +735,27 @@ struct ObservationStateMacroTests {
       }
       """,
       expandedSource: """
-      final class Counter {
-        var count: Int = 0
-      }
-      """,
+        final class Counter {
+          var count: Int = 0
+        }
+        """,
       diagnostics: [
         DiagnosticSpec(
           message:
-            "@ObservationState cannot generate 'withMutableCount' because that member name is already in use",
+          "@ObservationState cannot generate 'withMutableCount' because that member name is already in use",
           line: 2,
-          column: 3),
+          column: 3,
+        )
       ],
-      macros: macros)
+      macros: macros,
+    )
   }
+
+  // MARK: Private
+
+  private let macros: [String: Macro.Type] = [
+    "ObservationState": ObservationStateMacro.self,
+    "ObservationStateRequirements": ObservationStateRequirementsMacro.self,
+  ]
 
 }

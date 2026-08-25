@@ -14,24 +14,14 @@ import SwiftSyntaxMacros
 
 public struct LazyViewModelMacro: MemberMacro {
 
-  private struct Arguments {
-    let viewModelType: String
-    let observationPolicy: String
-    let pending: ExprSyntax?
-    let failure: ExprSyntax?
-  }
-
   // MARK: Public
-
-  // MARK: MemberMacro - generates all declarations
 
   public static func expansion(
     of node: AttributeSyntax,
     providingMembersOf declaration: some DeclGroupSyntax,
     conformingTo _: [TypeSyntax],
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in context: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     guard let structDecl = declaration.as(StructDeclSyntax.self) else {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.notAStruct(macroName: "LazyViewModel")))
       return []
@@ -83,11 +73,12 @@ public struct LazyViewModelMacro: MemberMacro {
     }
 
     members.append(
-      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }")
+      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }"
+    )
 
-    let ownedContent: ExprSyntax
-    if let pending = arguments.pending, let failure = arguments.failure {
-      ownedContent = """
+    let ownedContent: ExprSyntax =
+      if let pending = arguments.pending, let failure = arguments.failure {
+        """
         VISOR._visorOwnedViewModelContent(
             for: viewModel,
             observationPolicy: \(raw: observationPolicy),
@@ -101,8 +92,8 @@ public struct LazyViewModelMacro: MemberMacro {
             content
         }
         """
-    } else {
-      ownedContent = """
+      } else {
+        """
         VISOR._visorOwnedViewModelContent(
             for: viewModel,
             observationPolicy: \(raw: observationPolicy)
@@ -110,7 +101,7 @@ public struct LazyViewModelMacro: MemberMacro {
             content
         }
         """
-    }
+      }
 
     members.append(
       """
@@ -128,16 +119,24 @@ public struct LazyViewModelMacro: MemberMacro {
               }
           }
       }
-      """)
+      """
+    )
 
     return members
   }
 
   // MARK: Private
 
+  private struct Arguments {
+    let viewModelType: String
+    let observationPolicy: String
+    let pending: ExprSyntax?
+    let failure: ExprSyntax?
+  }
+
   private static func parseArguments(
     from node: AttributeSyntax,
-    in context: some MacroExpansionContext
+    in context: some MacroExpansionContext,
   ) -> Arguments? {
     // Stage 1: Must have an argument list
     guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
@@ -176,7 +175,8 @@ public struct LazyViewModelMacro: MemberMacro {
     guard (pending == nil) == (failure == nil) else {
       context.diagnose(Diagnostic(
         node: node,
-        message: VISORDiagnostic.lazyViewModelPresentationPairRequired))
+        message: VISORDiagnostic.lazyViewModelPresentationPairRequired,
+      ))
       return nil
     }
 
@@ -184,7 +184,8 @@ public struct LazyViewModelMacro: MemberMacro {
       viewModelType: viewModelType,
       observationPolicy: observationPolicy,
       pending: pending,
-      failure: failure)
+      failure: failure,
+    )
   }
 
   /// Re-indents source syntax without changing literal contents.

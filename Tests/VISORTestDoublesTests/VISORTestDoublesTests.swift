@@ -2,24 +2,34 @@ import os
 import Testing
 import VISORTestDoubles
 
+// MARK: - FixtureService
+
 @GenerateStub
 protocol FixtureService {
   @VISORTestDoubles.DefaultValue(7)
   var count: Int { get }
 
   @VISORTestDoubles.DefaultReturn("ready")
+
   func label() -> String
 }
+
+// MARK: - ConcurrentFixtureService
 
 @GenerateSpy(.sendable)
 nonisolated protocol ConcurrentFixtureService: Sendable {
   func record(_ value: Int)
 }
 
+// MARK: - TestDoubleCopyReference
+
 nonisolated private final class TestDoubleCopyReference: Sendable { }
 
+// MARK: - TestDoubleCopyCounter
+
 nonisolated private final class TestDoubleCopyCounter: Sendable {
-  private let lock = OSAllocatedUnfairLock(initialState: 0)
+
+  // MARK: Internal
 
   var value: Int {
     lock.withLock { $0 }
@@ -28,12 +38,16 @@ nonisolated private final class TestDoubleCopyCounter: Sendable {
   func increment() {
     lock.withLock { $0 += 1 }
   }
+
+  // MARK: Private
+
+  private let lock = OSAllocatedUnfairLock(initialState: 0)
+
 }
 
-nonisolated private struct TestDoubleCopyProbe: Sendable {
-  private var reference = TestDoubleCopyReference()
-  private let copyCounter: TestDoubleCopyCounter
+// MARK: - TestDoubleCopyProbe
 
+nonisolated private struct TestDoubleCopyProbe: Sendable {
   init(copyCounter: TestDoubleCopyCounter) {
     self.copyCounter = copyCounter
   }
@@ -43,12 +57,20 @@ nonisolated private struct TestDoubleCopyProbe: Sendable {
     copyCounter.increment()
     reference = TestDoubleCopyReference()
   }
+
+  private var reference = TestDoubleCopyReference()
+  private let copyCounter: TestDoubleCopyCounter
+
 }
+
+// MARK: - TestDoubleCopyState
 
 nonisolated private struct TestDoubleCopyState: Sendable {
   var retiredValue: String?
   var probe: TestDoubleCopyProbe
 }
+
+// MARK: - VISORTestDoublesTests
 
 @Suite
 struct VISORTestDoublesTests {
@@ -81,7 +103,8 @@ struct VISORTestDoublesTests {
     let copyCounter = TestDoubleCopyCounter()
     let storage = _TestDoubleStorage(TestDoubleCopyState(
       retiredValue: "retired",
-      probe: TestDoubleCopyProbe(copyCounter: copyCounter)))
+      probe: TestDoubleCopyProbe(copyCounter: copyCounter),
+    ))
 
     for value in 0..<100 {
       storage.withMutation(retiring: { $0.retiredValue }) { state in

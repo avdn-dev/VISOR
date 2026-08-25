@@ -21,11 +21,12 @@ extension StructDeclSyntax {
   }
 }
 
+// MARK: - ClassAnalysis
+
 /// The class-level facts needed by the v11 ViewModel macro.
 struct ClassAnalysis {
-  var hasActionEnum = false
-  var hasHandleMethod = false
-  var handleHasWrongLabel = false
+
+  // MARK: Lifecycle
 
   init(_ declaration: ClassDeclSyntax) {
     for member in declaration.memberBlock.members {
@@ -58,4 +59,11 @@ struct ClassAnalysis {
       }
     }
   }
+
+  // MARK: Internal
+
+  var hasActionEnum = false
+  var hasHandleMethod = false
+  var handleHasWrongLabel = false
+
 }

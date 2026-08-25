@@ -7,7 +7,7 @@
 
 import Observation
 
-// MARK: - ViewModel Protocol
+// MARK: - ViewModel
 
 /// The base protocol for all ViewModels in the VISOR architecture.
 ///
@@ -33,6 +33,7 @@ public protocol ViewModel: Observable, AnyObject {
   /// An inert per-instance token used by VISOR's hidden SwiftUI owner to
   /// serialise observation generations for this ViewModel identity.
   var _visorObservationOwnership: _ViewModelObservationOwnership { get }
+
   /// Describes cooperative observation sources to VISOR's package-owned
   /// runtime. `@ViewModel` generates this hook.
   func _visorBuildObservationRecipe(into visitor: _ObservationRecipeVisitor)
@@ -41,9 +42,14 @@ public protocol ViewModel: Observable, AnyObject {
 }
 
 extension ViewModel {
+
+  // MARK: Public
+
   public func _visorBuildObservationRecipe(
-    into visitor: _ObservationRecipeVisitor
-  ) {}
+    into _: _ObservationRecipeVisitor
+  ) { }
+
+  // MARK: Package
 
   package func _visorMakeObservationRecipes() -> [_ObservationRecipe] {
     let visitor = _ObservationRecipeVisitor()
@@ -54,5 +60,5 @@ extension ViewModel {
 
 extension ViewModel where Action == Never {
   /// Handles the uninhabited default action without requiring boilerplate.
-  public func handle(_ action: Never) async {}
+  public func handle(_: Never) async { }
 }

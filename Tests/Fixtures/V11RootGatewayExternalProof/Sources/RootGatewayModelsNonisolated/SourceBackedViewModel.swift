@@ -5,13 +5,33 @@ import VISOR
 private typealias NonisolatedSourceBackedRoot =
   NonisolatedSourceBackedViewModel
 
-// Deliberately omits explicit deinitialisers so release compilation exercises
-// the @ViewModel and cascaded State optimiser workarounds.
+// MARK: - NonisolatedSourceBackedViewModel
+
+/// Deliberately omits explicit deinitialisers so release compilation exercises
+/// the @ViewModel and cascaded State optimiser workarounds.
 @MainActor
 @Observable
 @ViewModel
 public final class NonisolatedSourceBackedViewModel {
+
+  // MARK: Public
+
   public final class State {
+
+    // MARK: Lifecycle
+
+    public init(
+      revision: Int,
+      mirroredRevision: Int,
+      projectedRevision: Int,
+    ) {
+      self.revision = revision
+      self.mirroredRevision = mirroredRevision
+      self.projectedRevision = projectedRevision
+    }
+
+    // MARK: Public
+
     @Bound(source: \NonisolatedSourceBackedViewModel.consumer.source)
     public private(set) var revision: Int
 
@@ -20,24 +40,18 @@ public final class NonisolatedSourceBackedViewModel {
 
     @Bound(
       source: \NonisolatedSourceBackedViewModel.consumer.projectedSource,
-      selecting: \RootProjectedSnapshot.revision)
+      selecting: \RootProjectedSnapshot.revision,
+    )
     public private(set) var projectedRevision: Int
 
     public private(set) var reactedRevision = -1
     public private(set) var reactedLabel = "unreconciled"
 
-    public init(
-      revision: Int,
-      mirroredRevision: Int,
-      projectedRevision: Int)
-    {
-      self.revision = revision
-      self.mirroredRevision = mirroredRevision
-      self.projectedRevision = projectedRevision
-    }
   }
 
   public let consumer: RootObservationConsumer
+
+  // MARK: Private
 
   @Reaction(source: \NonisolatedSourceBackedRoot.consumer.source)
   private func revisionChanged(_ revision: Int) {
@@ -46,7 +60,8 @@ public final class NonisolatedSourceBackedViewModel {
 
   @Reaction(
     source: \NonisolatedSourceBackedViewModel.consumer.projectedSource,
-    selecting: \RootProjectedSnapshot.label)
+    selecting: \RootProjectedSnapshot.label,
+  )
   private func projectedLabelChanged(_ label: String) {
     updateState(\.reactedLabel, to: label)
   }

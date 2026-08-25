@@ -2,38 +2,44 @@
 
 import PackageDescription
 
-let visor: Target.Dependency = .product(
+let visor = Target.Dependency.product(
   name: "VISOR",
-  package: "visor")
-let visorObservation: Target.Dependency = .product(
+  package: "visor",
+)
+let visorObservation = Target.Dependency.product(
   name: "VISORObservation",
-  package: "visor")
-let visorTesting: Target.Dependency = .product(
+  package: "visor",
+)
+let visorTesting = Target.Dependency.product(
   name: "VISORTesting",
-  package: "visor")
+  package: "visor",
+)
 
 let package = Package(
   name: "V11RootTestingExternalProof",
   platforms: [
-    .macOS(.v14),
+    .macOS(.v14)
   ],
   dependencies: [
-    .package(path: "../../.."),
+    .package(path: "../../..")
   ],
   targets: [
     .target(
       name: "RootTestingSupport",
       dependencies: [visorObservation],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .target(
       name: "RootTestingModelsNonisolated",
       dependencies: ["RootTestingSupport", visor],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .target(
       name: "RootTestingModelsMainActor",
       dependencies: ["RootTestingSupport", visor],
       packageAccess: false,
-      swiftSettings: [.defaultIsolation(MainActor.self)]),
+      swiftSettings: [.defaultIsolation(MainActor.self)],
+    ),
     .target(
       name: "RootTestingSelectorProbe",
       dependencies: [
@@ -41,7 +47,8 @@ let package = Package(
         visor,
         visorTesting,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .testTarget(
       name: "RootTestingNonisolatedTests",
       dependencies: [
@@ -49,7 +56,8 @@ let package = Package(
         "RootTestingSupport",
         visorTesting,
       ],
-      packageAccess: false),
+      packageAccess: false,
+    ),
     .testTarget(
       name: "RootTestingMainActorTests",
       dependencies: [
@@ -58,5 +66,7 @@ let package = Package(
         visorTesting,
       ],
       packageAccess: false,
-      swiftSettings: [.defaultIsolation(MainActor.self)]),
-  ])
+      swiftSettings: [.defaultIsolation(MainActor.self)],
+    ),
+  ],
+)

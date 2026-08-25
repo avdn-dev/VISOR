@@ -21,8 +21,8 @@ struct CodeGenHelpersTests {
   ])
   func `Normalises parameter-only specifiers for storage`(
     input: String,
-    expected: String)
-  {
+    expected: String,
+  ) {
     #expect(storageValueType(from: input) == expected)
   }
 
@@ -52,8 +52,8 @@ struct CodeGenHelpersTests {
   ])
   func `Recognises canonical qualified spellings for known defaults`(
     input: String,
-    expected: String)
-  {
+    expected: String,
+  ) {
     #expect(defaultValue(for: input) == expected)
   }
 
@@ -64,8 +64,8 @@ struct CodeGenHelpersTests {
     "Flag",
   ])
   func `Does not infer defaults for arbitrary modules or aliases`(
-    input: String)
-  {
+    input: String
+  ) {
     #expect(defaultValue(for: input) == nil)
   }
 
@@ -100,9 +100,8 @@ private func testMethod(
   name: String,
   parameterType: String,
   returnType: String?,
-  externalLabel: String? = "value")
-  -> ProtocolMethodInfo
-{
+  externalLabel: String? = "value",
+) -> ProtocolMethodInfo {
   ProtocolMethodInfo(
     name: name,
     genericParameterClause: "",
@@ -113,12 +112,14 @@ private func testMethod(
       externalLabel: externalLabel,
       internalName: "value",
       type: parameterType,
-      isInout: false)],
+      isInout: false,
+    )],
     isAsync: false,
     isConcurrent: false,
     throwsEffect: .none,
     returnType: returnType,
-    defaultReturnExpression: nil)
+    defaultReturnExpression: nil,
+  )
 }
 
 #endif

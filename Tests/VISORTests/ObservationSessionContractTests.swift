@@ -3,17 +3,27 @@ import VISOR
 import VISORObservation
 import VISORTesting
 
+// MARK: - ObservationSessionContractLog
+
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
 
 @MainActor
 private final class ObservationSessionContractLog {
-  var events: [String] = []
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
+  var events = [String]()
   var integer = -1
   var text = ""
 
-  deinit {}
 }
+
+// MARK: - ObservationSessionContractTests
 
 @Suite("Observation session contract")
 struct ObservationSessionContractTests {
@@ -30,13 +40,15 @@ struct ObservationSessionContractTests {
           #expect(text.source._visorActiveSubscriptionCount == 1)
           log.events.append("integer")
           log.integer = value
-        }])._visorErase(),
+        }],
+      )._visorErase(),
       _ObservationLane(
         source: text.source,
         handlers: [{ value in
           log.events.append("text")
           log.text = value
-        }])._visorErase(),
+        }],
+      )._visorErase(),
     ])
 
     try await session._visorStart()
@@ -65,13 +77,15 @@ struct ObservationSessionContractTests {
         }],
         initialReactions: [{ _ in
           log.events.append("reaction-saw-\(log.text)")
-        }])._visorErase(),
+        }],
+      )._visorErase(),
       _ObservationLane(
         source: text.source,
         handlers: [{ value in
           log.text = value
           log.events.append("text-projection")
-        }])._visorErase(),
+        }],
+      )._visorErase(),
     ])
 
     try await session._visorStart()
@@ -96,13 +110,15 @@ struct ObservationSessionContractTests {
         initialReactions: [{ value in
           log.events.append("trigger-\(value)")
           dependent.publish("new")
-        }])._visorErase(),
+        }],
+      )._visorErase(),
       _ObservationLane(
         source: dependent.source,
         handlers: [{ value in
           log.events.append("dependent-\(value)")
           log.text = value
-        }])._visorErase(),
+        }],
+      )._visorErase(),
     ])
 
     try await session._visorStart()
@@ -127,10 +143,12 @@ struct ObservationSessionContractTests {
         handlers: [{ value in
           if value == 1 { await gate.run() }
           log.integer = value
-        }])._visorErase(),
+        }],
+      )._visorErase(),
       _ObservationLane(
         source: text.source,
-        handlers: [{ value in log.text = value }])._visorErase(),
+        handlers: [{ value in log.text = value }],
+      )._visorErase(),
     ])
     try await session._visorStart()
 
@@ -181,10 +199,12 @@ struct ObservationSessionContractTests {
     let session = _ObservationSession(lanes: [
       _ObservationLane(
         source: integer.source,
-        handlers: [{ value in log.integer = value }])._visorErase(),
+        handlers: [{ value in log.integer = value }],
+      )._visorErase(),
       _ObservationLane(
         source: text.source,
-        handlers: [{ value in log.text = value }])._visorErase(),
+        handlers: [{ value in log.text = value }],
+      )._visorErase(),
     ])
     try await session._visorStart()
 
@@ -208,7 +228,7 @@ struct ObservationSessionContractTests {
     try await session._visorStart()
     #expect(session._visorIsReady)
 
-    try await session._visorWithPause {}
+    try await session._visorWithPause { }
     #expect(session._visorIsReady)
 
     await session._visorStop()

@@ -2,11 +2,15 @@ import Foundation
 import Testing
 import VISOR
 
+// MARK: - ObservationTestError
+
 /// A failure produced by VISOR's test-observation control plane.
 public enum ObservationTestError: Error, Equatable, Sendable {
   /// The requested operation could not run, so no result exists.
   case resultUnavailable
 }
+
+// MARK: LocalizedError
 
 extension ObservationTestError: LocalizedError {
   /// A human-readable explanation suitable for a failed test diagnostic.
@@ -18,9 +22,13 @@ extension ObservationTestError: LocalizedError {
   }
 }
 
+// MARK: - ObservationTestControlError
+
 enum ObservationTestControlError: Error {
   case stateIdentityChanged
 }
+
+// MARK: - ObservationTestPhase
 
 enum ObservationTestPhase: Equatable {
   case ready
@@ -29,6 +37,8 @@ enum ObservationTestPhase: Equatable {
   case poisoned
   case ended
 }
+
+// MARK: - WindowTransition
 
 enum WindowTransition {
   case succeeded
@@ -39,24 +49,21 @@ enum WindowTransition {
 package typealias ObservationTestIssueRecorder =
   @MainActor (String, SourceLocation) -> Void
 
+// MARK: - ObservationTest
+
 /// A scoped handle for fencing one semantic action at a time and matching its
 /// complete State mutation history.
 @MainActor
 public final class ObservationTest<SUT: ViewModel> {
-  private var sut: SUT?
-  private var state: SUT.State?
-  private var journal: StateJournal?
-  private var session: _ObservationSession?
-  private var phase = ObservationTestPhase.ready
-  private var hasReportedInfrastructureFailure = false
-  private let issueRecorder: ObservationTestIssueRecorder
+
+  // MARK: Lifecycle
 
   init(
     sut: SUT,
     state: SUT.State,
     journal: StateJournal,
     session: _ObservationSession,
-    issueRecorder: @escaping ObservationTestIssueRecorder
+    issueRecorder: @escaping ObservationTestIssueRecorder,
   ) {
     self.sut = sut
     self.state = state
@@ -65,14 +72,16 @@ public final class ObservationTest<SUT: ViewModel> {
     self.issueRecorder = issueRecorder
   }
 
-  // Work around a Swift 6.2.4 release optimiser crash for explicitly
-  // MainActor-isolated classes.
-  deinit {}
+  /// Work around a Swift 6.2.4 release optimiser crash for explicitly
+  /// MainActor-isolated classes.
+  deinit { }
+
+  // MARK: Public
 
   /// Performs one ViewModel action and fences all participating sources.
   public func perform(
     _ action: SUT.Action,
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) async {
     guard let sut else {
       recordEndedScopeMisuse(sourceLocation: sourceLocation)
@@ -89,7 +98,7 @@ public final class ObservationTest<SUT: ViewModel> {
   /// Performs one nonthrowing asynchronous operation and fences its State writes.
   public func perform(
     _ operation: @MainActor () async -> Void,
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) async {
     guard await openWindow(sourceLocation: sourceLocation) == .succeeded else {
       return
@@ -103,7 +112,7 @@ public final class ObservationTest<SUT: ViewModel> {
   /// - Throws: The operation's error after the observation window is closed.
   public func perform(
     _ operation: @MainActor () async throws -> Void,
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) async rethrows {
     guard await openWindow(sourceLocation: sourceLocation) == .succeeded else {
       return
@@ -125,7 +134,7 @@ public final class ObservationTest<SUT: ViewModel> {
   ///   before the operation starts.
   public func perform<Result>(
     _ operation: @MainActor () async throws -> Result,
-    sourceLocation: SourceLocation = #_sourceLocation
+    sourceLocation: SourceLocation = #_sourceLocation,
   ) async throws -> Result {
     switch await openWindow(sourceLocation: sourceLocation) {
     case .succeeded:
@@ -164,21 +173,166 @@ public final class ObservationTest<SUT: ViewModel> {
     }
   }
 
+  // MARK: Package
+
+  package var _rawCommitFieldNames: [String] {
+    journal?.entries.map(\.fieldName) ?? []
+  }
+
+  package var _outsideWindowDiagnosticContextForProof:
+    _OutsideWindowDiagnosticContextForProof
+  {
+    journal?.outsideWindowDiagnosticContext()
+      ?? _OutsideWindowDiagnosticContextForProof(
+        entries: [],
+        omittedEntryCount: 0,
+      )
+  }
+
+  package func _rawCommitCount<Value>(
+    _ selection: KeyPath<
+      SUT.State._VISORSelectors,
+      _StateField<SUT.State, Value>,
+    >
+  ) -> Int {
+    guard let journal else { return 0 }
+    let field = SUT.State._visorSelectors[keyPath: selection]
+    return journal.entries(for: field.identity).count
+  }
+
+  package func _waitForSessionFailureForProof() async throws {
+    guard let session else {
+      throw ObservationTestError.resultUnavailable
+    }
+    _ = try await session._visorWaitForFailure()
+  }
+
+  // MARK: Internal
+
+  @discardableResult
+  func reportSessionFailureIfNeeded(
+    sourceLocation: SourceLocation
+  ) -> Bool {
+    guard let session else { return false }
+    guard let failure = session._visorFailure else { return false }
+    journal?.abandon()
+    phase = .poisoned
+    recordInfrastructureFailure(
+      failure,
+      phase: "running the observation session",
+      sourceLocation: sourceLocation,
+    )
+    return true
+  }
+
+  func journalFailed(
+    _ error: any Error,
+    sourceLocation: SourceLocation,
+  ) {
+    guard phase == .performing else { return }
+    phase = .poisoned
+    let sessionFailure = session?._visorFailure
+    let failure = sessionFailure ?? error
+    let failurePhase = sessionFailure == nil
+      ? "recording an action window"
+      : "running the observation session"
+    // Make cancellation visible before reporting, because the issue recorder
+    // may synchronously re-enter user code.
+    session?._visorRequestStop()
+    recordInfrastructureFailure(
+      failure,
+      phase: failurePhase,
+      sourceLocation: sourceLocation,
+    )
+  }
+
+  func recordIssue(
+    _ message: String,
+    sourceLocation: SourceLocation,
+  ) {
+    issueRecorder(message, sourceLocation)
+  }
+
+  func end() {
+    guard phase != .ended else { return }
+    phase = .ended
+    journal?.finish()
+    sut = nil
+    state = nil
+    journal = nil
+    session = nil
+  }
+
+  func reportUnobservedSessionFailure(
+    _ failure: (any Error)?,
+    sourceLocation: SourceLocation,
+  ) {
+    guard let failure else { return }
+    recordInfrastructureFailure(
+      failure,
+      phase: "running the observation session",
+      sourceLocation: sourceLocation,
+    )
+  }
+
+  func journalForExpectation(
+    sourceLocation: SourceLocation
+  ) -> StateJournal? {
+    guard phase != .cancellationPending, phase != .poisoned else { return nil }
+    guard phase != .ended, let journal else {
+      recordEndedScopeMisuse(sourceLocation: sourceLocation)
+      return nil
+    }
+    guard phase != .performing else {
+      recordIssue(
+        "expect requires a completed perform window",
+        sourceLocation: sourceLocation,
+      )
+      return nil
+    }
+    guard !reportSessionFailureIfNeeded(sourceLocation: sourceLocation) else {
+      return nil
+    }
+    guard journal.hasClosedWindow else {
+      recordIssue(
+        "expect requires a completed perform window",
+        sourceLocation: sourceLocation,
+      )
+      return nil
+    }
+    return journal
+  }
+
+  // MARK: Private
+
+  private var sut: SUT?
+  private var state: SUT.State?
+  private var journal: StateJournal?
+  private var session: _ObservationSession?
+  private var phase = ObservationTestPhase.ready
+  private var hasReportedInfrastructureFailure = false
+  private let issueRecorder: ObservationTestIssueRecorder
+
   private func openWindow(
     sourceLocation: SourceLocation
   ) async -> WindowTransition {
     switch phase {
     case .ready:
       phase = .performing
+
     case .performing:
       recordIssue(
         "A perform window is already active for this State",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return .unavailable
+
     case .cancellationPending:
       return .cancelled
+
     case .poisoned:
       return .unavailable
+
     case .ended:
       recordEndedScopeMisuse(sourceLocation: sourceLocation)
       return .unavailable
@@ -195,7 +349,8 @@ public final class ObservationTest<SUT: ViewModel> {
       recordInfrastructureFailure(
         ObservationTestControlError.stateIdentityChanged,
         phase: "opening an action window",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return .unavailable
     }
     guard !reportSessionFailureIfNeeded(sourceLocation: sourceLocation) else {
@@ -207,7 +362,8 @@ public final class ObservationTest<SUT: ViewModel> {
         {
           journal.begin(state: state, sourceLocation: sourceLocation)
         },
-        _visorPhase: .openingFence)
+        _visorPhase: .openingFence,
+      )
       guard didBegin else {
         phase = .ready
         return .unavailable
@@ -223,7 +379,8 @@ public final class ObservationTest<SUT: ViewModel> {
       recordInfrastructureFailure(
         session._visorFailure ?? error,
         phase: "opening an action window",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return .unavailable
     }
   }
@@ -245,7 +402,8 @@ public final class ObservationTest<SUT: ViewModel> {
     do {
       try await session._visorWithPause(
         { journal.close() },
-        _visorPhase: .closingFence)
+        _visorPhase: .closingFence,
+      )
       phase = .ready
       return .succeeded
     } catch is CancellationError {
@@ -258,56 +416,23 @@ public final class ObservationTest<SUT: ViewModel> {
       recordInfrastructureFailure(
         session._visorFailure ?? error,
         phase: "closing an action window",
-        sourceLocation: sourceLocation)
+        sourceLocation: sourceLocation,
+      )
       return .unavailable
     }
-  }
-
-  @discardableResult
-  func reportSessionFailureIfNeeded(
-    sourceLocation: SourceLocation
-  ) -> Bool {
-    guard let session else { return false }
-    guard let failure = session._visorFailure else { return false }
-    journal?.abandon()
-    phase = .poisoned
-    recordInfrastructureFailure(
-      failure,
-      phase: "running the observation session",
-      sourceLocation: sourceLocation)
-    return true
   }
 
   private func recordInfrastructureFailure(
     _ error: any Error,
     phase: String,
-    sourceLocation: SourceLocation
+    sourceLocation: SourceLocation,
   ) {
     guard !hasReportedInfrastructureFailure else { return }
     hasReportedInfrastructureFailure = true
     recordIssue(
       "VISOR failed while \(phase): \(String(describing: error))",
-      sourceLocation: sourceLocation)
-  }
-
-  func journalFailed(
-    _ error: any Error,
-    sourceLocation: SourceLocation
-  ) {
-    guard phase == .performing else { return }
-    phase = .poisoned
-    let sessionFailure = session?._visorFailure
-    let failure = sessionFailure ?? error
-    let failurePhase = sessionFailure == nil
-      ? "recording an action window"
-      : "running the observation session"
-    // Make cancellation visible before reporting, because the issue recorder
-    // may synchronously re-enter user code.
-    session?._visorRequestStop()
-    recordInfrastructureFailure(
-      failure,
-      phase: failurePhase,
-      sourceLocation: sourceLocation)
+      sourceLocation: sourceLocation,
+    )
   }
 
   private func recordEndedScopeMisuse(
@@ -315,92 +440,8 @@ public final class ObservationTest<SUT: ViewModel> {
   ) {
     recordIssue(
       "This observation scope has ended",
-      sourceLocation: sourceLocation)
-  }
-
-  func recordIssue(
-    _ message: String,
-    sourceLocation: SourceLocation
-  ) {
-    issueRecorder(message, sourceLocation)
-  }
-
-  func end() {
-    guard phase != .ended else { return }
-    phase = .ended
-    journal?.finish()
-    sut = nil
-    state = nil
-    journal = nil
-    session = nil
-  }
-
-  func reportUnobservedSessionFailure(
-    _ failure: (any Error)?,
-    sourceLocation: SourceLocation
-  ) {
-    guard let failure else { return }
-    recordInfrastructureFailure(
-      failure,
-      phase: "running the observation session",
-      sourceLocation: sourceLocation)
-  }
-
-  func journalForExpectation(
-    sourceLocation: SourceLocation
-  ) -> StateJournal? {
-    guard phase != .cancellationPending, phase != .poisoned else { return nil }
-    guard phase != .ended, let journal else {
-      recordEndedScopeMisuse(sourceLocation: sourceLocation)
-      return nil
-    }
-    guard phase != .performing else {
-      recordIssue(
-        "expect requires a completed perform window",
-        sourceLocation: sourceLocation)
-      return nil
-    }
-    guard !reportSessionFailureIfNeeded(sourceLocation: sourceLocation) else {
-      return nil
-    }
-    guard journal.hasClosedWindow else {
-      recordIssue(
-        "expect requires a completed perform window",
-        sourceLocation: sourceLocation)
-      return nil
-    }
-    return journal
-  }
-
-  package func _rawCommitCount<Value>(
-    _ selection: KeyPath<
-      SUT.State._VISORSelectors,
-      _StateField<SUT.State, Value>
-    >
-  ) -> Int {
-    guard let journal else { return 0 }
-    let field = SUT.State._visorSelectors[keyPath: selection]
-    return journal.entries(for: field.identity).count
-  }
-
-  package var _rawCommitFieldNames: [String] {
-    journal?.entries.map(\.fieldName) ?? []
-  }
-
-  package var _outsideWindowDiagnosticContextForProof:
-    _OutsideWindowDiagnosticContextForProof
-  {
-    journal?.outsideWindowDiagnosticContext()
-      ?? _OutsideWindowDiagnosticContextForProof(
-        entries: [],
-        omittedEntryCount: 0)
-  }
-
-  package func _waitForSessionFailureForProof() async throws {
-    guard let session else {
-      throw ObservationTestError.resultUnavailable
-    }
-    _ = try await session._visorWaitForFailure()
+      sourceLocation: sourceLocation,
+    )
   }
 
 }

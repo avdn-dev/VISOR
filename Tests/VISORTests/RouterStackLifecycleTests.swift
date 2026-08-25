@@ -13,20 +13,15 @@ import Testing
 
 @MainActor
 private final class NavigationLifecycleProbe {
-  private struct Waiter {
-    let count: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
 
-  private var counts: [NavigationLifecycleEvent: Int] = [:]
-  private var waiters: [NavigationLifecycleEvent: [Waiter]] = [:]
+  // MARK: Internal
 
   func record(_ event: NavigationLifecycleEvent) {
     let count = counts[event, default: 0] + 1
     counts[event] = count
 
     let waiting = waiters.removeValue(forKey: event) ?? []
-    var remaining: [Waiter] = []
+    var remaining = [Waiter]()
     for waiter in waiting {
       if count >= waiter.count {
         waiter.continuation.resume()
@@ -44,9 +39,21 @@ private final class NavigationLifecycleProbe {
     await withCheckedContinuation { continuation in
       waiters[event, default: []].append(Waiter(
         count: count,
-        continuation: continuation))
+        continuation: continuation,
+      ))
     }
   }
+
+  // MARK: Private
+
+  private struct Waiter {
+    let count: Int
+    let continuation: CheckedContinuation<Void, Never>
+  }
+
+  private var counts = [NavigationLifecycleEvent: Int]()
+  private var waiters = [NavigationLifecycleEvent: [Waiter]]()
+
 }
 
 private enum NavigationLifecycleEvent: Hashable {
@@ -80,6 +87,7 @@ private struct NavigationLifecycleMarker: View {
 @MainActor
 private struct NavigationTabLifecycleHost: View {
   @Bindable var router: Router<TestScene>
+
   let probe: NavigationLifecycleProbe
 
   var body: some View {
@@ -87,7 +95,7 @@ private struct NavigationTabLifecycleHost: View {
       router: router,
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       TabView(selection: $router.selectedRoot) {
         RouterStack(
@@ -95,12 +103,13 @@ private struct NavigationTabLifecycleHost: View {
           root: .home,
           pushContent: { _ in EmptyView() },
           sheetContent: { _ in EmptyView() },
-          fullScreenContent: { _ in EmptyView() }
+          fullScreenContent: { _ in EmptyView() },
         ) {
           NavigationLifecycleMarker(
             appeared: .homeAppeared,
             disappeared: .homeDisappeared,
-            probe: probe)
+            probe: probe,
+          )
         }
         .tabItem { Text("Home") }
         .tag(TestRoot.home as TestRoot?)
@@ -110,12 +119,13 @@ private struct NavigationTabLifecycleHost: View {
           root: .settings,
           pushContent: { _ in EmptyView() },
           sheetContent: { _ in EmptyView() },
-          fullScreenContent: { _ in EmptyView() }
+          fullScreenContent: { _ in EmptyView() },
         ) {
           NavigationLifecycleMarker(
             appeared: .settingsAppeared,
             disappeared: nil,
-            probe: probe)
+            probe: probe,
+          )
         }
         .tabItem { Text("Settings") }
         .tag(TestRoot.settings as TestRoot?)
@@ -126,7 +136,11 @@ private struct NavigationTabLifecycleHost: View {
 
 @MainActor
 private struct NavigationSplitLifecycleHost: View {
+
+  // MARK: Internal
+
   @Bindable var router: Router<TestScene>
+
   let probe: NavigationLifecycleProbe
 
   var body: some View {
@@ -134,7 +148,7 @@ private struct NavigationSplitLifecycleHost: View {
       router: router,
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       NavigationSplitView {
         List(selection: $router.selectedRoot) {
@@ -147,12 +161,16 @@ private struct NavigationSplitLifecycleHost: View {
           rootStack(
             root: .home,
             appeared: .homeAppeared,
-            disappeared: .homeDisappeared)
+            disappeared: .homeDisappeared,
+          )
+
         case .settings:
           rootStack(
             root: .settings,
             appeared: .settingsAppeared,
-            disappeared: nil)
+            disappeared: nil,
+          )
+
         case nil:
           Text("Select a destination")
         }
@@ -160,30 +178,33 @@ private struct NavigationSplitLifecycleHost: View {
     }
   }
 
+  // MARK: Private
+
   private func rootStack(
     root: TestRoot,
     appeared: NavigationLifecycleEvent,
-    disappeared: NavigationLifecycleEvent?
+    disappeared: NavigationLifecycleEvent?,
   ) -> some View {
     RouterStack(
       parentRouter: router,
       root: root,
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       NavigationLifecycleMarker(
         appeared: appeared,
         disappeared: disappeared,
-        probe: probe)
+        probe: probe,
+      )
     }
   }
 }
 
 @MainActor
 private final class NavigationViewHost {
-  let hostingView: NSHostingView<AnyView>
-  private let window: NSWindow
+
+  // MARK: Lifecycle
 
   init(rootView: AnyView) {
     _ = NSApplication.shared
@@ -193,12 +214,17 @@ private final class NavigationViewHost {
       contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
       styleMask: [.titled],
       backing: .buffered,
-      defer: false)
+      defer: false,
+    )
     window.isReleasedWhenClosed = false
     window.contentView = hostingView
     window.orderFront(nil)
     layout()
   }
+
+  // MARK: Internal
+
+  let hostingView: NSHostingView<AnyView>
 
   func layout() {
     hostingView.layoutSubtreeIfNeeded()
@@ -211,6 +237,11 @@ private final class NavigationViewHost {
     window.contentView = nil
     window.close()
   }
+
+  // MARK: Private
+
+  private let window: NSWindow
+
 }
 
 @Suite("Router host and stack lifecycle", .serialized)
@@ -224,12 +255,13 @@ struct RouterStackLifecycleTests {
       router: router,
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       NavigationLifecycleMarker(
         appeared: .homeAppeared,
         disappeared: nil,
-        probe: probe)
+        probe: probe,
+      )
     })
     let host = NavigationViewHost(rootView: root)
     defer { host.close() }
@@ -248,10 +280,11 @@ struct RouterStackLifecycleTests {
         NavigationLifecycleMarker(
           appeared: .detailAppeared,
           disappeared: .detailDisappeared,
-          probe: probe)
+          probe: probe,
+        )
       },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       EmptyView()
     })
@@ -280,7 +313,8 @@ struct RouterStackLifecycleTests {
     router.selectedRoot = .home
 
     let host = NavigationViewHost(rootView: AnyView(
-      NavigationTabLifecycleHost(router: router, probe: probe)))
+      NavigationTabLifecycleHost(router: router, probe: probe)
+    ))
     defer { host.close() }
     await probe.wait(for: .homeAppeared)
 
@@ -309,7 +343,8 @@ struct RouterStackLifecycleTests {
     router.selectedRoot = .home
 
     let host = NavigationViewHost(rootView: AnyView(
-      NavigationSplitLifecycleHost(router: router, probe: probe)))
+      NavigationSplitLifecycleHost(router: router, probe: probe)
+    ))
     defer { host.close() }
     await probe.wait(for: .homeAppeared)
 
@@ -340,9 +375,10 @@ struct RouterStackLifecycleTests {
         NavigationLifecycleMarker(
           appeared: .sheetAppeared,
           disappeared: .sheetDisappeared,
-          probe: probe)
+          probe: probe,
+        )
       },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       EmptyView()
     })

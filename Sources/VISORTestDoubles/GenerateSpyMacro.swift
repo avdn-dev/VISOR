@@ -7,4 +7,5 @@
 @attached(peer, names: prefixed(Spy))
 public macro GenerateSpy(_ traits: TestDoubleTrait...) = #externalMacro(
   module: "VISORMacros",
-  type: "GenerateTestDoublesSpyMacro")
+  type: "GenerateTestDoublesSpyMacro",
+)

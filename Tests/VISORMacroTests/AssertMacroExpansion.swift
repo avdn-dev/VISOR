@@ -5,10 +5,10 @@
 //  Created by Matthew Yuen on 3/4/2026.
 //
 
-import Testing
 import SwiftSyntax
 import SwiftSyntaxMacroExpansion
 import SwiftSyntaxMacros
+import Testing
 @_spi(XCTestFailureLocation) import SwiftSyntaxMacrosGenericTestSupport
 
 // Re-export the spec types from `SwiftSyntaxMacrosGenericTestSupport`.
@@ -30,7 +30,7 @@ public func assertMacroExpansionSwiftTesting(
   fileID: StaticString = #fileID,
   filePath: StaticString = #filePath,
   line: UInt = #line,
-  column: UInt = #column
+  column: UInt = #column,
 ) {
   let specs = macros.mapValues { MacroSpec(type: $0) }
   VISORMacroTests.assertMacroExpansionSwiftTesting(
@@ -47,7 +47,7 @@ public func assertMacroExpansionSwiftTesting(
     fileID: fileID,
     filePath: filePath,
     line: line,
-    column: column
+    column: column,
   )
 }
 
@@ -65,7 +65,7 @@ public func assertMacroExpansionSwiftTesting(
   fileID: StaticString = #fileID,
   filePath: StaticString = #filePath,
   line: UInt = #line,
-  column: UInt = #column
+  column: UInt = #column,
 ) {
   SwiftSyntaxMacrosGenericTestSupport.assertMacroExpansion(
     originalSource,
@@ -83,6 +83,6 @@ public func assertMacroExpansionSwiftTesting(
     fileID: fileID,
     filePath: filePath,
     line: line,
-    column: column
+    column: column,
   )
 }

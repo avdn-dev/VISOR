@@ -6,21 +6,30 @@ import PackageDescription
 let package = Package(
   name: "VISOR",
   platforms: [
-    .macOS(.v14), .iOS(.v17), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17), .visionOS(.v2),
+    .macOS(.v14),
+    .iOS(.v17),
+    .tvOS(.v17),
+    .watchOS(.v10),
+    .macCatalyst(.v17),
+    .visionOS(.v2),
   ],
   products: [
     .library(
       name: "VISORObservation",
-      targets: ["VISORObservation"]),
+      targets: ["VISORObservation"],
+    ),
     .library(
       name: "VISOR",
-      targets: ["VISOR"]),
+      targets: ["VISOR"],
+    ),
     .library(
       name: "VISORTesting",
-      targets: ["VISORTesting"]),
+      targets: ["VISORTesting"],
+    ),
     .library(
       name: "VISORTestDoubles",
-      targets: ["VISORTestDoubles"]),
+      targets: ["VISORTestDoubles"],
+    ),
   ],
   dependencies: [
     .package(url: "https://github.com/swiftlang/swift-syntax.git", "602.0.0"..<"604.0.0"),
@@ -29,7 +38,8 @@ let package = Package(
   targets: [
     .target(
       name: "VISORObservation",
-      dependencies: ["VISORMacros"]),
+      dependencies: ["VISORMacros"],
+    ),
 
     .macro(
       name: "VISORMacros",
@@ -38,45 +48,54 @@ let package = Package(
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-      ]),
+      ],
+    ),
 
     .target(
       name: "VISOR",
       dependencies: [
         "VISORObservation",
         "VISORMacros",
-      ]),
+      ],
+    ),
 
     .target(
       name: "VISORTesting",
-      dependencies: ["VISOR", "VISORObservation"]),
+      dependencies: ["VISOR", "VISORObservation"],
+    ),
 
     .target(
       name: "VISORTestDoubles",
-      dependencies: ["VISORMacros"]),
+      dependencies: ["VISORMacros"],
+    ),
 
     .testTarget(
       name: "VISORTests",
-      dependencies: ["VISOR", "VISORObservation", "VISORTesting"]),
+      dependencies: ["VISOR", "VISORObservation", "VISORTesting"],
+    ),
 
     .testTarget(
       name: "VISORObservationTests",
-      dependencies: ["VISORObservation", "VISORTesting"]),
+      dependencies: ["VISORObservation", "VISORTesting"],
+    ),
 
     .testTarget(
       name: "VISORTestingTests",
-      dependencies: ["VISOR", "VISORObservation", "VISORTesting"]),
+      dependencies: ["VISOR", "VISORObservation", "VISORTesting"],
+    ),
 
     .testTarget(
       name: "VISORTestDoublesTests",
       dependencies: ["VISORObservation", "VISORTestDoubles"],
-      swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")]),
+      swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
+    ),
 
     .testTarget(
       name: "VISORMacroTests",
       dependencies: [
         "VISORMacros",
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
-      ]),
-
-  ])
+      ],
+    ),
+  ],
+)

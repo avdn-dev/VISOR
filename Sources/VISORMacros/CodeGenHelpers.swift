@@ -8,7 +8,7 @@
 import SwiftParser
 import SwiftSyntax
 
-// MARK: - Attribute Name Constants
+// MARK: - AttributeName
 
 enum AttributeName {
   static let bound = "Bound"
@@ -42,34 +42,47 @@ func defaultValue(for type: String) -> String? {
   switch nominal.name {
   case "Optional":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "nil")
+
   case "Bool":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "false")
+
   case "Int", "Int8", "Int16", "Int32", "Int64",
        "UInt", "UInt8", "UInt16", "UInt32", "UInt64":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "0")
+
   case "Float", "Double":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "0.0")
+
   case "CGFloat":
     (expectedModule, expectedArgumentCount, value) =
       ("CoreGraphics", 0, "0.0")
+
   case "Decimal":
     (expectedModule, expectedArgumentCount, value) = ("Foundation", 0, "0")
+
   case "String":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "\"\"")
+
   case "Data":
     (expectedModule, expectedArgumentCount, value) =
       ("Foundation", 0, "Data()")
+
   case "Array":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "[]")
+
   case "Dictionary":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 2, "[:]")
+
   case "Set":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 1, "[]")
+
   case "Void":
     (expectedModule, expectedArgumentCount, value) = ("Swift", 0, "()")
+
   case "AsyncStream":
     (expectedModule, expectedArgumentCount, value) =
       ("_Concurrency", 1, "AsyncStream { $0.finish() }")
+
   default:
     return nil
   }
@@ -89,24 +102,26 @@ private func parsedType(from spelling: String) -> TypeSyntax? {
     !source.hasError,
     source.statements.count == 1,
     let declaration = source.statements.first?.item.as(
-      TypeAliasDeclSyntax.self)
+      TypeAliasDeclSyntax.self
+    )
   else {
     return nil
   }
   return declaration.initializer.value
 }
 
-private extension TypeSyntax {
-  var nominalIdentity: (
+extension TypeSyntax {
+  fileprivate var nominalIdentity: (
     module: String?,
     name: String,
-    genericArgumentCount: Int
+    genericArgumentCount: Int,
   )? {
     if let identifier = self.as(IdentifierTypeSyntax.self) {
       return (
         nil,
         identifier.name.text,
-        identifier.genericArgumentClause?.arguments.count ?? 0)
+        identifier.genericArgumentClause?.arguments.count ?? 0,
+      )
     }
     guard
       let member = self.as(MemberTypeSyntax.self),
@@ -118,7 +133,8 @@ private extension TypeSyntax {
     return (
       base.name.text,
       member.name.text,
-      member.genericArgumentClause?.arguments.count ?? 0)
+      member.genericArgumentClause?.arguments.count ?? 0,
+    )
   }
 }
 
@@ -133,9 +149,8 @@ func methodReferencesGenericParameters(_ method: ProtocolMethodInfo, in type: St
 
 func genericParameterNamesReferenced(
   by method: ProtocolMethodInfo,
-  in type: String?)
-  -> [String]
-{
+  in type: String?,
+) -> [String] {
   guard let type, !method.genericParameterNames.isEmpty else { return [] }
   return method.genericParameterNames.filter { genericName in
     type.containsTypeIdentifier(genericName)
@@ -176,7 +191,7 @@ func hasUnknownTypeDefaults(properties: [ProtocolPropertyInfo], methods: [Protoc
 /// If labels alone still collide (same name and labels, different return types),
 /// the return type is appended: `loadIdReturningItem` vs `loadIdReturningItems`.
 func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
-  var nameCounts: [String: Int] = [:]
+  var nameCounts = [String: Int]()
   for m in methods { nameCounts[m.name, default: 0] += 1 }
 
   // Phase 1: disambiguate by parameter labels
@@ -192,7 +207,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   }
 
   // Phase 2: if prefixes still collide, append return type.
-  var prefixCounts: [String: Int] = [:]
+  var prefixCounts = [String: Int]()
   for p in prefixes { prefixCounts[p, default: 0] += 1 }
 
   for (i, prefix) in prefixes.enumerated() where prefixCounts[prefix, default: 0] > 1 {
@@ -216,7 +231,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   // guarantees a unique final generated API.
   prefixCounts = [:]
   for p in prefixes { prefixCounts[p, default: 0] += 1 }
-  var prefixOrdinals: [String: Int] = [:]
+  var prefixOrdinals = [String: Int]()
   for index in prefixes.indices where prefixCounts[prefixes[index], default: 0] > 1 {
     let prefix = prefixes[index]
     prefixOrdinals[prefix, default: 0] += 1
@@ -226,7 +241,7 @@ func uniqueMethodPrefixes(for methods: [ProtocolMethodInfo]) -> [String] {
   return prefixes
 }
 
-// MARK: - Method Fallback Helper
+// MARK: - MethodFallbackStyle
 
 enum MethodFallbackStyle {
   case expression
@@ -236,9 +251,8 @@ enum MethodFallbackStyle {
 func generateFallbackBodyLines(
   method: ProtocolMethodInfo,
   returnStorageName: String?,
-  style: MethodFallbackStyle)
-  -> [String]
-{
+  style: MethodFallbackStyle,
+) -> [String] {
   if method.isRethrowing {
     if let forwardingCall = method.rethrowingBodyForwardingCall {
       if method.returnType != nil {
@@ -254,7 +268,8 @@ func generateFallbackBodyLines(
     return []
   }
 
-  if methodReferencesGenericParameters(method, in: method.returnType)
+  if
+    methodReferencesGenericParameters(method, in: method.returnType)
     || methodReferencesGenericParameters(method, in: method.throwsEffect.explicitErrorType)
   {
     return ["    fatalError(\"No generated default for \(method.name)(); provide a manual implementation for this method\")"]
@@ -269,7 +284,7 @@ func generateFallbackBodyLines(
       if needsGuard {
         return [
           "    guard let result = \(returnStorageName) else { fatalError(\"Configure \(returnStorageName) before calling \(method.name)()\") }",
-          "    return try result.get()"
+          "    return try result.get()",
         ]
       }
 
@@ -292,7 +307,7 @@ func generateFallbackBodyLines(
     if needsGuard {
       return [
         "    guard let value = \(returnStorageName) else { fatalError(\"Configure \(returnStorageName) before calling \(method.name)()\") }",
-        "    return value"
+        "    return value",
       ]
     }
 
@@ -354,6 +369,8 @@ func storageValueType(from typeString: String) -> String {
 
   return result
 }
+
+// MARK: - StorageSnapshotStrategy
 
 enum StorageSnapshotStrategy: Equatable, Sendable {
   case none
@@ -432,9 +449,8 @@ func accessLevel(of declaration: some DeclGroupSyntax) -> String {
 
 func makeProtocolExtension(
   for type: some TypeSyntaxProtocol,
-  conformingTo protocolName: String)
-  -> ExtensionDeclSyntax
-{
+  conformingTo protocolName: String,
+) -> ExtensionDeclSyntax {
   let extensionDecl: DeclSyntax = """
     extension \(type.trimmed): @MainActor \(raw: protocolName) {}
     """
@@ -452,7 +468,7 @@ extension String {
   var trimmingWhitespace: String {
     let start = firstIndex(where: { !$0.isWhitespace }) ?? startIndex
     let end = lastIndex(where: { !$0.isWhitespace }).map(index(after:)) ?? endIndex
-    if start == startIndex && end == endIndex { return self }
+    if start == startIndex, end == endIndex { return self }
     return String(self[start..<end])
   }
 
@@ -469,7 +485,7 @@ extension String {
       let after = range.upperBound == endIndex ? nil : self[range.upperBound]
       let hasIdentifierBoundaryBefore = before.map { !$0.isIdentifierCharacter } ?? true
       let hasIdentifierBoundaryAfter = after.map { !$0.isIdentifierCharacter } ?? true
-      if hasIdentifierBoundaryBefore && hasIdentifierBoundaryAfter {
+      if hasIdentifierBoundaryBefore, hasIdentifierBoundaryAfter {
         return true
       }
 
@@ -491,20 +507,21 @@ extension String {
   }
 }
 
-private extension Character {
-  var isIdentifierCharacter: Bool {
+extension Character {
+  fileprivate var isIdentifierCharacter: Bool {
     isLetter || isNumber || self == "_"
   }
 }
 
-private extension ProtocolMethodInfo {
-  var rethrowingBodyForwardingCall: String? {
+extension ProtocolMethodInfo {
+  fileprivate var rethrowingBodyForwardingCall: String? {
     guard isRethrowing else { return nil }
 
     for parameter in parameters {
       let type = stripInvocationOnlyFunctionAttributes(from: parameter.type)
-      guard isZeroArgumentFunction(type),
-            canForwardFunctionReturnType(functionReturnType(in: type), for: returnType)
+      guard
+        isZeroArgumentFunction(type),
+        canForwardFunctionReturnType(functionReturnType(in: type), for: returnType)
       else {
         continue
       }
@@ -517,7 +534,7 @@ private extension ProtocolMethodInfo {
     return nil
   }
 
-  var canForwardRethrowingBodyResult: Bool {
+  fileprivate var canForwardRethrowingBodyResult: Bool {
     rethrowingBodyForwardingCall != nil
   }
 }

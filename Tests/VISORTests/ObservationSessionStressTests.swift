@@ -3,6 +3,8 @@ import VISOR
 import VISORObservation
 import VISORTesting
 
+// MARK: - ObservationFailureWaitOutcome
+
 // Explicit deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated test helpers.
 
@@ -12,9 +14,12 @@ nonisolated private enum ObservationFailureWaitOutcome: Equatable, Sendable {
   case unexpected(String)
 }
 
+// MARK: - ObservationSessionStressTests
+
 @Suite("Observation session waiter stress", .timeLimit(.minutes(1)))
 struct ObservationSessionStressTests {
-  private static let waiterCount = 64
+
+  // MARK: Internal
 
   @Test
   @MainActor
@@ -23,7 +28,8 @@ struct ObservationSessionStressTests {
     let session = _ObservationSession(lanes: [
       _ObservationLane(
         source: channel.source,
-        handlers: [])._visorErase(),
+        handlers: [],
+      )._visorErase()
     ])
     try await session._visorStart()
 
@@ -61,7 +67,7 @@ struct ObservationSessionStressTests {
 
     let lateOutcomes = await withTaskGroup(
       of: ObservationFailureWaitOutcome.self,
-      returning: [ObservationFailureWaitOutcome].self
+      returning: [ObservationFailureWaitOutcome].self,
     ) { group in
       for _ in 0..<Self.waiterCount {
         group.addTask {
@@ -75,7 +81,7 @@ struct ObservationSessionStressTests {
         }
       }
 
-      var outcomes: [ObservationFailureWaitOutcome] = []
+      var outcomes = [ObservationFailureWaitOutcome]()
       for await outcome in group {
         outcomes.append(outcome)
       }
@@ -97,7 +103,8 @@ struct ObservationSessionStressTests {
     let session = _ObservationSession(lanes: [
       _ObservationLane(
         source: channel.source,
-        handlers: [])._visorErase(),
+        handlers: [],
+      )._visorErase()
     ])
     try await session._visorStart()
 
@@ -129,4 +136,9 @@ struct ObservationSessionStressTests {
     #expect(session._visorIsStopped)
     #expect(channel.source._visorActiveSubscriptionCount == 0)
   }
+
+  // MARK: Private
+
+  private static let waiterCount = 64
+
 }

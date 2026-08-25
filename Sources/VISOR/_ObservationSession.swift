@@ -2,22 +2,14 @@ import Foundation
 import os
 import VISORObservation
 
+// MARK: - _ObservationFailureLatch
+
 // Empty deinitialisers in this file work around a Swift 6.2.4 release
 // optimiser crash for explicitly MainActor-isolated classes.
 
 nonisolated private final class _ObservationFailureLatch: Sendable {
-  private typealias Waiter = CheckedContinuation<
-    Result<_ObservationSourceFailure, CancellationError>,
-    Never
-  >
 
-  private struct State: Sendable {
-    var failure: _ObservationSourceFailure?
-    var isFinished = false
-    var waiters: [UUID: Waiter] = [:]
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
+  // MARK: Internal
 
   func wait() async throws -> _ObservationSourceFailure {
     let id = UUID()
@@ -74,25 +66,50 @@ nonisolated private final class _ObservationFailureLatch: Sendable {
       waiter.resume(returning: .failure(CancellationError()))
     }
   }
+
+  // MARK: Private
+
+  private typealias Waiter = CheckedContinuation<
+    Result<_ObservationSourceFailure, CancellationError>,
+    Never,
+  >
+
+  private struct State: Sendable {
+    var failure: _ObservationSourceFailure?
+    var isFinished = false
+    var waiters = [UUID: Waiter]()
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
+
 }
+
+// MARK: - _ObservationHandlerInvocation
 
 @MainActor
 private final class _ObservationHandlerInvocation {
-  let sessionID: UUID?
-  let laneID: UUID?
-  private(set) var isActive = true
+
+  // MARK: Lifecycle
 
   init(sessionID: UUID?, laneID: UUID?) {
     self.sessionID = sessionID
     self.laneID = laneID
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Internal
+
+  let sessionID: UUID?
+  let laneID: UUID?
+  private(set) var isActive = true
 
   func finish() {
     isActive = false
   }
 }
+
+// MARK: - _ObservationHandlerExecution
 
 nonisolated private enum _ObservationHandlerExecution {
   @TaskLocal static var currentInvocation: _ObservationHandlerInvocation?
@@ -101,11 +118,12 @@ nonisolated private enum _ObservationHandlerExecution {
   static func withHandler(
     sessionID: UUID?,
     laneID: UUID? = nil,
-    operation: @MainActor () async -> Void
+    operation: @MainActor () async -> Void,
   ) async {
     let invocation = _ObservationHandlerInvocation(
       sessionID: sessionID,
-      laneID: laneID)
+      laneID: laneID,
+    )
     await Self.$currentInvocation.withValue(invocation) {
       await operation()
     }
@@ -116,39 +134,28 @@ nonisolated private enum _ObservationHandlerExecution {
   }
 }
 
+// MARK: - _ObservationLane
+
 @MainActor
 package final class _ObservationLane<Value: Sendable> {
-  package typealias Handler = @MainActor @Sendable (Value) async -> Void
 
-  private enum Lifecycle {
-    case idle
-    case prepared
-    case projected
-    case initialised
-    case active
-    case ended
-  }
-
-  fileprivate let source: ObservationSource<Value>
-  private let projections: [Handler]
-  private let reactions: [Handler]
-  private var lifecycle = Lifecycle.idle
-  private var subscription: _ObservationSubscription<Value>?
-  private var worker: Task<Void, any Error>?
-  private var sessionID: UUID?
-  private let handlerExecutionID = UUID()
+  // MARK: Lifecycle
 
   package init(
     source: ObservationSource<Value>,
     handlers: [Handler],
-    initialReactions: [Handler] = []
+    initialReactions: [Handler] = [],
   ) {
     self.source = source
     projections = handlers
     reactions = initialReactions
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Package
+
+  package typealias Handler = @MainActor @Sendable (Value) async -> Void
 
   package func _visorErase() -> _AnyObservationLane {
     _AnyObservationLane(
@@ -156,18 +163,70 @@ package final class _ObservationLane<Value: Sendable> {
       adopt: { [self] prepared, sessionID in
         let observation = try prepared._visorUnwrap(as: Value.self)
         return _AnyPreparedObservationLane(
-          try adopt(observation, sessionID: sessionID))
-      })
+          try adopt(observation, sessionID: sessionID)
+        )
+      },
+    )
   }
+
+  package func _visorCheckpointAndPause() async throws
+    -> _ObservationCheckpoint<Value>
+  {
+    guard !isExecutingHandler else {
+      throw _ObservationSourceFailure.protocolViolation(
+        "An observation handler cannot checkpoint its own lane"
+      )
+    }
+    guard lifecycle == .active, let subscription else {
+      throw _ObservationSourceFailure.protocolViolation(
+        "The observation lane has not started"
+      )
+    }
+    do {
+      try Task.checkCancellation()
+      let checkpoint = try subscription._visorCheckpointAndPause()
+      try await subscription._visorWaitUntilAcknowledged(checkpoint)
+      return checkpoint
+    } catch {
+      signalCancellation()
+      await join()
+      throw error
+    }
+  }
+
+  package func _visorResume(
+    after checkpoint: _ObservationCheckpoint<Value>
+  ) throws {
+    guard lifecycle == .active, let subscription else {
+      throw _ObservationSourceFailure.protocolViolation(
+        "The observation lane has not started"
+      )
+    }
+    try subscription._visorResume(after: checkpoint)
+  }
+
+  package func _visorCancelAndJoin() async {
+    signalCancellation()
+    // Joining here would make a handler wait for the worker or startup task
+    // that is currently awaiting that same handler. Cancellation is already
+    // visible synchronously; an owner outside the handler can join later.
+    guard !isExecutingHandler else { return }
+    await join()
+  }
+
+  // MARK: Fileprivate
+
+  fileprivate let source: ObservationSource<Value>
 
   fileprivate func adopt(
     _ observation: _PreparedObservation<Value>,
-    sessionID: UUID?
+    sessionID: UUID?,
   ) throws -> _PreparedLane<Value> {
     guard lifecycle == .idle, subscription == nil else {
       observation._visorCancel()
       throw _ObservationSourceFailure.protocolViolation(
-        "An observation lane can prepare once per generation")
+        "An observation lane can prepare once per generation"
+      )
     }
 
     let opened = observation._visorActivate()
@@ -177,7 +236,8 @@ package final class _ObservationLane<Value: Sendable> {
     return _PreparedLane(
       lane: self,
       observation: observation,
-      opened: opened)
+      opened: opened,
+    )
   }
 
   fileprivate func applyProjection(
@@ -185,7 +245,8 @@ package final class _ObservationLane<Value: Sendable> {
   ) async throws {
     guard lifecycle == .prepared else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A prepared lane can project one startup target")
+        "A prepared lane can project one startup target"
+      )
     }
 
     do {
@@ -193,7 +254,7 @@ package final class _ObservationLane<Value: Sendable> {
       for projection in projections {
         await _ObservationHandlerExecution.withHandler(
           sessionID: sessionID,
-          laneID: handlerExecutionID
+          laneID: handlerExecutionID,
         ) {
           await projection(envelope.snapshot)
         }
@@ -214,7 +275,8 @@ package final class _ObservationLane<Value: Sendable> {
   ) async throws {
     guard lifecycle == .projected, let subscription else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A projected lane can run its initial reactions once")
+        "A projected lane can run its initial reactions once"
+      )
     }
 
     do {
@@ -222,7 +284,7 @@ package final class _ObservationLane<Value: Sendable> {
       for reaction in reactions {
         await _ObservationHandlerExecution.withHandler(
           sessionID: sessionID,
-          laneID: handlerExecutionID
+          laneID: handlerExecutionID,
         ) {
           await reaction(envelope.snapshot)
         }
@@ -241,14 +303,16 @@ package final class _ObservationLane<Value: Sendable> {
 
   fileprivate func startWorker(
     reportingFailure: @escaping @MainActor @Sendable
-      (_ObservationSourceFailure) -> Void = { _ in }
+    (_ObservationSourceFailure) -> Void = { _ in }
   ) throws {
-    guard lifecycle == .initialised,
-          worker == nil,
-          let subscription
+    guard
+      lifecycle == .initialised,
+      worker == nil,
+      let subscription
     else {
       throw _ObservationSourceFailure.protocolViolation(
-        "An observation lane starts after exactly one startup target")
+        "An observation lane starts after exactly one startup target"
+      )
     }
 
     let handlerSessionID = sessionID
@@ -261,7 +325,7 @@ package final class _ObservationLane<Value: Sendable> {
           for projection in projections {
             await _ObservationHandlerExecution.withHandler(
               sessionID: handlerSessionID,
-              laneID: handlerLaneID
+              laneID: handlerLaneID,
             ) {
               await projection(envelope.snapshot)
             }
@@ -270,7 +334,7 @@ package final class _ObservationLane<Value: Sendable> {
           for reaction in reactions {
             await _ObservationHandlerExecution.withHandler(
               sessionID: handlerSessionID,
-              laneID: handlerLaneID
+              laneID: handlerLaneID,
             ) {
               await reaction(envelope.snapshot)
             }
@@ -307,47 +371,24 @@ package final class _ObservationLane<Value: Sendable> {
     lifecycle = .ended
   }
 
-  package func _visorCheckpointAndPause() async throws
-    -> _ObservationCheckpoint<Value>
-  {
-    guard !isExecutingHandler else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "An observation handler cannot checkpoint its own lane")
-    }
-    guard lifecycle == .active, let subscription else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "The observation lane has not started")
-    }
-    do {
-      try Task.checkCancellation()
-      let checkpoint = try subscription._visorCheckpointAndPause()
-      try await subscription._visorWaitUntilAcknowledged(checkpoint)
-      return checkpoint
-    } catch {
-      signalCancellation()
-      await join()
-      throw error
-    }
+  // MARK: Private
+
+  private enum Lifecycle {
+    case idle
+    case prepared
+    case projected
+    case initialised
+    case active
+    case ended
   }
 
-  package func _visorResume(
-    after checkpoint: _ObservationCheckpoint<Value>
-  ) throws {
-    guard lifecycle == .active, let subscription else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "The observation lane has not started")
-    }
-    try subscription._visorResume(after: checkpoint)
-  }
-
-  package func _visorCancelAndJoin() async {
-    signalCancellation()
-    // Joining here would make a handler wait for the worker or startup task
-    // that is currently awaiting that same handler. Cancellation is already
-    // visible synchronously; an owner outside the handler can join later.
-    guard !isExecutingHandler else { return }
-    await join()
-  }
+  private let projections: [Handler]
+  private let reactions: [Handler]
+  private var lifecycle = Lifecycle.idle
+  private var subscription: _ObservationSubscription<Value>?
+  private var worker: Task<Void, any Error>?
+  private var sessionID: UUID?
+  private let handlerExecutionID = UUID()
 
   private var isExecutingHandler: Bool {
     guard let invocation = _ObservationHandlerExecution.currentInvocation else {
@@ -357,42 +398,41 @@ package final class _ObservationLane<Value: Sendable> {
   }
 }
 
+// MARK: - _PreparedLane
+
 @MainActor
 package final class _PreparedLane<Value: Sendable> {
-  private enum Phase {
-    case pending
-    case projected
-    case initialised
-    case active
-    case cancelled
-  }
 
-  private let lane: _ObservationLane<Value>
-  private let observation: _PreparedObservation<Value>
-  private let opened: _OpenObservation<Value>
-  private var phase = Phase.pending
-  private var startupEnvelope: _ObservationEnvelope<Value>?
+  // MARK: Lifecycle
 
   fileprivate init(
     lane: _ObservationLane<Value>,
     observation: _PreparedObservation<Value>,
-    opened: _OpenObservation<Value>
+    opened: _OpenObservation<Value>,
   ) {
     self.lane = lane
     self.observation = observation
     self.opened = opened
   }
 
-  fileprivate var erasedSubscription: _AnyObservationSubscription {
-    opened.subscription._visorErase()
+  deinit {
+    switch phase {
+    case .pending, .projected, .initialised:
+      observation._visorCancel()
+    case .active, .cancelled:
+      break
+    }
   }
+
+  // MARK: Package
 
   package func _visorApplyProjection(
     _ checkpoint: _AnyObservationCheckpoint
   ) async throws {
     guard phase == .pending else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A prepared lane projects one startup target")
+        "A prepared lane projects one startup target"
+      )
     }
     let typedCheckpoint = try checkpoint._visorUnwrap(as: Value.self)
     let envelope = try opened.subscription
@@ -411,7 +451,8 @@ package final class _PreparedLane<Value: Sendable> {
   package func _visorApplyInitialReactions() async throws {
     guard phase == .projected, let startupEnvelope else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A projected lane runs its initial reactions once")
+        "A projected lane runs its initial reactions once"
+      )
     }
     do {
       try await lane.applyInitialReactionsAndAcknowledge(startupEnvelope)
@@ -427,14 +468,21 @@ package final class _PreparedLane<Value: Sendable> {
 
   package func _visorStartWorker(
     reportingFailure: @escaping @MainActor @Sendable
-      (_ObservationSourceFailure) -> Void = { _ in }
+    (_ObservationSourceFailure) -> Void = { _ in }
   ) throws {
     guard phase == .initialised else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A prepared lane starts after its startup target")
+        "A prepared lane starts after its startup target"
+      )
     }
     try lane.startWorker(reportingFailure: reportingFailure)
     phase = .active
+  }
+
+  // MARK: Fileprivate
+
+  fileprivate var erasedSubscription: _AnyObservationSubscription {
+    opened.subscription._visorErase()
   }
 
   fileprivate func signalCancellation() {
@@ -446,57 +494,71 @@ package final class _PreparedLane<Value: Sendable> {
     await lane.join()
   }
 
-  deinit {
-    switch phase {
-    case .pending, .projected, .initialised:
-      observation._visorCancel()
-    case .active, .cancelled:
-      break
-    }
+  // MARK: Private
+
+  private enum Phase {
+    case pending
+    case projected
+    case initialised
+    case active
+    case cancelled
   }
+
+  private let lane: _ObservationLane<Value>
+  private let observation: _PreparedObservation<Value>
+  private let opened: _OpenObservation<Value>
+  private var phase = Phase.pending
+  private var startupEnvelope: _ObservationEnvelope<Value>?
+
 }
+
+// MARK: - _AnyObservationLane
 
 @MainActor
 package final class _AnyObservationLane {
-  package let source: _AnyObservationSource
-  private let adoptOperation:
-    @MainActor (_AnyPreparedObservation, UUID) throws
-      -> _AnyPreparedObservationLane
+
+  // MARK: Lifecycle
 
   fileprivate init(
     source: _AnyObservationSource,
     adopt: @escaping @MainActor (_AnyPreparedObservation, UUID) throws
-      -> _AnyPreparedObservationLane
+      -> _AnyPreparedObservationLane,
   ) {
     self.source = source
     adoptOperation = adopt
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Package
+
+  package let source: _AnyObservationSource
+
+  // MARK: Fileprivate
 
   fileprivate func adopt(
     _ observation: _AnyPreparedObservation,
-    sessionID: UUID
+    sessionID: UUID,
   ) throws -> _AnyPreparedObservationLane {
     try adoptOperation(observation, sessionID)
   }
+
+  // MARK: Private
+
+  private let adoptOperation:
+    @MainActor (_AnyPreparedObservation, UUID) throws
+    -> _AnyPreparedObservationLane
+
 }
+
+// MARK: - _AnyPreparedObservationLane
 
 @MainActor
 package final class _AnyPreparedObservationLane {
-  private let subscriptionOperation:
-    @MainActor () -> _AnyObservationSubscription
-  private let applyProjectionOperation:
-    @MainActor (_AnyObservationCheckpoint) async throws -> Void
-  private let applyInitialReactionsOperation:
-    @MainActor () async throws -> Void
-  private let startOperation:
-    @MainActor (@escaping @MainActor @Sendable
-      (_ObservationSourceFailure) -> Void) throws -> Void
-  private let cancelOperation: @MainActor () -> Void
-  private let joinOperation: @MainActor () async -> Void
 
-  fileprivate init<Value: Sendable>(_ lane: _PreparedLane<Value>) {
+  // MARK: Lifecycle
+
+  fileprivate init(_ lane: _PreparedLane<some Sendable>) {
     subscriptionOperation = { lane.erasedSubscription }
     applyProjectionOperation = { try await lane._visorApplyProjection($0) }
     applyInitialReactionsOperation = {
@@ -507,7 +569,9 @@ package final class _AnyPreparedObservationLane {
     joinOperation = { await lane.join() }
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Fileprivate
 
   fileprivate var subscription: _AnyObservationSubscription {
     subscriptionOperation()
@@ -525,7 +589,7 @@ package final class _AnyPreparedObservationLane {
 
   fileprivate func start(
     reportingFailure: @escaping @MainActor @Sendable
-      (_ObservationSourceFailure) -> Void
+    (_ObservationSourceFailure) -> Void
   ) throws {
     try startOperation(reportingFailure)
   }
@@ -537,60 +601,45 @@ package final class _AnyPreparedObservationLane {
   fileprivate func join() async {
     await joinOperation()
   }
+
+  // MARK: Private
+
+  private let subscriptionOperation:
+    @MainActor () -> _AnyObservationSubscription
+  private let applyProjectionOperation:
+    @MainActor (_AnyObservationCheckpoint) async throws -> Void
+  private let applyInitialReactionsOperation:
+    @MainActor () async throws -> Void
+  private let startOperation:
+    @MainActor (@escaping @MainActor @Sendable
+      (_ObservationSourceFailure) -> Void) throws -> Void
+  private let cancelOperation: @MainActor () -> Void
+  private let joinOperation: @MainActor () async -> Void
+
 }
+
+// MARK: - _ObservationSession
 
 @MainActor
 package final class _ObservationSession {
-  private static let deadlineDiagnosticSourceLimit = 8
 
-  private enum Lifecycle {
-    case idle
-    case starting
-    case ready
-    case paused(UUID)
-    case stopping
-    case stopped
-  }
-
-  private let recipes: [_AnyObservationLane]
-  private let beforeReady: @MainActor @Sendable () async -> Void
-  private let afterStartupHandoff: @MainActor @Sendable () async -> Void
-  private let beforePauseCheckpoint: @MainActor @Sendable () -> Void
-  private let afterPauseCheckpoint: @MainActor @Sendable () -> Void
-  private let beforePauseDrain: @MainActor @Sendable () async -> Void
-  private let beforePauseOperation: @MainActor @Sendable () async -> Void
-  private let onFailure:
-    @MainActor @Sendable (_ObservationSourceFailure) -> Void
-  let deadlinePolicy: _ObservationDeadlinePolicy
-  private let failureLatch = _ObservationFailureLatch()
-  private let handlerExecutionID = UUID()
-  private var lifecycle = Lifecycle.idle
-  private var lanes: [_AnyPreparedObservationLane] = []
-  var failure: _ObservationSourceFailure?
-  private var hasReservedControlOperation = false
-  private var activeControlTask: Task<Void, Never>?
-  private var activeControlTaskID: UUID?
-  private var teardownTask: Task<Void, Never>?
-  var teardownDeadlineCoordinator: _ObservationTeardownDeadlineCoordinator?
-  var teardownDeadlineWatchdog: Task<Void, Never>?
-  private var stoppedCallbacks: [@MainActor @Sendable () -> Void] = []
-  private var hasExceededTeardownDeadline = false
+  // MARK: Lifecycle
 
   package init(
     lanes: [_AnyObservationLane],
-    _visorBeforeReady: @escaping @MainActor @Sendable () async -> Void = {},
+    _visorBeforeReady: @escaping @MainActor @Sendable () async -> Void = { },
     _visorAfterStartupHandoff:
-      @escaping @MainActor @Sendable () async -> Void = {},
+    @escaping @MainActor @Sendable () async -> Void = { },
     _visorBeforePauseCheckpoint:
-      @escaping @MainActor @Sendable () -> Void = {},
+    @escaping @MainActor @Sendable () -> Void = { },
     _visorAfterPauseCheckpoint:
-      @escaping @MainActor @Sendable () -> Void = {},
-    _visorBeforePauseDrain: @escaping @MainActor @Sendable () async -> Void = {},
-    _visorBeforePauseOperation: @escaping @MainActor @Sendable () async -> Void = {},
+    @escaping @MainActor @Sendable () -> Void = { },
+    _visorBeforePauseDrain: @escaping @MainActor @Sendable () async -> Void = { },
+    _visorBeforePauseOperation: @escaping @MainActor @Sendable () async -> Void = { },
     _visorOnFailure:
-      @escaping @MainActor @Sendable
-        (_ObservationSourceFailure) -> Void = { _ in },
-    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production
+    @escaping @MainActor @Sendable
+    (_ObservationSourceFailure) -> Void = { _ in },
+    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production,
   ) {
     recipes = lanes
     beforeReady = _visorBeforeReady
@@ -605,20 +654,23 @@ package final class _ObservationSession {
 
   package convenience init(
     recipes: [_ObservationRecipe],
-    _visorBeforePauseDrain: @escaping @MainActor @Sendable () async -> Void = {},
+    _visorBeforePauseDrain: @escaping @MainActor @Sendable () async -> Void = { },
     _visorOnFailure:
-      @escaping @MainActor @Sendable
-        (_ObservationSourceFailure) -> Void = { _ in },
-    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production
+    @escaping @MainActor @Sendable
+    (_ObservationSourceFailure) -> Void = { _ in },
+    _visorDeadlinePolicy: _ObservationDeadlinePolicy = .production,
   ) {
     self.init(
       lanes: recipes.map { $0._visorMakeLane() },
       _visorBeforePauseDrain: _visorBeforePauseDrain,
       _visorOnFailure: _visorOnFailure,
-      _visorDeadlinePolicy: _visorDeadlinePolicy)
+      _visorDeadlinePolicy: _visorDeadlinePolicy,
+    )
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Package
 
   package var _visorIsReady: Bool {
     if case .ready = lifecycle { return true }
@@ -652,7 +704,8 @@ package final class _ObservationSession {
   package func _visorWaitForFailure() async throws -> _ObservationSourceFailure {
     guard !isExecutingHandler else {
       throw _ObservationSourceFailure.protocolViolation(
-        "An observation handler cannot wait for its own session to fail")
+        "An observation handler cannot wait for its own session to fail"
+      )
     }
     return try await failureLatch.wait()
   }
@@ -660,11 +713,13 @@ package final class _ObservationSession {
   package func _visorStart() async throws {
     guard case .idle = lifecycle else {
       throw _ObservationSourceFailure.protocolViolation(
-        "An observation session starts once per generation")
+        "An observation session starts once per generation"
+      )
     }
     guard !hasReservedControlOperation else {
       throw _ObservationSourceFailure.protocolViolation(
-        "An observation session runs one control operation at a time")
+        "An observation session runs one control operation at a time"
+      )
     }
     hasReservedControlOperation = true
     defer { hasReservedControlOperation = false }
@@ -680,8 +735,8 @@ package final class _ObservationSession {
         // this task resumes from its final hand-off. Revalidate before exposing
         // readiness to the owner.
         try validateStartupHandoff()
-      })
-    {
+      },
+    ) {
     case .success:
       return
 
@@ -697,6 +752,198 @@ package final class _ObservationSession {
     }
   }
 
+  package func _visorWithPause<Result>(
+    _ operation: @MainActor () throws -> Result,
+    _visorPhase: _ObservationDeadlinePhase = .fence,
+  ) async throws -> Result {
+    guard !isExecutingHandler else {
+      throw _ObservationSourceFailure.protocolViolation(
+        "An observation handler cannot pause its own session"
+      )
+    }
+    guard !hasReservedControlOperation else {
+      throw _ObservationSourceFailure.protocolViolation(
+        "An observation session runs one control operation at a time"
+      )
+    }
+    hasReservedControlOperation = true
+    defer { hasReservedControlOperation = false }
+
+    let paused: (id: UUID, checkpoints: [_AnyObservationCheckpoint])
+    switch await runWithDeadline(
+      phase: _visorPhase,
+      synchronousPreparation: { [self] deadlineHasResolved in
+        // Checkpoint synchronously in the caller's MainActor turn. Deferring
+        // this cut into the operation Task would let another source drain
+        // between the fence request and its first suspension. The deadline
+        // race and off-actor watchdog are already active at this point.
+        try preparePause(deadlineHasResolved: deadlineHasResolved)
+      },
+      operation: { [self] prepared in
+        try await drainPreparedPause(prepared)
+      },
+    ) {
+    case .success(let value):
+      paused = value
+
+    case .cancelled:
+      beginTeardown()
+      _ = await awaitTeardownWithinDeadline()
+      throw CancellationError()
+
+    case .failure(let pauseFailure):
+      beginTeardown(failure: pauseFailure)
+      _ = await awaitTeardownWithinDeadline()
+      throw failure ?? pauseFailure
+    }
+
+    let (id, checkpoints) = paused
+    do {
+      await beforePauseOperation()
+      try Task.checkCancellation()
+      try validateActivePause(id: id)
+      let result = try operation()
+      try Task.checkCancellation()
+      try await resume(id: id, checkpoints: checkpoints)
+      return result
+    } catch {
+      let primary = failure ?? (error as? _ObservationSourceFailure)
+      beginTeardown(failure: primary)
+      _ = await awaitTeardownWithinDeadline()
+      throw failure ?? error
+    }
+  }
+
+  package func _visorStop() async {
+    _ = await _visorStopWithinDeadline()
+  }
+
+  package func _visorStopWithinDeadline() async -> Bool {
+    if case .stopped = lifecycle { return true }
+    beginTeardown()
+    // Joining here would make a handler wait for the worker or startup task
+    // that is currently awaiting that same handler. The request is already
+    // visible synchronously through `.stopping`; its owner can join later.
+    guard !isExecutingHandler else { return false }
+    guard !hasExceededTeardownDeadline else { return false }
+    return await awaitTeardownWithinDeadline()
+  }
+
+  /// Synchronously makes cancellation visible before an owner awaits joined
+  /// teardown. This remains package-only lifecycle machinery.
+  package func _visorRequestStop() {
+    beginTeardown()
+  }
+
+  package func controlPlaneFailed(_ failure: _ObservationSourceFailure) {
+    guard self.failure == nil, !_visorIsStopped else { return }
+    // Latch the cause, revoke the lifecycle and request cancellation before
+    // invoking arbitrary owner code. A synchronous re-entrant failure then
+    // observes this first cause and cannot replace or report it twice.
+    beginTeardown(failure: failure)
+    onFailure(failure)
+  }
+
+  // MARK: Internal
+
+  let deadlinePolicy: _ObservationDeadlinePolicy
+  var failure: _ObservationSourceFailure?
+  var teardownDeadlineCoordinator: _ObservationTeardownDeadlineCoordinator?
+  var teardownDeadlineWatchdog: Task<Void, Never>?
+
+  func beginTeardownForDeadlineSupport() {
+    beginTeardown()
+  }
+
+  func installControlTask(
+    _ task: Task<Void, Never>,
+    id: UUID,
+  ) {
+    precondition(activeControlTask == nil)
+    activeControlTask = task
+    activeControlTaskID = id
+  }
+
+  func clearControlTask(id: UUID) {
+    guard activeControlTaskID == id else { return }
+    activeControlTask = nil
+    activeControlTaskID = nil
+  }
+
+  func deadlineFailure(
+    for phase: _ObservationDeadlinePhase
+  ) -> _ObservationSourceFailure {
+    let allSourceIDs = recipes.map { $0.source.sourceID }
+    let sourceIDs = Array(
+      allSourceIDs.prefix(Self.deadlineDiagnosticSourceLimit)
+    )
+    return .safetyDeadlineExceeded(
+      phase: phase.diagnosticName,
+      sourceIDs: sourceIDs,
+      omittedSourceCount: allSourceIDs.count - sourceIDs.count,
+    )
+  }
+
+  func deadlineDidFire(phase: _ObservationDeadlinePhase) {
+    if phase == .teardownJoin {
+      hasExceededTeardownDeadline = true
+    }
+    controlPlaneFailed(deadlineFailure(for: phase))
+  }
+
+  func markTeardownDeadlineWaitEnded() {
+    hasExceededTeardownDeadline = true
+  }
+
+  func finishTeardownDeadlineWait(
+    _ coordinator: _ObservationTeardownDeadlineCoordinator
+  ) {
+    guard teardownDeadlineCoordinator === coordinator else { return }
+    teardownDeadlineWatchdog?.cancel()
+    teardownDeadlineWatchdog = nil
+    teardownDeadlineCoordinator = nil
+  }
+
+  // MARK: Private
+
+  private enum Lifecycle {
+    case idle
+    case starting
+    case ready
+    case paused(UUID)
+    case stopping
+    case stopped
+  }
+
+  private static let deadlineDiagnosticSourceLimit = 8
+
+  private let recipes: [_AnyObservationLane]
+  private let beforeReady: @MainActor @Sendable () async -> Void
+  private let afterStartupHandoff: @MainActor @Sendable () async -> Void
+  private let beforePauseCheckpoint: @MainActor @Sendable () -> Void
+  private let afterPauseCheckpoint: @MainActor @Sendable () -> Void
+  private let beforePauseDrain: @MainActor @Sendable () async -> Void
+  private let beforePauseOperation: @MainActor @Sendable () async -> Void
+  private let onFailure:
+    @MainActor @Sendable (_ObservationSourceFailure) -> Void
+  private let failureLatch = _ObservationFailureLatch()
+  private let handlerExecutionID = UUID()
+  private var lifecycle = Lifecycle.idle
+  private var lanes = [_AnyPreparedObservationLane]()
+  private var hasReservedControlOperation = false
+  private var activeControlTask: Task<Void, Never>?
+  private var activeControlTaskID: UUID?
+  private var teardownTask: Task<Void, Never>?
+  private var stoppedCallbacks = [@MainActor @Sendable () -> Void]()
+  private var hasExceededTeardownDeadline = false
+
+  private var isExecutingHandler: Bool {
+    guard let invocation = _ObservationHandlerExecution.currentInvocation else {
+      return false
+    }
+    return invocation.isActive && invocation.sessionID == handlerExecutionID
+  }
+
   private func validateStartupHandoff() throws {
     if let failure {
       throw failure
@@ -709,15 +956,17 @@ package final class _ObservationSession {
         throw CancellationError()
       }
       throw _ObservationSourceFailure.protocolViolation(
-        "The session changed lifecycle before startup returned")
+        "The session changed lifecycle before startup returned"
+      )
     }
   }
 
   private func runStartup() async throws {
     let observations = try _ObservationRuntime._visorPrepareAll(
-      recipes.map(\.source))
+      recipes.map(\.source)
+    )
 
-    var adopted: [_AnyPreparedObservationLane] = []
+    var adopted = [_AnyPreparedObservationLane]()
     do {
       try Task.checkCancellation()
       for (recipe, observation) in zip(recipes, observations) {
@@ -725,7 +974,9 @@ package final class _ObservationSession {
         adopted.append(
           try recipe.adopt(
             observation,
-            sessionID: handlerExecutionID))
+            sessionID: handlerExecutionID,
+          )
+        )
       }
     } catch {
       for lane in adopted.reversed() {
@@ -762,7 +1013,8 @@ package final class _ObservationSession {
         throw CancellationError()
       }
       throw _ObservationSourceFailure.protocolViolation(
-        "The session stopped before readiness completed")
+        "The session stopped before readiness completed"
+      )
     }
     try _ObservationRuntime._visorResumeAll(after: checkpoints)
     for lane in adopted {
@@ -780,76 +1032,17 @@ package final class _ObservationSession {
     lifecycle = .ready
   }
 
-  package func _visorWithPause<Result>(
-    _ operation: @MainActor () throws -> Result,
-    _visorPhase: _ObservationDeadlinePhase = .fence
-  ) async throws -> Result {
-    guard !isExecutingHandler else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "An observation handler cannot pause its own session")
-    }
-    guard !hasReservedControlOperation else {
-      throw _ObservationSourceFailure.protocolViolation(
-        "An observation session runs one control operation at a time")
-    }
-    hasReservedControlOperation = true
-    defer { hasReservedControlOperation = false }
-
-    let paused: (id: UUID, checkpoints: [_AnyObservationCheckpoint])
-    switch await runWithDeadline(
-      phase: _visorPhase,
-      synchronousPreparation: { [self] deadlineHasResolved in
-        // Checkpoint synchronously in the caller's MainActor turn. Deferring
-        // this cut into the operation Task would let another source drain
-        // between the fence request and its first suspension. The deadline
-        // race and off-actor watchdog are already active at this point.
-        try preparePause(deadlineHasResolved: deadlineHasResolved)
-      },
-      operation: { [self] prepared in
-        try await drainPreparedPause(prepared)
-      })
-    {
-    case .success(let value):
-      paused = value
-    case .cancelled:
-      beginTeardown()
-      _ = await awaitTeardownWithinDeadline()
-      throw CancellationError()
-    case .failure(let pauseFailure):
-      beginTeardown(failure: pauseFailure)
-      _ = await awaitTeardownWithinDeadline()
-      throw failure ?? pauseFailure
-    }
-
-    let (id, checkpoints) = paused
-    do {
-      await beforePauseOperation()
-      try Task.checkCancellation()
-      try validateActivePause(id: id)
-      let result = try operation()
-      try Task.checkCancellation()
-      try await resume(id: id, checkpoints: checkpoints)
-      return result
-    } catch {
-      let primary = failure ?? (error as? _ObservationSourceFailure)
-      beginTeardown(failure: primary)
-      _ = await awaitTeardownWithinDeadline()
-      throw failure ?? error
-    }
-  }
-
   private func preparePause(
     deadlineHasResolved: @Sendable () -> Bool
-  ) throws
-    -> (id: UUID, checkpoints: [_AnyObservationCheckpoint])
-  {
+  ) throws -> (id: UUID, checkpoints: [_AnyObservationCheckpoint]) {
     try Task.checkCancellation()
     guard !deadlineHasResolved() else {
       throw _ObservationDeadlinePreparationAborted()
     }
     guard case .ready = lifecycle else {
       throw _ObservationSourceFailure.protocolViolation(
-        "A ready observation session can begin one pause")
+        "A ready observation session can begin one pause"
+      )
     }
     let id = UUID()
     lifecycle = .paused(id)
@@ -889,14 +1082,15 @@ package final class _ObservationSession {
         throw CancellationError()
       }
       throw _ObservationSourceFailure.protocolViolation(
-        "The session stopped while its pause was draining")
+        "The session stopped while its pause was draining"
+      )
     }
     return (id, checkpoints)
   }
 
   private func resume(
     id: UUID,
-    checkpoints: [_AnyObservationCheckpoint]
+    checkpoints: [_AnyObservationCheckpoint],
   ) async throws {
     guard case .paused(let currentID) = lifecycle, currentID == id else {
       if case .stopping = lifecycle {
@@ -906,7 +1100,8 @@ package final class _ObservationSession {
         throw CancellationError()
       }
       throw _ObservationSourceFailure.protocolViolation(
-        "A session pause can resume once in its generation")
+        "A session pause can resume once in its generation"
+      )
     }
     do {
       try _ObservationRuntime._visorResumeAll(after: checkpoints)
@@ -928,100 +1123,13 @@ package final class _ObservationSession {
         throw CancellationError()
       }
       throw _ObservationSourceFailure.protocolViolation(
-        "A session pause remains active through its scoped operation")
+        "A session pause remains active through its scoped operation"
+      )
     }
-  }
-
-  package func _visorStop() async {
-    _ = await _visorStopWithinDeadline()
-  }
-
-  package func _visorStopWithinDeadline() async -> Bool {
-    if case .stopped = lifecycle { return true }
-    beginTeardown()
-    // Joining here would make a handler wait for the worker or startup task
-    // that is currently awaiting that same handler. The request is already
-    // visible synchronously through `.stopping`; its owner can join later.
-    guard !isExecutingHandler else { return false }
-    guard !hasExceededTeardownDeadline else { return false }
-    return await awaitTeardownWithinDeadline()
-  }
-
-  /// Synchronously makes cancellation visible before an owner awaits joined
-  /// teardown. This remains package-only lifecycle machinery.
-  package func _visorRequestStop() {
-    beginTeardown()
-  }
-
-  private var isExecutingHandler: Bool {
-    guard let invocation = _ObservationHandlerExecution.currentInvocation else {
-      return false
-    }
-    return invocation.isActive && invocation.sessionID == handlerExecutionID
   }
 
   private func workerFailed(_ failure: _ObservationSourceFailure) {
     controlPlaneFailed(failure)
-  }
-
-  func beginTeardownForDeadlineSupport() {
-    beginTeardown()
-  }
-
-  func installControlTask(
-    _ task: Task<Void, Never>,
-    id: UUID
-  ) {
-    precondition(activeControlTask == nil)
-    activeControlTask = task
-    activeControlTaskID = id
-  }
-
-  func clearControlTask(id: UUID) {
-    guard activeControlTaskID == id else { return }
-    activeControlTask = nil
-    activeControlTaskID = nil
-  }
-
-  func deadlineFailure(
-    for phase: _ObservationDeadlinePhase
-  ) -> _ObservationSourceFailure {
-    let allSourceIDs = recipes.map { $0.source.sourceID }
-    let sourceIDs = Array(
-      allSourceIDs.prefix(Self.deadlineDiagnosticSourceLimit))
-    return .safetyDeadlineExceeded(
-      phase: phase.diagnosticName,
-      sourceIDs: sourceIDs,
-      omittedSourceCount: allSourceIDs.count - sourceIDs.count)
-  }
-
-  func deadlineDidFire(phase: _ObservationDeadlinePhase) {
-    if phase == .teardownJoin {
-      hasExceededTeardownDeadline = true
-    }
-    controlPlaneFailed(deadlineFailure(for: phase))
-  }
-
-  func markTeardownDeadlineWaitEnded() {
-    hasExceededTeardownDeadline = true
-  }
-
-  func finishTeardownDeadlineWait(
-    _ coordinator: _ObservationTeardownDeadlineCoordinator
-  ) {
-    guard teardownDeadlineCoordinator === coordinator else { return }
-    teardownDeadlineWatchdog?.cancel()
-    teardownDeadlineWatchdog = nil
-    teardownDeadlineCoordinator = nil
-  }
-
-  package func controlPlaneFailed(_ failure: _ObservationSourceFailure) {
-    guard self.failure == nil, !self._visorIsStopped else { return }
-    // Latch the cause, revoke the lifecycle and request cancellation before
-    // invoking arbitrary owner code. A synchronous re-entrant failure then
-    // observes this first cause and cannot replace or report it twice.
-    beginTeardown(failure: failure)
-    onFailure(failure)
   }
 
   private func beginTeardown(
@@ -1052,16 +1160,16 @@ package final class _ObservationSession {
       for lane in adopted {
         await lane.join()
       }
-      if self.activeControlTaskID == controlID {
-        self.activeControlTask = nil
-        self.activeControlTaskID = nil
+      if activeControlTaskID == controlID {
+        activeControlTask = nil
+        activeControlTaskID = nil
       }
-      self.lanes.removeAll(keepingCapacity: false)
-      self.lifecycle = .stopped
-      self.failureLatch.finish()
-      self.teardownTask = nil
-      let callbacks = self.stoppedCallbacks
-      self.stoppedCallbacks.removeAll(keepingCapacity: false)
+      lanes.removeAll(keepingCapacity: false)
+      lifecycle = .stopped
+      failureLatch.finish()
+      teardownTask = nil
+      let callbacks = stoppedCallbacks
+      stoppedCallbacks.removeAll(keepingCapacity: false)
       for callback in callbacks {
         callback()
       }

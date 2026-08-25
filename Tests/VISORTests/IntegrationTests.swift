@@ -3,13 +3,17 @@ import Testing
 import VISOR
 import VISORObservation
 
+// MARK: - IntegrationSnapshot
+
 private struct IntegrationSnapshot: Sendable {
   let count: Int
 }
 
+// MARK: - IntegrationService
+
 private actor IntegrationService {
-  private let channel: ObservationChannel<IntegrationSnapshot>
-  nonisolated let source: ObservationSource<IntegrationSnapshot>
+
+  // MARK: Lifecycle
 
   init(count: Int = 0) {
     let channel = ObservationChannel(IntegrationSnapshot(count: count))
@@ -17,20 +21,28 @@ private actor IntegrationService {
     source = channel.source
   }
 
+  // MARK: Internal
+
+  nonisolated let source: ObservationSource<IntegrationSnapshot>
+
   func publish(count: Int) {
     channel.publish(IntegrationSnapshot(count: count))
   }
+
+  // MARK: Private
+
+  private let channel: ObservationChannel<IntegrationSnapshot>
+
 }
+
+// MARK: - IntegrationEvent
 
 @MainActor
 private final class IntegrationEvent {
-  private struct Waiter {
-    let value: Int
-    let continuation: CheckedContinuation<Void, Never>
-  }
 
-  private(set) var values: [Int] = []
-  private var waiters: [Waiter] = []
+  // MARK: Internal
+
+  private(set) var values = [Int]()
 
   func record(_ value: Int) {
     values.append(value)
@@ -47,35 +59,59 @@ private final class IntegrationEvent {
       waiters.append(Waiter(value: value, continuation: continuation))
     }
   }
+
+  // MARK: Private
+
+  private struct Waiter {
+    let value: Int
+    let continuation: CheckedContinuation<Void, Never>
+  }
+
+  private var waiters = [Waiter]()
+
 }
+
+// MARK: - IntegrationViewModel
 
 @MainActor
 @Observable
 @ViewModel
 private final class IntegrationViewModel {
-  final class State {
-    @Bound(
-      source: \IntegrationViewModel.service.source,
-      selecting: \IntegrationSnapshot.count)
-    private(set) var count = -1
-  }
 
-  let state = State()
-  let service: IntegrationService
-  private let event: IntegrationEvent
+  // MARK: Lifecycle
 
   init(service: IntegrationService, event: IntegrationEvent) {
     self.service = service
     self.event = event
   }
 
+  // MARK: Internal
+
+  final class State {
+    @Bound(
+      source: \IntegrationViewModel.service.source,
+      selecting: \IntegrationSnapshot.count,
+    )
+    private(set) var count = -1
+  }
+
+  let state = State()
+  let service: IntegrationService
+
+  // MARK: Private
+
+  private let event: IntegrationEvent
+
   @Reaction(
     source: \IntegrationViewModel.service.source,
-    selecting: \IntegrationSnapshot.count)
+    selecting: \IntegrationSnapshot.count,
+  )
   private func countChanged(_ count: Int) {
     event.record(count)
   }
 }
+
+// MARK: - IntegrationTests
 
 @Suite("V11 integration")
 @MainActor
@@ -89,7 +125,8 @@ struct IntegrationTests {
     }
     let viewModel = factory.makeViewModel()
     let session = _ObservationSession(
-      recipes: viewModel._visorMakeObservationRecipes())
+      recipes: viewModel._visorMakeObservationRecipes()
+    )
 
     try await session._visorStart()
     #expect(viewModel.state.count == 0)
@@ -109,9 +146,11 @@ struct IntegrationTests {
     let first = IntegrationViewModel(service: service, event: firstEvent)
     let second = IntegrationViewModel(service: service, event: secondEvent)
     let firstSession = _ObservationSession(
-      recipes: first._visorMakeObservationRecipes())
+      recipes: first._visorMakeObservationRecipes()
+    )
     let secondSession = _ObservationSession(
-      recipes: second._visorMakeObservationRecipes())
+      recipes: second._visorMakeObservationRecipes()
+    )
 
     try await firstSession._visorStart()
     try await secondSession._visorStart()
@@ -134,7 +173,8 @@ struct IntegrationTests {
     let viewModel = IntegrationViewModel(service: service, event: event)
     let router = Router<TestScene>()
     let session = _ObservationSession(
-      recipes: viewModel._visorMakeObservationRecipes())
+      recipes: viewModel._visorMakeObservationRecipes()
+    )
 
     try await session._visorStart()
     router.activate()
@@ -159,11 +199,12 @@ struct IntegrationTests {
       .equal(to: ["home"], destination: .root(.home)),
       .equal(
         to: ["settings", "detail"],
-        destination: .push(.detail(id: "deep"))),
+        destination: .push(.detail(id: "deep")),
+      ),
     ])
     child.activate()
 
-    let outcome = child.openDeepLink(URL(string: "test://settings/detail")!)
+    let outcome = child.openDeepLink(try #require(URL(string: "test://settings/detail")))
 
     #expect(outcome == .handled(.push(.detail(id: "deep"))))
     #expect(child.navigationPath == [.detail(id: "deep")])
@@ -172,7 +213,7 @@ struct IntegrationTests {
   @Test
   func `A routed factory receives the concrete Router`() {
     let router = Router<TestScene>()
-    let factory: ViewModelFactory<RoutedTestVM> = .routed {
+    let factory = ViewModelFactory<RoutedTestVM>.routed {
       (router: Router<TestScene>) in
       RoutedTestVM(routerID: ObjectIdentifier(router))
     }

@@ -3,23 +3,30 @@ import VISOR
 import VISORObservation
 import VISORTesting
 
+// MARK: - TestingSnapshot
+
 struct TestingSnapshot: Equatable, Sendable {
   var value: Int
 }
 
+// MARK: - TestingService
+
 actor TestingService {
-  private let channel: ObservationChannel<TestingSnapshot>
 
-  nonisolated let source: ObservationSource<TestingSnapshot>
-
-  nonisolated var activeObservationCount: Int {
-    source._visorActiveSubscriptionCount
-  }
+  // MARK: Lifecycle
 
   init(_ value: Int = 0) {
     let channel = ObservationChannel(TestingSnapshot(value: value))
     self.channel = channel
     source = channel.source
+  }
+
+  // MARK: Internal
+
+  nonisolated let source: ObservationSource<TestingSnapshot>
+
+  nonisolated var activeObservationCount: Int {
+    source._visorActiveSubscriptionCount
   }
 
   func publish(_ value: Int) {
@@ -33,18 +40,41 @@ actor TestingService {
   nonisolated func terminate() {
     channel._visorTerminate()
   }
+
+  // MARK: Private
+
+  private let channel: ObservationChannel<TestingSnapshot>
+
 }
 
-final class TestingReference {}
+// MARK: - TestingReference
+
+final class TestingReference { }
+
+// MARK: - TestingViewModel
 
 @MainActor
 @Observable
 @ViewModel
 final class TestingViewModel {
+
+  // MARK: Lifecycle
+
+  init(
+    service: TestingService = TestingService(),
+    reactionGate: ControllableOperation<Void, Never>? = nil,
+  ) {
+    self.service = service
+    self.reactionGate = reactionGate
+  }
+
+  // MARK: Internal
+
   final class State {
     @Bound(
       source: \TestingViewModel.service.source,
-      selecting: \TestingSnapshot.value)
+      selecting: \TestingSnapshot.value,
+    )
     private(set) var sourceValue = -1
 
     private(set) var reactedValue = -1
@@ -53,7 +83,7 @@ final class TestingViewModel {
     var reference = TestingReference()
     var anyValue: Any = 0
     var optionalReference: TestingReference?
-    var referenceContainer: [TestingReference] = []
+    var referenceContainer = [TestingReference]()
   }
 
   enum Action {
@@ -62,26 +92,22 @@ final class TestingViewModel {
 
   let state = State()
   let service: TestingService
-  private let reactionGate: ControllableOperation<Void, Never>?
-
-  init(
-    service: TestingService = TestingService(),
-    reactionGate: ControllableOperation<Void, Never>? = nil
-  ) {
-    self.service = service
-    self.reactionGate = reactionGate
-  }
 
   func handle(_ action: Action) async {
     switch action {
-    case let .setCount(value):
+    case .setCount(let value):
       updateState(\.count, to: value)
     }
   }
 
+  // MARK: Private
+
+  private let reactionGate: ControllableOperation<Void, Never>?
+
   @Reaction(
     source: \TestingViewModel.service.source,
-    selecting: \TestingSnapshot.value)
+    selecting: \TestingSnapshot.value,
+  )
   private func sourceChanged(_ value: Int) async {
     if value == 10 {
       await reactionGate?.run()
@@ -90,13 +116,23 @@ final class TestingViewModel {
   }
 }
 
+// MARK: - WeakReference
+
 final class WeakReference<Value: AnyObject> {
-  weak var value: Value?
+
+  // MARK: Lifecycle
 
   init(_ value: Value?) {
     self.value = value
   }
+
+  // MARK: Internal
+
+  weak var value: Value?
+
 }
+
+// MARK: - SwappableTestingViewModel
 
 /// An intentionally adversarial source-backed conformer used to verify the
 /// runtime's identity guard. Production `@ViewModel` expansion requires a
@@ -105,6 +141,17 @@ final class WeakReference<Value: AnyObject> {
 @MainActor
 @Observable
 final class SwappableTestingViewModel: ViewModel {
+
+  // MARK: Lifecycle
+
+  init(service: TestingService) {
+    self.service = service
+  }
+
+  deinit { }
+
+  // MARK: Internal
+
   @MainActor
   @VISOR._ViewModelState
   final class State {
@@ -114,12 +161,6 @@ final class SwappableTestingViewModel: ViewModel {
   var state = State()
   let _visorObservationOwnership = _ViewModelObservationOwnership()
   let service: TestingService
-
-  init(service: TestingService) {
-    self.service = service
-  }
-
-  deinit {}
 
   func replaceState() {
     state = State()
@@ -133,8 +174,9 @@ final class SwappableTestingViewModel: ViewModel {
       projections: [
         { [weak self] snapshot in
           guard let self else { return }
-          self.updateState(\.sourceValue, to: snapshot.value)
+          updateState(\.sourceValue, to: snapshot.value)
         }
-      ])
+      ],
+    )
   }
 }

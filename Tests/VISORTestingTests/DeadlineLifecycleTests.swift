@@ -2,29 +2,23 @@ import Testing
 import VISOR
 import VISORTesting
 
+// MARK: - DeadlineLifecycleError
+
 private enum DeadlineLifecycleError: Error {
   case action
   case body
 }
 
+// MARK: - TestingDeadlineSleeper
+
 @MainActor
 private final class TestingDeadlineSleeper {
-  private struct Pending {
-    let id: Int
-    let duration: Duration
-    let continuation: CheckedContinuation<Void, any Error>
-  }
 
-  private struct ArmWaiter {
-    let duration: Duration
-    let continuation: CheckedContinuation<Int, Never>
-  }
+  // MARK: Lifecycle
 
-  private var nextID = 0
-  private var pending: [Pending] = []
-  private var waiters: [ArmWaiter] = []
+  deinit { }
 
-  deinit {}
+  // MARK: Internal
 
   func sleep(for duration: Duration) async throws {
     let id = nextID
@@ -45,7 +39,8 @@ private final class TestingDeadlineSleeper {
         pending.append(Pending(
           id: id,
           duration: duration,
-          continuation: continuation))
+          continuation: continuation,
+        ))
       }
     } onCancel: {
       Task { @MainActor [weak self] in
@@ -61,7 +56,8 @@ private final class TestingDeadlineSleeper {
     return await withCheckedContinuation { continuation in
       waiters.append(ArmWaiter(
         duration: duration,
-        continuation: continuation))
+        continuation: continuation,
+      ))
     }
   }
 
@@ -72,26 +68,47 @@ private final class TestingDeadlineSleeper {
     pending.remove(at: index).continuation.resume()
   }
 
+  // MARK: Private
+
+  private struct Pending {
+    let id: Int
+    let duration: Duration
+    let continuation: CheckedContinuation<Void, any Error>
+  }
+
+  private struct ArmWaiter {
+    let duration: Duration
+    let continuation: CheckedContinuation<Int, Never>
+  }
+
+  private var nextID = 0
+  private var pending = [Pending]()
+  private var waiters = [ArmWaiter]()
+
   private func cancel(id: Int) {
     guard let index = pending.firstIndex(where: { $0.id == id }) else {
       return
     }
     pending.remove(at: index).continuation.resume(
-      throwing: CancellationError())
+      throwing: CancellationError()
+    )
   }
 }
 
+// MARK: - NthPauseGate
+
 @MainActor
 private final class NthPauseGate {
-  private let target: Int
-  private let operation = ControllableOperation<Void, Never>()
-  private var count = 0
+
+  // MARK: Lifecycle
 
   init(target: Int) {
     self.target = target
   }
 
-  deinit {}
+  deinit { }
+
+  // MARK: Internal
 
   func visit() async {
     count += 1
@@ -106,18 +123,32 @@ private final class NthPauseGate {
   func open() {
     operation.finish()
   }
+
+  // MARK: Private
+
+  private let target: Int
+  private let operation = ControllableOperation<Void, Never>()
+  private var count = 0
+
 }
+
+// MARK: - DeadlineIssueLog
 
 @MainActor
 private final class DeadlineIssueLog {
+
+  // MARK: Lifecycle
+
+  deinit { }
+
+  // MARK: Internal
+
   struct Entry {
     let message: String
     let location: SourceLocation
   }
 
-  private(set) var entries: [Entry] = []
-
-  deinit {}
+  private(set) var entries = [Entry]()
 
   func record(_ message: String, at location: SourceLocation) {
     entries.append(Entry(message: message, location: location))
@@ -136,8 +167,11 @@ private func testingDeadlinePolicy(
     teardownJoin: .seconds(5),
     sleeper: { duration in
       try await sleeper.sleep(for: duration)
-    })
+    },
+  )
 }
+
+// MARK: - DeadlineLifecycleTests
 
 @Suite("VISORTesting control-plane deadlines")
 struct DeadlineLifecycleTests {
@@ -148,14 +182,16 @@ struct DeadlineLifecycleTests {
     let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
-      reactionGate: reactionGate)
+      reactionGate: reactionGate,
+    )
     let sleeper = TestingDeadlineSleeper()
     let issues = DeadlineIssueLog()
     let observeLocation = SourceLocation(
       fileID: "DeadlineLifecycleTests/startup",
       filePath: "/DeadlineLifecycleTests/startup.swift",
       line: 123,
-      column: 4)
+      column: 4,
+    )
     var enteredBody = false
 
     let observation = Task { @MainActor in
@@ -163,7 +199,7 @@ struct DeadlineLifecycleTests {
         sut,
         sourceLocation: observeLocation,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { _ in
         enteredBody = true
       }
@@ -180,7 +216,8 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.location == observeLocation)
     #expect(issues.entries.first?.message.hasPrefix(
-      "VISOR failed while starting observation:") == true)
+      "VISOR failed while starting observation:"
+    ) == true)
 
     reactionGate.finish()
   }
@@ -198,7 +235,7 @@ struct DeadlineLifecycleTests {
       try await _observeWithDeadlinePolicyForProof(
         sut,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { test in
         await test.perform {
           await actionGate.run()
@@ -229,7 +266,8 @@ struct DeadlineLifecycleTests {
       fileID: "DeadlineLifecycleTests/opening",
       filePath: "/DeadlineLifecycleTests/opening.swift",
       line: 234,
-      column: 5)
+      column: 5,
+    )
     var actionRan = false
 
     let observation = Task { @MainActor in
@@ -237,7 +275,7 @@ struct DeadlineLifecycleTests {
         sut,
         beforePauseDrain: openingGate.visit,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { test in
         await test.perform({ actionRan = true }, sourceLocation: performLocation)
       }
@@ -254,7 +292,8 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.location == performLocation)
     #expect(issues.entries.first?.message.hasPrefix(
-      "VISOR failed while opening an action window:") == true)
+      "VISOR failed while opening an action window:"
+    ) == true)
 
     openingGate.open()
   }
@@ -270,7 +309,8 @@ struct DeadlineLifecycleTests {
       fileID: "DeadlineLifecycleTests/result",
       filePath: "/DeadlineLifecycleTests/result.swift",
       line: 321,
-      column: 9)
+      column: 9,
+    )
     var result: Int?
 
     let observation = Task { @MainActor in
@@ -278,11 +318,12 @@ struct DeadlineLifecycleTests {
         sut,
         beforePauseDrain: closingGate.visit,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { test in
         result = try await test.perform(
           { 42 },
-          sourceLocation: performLocation)
+          sourceLocation: performLocation,
+        )
       }
     }
 
@@ -297,7 +338,8 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.location == performLocation)
     #expect(issues.entries.first?.message.hasPrefix(
-      "VISOR failed while closing an action window:") == true)
+      "VISOR failed while closing an action window:"
+    ) == true)
 
     closingGate.open()
   }
@@ -315,7 +357,7 @@ struct DeadlineLifecycleTests {
         sut,
         beforePauseDrain: closingGate.visit,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { test in
         await #expect(throws: DeadlineLifecycleError.action) {
           try await test.perform {
@@ -334,7 +376,8 @@ struct DeadlineLifecycleTests {
 
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.message.hasPrefix(
-      "VISOR failed while closing an action window:") == true)
+      "VISOR failed while closing an action window:"
+    ) == true)
 
     closingGate.open()
   }
@@ -346,21 +389,23 @@ struct DeadlineLifecycleTests {
     let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
-      reactionGate: reactionGate)
+      reactionGate: reactionGate,
+    )
     let sleeper = TestingDeadlineSleeper()
     let issues = DeadlineIssueLog()
     let observeLocation = SourceLocation(
       fileID: "DeadlineLifecycleTests/body",
       filePath: "/DeadlineLifecycleTests/body.swift",
       line: 654,
-      column: 7)
+      column: 7,
+    )
 
     let observation = Task { @MainActor in
       try await _observeWithDeadlinePolicyForProof(
         sut,
         sourceLocation: observeLocation,
         deadlinePolicy: testingDeadlinePolicy(sleeper: sleeper),
-        issueRecorder: issues.record
+        issueRecorder: issues.record,
       ) { _ in
         await service.publish(10)
         await reactionGate.waitUntilStarted()
@@ -378,7 +423,8 @@ struct DeadlineLifecycleTests {
     #expect(issues.entries.count == 1)
     #expect(issues.entries.first?.location == observeLocation)
     #expect(issues.entries.first?.message.hasPrefix(
-      "VISOR failed while running the observation session:") == true)
+      "VISOR failed while running the observation session:"
+    ) == true)
 
     reactionGate.finish()
   }
@@ -390,7 +436,8 @@ struct DeadlineLifecycleTests {
     let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
       service: service,
-      reactionGate: reactionGate)
+      reactionGate: reactionGate,
+    )
     let firstSleeper = TestingDeadlineSleeper()
     let firstIssues = DeadlineIssueLog()
     let trueJoin = TestEventCounter()
@@ -401,7 +448,7 @@ struct DeadlineLifecycleTests {
         sut,
         deadlinePolicy: testingDeadlinePolicy(sleeper: firstSleeper),
         _visorDidFinishTeardown: trueJoin.record,
-        issueRecorder: firstIssues.record
+        issueRecorder: firstIssues.record,
       ) { _ in
         firstBodyRan = true
         await service.publish(10)
@@ -411,22 +458,25 @@ struct DeadlineLifecycleTests {
 
     await reactionGate.waitUntilStarted()
     let teardownWatchdog = await firstSleeper.waitUntilArmed(
-      for: .seconds(5))
+      for: .seconds(5)
+    )
     firstSleeper.fire(teardownWatchdog)
     try await firstObservation.value
 
     #expect(firstBodyRan)
     #expect(firstIssues.entries.count == 1)
     #expect(firstIssues.entries.first?.message.hasPrefix(
-      "VISOR failed while running the observation session:") == true)
+      "VISOR failed while running the observation session:"
+    ) == true)
 
     let rejectedIssues = DeadlineIssueLog()
     var rejectedBodyRan = false
     try await _observeWithDeadlinePolicyForProof(
       sut,
       deadlinePolicy: testingDeadlinePolicy(
-        sleeper: TestingDeadlineSleeper()),
-      issueRecorder: rejectedIssues.record
+        sleeper: TestingDeadlineSleeper()
+      ),
+      issueRecorder: rejectedIssues.record,
     ) { _ in
       rejectedBodyRan = true
     }
@@ -447,11 +497,12 @@ struct DeadlineLifecycleTests {
     try await _observeWithDeadlinePolicyForProof(
       sut,
       deadlinePolicy: testingDeadlinePolicy(
-        sleeper: TestingDeadlineSleeper()),
-      issueRecorder: laterIssues.record
+        sleeper: TestingDeadlineSleeper()
+      ),
+      issueRecorder: laterIssues.record,
     ) { test in
       laterBodyRan = true
-      await test.perform {}
+      await test.perform { }
       test.expect(\.sourceValue, hasExactChanges: [])
     }
 

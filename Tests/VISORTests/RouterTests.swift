@@ -5,16 +5,18 @@
 //  Created by Anh Nguyen on 17/2/2026.
 //
 
-import VISOR
-import Testing
 import Foundation
 import SwiftUI
+import Testing
+import VISOR
 
 #if os(macOS)
 @MainActor
 private final class RouterInputProbe {
-  private(set) var routerIDs: [ObjectIdentifier] = []
-  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  // MARK: Internal
+
+  private(set) var routerIDs = [ObjectIdentifier]()
 
   func record(_ routerID: ObjectIdentifier) {
     routerIDs.append(routerID)
@@ -30,11 +32,15 @@ private final class RouterInputProbe {
       await withCheckedContinuation { waiters.append($0) }
     }
   }
+
+  // MARK: Private
+
+  private var waiters = [CheckedContinuation<Void, Never>]()
+
 }
 
 @MainActor
 private struct RouterInputReporter: View {
-  @Environment(Router<TestScene>.self) private var router
   let probe: RouterInputProbe
 
   var body: some View {
@@ -43,10 +49,13 @@ private struct RouterInputReporter: View {
         probe.record(routerID)
       }
   }
+
+  @Environment(Router<TestScene>.self) private var router
+
 }
 #endif
 
-// MARK: - Router Tests
+// MARK: - RouterTests
 
 @Suite("Router")
 @MainActor
@@ -177,10 +186,10 @@ struct RouterTests {
   func `Deep link without a mounted host reports inactive`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["detail"], destination: .push(.detail(id: "deep"))),
+      .equal(to: ["detail"], destination: .push(.detail(id: "deep")))
     ])
 
-    let outcome = root.openDeepLink(URL(string: "test://detail")!)
+    let outcome = root.openDeepLink(try #require(URL(string: "test://detail")))
 
     #expect(outcome == .inactive)
     #expect(root.navigationPath.isEmpty)
@@ -235,8 +244,6 @@ struct RouterTests {
     #expect(modal.parent === root)
   }
 
-  // MARK: - selectAndPush
-
   @Test
   func `selectAndPush pushes to child router not self`() {
     let root = Router<TestScene>()
@@ -257,8 +264,6 @@ struct RouterTests {
 
     #expect(root.selectedRoot == .settings)
   }
-
-  // MARK: - childRouter caching
 
   @Test
   func `Root destination set snapshots the declared finite value space`() {
@@ -290,8 +295,6 @@ struct RouterTests {
     #expect(first !== second)
   }
 
-  // MARK: - Deep linking
-
   @Test
   func `Deep link on active root handles all destination types`() throws {
     let router = Router<TestScene>()
@@ -304,23 +307,27 @@ struct RouterTests {
     router.activate()
 
     #expect(
-      router.openDeepLink(URL(string: "test://detail")!)
-        == .handled(.push(.detail(id: "deep"))))
+      router.openDeepLink(try #require(URL(string: "test://detail")))
+        == .handled(.push(.detail(id: "deep")))
+    )
     #expect(router.navigationPath == [.detail(id: "deep")])
 
     #expect(
-      router.openDeepLink(URL(string: "test://settings")!)
-        == .handled(.root(.settings)))
+      router.openDeepLink(try #require(URL(string: "test://settings")))
+        == .handled(.root(.settings))
+    )
     #expect(router.selectedRoot == .settings)
 
     #expect(
-      router.openDeepLink(URL(string: "test://preferences")!)
-        == .handled(.sheet(.preferences)))
+      router.openDeepLink(try #require(URL(string: "test://preferences")))
+        == .handled(.sheet(.preferences))
+    )
     #expect(router.presentingSheet == .preferences)
 
     #expect(
-      router.openDeepLink(URL(string: "test://onboarding")!)
-        == .handled(.fullScreen(.onboarding)))
+      router.openDeepLink(try #require(URL(string: "test://onboarding")))
+        == .handled(.fullScreen(.onboarding))
+    )
     #expect(router.presentingFullScreen == .onboarding)
   }
 
@@ -329,7 +336,7 @@ struct RouterTests {
     let root = Router<TestScene>()
     let child = root.childRouter(for: .home)
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["detail"], destination: .push(.detail(id: "deep"))),
+      .equal(to: ["detail"], destination: .push(.detail(id: "deep")))
     ])
     root.activate()
     child.activate()
@@ -337,14 +344,12 @@ struct RouterTests {
     #expect(!root.receivesDeepLinks)
     #expect(child.receivesDeepLinks)
 
-    let outcome = root.openDeepLink(URL(string: "test://detail")!)
+    let outcome = root.openDeepLink(try #require(URL(string: "test://detail")))
 
     #expect(outcome == .handled(.push(.detail(id: "deep"))))
     #expect(root.navigationPath.isEmpty)
     #expect(child.navigationPath == [.detail(id: "deep")])
   }
-
-  // MARK: - Init
 
   @Test
   func `init with parent sets child inactive`() {
@@ -354,21 +359,20 @@ struct RouterTests {
     #expect(!child.isActive)
   }
 
-  // MARK: - configureDeepLinks
-
   @Test
   func `openDeepLink reports unconfigured and scheme mismatch outcomes`() throws {
     let root = Router<TestScene>()
 
-    #expect(root.openDeepLink(URL(string: "test://settings")!) == .unconfigured)
+    #expect(root.openDeepLink(try #require(URL(string: "test://settings"))) == .unconfigured)
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     root.activate()
 
     #expect(
-      root.openDeepLink(URL(string: "other://settings")!) == .schemeMismatch)
+      root.openDeepLink(try #require(URL(string: "other://settings"))) == .schemeMismatch
+    )
   }
 
   @Test
@@ -380,7 +384,7 @@ struct RouterTests {
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test://settings")!)
+    let result = root.openDeepLink(try #require(URL(string: "test://settings")))
     #expect(result == .handled(.root(.settings))) // first parser wins
   }
 
@@ -388,13 +392,13 @@ struct RouterTests {
   func `Deep-link configuration propagates to root children`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .root(.home)),
+      .equal(to: ["home"], destination: .root(.home))
     ])
 
     let child = root.childRouter(for: .home)
     child.activate()
 
-    let result = child.openDeepLink(URL(string: "test://home")!)
+    let result = child.openDeepLink(try #require(URL(string: "test://home")))
     #expect(result == .handled(.root(.home)))
   }
 
@@ -402,13 +406,13 @@ struct RouterTests {
   func `Deep-link configuration propagates to modal children`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["home"], destination: .root(.home)),
+      .equal(to: ["home"], destination: .root(.home))
     ])
 
     let modal = root.childRouter()
     modal.activate()
 
-    let result = modal.openDeepLink(URL(string: "test://home")!)
+    let result = modal.openDeepLink(try #require(URL(string: "test://home")))
     #expect(result == .handled(.root(.home)))
   }
 
@@ -420,10 +424,10 @@ struct RouterTests {
     let modal = home.childRouter()
 
     try home.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
 
-    let url = URL(string: "test://settings")!
+    let url = try #require(URL(string: "test://settings"))
     home.activate()
     #expect(root.openDeepLink(url) == .handled(.root(.settings)))
     settings.activate()
@@ -437,22 +441,25 @@ struct RouterTests {
     let firstRoot = Router<TestScene>()
     let secondRoot = Router<TestScene>()
     try firstRoot.configureDeepLinks(scheme: "first", parsers: [
-      .equal(to: ["home"], destination: .root(.home)),
+      .equal(to: ["home"], destination: .root(.home))
     ])
     try secondRoot.configureDeepLinks(scheme: "second", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     firstRoot.activate()
     secondRoot.activate()
 
     #expect(
-      firstRoot.openDeepLink(URL(string: "first://home")!) == .handled(.root(.home)))
+      firstRoot.openDeepLink(try #require(URL(string: "first://home"))) == .handled(.root(.home))
+    )
     #expect(
-      firstRoot.openDeepLink(URL(string: "second://settings")!) == .schemeMismatch)
+      firstRoot.openDeepLink(try #require(URL(string: "second://settings"))) == .schemeMismatch
+    )
     #expect(
-      secondRoot.openDeepLink(URL(string: "second://settings")!)
-        == .handled(.root(.settings)))
-    #expect(secondRoot.openDeepLink(URL(string: "first://home")!) == .schemeMismatch)
+      secondRoot.openDeepLink(try #require(URL(string: "second://settings")))
+        == .handled(.root(.settings))
+    )
+    #expect(secondRoot.openDeepLink(try #require(URL(string: "first://home"))) == .schemeMismatch)
   }
 
   @Test
@@ -460,26 +467,24 @@ struct RouterTests {
     let root = Router<TestScene>()
     root.activate()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
 
-    let outcome = root.openDeepLink(URL(string: "test://settings")!)
+    let outcome = root.openDeepLink(try #require(URL(string: "test://settings")))
 
     #expect(outcome == .handled(.root(.settings)))
     #expect(root.selectedRoot == .settings)
   }
 
-  // MARK: - Case-insensitive scheme
-
   @Test
   func `configureDeepLinks is case-insensitive for scheme`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "TEST://settings")!)
+    let result = root.openDeepLink(try #require(URL(string: "TEST://settings")))
     #expect(result == .handled(.root(.settings)))
   }
 
@@ -490,7 +495,7 @@ struct RouterTests {
     "test://",
     "tést",
   ])
-  func `configureDeepLinks rejects invalid URL schemes`(_ scheme: String) {
+  func `configureDeepLinks rejects invalid URL schemes`(_ scheme: String) throws {
     let root = Router<TestScene>()
 
     #expect {
@@ -498,22 +503,20 @@ struct RouterTests {
     } throws: { error in
       error as? DeepLinkConfigurationError == .invalidScheme(scheme)
     }
-    #expect(root.openDeepLink(URL(string: "test://settings")!) == .unconfigured)
+    #expect(root.openDeepLink(try #require(URL(string: "test://settings"))) == .unconfigured)
   }
 
   @Test
   func `configureDeepLinks accepts every URL scheme punctuation character`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test+beta-1.0", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test+beta-1.0://settings")!)
+    let result = root.openDeepLink(try #require(URL(string: "test+beta-1.0://settings")))
     #expect(result == .handled(.root(.settings)))
   }
-
-  // MARK: - Empty parsers
 
   @Test
   func `configureDeepLinks with empty parsers reports unmatched`() throws {
@@ -521,21 +524,19 @@ struct RouterTests {
     try root.configureDeepLinks(scheme: "test", parsers: [])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test://settings")!)
+    let result = root.openDeepLink(try #require(URL(string: "test://settings")))
     #expect(result == .unmatched)
   }
-
-  // MARK: - No parser matches
 
   @Test
   func `configureDeepLinks reports unmatched when no parser recognises the route`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test://unknown")!)
+    let result = root.openDeepLink(try #require(URL(string: "test://unknown")))
     #expect(result == .unmatched)
   }
 
@@ -551,7 +552,7 @@ struct RouterTests {
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test://detail")!)
+    let result = root.openDeepLink(try #require(URL(string: "test://detail")))
     #expect(result == .invalid)
     #expect(root.selectedRoot == nil)
   }
@@ -560,11 +561,11 @@ struct RouterTests {
   func `Malformed path returns invalid before parser dispatch`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      DeepLinkParser { _ in .destination(.root(.settings)) },
+      DeepLinkParser { _ in .destination(.root(.settings)) }
     ])
     root.activate()
 
-    let result = root.openDeepLink(URL(string: "test://detail//42")!)
+    let result = root.openDeepLink(try #require(URL(string: "test://detail//42")))
 
     #expect(result == .invalid)
     #expect(root.selectedRoot == nil)
@@ -574,30 +575,35 @@ struct RouterTests {
   func `Automatic receiver reports every reachable deep-link outcome`() throws {
     let root = Router<TestScene>()
     root.activate()
-    var outcomes: [DeepLinkOutcome<TestScene>] = []
+    var outcomes = [DeepLinkOutcome<TestScene>]()
     let record: @MainActor (DeepLinkOutcome<TestScene>) -> Void = {
       outcomes.append($0)
     }
 
     root.receiveDeepLink(
-      URL(string: "test://settings")!,
-      onOutcome: record)
+      try #require(URL(string: "test://settings")),
+      onOutcome: record,
+    )
 
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
     root.receiveDeepLink(
-      URL(string: "other://settings")!,
-      onOutcome: record)
+      try #require(URL(string: "other://settings")),
+      onOutcome: record,
+    )
     root.receiveDeepLink(
-      URL(string: "test://unknown")!,
-      onOutcome: record)
+      try #require(URL(string: "test://unknown")),
+      onOutcome: record,
+    )
     root.receiveDeepLink(
-      URL(string: "test://detail//42")!,
-      onOutcome: record)
+      try #require(URL(string: "test://detail//42")),
+      onOutcome: record,
+    )
     root.receiveDeepLink(
-      URL(string: "test://settings")!,
-      onOutcome: record)
+      try #require(URL(string: "test://settings")),
+      onOutcome: record,
+    )
 
     #expect(outcomes == [
       .unconfigured,
@@ -612,18 +618,16 @@ struct RouterTests {
   func `Inactive automatic receiver ignores delivery without hiding direct outcome`() throws {
     let root = Router<TestScene>()
     try root.configureDeepLinks(scheme: "test", parsers: [
-      .equal(to: ["settings"], destination: .root(.settings)),
+      .equal(to: ["settings"], destination: .root(.settings))
     ])
-    var outcomes: [DeepLinkOutcome<TestScene>] = []
-    let url = URL(string: "test://settings")!
+    var outcomes = [DeepLinkOutcome<TestScene>]()
+    let url = try #require(URL(string: "test://settings"))
 
     root.receiveDeepLink(url) { outcomes.append($0) }
 
     #expect(outcomes.isEmpty)
     #expect(root.openDeepLink(url) == .inactive)
   }
-
-  // MARK: - activate idempotent
 
   @Test
   func `activate is idempotent`() {
@@ -636,8 +640,6 @@ struct RouterTests {
     #expect(!root.isActive)
   }
 
-  // MARK: - selectAndPush preserves existing path
-
   @Test
   func `selectAndPush on child with existing items preserves path`() {
     let root = Router<TestScene>()
@@ -649,8 +651,6 @@ struct RouterTests {
     #expect(root.selectedRoot == .settings)
   }
 
-  // MARK: - selectAndPush then popToRoot on child
-
   @Test
   func `selectAndPush then popToRoot on child clears only child`() {
     let root = Router<TestScene>()
@@ -661,8 +661,6 @@ struct RouterTests {
     #expect(child.navigationPath.isEmpty)
     #expect(root.selectedRoot == .settings)
   }
-
-  // MARK: - Presentation delegation to selected root
 
   @Test
   func `present fullScreen from root with selectedRoot delegates to root child`() {
@@ -700,8 +698,6 @@ struct RouterTests {
 
     #expect(modal.presentingFullScreen == .onboarding)
   }
-
-  // MARK: - dismiss walking up parent chain
 
   @Test
   func `dismissFullScreen walks up from deep child to clear presentation`() {
@@ -765,8 +761,6 @@ struct RouterTests {
     #expect(root.presentingSheet == nil)
     #expect(child.presentingSheet == .profile)
   }
-
-  // MARK: - Active visible routing
 
   @Test
   func `Root actions are rejected until a RouterHost mounts`() {
@@ -841,7 +835,7 @@ struct RouterTests {
       onDeepLinkOutcome: { _ in },
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       EmptyView()
     }
@@ -856,7 +850,7 @@ struct RouterTests {
 
     let stack = RouterStack(
       router: root,
-      pushContent: { _ in EmptyView() }
+      pushContent: { _ in EmptyView() },
     ) {
       EmptyView()
     }
@@ -875,7 +869,7 @@ struct RouterTests {
       onDeepLinkOutcome: { _ in },
       pushContent: { _ in EmptyView() },
       sheetContent: { _ in EmptyView() },
-      fullScreenContent: { _ in EmptyView() }
+      fullScreenContent: { _ in EmptyView() },
     ) {
       EmptyView()
     }
@@ -896,7 +890,7 @@ struct RouterTests {
         router: router,
         pushContent: { _ in EmptyView() },
         sheetContent: { _ in EmptyView() },
-        fullScreenContent: { _ in EmptyView() }
+        fullScreenContent: { _ in EmptyView() },
       ) {
         RouterInputReporter(probe: probe)
       })

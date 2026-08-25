@@ -56,13 +56,24 @@ import SwiftUI
 /// > The generated `viewModel` property fails with a diagnostic precondition if accessed
 /// > before initialisation. The generated `body` renders `content` only while the backing
 /// > `@State` contains a ViewModel; its task creates that instance when the owner mounts.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(hostRouter), named(scenePhase))
+@attached(
+  member,
+  names: named(body),
+  named(_viewModel),
+  named(viewModel),
+  named(state),
+  named(bindableState),
+  named(factory),
+  named(hostRouter),
+  named(scenePhase)
+)
 public macro LazyViewModel<VM: ViewModel>(
   _ viewModelType: VM.Type,
-  observationPolicy: ObservationPolicy = .alwaysObserving
+  observationPolicy: ObservationPolicy = .alwaysObserving,
 ) = #externalMacro(
   module: "VISORMacros",
-  type: "LazyViewModelMacro")
+  type: "LazyViewModelMacro",
+)
 
 /// Custom-presentation form of ``LazyViewModel(_:observationPolicy:)``.
 ///
@@ -77,12 +88,23 @@ public macro LazyViewModel<VM: ViewModel>(
 ///   - observationPolicy: Controls whether observation pauses based on scene phase.
 ///   - pending: UI shown while VISOR reconciles initial observation state.
 ///   - failure: UI shown when VISOR can no longer guarantee coherent State.
-@attached(member, names: named(body), named(_viewModel), named(viewModel), named(state), named(bindableState), named(factory), named(hostRouter), named(scenePhase))
+@attached(
+  member,
+  names: named(body),
+  named(_viewModel),
+  named(viewModel),
+  named(state),
+  named(bindableState),
+  named(factory),
+  named(hostRouter),
+  named(scenePhase)
+)
 public macro LazyViewModel<VM: ViewModel, Pending: View, Failure: View>(
   _ viewModelType: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving,
   pending: Pending,
-  failure: Failure
+  failure: Failure,
 ) = #externalMacro(
   module: "VISORMacros",
-  type: "LazyViewModelMacro")
+  type: "LazyViewModelMacro",
+)

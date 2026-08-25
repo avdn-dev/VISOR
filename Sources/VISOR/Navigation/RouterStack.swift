@@ -23,7 +23,7 @@ public struct RouterStack<
   Content: View,
   PushView: View,
   SheetView: View,
-  FullScreenView: View
+  FullScreenView: View,
 >: View {
 
   // MARK: Lifecycle
@@ -35,7 +35,7 @@ public struct RouterStack<
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.router = router
     self.content = content()
@@ -53,7 +53,7 @@ public struct RouterStack<
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.init(
       router: parentRouter.childRouter(for: root),
@@ -61,7 +61,8 @@ public struct RouterStack<
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
-      content: content)
+      content: content,
+    )
   }
 
   init(
@@ -70,7 +71,7 @@ public struct RouterStack<
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
     @ViewBuilder sheetContent: @escaping (Scene.Sheet) -> SheetView,
     @ViewBuilder fullScreenContent: @escaping (Scene.FullScreen) -> FullScreenView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.init(
       router: presentedRouter,
@@ -78,7 +79,8 @@ public struct RouterStack<
       pushContent: pushContent,
       sheetContent: sheetContent,
       fullScreenContent: fullScreenContent,
-      content: content)
+      content: content,
+    )
   }
 
   // MARK: Public
@@ -89,12 +91,13 @@ public struct RouterStack<
       onDeepLinkOutcome: onDeepLinkOutcome,
       pushContent: pushContent,
       sheetContent: sheetContent,
-      fullScreenContent: fullScreenContent
+      fullScreenContent: fullScreenContent,
     ) {
       RouterStackContent(
         router: router,
         content: content,
-        pushContent: pushContent)
+        pushContent: pushContent,
+      )
     }
   }
 
@@ -110,18 +113,18 @@ public struct RouterStack<
 
 // MARK: - Push-Only RouterStack
 
-public extension RouterStack where
+extension RouterStack where
   Scene.Sheet == NoModalDestination,
   Scene.FullScreen == NoModalDestination,
   SheetView == EmptyView,
   FullScreenView == EmptyView
 {
   /// Creates a push-only stack for an existing Router.
-  init(
+  public init(
     router: Router<Scene>,
     onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.init(
       router: router,
@@ -129,16 +132,17 @@ public extension RouterStack where
       pushContent: pushContent,
       sheetContent: { _ in EmptyView() },
       fullScreenContent: { _ in EmptyView() },
-      content: content)
+      content: content,
+    )
   }
 
   /// Creates a push-only stack for a cached top-level destination Router.
-  init(
+  public init(
     parentRouter: Router<Scene>,
     root: Scene.Root,
     onDeepLinkOutcome: @escaping @MainActor (DeepLinkOutcome<Scene>) -> Void = { _ in },
     @ViewBuilder pushContent: @escaping (Scene.Push) -> PushView,
-    @ViewBuilder content: () -> Content
+    @ViewBuilder content: () -> Content,
   ) {
     self.init(
       router: parentRouter.childRouter(for: root),
@@ -146,7 +150,8 @@ public extension RouterStack where
       pushContent: pushContent,
       sheetContent: { _ in EmptyView() },
       fullScreenContent: { _ in EmptyView() },
-      content: content)
+      content: content,
+    )
   }
 }
 
@@ -155,10 +160,11 @@ public extension RouterStack where
 private struct RouterStackContent<
   Scene: NavigationScene,
   Content: View,
-  PushView: View
+  PushView: View,
 >: View {
 
   @Bindable var router: Router<Scene>
+
   let content: Content
   let pushContent: (Scene.Push) -> PushView
 

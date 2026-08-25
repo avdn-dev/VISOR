@@ -27,12 +27,15 @@ struct RootObservationConsumerTests {
 
     #expect(consumer.projectedSnapshot() == RootProjectedSnapshot(
       revision: 1,
-      label: "revision-1"))
+      label: "revision-1",
+    ))
     consumer.publish(RootProjectedSnapshot(
       revision: 3,
-      label: "three"))
+      label: "three",
+    ))
     #expect(consumer.projectedSnapshot() == RootProjectedSnapshot(
       revision: 3,
-      label: "three"))
+      label: "three",
+    ))
   }
 }

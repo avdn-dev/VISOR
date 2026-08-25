@@ -1,10 +1,14 @@
 import Testing
 import VISORTesting
 
+// MARK: - LifecycleError
+
 private enum LifecycleError: Error {
   case action
   case body
 }
+
+// MARK: - ObservationLifecycleTests
 
 @Suite("Observation lifecycle")
 struct ObservationLifecycleTests {
@@ -13,20 +17,21 @@ struct ObservationLifecycleTests {
   func `State identity swap fails the next opening and requests teardown once`() async throws {
     let service = TestingService(1)
     let sut = SwappableTestingViewModel(service: service)
-    var infrastructureIssues: [(String, SourceLocation)] = []
+    var infrastructureIssues = [(String, SourceLocation)]()
     var actionRan = false
     var laterActionRan = false
     let performLocation = SourceLocation(
       fileID: "ObservationLifecycleTests/state-identity",
       filePath: "/ObservationLifecycleTests/state-identity.swift",
       line: 456,
-      column: 7)
+      column: 7,
+    )
 
     try await _observeWithJournalPolicyForProof(
       sut,
       issueRecorder: { message, location in
         infrastructureIssues.append((message, location))
-      }
+      },
     ) { test in
       #expect(service.activeObservationCount == 1)
       #expect(sut.state.sourceValue == 1)
@@ -34,7 +39,8 @@ struct ObservationLifecycleTests {
       sut.replaceState()
       await test.perform(
         { actionRan = true },
-        sourceLocation: performLocation)
+        sourceLocation: performLocation,
+      )
 
       #expect(!actionRan)
       #expect(infrastructureIssues.count == 1)
@@ -62,20 +68,21 @@ struct ObservationLifecycleTests {
     let service = TestingService()
     service.terminate()
     let sut = TestingViewModel(service: service)
-    var issues: [(message: String, location: SourceLocation)] = []
+    var issues = [(message: String, location: SourceLocation)]()
     var enteredBody = false
     let observeLocation = SourceLocation(
       fileID: "ObservationLifecycleTests/startup",
       filePath: "/ObservationLifecycleTests/startup.swift",
       line: 404,
-      column: 4)
+      column: 4,
+    )
 
     try await _observeWithJournalPolicyForProof(
       sut,
       sourceLocation: observeLocation,
       issueRecorder: { message, location in
         issues.append((message, location))
-      }
+      },
     ) { _ in
       enteredBody = true
     }
@@ -94,32 +101,36 @@ struct ObservationLifecycleTests {
   func `Runtime source failure poisons the window and suppresses later work`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    var issues: [(message: String, location: SourceLocation)] = []
+    var issues = [(message: String, location: SourceLocation)]()
     var laterOperationRan = false
     let failureLocation = SourceLocation(
       fileID: "ObservationLifecycleTests/runtime",
       filePath: "/ObservationLifecycleTests/runtime.swift",
       line: 505,
-      column: 5)
+      column: 5,
+    )
     let suppressedExpectationLocation = SourceLocation(
       fileID: "ObservationLifecycleTests/suppressed-expectation",
       filePath: "/ObservationLifecycleTests/suppressed-expectation.swift",
       line: 506,
-      column: 6)
+      column: 6,
+    )
 
     try await _observeWithJournalPolicyForProof(
       sut,
       issueRecorder: { message, location in
         issues.append((message, location))
-      }
+      },
     ) { test in
       await test.perform(
         { service.terminate() },
-        sourceLocation: failureLocation)
+        sourceLocation: failureLocation,
+      )
       test.expect(
         \.sourceValue,
         hasExactChanges: [],
-        sourceLocation: suppressedExpectationLocation)
+        sourceLocation: suppressedExpectationLocation,
+      )
       await test.perform {
         laterOperationRan = true
       }
@@ -165,14 +176,14 @@ struct ObservationLifecycleTests {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
     let gate = ControllableOperation<Void, Never>()
-    var issues: [String] = []
+    var issues = [String]()
     var rejectedOperationRan = false
 
     try await _observeWithJournalPolicyForProof(
       sut,
       issueRecorder: { message, _ in
         issues.append(message)
-      }
+      },
     ) { test in
       let first = Task { @MainActor in
         await test.perform {
@@ -205,19 +216,20 @@ struct ObservationLifecycleTests {
     var sut: TestingViewModel? = TestingViewModel(service: service)
     let weakSUT = WeakReference(sut)
     var escaped: ObservationTest<TestingViewModel>?
-    var issues: [(message: String, location: SourceLocation)] = []
+    var issues = [(message: String, location: SourceLocation)]()
     var staleOperationRan = false
     let staleLocation = SourceLocation(
       fileID: "ObservationLifecycleTests/stale-handle",
       filePath: "/ObservationLifecycleTests/stale-handle.swift",
       line: 606,
-      column: 6)
+      column: 6,
+    )
 
     try await _observeWithJournalPolicyForProof(
-      sut!,
+      try #require(sut),
       issueRecorder: { message, location in
         issues.append((message, location))
-      }
+      },
     ) { test in
       escaped = test
     }
@@ -229,7 +241,8 @@ struct ObservationLifecycleTests {
 
     await escaped?.perform(
       { staleOperationRan = true },
-      sourceLocation: staleLocation)
+      sourceLocation: staleLocation,
+    )
 
     #expect(issues.count == 1)
     #expect(issues.first?.message == "This observation scope has ended")
@@ -243,14 +256,14 @@ struct ObservationLifecycleTests {
   func `Action error remains primary when its closing fence fails`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    var issues: [String] = []
+    var issues = [String]()
     var laterOperationRan = false
 
     try await _observeWithJournalPolicyForProof(
       sut,
       issueRecorder: { message, _ in
         issues.append(message)
-      }
+      },
     ) { test in
       await #expect(throws: LifecycleError.action) {
         try await test.perform {
@@ -276,14 +289,14 @@ struct ObservationLifecycleTests {
   func `Produced result survives when its closing fence fails`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
-    var issues: [String] = []
+    var issues = [String]()
     var result: Int?
 
     try await _observeWithJournalPolicyForProof(
       sut,
       issueRecorder: { message, _ in
         issues.append(message)
-      }
+      },
     ) { test in
       result = try await test.perform {
         service.terminate()

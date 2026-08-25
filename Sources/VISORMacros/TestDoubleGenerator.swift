@@ -15,6 +15,8 @@ enum TestDoubleKind {
   case stub
   case spy
 
+  // MARK: Internal
+
   var macroName: String {
     switch self {
     case .stub:
@@ -37,18 +39,21 @@ enum TestDoubleKind {
 // MARK: - TestDoubleGenerator
 
 struct TestDoubleGenerator {
+
+  // MARK: Internal
+
   let kind: TestDoubleKind
 
   func expand(
     _ node: AttributeSyntax,
     declaration: some DeclSyntaxProtocol,
-    in context: some MacroExpansionContext)
-    throws -> [DeclSyntax]
-  {
+    in context: some MacroExpansionContext,
+  ) throws -> [DeclSyntax] {
     guard let protocolDecl = declaration.as(ProtocolDeclSyntax.self) else {
       context.diagnose(Diagnostic(
         node: Syntax(declaration),
-        message: TestDoubleDiagnostic.notAProtocol(macroName: kind.macroName)))
+        message: TestDoubleDiagnostic.notAProtocol(macroName: kind.macroName),
+      ))
       return []
     }
 
@@ -57,57 +62,69 @@ struct TestDoubleGenerator {
     }
 
     let analysis = ProtocolAnalysis(protocolDecl)
-    guard validateProtocolForTestDouble(
-      analysis,
-      protocolDecl: protocolDecl,
-      traits: traits,
-      macroName: kind.macroName,
-      context: context)
+    guard
+      validateProtocolForTestDouble(
+        analysis,
+        protocolDecl: protocolDecl,
+        traits: traits,
+        macroName: kind.macroName,
+        context: context,
+      )
     else {
       return []
     }
 
-    if let property = analysis.properties.first(where: {
-      $0.observationState != nil
-        && $0.defaultValueExpression == nil
-        && defaultValue(for: $0.type) == nil
-    }) {
+    if
+      let property = analysis.properties.first(where: {
+        $0.observationState != nil
+          && $0.defaultValueExpression == nil
+          && defaultValue(for: $0.type) == nil
+      })
+    {
       context.diagnose(Diagnostic(
         node: Syntax(protocolDecl),
         message: TestDoubleDiagnostic.observationStateBaselineRequired(
           propertyName: property.name,
           type: property.type,
-          macroName: kind.macroName)))
+          macroName: kind.macroName,
+        ),
+      ))
       return []
     }
 
-    if kind == .spy, traits.isSendable,
-       let unsupportedMethod = analysis.methods.lazy.compactMap({ method -> (ProtocolMethodInfo, [String])? in
-         let genericNames = unconstrainedGenericParameterNamesRequiringSendableStorage(in: method)
-         return genericNames.isEmpty ? nil : (method, genericNames)
-       }).first
+    if
+      kind == .spy, traits.isSendable,
+      let unsupportedMethod = analysis.methods.lazy.compactMap({ method -> (ProtocolMethodInfo, [String])? in
+        let genericNames = unconstrainedGenericParameterNamesRequiringSendableStorage(in: method)
+        return genericNames.isEmpty ? nil : (method, genericNames)
+      }).first
     {
       context.diagnose(Diagnostic(
         node: Syntax(protocolDecl),
         message: TestDoubleDiagnostic.sendableSpyUnconstrainedGenericValues(
           methodName: unsupportedMethod.0.name,
-          genericNames: unsupportedMethod.1)))
+          genericNames: unsupportedMethod.1,
+        ),
+      ))
       return []
     }
 
     let namePlan = TestDoubleNamePlan(
       kind: kind,
       analysis: analysis,
-      isSendable: traits.isSendable)
+      isSendable: traits.isSendable,
+    )
     if hasUnknownTypeDefaults(properties: analysis.properties, methods: analysis.methods) {
       context.diagnose(Diagnostic(
         node: Syntax(protocolDecl),
-        message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: kind.macroName)))
+        message: TestDoubleDiagnostic.unknownTypeDefaults(macroName: kind.macroName),
+      ))
     }
     namePlan.diagnose(
       protocolDecl: protocolDecl,
       macroName: kind.macroName,
-      context: context)
+      context: context,
+    )
 
     let plan = TestDoubleGenerationPlan(
       kind: kind,
@@ -115,7 +132,8 @@ struct TestDoubleGenerator {
       access: accessLevel(of: protocolDecl),
       analysis: analysis,
       names: namePlan,
-      isSendable: traits.isSendable)
+      isSendable: traits.isSendable,
+    )
     var members = traits.isSendable
       ? SendableTestDoubleRenderer().render(plan)
       : OrdinaryTestDoubleRenderer().render(plan)
@@ -134,6 +152,8 @@ struct TestDoubleGenerator {
     return [result]
   }
 
+  // MARK: Private
+
   private func initialiserMembers(access: String) -> [String] {
     guard access == "public" || access == "package" else { return [] }
     return ["  \(access) init() {}"]
@@ -143,6 +163,9 @@ struct TestDoubleGenerator {
 // MARK: - OrdinaryTestDoubleRenderer
 
 private struct OrdinaryTestDoubleRenderer {
+
+  // MARK: Internal
+
   func render(_ plan: TestDoubleGenerationPlan) -> [String] {
     var members = plan.protocolProperties.flatMap {
       directPropertyMembers($0, access: plan.access)
@@ -157,8 +180,10 @@ private struct OrdinaryTestDoubleRenderer {
     return members
   }
 
+  // MARK: Private
+
   private func stubMembers(_ plan: TestDoubleGenerationPlan) -> [String] {
-    var members: [String] = []
+    var members = [String]()
     for methodPlan in plan.methods {
       members.append(contentsOf: methodPlan.storedProperties.flatMap {
         directPropertyMembers($0, access: plan.access)
@@ -168,7 +193,8 @@ private struct OrdinaryTestDoubleRenderer {
       let bodyLines = generateFallbackBodyLines(
         method: methodPlan.method,
         returnStorageName: methodPlan.returnProperty?.name,
-        style: .expression)
+        style: .expression,
+      )
       if bodyLines.isEmpty {
         members.append("  \(signature) { }")
       } else if bodyLines.count == 1 {
@@ -184,7 +210,7 @@ private struct OrdinaryTestDoubleRenderer {
 
   private func spyMembers(_ plan: TestDoubleGenerationPlan) -> [String] {
     let prefix = plan.access.isEmpty ? "" : "\(plan.access) "
-    var members: [String] = []
+    var members = [String]()
     members.reserveCapacity(plan.methods.count * 8 + (plan.methods.isEmpty ? 0 : 3))
 
     for methodPlan in plan.methods {
@@ -193,22 +219,25 @@ private struct OrdinaryTestDoubleRenderer {
         directPropertyMembers(
           $0,
           access: plan.access,
-          omitType: $0.name == methodPlan.callCountName)
+          omitType: $0.name == methodPlan.callCountName,
+        )
       })
 
       let signature = buildMethodSignature(methodPlan.method, access: plan.access)
       var bodyLines = directRecordingBodyLines(
         methodPlan,
-        callLogName: plan.callLogProperty?.name ?? "calls")
+        callLogName: plan.callLogProperty?.name ?? "calls",
+      )
       bodyLines.append(contentsOf: generateImplementationBodyLines(for: methodPlan))
       members.append("  \(signature) {")
       members.append(contentsOf: bodyLines)
       members.append("  }")
     }
 
-    if !plan.methods.isEmpty,
-       let callTypeName = plan.names.callType,
-       let callLogProperty = plan.callLogProperty
+    if
+      !plan.methods.isEmpty,
+      let callTypeName = plan.names.callType,
+      let callLogProperty = plan.callLogProperty
     {
       members.append("  \(prefix)enum \(callTypeName) {")
       members.append(contentsOf: plan.methods.compactMap { method in
@@ -222,20 +251,21 @@ private struct OrdinaryTestDoubleRenderer {
 
   private func directRecordingBodyLines(
     _ plan: TestDoubleMethodGenerationPlan,
-    callLogName: String)
-    -> [String]
-  {
+    callLogName: String,
+  ) -> [String] {
     var lines = ["    \(plan.callCountName) += 1"]
-    if plan.receivedParameters.count == 1,
-       let parameter = plan.receivedParameters.first,
-       let receivedArgument = plan.names.receivedArgument,
-       let receivedInvocations = plan.names.receivedInvocations
+    if
+      plan.receivedParameters.count == 1,
+      let parameter = plan.receivedParameters.first,
+      let receivedArgument = plan.names.receivedArgument,
+      let receivedInvocations = plan.names.receivedInvocations
     {
       lines.append("    \(receivedArgument) = \(parameter.valueExpression)")
       lines.append("    \(receivedInvocations).append(\(parameter.valueExpression))")
-    } else if plan.receivedParameters.count > 1,
-              let receivedArguments = plan.names.receivedArguments,
-              let receivedInvocations = plan.names.receivedInvocations
+    } else if
+      plan.receivedParameters.count > 1,
+      let receivedArguments = plan.names.receivedArguments,
+      let receivedInvocations = plan.names.receivedInvocations
     {
       let tuple = "(" + plan.receivedParameters.map(\.valueExpression).joined(separator: ", ") + ")"
       lines.append("    \(receivedArguments) = \(tuple)")
@@ -250,15 +280,14 @@ private struct OrdinaryTestDoubleRenderer {
   private func directPropertyMembers(
     _ property: TestDoubleStoredPropertyPlan,
     access: String,
-    omitType: Bool = false)
-    -> [String]
-  {
+    omitType: Bool = false,
+  ) -> [String] {
     if property.isObservationState {
       return observationStateMembers(property, access: access)
     }
 
     let prefix = access.isEmpty ? "" : "\(access) "
-    var members: [String] = []
+    var members = [String]()
     if property.isObservationIgnored {
       members.append("  @ObservationIgnored")
     }
@@ -275,7 +304,7 @@ private struct OrdinaryTestDoubleRenderer {
 
   private func observationStateMembers(
     _ property: TestDoubleStoredPropertyPlan,
-    access: String
+    access: String,
   ) -> [String] {
     guard let observationState = property.observationState else { return [] }
     let prefix = access.isEmpty ? "" : "\(access) "

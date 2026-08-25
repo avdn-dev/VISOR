@@ -1,29 +1,35 @@
 import Observation
 import SwiftUI
 
-private final class StateFieldIdentity {}
+// MARK: - StateFieldIdentity
 
-@MainActor
+private final class StateFieldIdentity { }
+
+// MARK: - _StateField
+
 /// Generated metadata for one writable ViewModel State field.
 ///
 /// This type is public only because attached macro expansions are type-checked
 /// in the consuming module. Application code uses generated selector key paths
 /// with ``ViewModel/updateState(_:to:)`` instead of constructing fields.
+@MainActor
 public struct _StateField<Root: AnyObject, Value> {
-  private let identityStorage: StateFieldIdentity
-  private let keyPath: ReferenceWritableKeyPath<Root, Value>
 
-  package let name: String
+  // MARK: Lifecycle
 
   /// Creates generated metadata for a State field.
   public init(
     _ name: String,
-    keyPath: ReferenceWritableKeyPath<Root, Value>
+    keyPath: ReferenceWritableKeyPath<Root, Value>,
   ) {
     identityStorage = StateFieldIdentity()
     self.keyPath = keyPath
     self.name = name
   }
+
+  // MARK: Package
+
+  package let name: String
 
   package var identity: ObjectIdentifier {
     ObjectIdentifier(identityStorage)
@@ -40,50 +46,64 @@ public struct _StateField<Root: AnyObject, Value> {
   package func write(_ value: Value, to root: Root) {
     root[keyPath: keyPath] = value
   }
+
+  // MARK: Private
+
+  private let identityStorage: StateFieldIdentity
+  private let keyPath: ReferenceWritableKeyPath<Root, Value>
+
 }
 
-@MainActor
+// MARK: - _AnyStateField
+
 /// Type-erased generated metadata for recording a State field.
 ///
 /// This type is public only for external macro expansions.
+@MainActor
 public struct _AnyStateField<Root: AnyObject> {
-  private let readValue: (Root) -> Any
-
-  package let identity: ObjectIdentifier
-  package let name: String
-
   /// Erases one generated State field while retaining its untracked reader.
   public init<Value>(
     _ field: _StateField<Root, Value>,
-    untrackedRead: @escaping (Root) -> Value
+    untrackedRead: @escaping (Root) -> Value,
   ) {
     identity = field.identity
     name = field.name
     readValue = { root in untrackedRead(root) }
   }
 
+  package let identity: ObjectIdentifier
+  package let name: String
+
   package func read(from root: Root) -> Any {
     readValue(root)
   }
+
+  private let readValue: (Root) -> Any
+
 }
 
-@MainActor
+// MARK: - _StateMutationRecorder
+
 /// Generated mutation-recorder contract used by `VISORTesting`.
 ///
 /// This protocol is public only for external macro expansions.
+@MainActor
 public protocol _StateMutationRecorder: AnyObject {
   /// Records one completed generated State assignment.
   func record(
     fieldID: ObjectIdentifier,
     fieldName: String,
     oldValue: Any,
-    newValue: Any)
+    newValue: Any,
+  )
 }
 
-@MainActor
+// MARK: - _ViewModelState
+
 /// Generated requirements implemented by a ViewModel's nested State class.
 ///
 /// This protocol is public only for external macro expansions.
+@MainActor
 public protocol _ViewModelState: AnyObject {
   /// The generated selector namespace for the State type.
   associatedtype _VISORSelectors
@@ -92,6 +112,7 @@ public protocol _ViewModelState: AnyObject {
   static var _visorSelectors: _VISORSelectors { get }
   /// Type-erased metadata for every generated State field.
   static var _visorAllFields: [_AnyStateField<Self>] { get }
+
   /// The active test mutation recorder, when the State is reserved by a test.
   var _visorMutationRecorder: (any _StateMutationRecorder)? { get set }
 }
@@ -115,7 +136,7 @@ extension _ViewModelState {
   public func _visorRecordMutation<Value>(
     _ field: _StateField<Self, Value>,
     oldValue: Value,
-    newValue: Value
+    newValue: Value,
   ) {
     guard let recorder = _visorMutationRecorder else { return }
 
@@ -123,7 +144,8 @@ extension _ViewModelState {
       fieldID: field.identity,
       fieldName: field.name,
       oldValue: oldValue,
-      newValue: newValue)
+      newValue: newValue,
+    )
   }
 }
 
@@ -132,9 +154,9 @@ extension ViewModel {
   public func updateState<Value>(
     _ selection: KeyPath<
       State._VISORSelectors,
-      _StateField<State, Value>
+      _StateField<State, Value>,
     >,
-    to value: Value
+    to value: Value,
   ) {
     state[selection] = value
   }

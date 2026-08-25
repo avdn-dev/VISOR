@@ -2,34 +2,40 @@ import os
 import Testing
 import VISORObservation
 
-private final class ReentrantSnapshot: Sendable {
-  private let onDeinitialise: @Sendable () -> Void
+// MARK: - ReentrantSnapshot
 
-  init(onDeinitialise: @escaping @Sendable () -> Void = {}) {
+private final class ReentrantSnapshot: Sendable {
+
+  // MARK: Lifecycle
+
+  init(onDeinitialise: @escaping @Sendable () -> Void = { }) {
     self.onDeinitialise = onDeinitialise
   }
 
   deinit {
     onDeinitialise()
   }
+
+  // MARK: Private
+
+  private let onDeinitialise: @Sendable () -> Void
+
 }
 
-private final class ReentrantSnapshotTarget: Sendable {
-  private struct State {
-    weak var channel: ObservationChannel<ReentrantSnapshot>?
-    var reentryCount = 0
-  }
+// MARK: - ReentrantSnapshotTarget
 
-  private let lock = OSAllocatedUnfairLock(initialState: State())
+private final class ReentrantSnapshotTarget: Sendable {
+
+  // MARK: Internal
+
+  var reentryCount: Int {
+    lock.withLock { $0.reentryCount }
+  }
 
   func install(_ channel: ObservationChannel<ReentrantSnapshot>) {
     lock.withLock { state in
       state.channel = channel
     }
-  }
-
-  var reentryCount: Int {
-    lock.withLock { $0.reentryCount }
   }
 
   func publishFromDeinitialiser() {
@@ -39,7 +45,19 @@ private final class ReentrantSnapshotTarget: Sendable {
     }
     channel?.publish(ReentrantSnapshot())
   }
+
+  // MARK: Private
+
+  private struct State {
+    weak var channel: ObservationChannel<ReentrantSnapshot>?
+    var reentryCount = 0
+  }
+
+  private let lock = OSAllocatedUnfairLock(initialState: State())
+
 }
+
+// MARK: - ObservationRetirementTests
 
 @Suite
 struct ObservationRetirementTests {
@@ -52,7 +70,8 @@ struct ObservationRetirementTests {
     channel.publish(
       ReentrantSnapshot {
         target.publishFromDeinitialiser()
-      })
+      }
+    )
     channel.publish(ReentrantSnapshot())
 
     #expect(target.reentryCount == 1)
@@ -68,7 +87,8 @@ struct ObservationRetirementTests {
     channel.publish(
       ReentrantSnapshot {
         target.publishFromDeinitialiser()
-      })
+      }
+    )
 
     #expect(target.reentryCount == 1)
   }
@@ -84,7 +104,8 @@ struct ObservationRetirementTests {
     channel.publish(
       ReentrantSnapshot {
         target.publishFromDeinitialiser()
-      })
+      }
+    )
     var checkpoint: _ObservationCheckpoint<ReentrantSnapshot>? =
       try opened.subscription._visorCheckpointAndPause()
     channel.publish(ReentrantSnapshot())
@@ -110,7 +131,8 @@ struct ObservationRetirementTests {
     channel.publish(
       ReentrantSnapshot {
         target.publishFromDeinitialiser()
-      })
+      }
+    )
     var checkpoint: _ObservationCheckpoint<ReentrantSnapshot>? =
       try opened.subscription._visorCheckpointAndPause()
     channel.publish(ReentrantSnapshot())

@@ -14,9 +14,17 @@ public final class ControllableOperation<Success: Sendable, Failure: Error & Sen
 
   // MARK: Public
 
-  public var callCount: Int { started.count }
-  public var cancellationCount: Int { cancelled.count }
-  public var completionCount: Int { completed.count }
+  public var callCount: Int {
+    started.count
+  }
+
+  public var cancellationCount: Int {
+    cancelled.count
+  }
+
+  public var completionCount: Int {
+    completed.count
+  }
 
   /// Runs an invocation that records cancellation but remains suspended until explicitly resumed.
   public func run() async throws(Failure) -> Success {
@@ -111,7 +119,8 @@ public final class ControllableOperation<Success: Sendable, Failure: Error & Sen
         if resolvedCalls.contains(call) {
           guard let cancellationResult else {
             preconditionFailure(
-              "A non-cooperative controllable operation resolved without an explicit result")
+              "A non-cooperative controllable operation resolved without an explicit result"
+            )
           }
           continuation.resume(returning: cancellationResult)
         } else if let result = queuedResults.removeValue(forKey: call) {
@@ -136,7 +145,7 @@ public final class ControllableOperation<Success: Sendable, Failure: Error & Sen
 
   private func recordCancellation(
     call: Int,
-    result: OperationResult?
+    result: OperationResult?,
   ) {
     guard !completedCalls.contains(call) else { return }
     guard cancelledCalls.insert(call).inserted else { return }
@@ -165,7 +174,8 @@ public final class ControllableOperation<Success: Sendable, Failure: Error & Sen
     precondition(terminalResult == nil, "A terminal controllable operation cannot be resumed")
     precondition(
       !resolvedCalls.contains(call) && queuedResults[call] == nil,
-      "A controllable operation invocation must be resumed exactly once")
+      "A controllable operation invocation must be resumed exactly once",
+    )
 
     if let continuation = pending.removeValue(forKey: call) {
       resolvedCalls.insert(call)

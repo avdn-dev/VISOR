@@ -4,29 +4,48 @@ import RootObservationConsumer
 import SwiftUI
 import VISOR
 
+// MARK: - DocumentationPush
+
 nonisolated public enum DocumentationPush: PushDestination {
   case detail(id: String)
 }
 
+// MARK: - DocumentationSheet
+
 nonisolated public enum DocumentationSheet: SheetDestination {
   case preferences
 
-  public var id: Self { self }
+  public var id: Self {
+    self
+  }
 }
+
+// MARK: - DocumentationFullScreen
 
 nonisolated public enum DocumentationFullScreen: FullScreenDestination {
   case onboarding
 
-  public var id: Self { self }
+  public var id: Self {
+    self
+  }
 }
+
+// MARK: - DocumentationRootDestination
 
 nonisolated public enum DocumentationRootDestination: String, RootDestination, Identifiable {
   case library
   case settings
 
-  public var id: Self { self }
-  var title: String { rawValue.capitalized }
+  public var id: Self {
+    self
+  }
+
+  var title: String {
+    rawValue.capitalized
+  }
 }
+
+// MARK: - DocumentationScene
 
 nonisolated public enum DocumentationScene: NavigationScene {
   public typealias Push = DocumentationPush
@@ -35,6 +54,8 @@ nonisolated public enum DocumentationScene: NavigationScene {
   public typealias Root = DocumentationRootDestination
 }
 
+// MARK: - DocumentationPushOnlyScene
+
 nonisolated public enum DocumentationPushOnlyScene: NavigationScene {
   public typealias Push = DocumentationPush
 }
@@ -42,47 +63,70 @@ nonisolated public enum DocumentationPushOnlyScene: NavigationScene {
 @MainActor
 func openDocumentationDeepLink(
   _ url: URL,
-  with router: Router<DocumentationScene>)
-  throws -> DeepLinkOutcome<DocumentationScene>
-{
+  with router: Router<DocumentationScene>,
+) throws -> DeepLinkOutcome<DocumentationScene> {
   try router.configureDeepLinks(scheme: "documentation", parsers: [
     DeepLinkParser { request in
       guard request.components.first == "detail" else { return .noMatch }
-      guard request.components.count == 2,
-            let id = request.components[1].removingPercentEncoding,
-            !id.isEmpty
+      guard
+        request.components.count == 2,
+        let id = request.components[1].removingPercentEncoding,
+        !id.isEmpty
       else { return .invalid }
       return .destination(.push(.detail(id: id)))
-    },
+    }
   ])
   return router.openDeepLink(url)
 }
+
+// MARK: - DocumentationLoadFailure
 
 nonisolated enum DocumentationLoadFailure: Error, Equatable, Hashable, Sendable {
   case offline
   case unavailable
 }
 
+// MARK: - DocumentationViewModel
+
 @MainActor
 @Observable
 @ViewModel
 final class DocumentationViewModel {
+
+  // MARK: Lifecycle
+
+  init(
+    router: Router<DocumentationScene>,
+    consumer: RootObservationConsumer,
+  ) {
+    self.router = router
+    self.consumer = consumer
+  }
+
+  // MARK: Internal
+
   final class State {
+
+    // MARK: Lifecycle
+
+    init(
+      revision: Int = -1,
+      draft: String = "",
+      items: Loadable<[String], DocumentationLoadFailure> = .loading,
+    ) {
+      self.revision = revision
+      self.draft = draft
+      self.items = items
+    }
+
+    // MARK: Internal
+
     @Bound(source: \DocumentationViewModel.consumer.source)
     private(set) var revision: Int
 
     var draft: String
     private(set) var items: Loadable<[String], DocumentationLoadFailure>
 
-    init(
-      revision: Int = -1,
-      draft: String = "",
-      items: Loadable<[String], DocumentationLoadFailure> = .loading
-    ) {
-      self.revision = revision
-      self.draft = draft
-      self.items = items
-    }
   }
 
   enum Action {
@@ -91,15 +135,6 @@ final class DocumentationViewModel {
 
   let state = State()
   let consumer: RootObservationConsumer
-  private let router: Router<DocumentationScene>
-
-  init(
-    router: Router<DocumentationScene>,
-    consumer: RootObservationConsumer
-  ) {
-    self.router = router
-    self.consumer = consumer
-  }
 
   func handle(_ action: Action) {
     switch action {
@@ -107,6 +142,11 @@ final class DocumentationViewModel {
       router.push(.detail(id: id))
     }
   }
+
+  // MARK: Private
+
+  private let router: Router<DocumentationScene>
+
 }
 
 extension DocumentationViewModel.State {
@@ -116,6 +156,8 @@ extension DocumentationViewModel.State {
     self[\.draft] = previewDraft
   }
 }
+
+// MARK: - DocumentationScreen
 
 @MainActor
 @LazyViewModel(DocumentationViewModel.self)
@@ -127,9 +169,12 @@ struct DocumentationScreen: View {
   }
 }
 
+// MARK: - DocumentationContent
+
 @MainActor
 struct DocumentationContent: View {
   @Bindable var state: DocumentationViewModel.State
+
   let onAction: (DocumentationViewModel.Action) -> Void
 
   var body: some View {
@@ -140,12 +185,15 @@ struct DocumentationContent: View {
       switch state.items {
       case .loading:
         ProgressView("Loading items")
+
       case .empty:
         ContentUnavailableView("No Items", systemImage: "tray")
+
       case .loaded(let items):
         ForEach(items, id: \.self) { item in
           Text(item)
         }
+
       case .failure(let failure):
         switch failure {
         case .offline:
@@ -153,7 +201,8 @@ struct DocumentationContent: View {
         case .unavailable:
           ContentUnavailableView(
             "Items Unavailable",
-            systemImage: "exclamationmark.triangle")
+            systemImage: "exclamationmark.triangle",
+          )
         }
       }
 
@@ -164,9 +213,12 @@ struct DocumentationContent: View {
   }
 }
 
+// MARK: - DocumentationRoot
+
 @MainActor
 struct DocumentationRoot: View {
-  @State private var router = Router<DocumentationScene>()
+
+  // MARK: Internal
 
   var body: some View {
     RouterStack(
@@ -177,7 +229,7 @@ struct DocumentationRoot: View {
         }
       },
       sheetContent: { _ in Text("Preferences") },
-      fullScreenContent: { _ in Text("Onboarding") }
+      fullScreenContent: { _ in Text("Onboarding") },
     ) {
       DocumentationScreen()
     }
@@ -185,15 +237,22 @@ struct DocumentationRoot: View {
       DocumentationViewModel.Factory.routed { router in
         DocumentationViewModel(
           router: router,
-          consumer: RootObservationConsumer(initialValue: 0))
-      })
+          consumer: RootObservationConsumer(initialValue: 0),
+        )
+      }
+    )
   }
+
+  // MARK: Private
+
+  @State private var router = Router<DocumentationScene>()
+
 }
+
+// MARK: - DocumentationPushOnlyRoot
 
 @MainActor
 struct DocumentationPushOnlyRoot: View {
-  @State private var router = Router<DocumentationPushOnlyScene>()
-
   var body: some View {
     RouterStack(
       router: router,
@@ -201,16 +260,22 @@ struct DocumentationPushOnlyRoot: View {
         switch destination {
         case .detail(let id): Text("Detail \(id)")
         }
-      }
+      },
     ) {
       Text("Library")
     }
   }
+
+  @State private var router = Router<DocumentationPushOnlyScene>()
+
 }
+
+// MARK: - DocumentationSplitRoot
 
 @MainActor
 struct DocumentationSplitRoot: View {
-  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
+  // MARK: Internal
 
   var body: some View {
     @Bindable var router = router
@@ -219,7 +284,7 @@ struct DocumentationSplitRoot: View {
       router: router,
       pushContent: pushContent(for:),
       sheetContent: { _ in Text("Preferences") },
-      fullScreenContent: { _ in Text("Onboarding") }
+      fullScreenContent: { _ in Text("Onboarding") },
     ) {
       NavigationSplitView {
         List(selection: $router.selectedRoot) {
@@ -234,7 +299,7 @@ struct DocumentationSplitRoot: View {
             root: root,
             pushContent: pushContent(for:),
             sheetContent: { _ in Text("Preferences") },
-            fullScreenContent: { _ in Text("Onboarding") }
+            fullScreenContent: { _ in Text("Onboarding") },
           ) {
             Text(root.title)
           }
@@ -245,6 +310,10 @@ struct DocumentationSplitRoot: View {
     }
   }
 
+  // MARK: Private
+
+  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
   @ViewBuilder
   private func pushContent(for destination: DocumentationPush) -> some View {
     switch destination {
@@ -253,9 +322,12 @@ struct DocumentationSplitRoot: View {
   }
 }
 
+// MARK: - DocumentationTabRoot
+
 @MainActor
 struct DocumentationTabRoot: View {
-  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
+  // MARK: Internal
 
   var body: some View {
     @Bindable var router = router
@@ -264,7 +336,7 @@ struct DocumentationTabRoot: View {
       router: router,
       pushContent: pushContent(for:),
       sheetContent: { _ in Text("Preferences") },
-      fullScreenContent: { _ in Text("Onboarding") }
+      fullScreenContent: { _ in Text("Onboarding") },
     ) {
       TabView(selection: $router.selectedRoot) {
         rootStack(for: .library)
@@ -278,13 +350,17 @@ struct DocumentationTabRoot: View {
     }
   }
 
+  // MARK: Private
+
+  @State private var router = Router<DocumentationScene>.preview(root: .library)
+
   private func rootStack(for root: DocumentationRootDestination) -> some View {
     RouterStack(
       parentRouter: router,
       root: root,
       pushContent: pushContent(for:),
       sheetContent: { _ in Text("Preferences") },
-      fullScreenContent: { _ in Text("Onboarding") }
+      fullScreenContent: { _ in Text("Onboarding") },
     ) {
       Text(root.title)
     }
@@ -298,13 +374,17 @@ struct DocumentationTabRoot: View {
   }
 }
 
+// MARK: - DocumentationContentPreviews
+
 @MainActor
 struct DocumentationContentPreviews: PreviewProvider {
   static var previews: some View {
     DocumentationContent(
       state: DocumentationViewModel.State(
         previewRevision: 42,
-        previewDraft: "Preview"),
-      onAction: { _ in })
+        previewDraft: "Preview",
+      ),
+      onAction: { _ in },
+    )
   }
 }

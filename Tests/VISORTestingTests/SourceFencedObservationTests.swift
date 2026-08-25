@@ -1,9 +1,13 @@
 import Testing
 import VISORTesting
 
+// MARK: - TestActionError
+
 private enum TestActionError: Error {
   case expected
 }
+
+// MARK: - SourceFencedObservationTests
 
 @Suite("Source-fenced observation")
 struct SourceFencedObservationTests {
@@ -22,7 +26,7 @@ struct SourceFencedObservationTests {
         if service.source.currentSnapshot().value == 10 {
           service.publishSynchronously(11)
         }
-      }
+      },
     ) { test in
       #expect(service.activeObservationCount == 1)
       #expect(sut.state.sourceValue == 1)
@@ -45,7 +49,7 @@ struct SourceFencedObservationTests {
 
       // Revision 11 was published after the previous closing checkpoint. The
       // next opening fence reconciles it before taking this action's baseline.
-      await test.perform {}
+      await test.perform { }
       #expect(sut.state.sourceValue == 11)
       #expect(sut.state.reactedValue == 11)
       test.expect(\.sourceValue, hasExactChanges: [])
@@ -87,7 +91,7 @@ struct SourceFencedObservationTests {
       #expect(result == 42)
       test.expect(\.status, hasExactChanges: ["returned"])
 
-      await test.perform {}
+      await test.perform { }
       test.expect(\.count, hasExactChanges: [])
       test.expect(\.status, hasExactChanges: [])
     }
