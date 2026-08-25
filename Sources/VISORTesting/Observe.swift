@@ -4,8 +4,12 @@ import VISOR
 /// Starts the generated observation session and reconciles every source before
 /// entering `body`.
 ///
+/// VISOR applies a 30-second infrastructure limit to observation readiness and
+/// 10-second limits to each source fence and teardown join. These monotonic
+/// limits do not time `body` or a performed domain operation.
+///
 /// Teardown normally joins before this function returns. If VISOR's private
-/// safety deadline expires first, the function returns after reporting the
+/// teardown limit expires first, the function returns after reporting the
 /// failure while retaining the State reservation until the session truly
 /// joins, preventing a replacement scope from receiving retired writes.
 ///

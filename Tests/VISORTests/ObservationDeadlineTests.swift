@@ -128,6 +128,34 @@ private func deadlinePolicy(
 
 @Suite("Observation control-plane deadlines", .timeLimit(.minutes(1)))
 struct ObservationDeadlineTests {
+  @Test(
+    arguments: zip(
+      [
+        _ObservationDeadlinePhase.readiness,
+        .openingFence,
+        .closingFence,
+        .fence,
+        .teardownJoin,
+      ],
+      [
+        Duration.seconds(30),
+        .seconds(10),
+        .seconds(10),
+        .seconds(10),
+        .seconds(10),
+      ],
+    )
+  )
+  func `Production policy uses its documented limit`(
+    phase: _ObservationDeadlinePhase,
+    expectedDuration: Duration,
+  ) {
+    #expect(
+      _ObservationDeadlinePolicy.production.duration(for: phase)
+        == expectedDuration
+    )
+  }
+
   @Test
   @MainActor
   func `A due watchdog wins while MainActor is synchronously occupied`() async throws {

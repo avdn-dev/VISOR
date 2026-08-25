@@ -126,18 +126,7 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
     )
   }()
 
-  // MARK: Internal
-
-  let readiness: Duration
-  let openingFence: Duration
-  let closingFence: Duration
-  let fence: Duration
-  let teardownJoin: Duration
-  let makeWatchdog: WatchdogFactory
-  let didResolveDeadline:
-    @Sendable (_ phase: _ObservationDeadlinePhase) -> Void
-
-  func duration(for phase: _ObservationDeadlinePhase) -> Duration {
+  package func duration(for phase: _ObservationDeadlinePhase) -> Duration {
     switch phase {
     case .readiness:
       readiness
@@ -151,6 +140,17 @@ nonisolated package struct _ObservationDeadlinePolicy: Sendable {
       teardownJoin
     }
   }
+
+  // MARK: Internal
+
+  let readiness: Duration
+  let openingFence: Duration
+  let closingFence: Duration
+  let fence: Duration
+  let teardownJoin: Duration
+  let makeWatchdog: WatchdogFactory
+  let didResolveDeadline:
+    @Sendable (_ phase: _ObservationDeadlinePhase) -> Void
 
 }
 
