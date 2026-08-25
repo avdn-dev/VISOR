@@ -478,7 +478,7 @@ struct ObservationSourceTests {
 
     try await gate.waitUntilStarted()
     #expect(model.current == 0)
-    gate.setTerminalResult(.success(()))
+    gate.resolveAllInvocations(with: .success(()))
 
     let checkpoint = try await fence.value
     #expect(model.current == 1)
@@ -526,7 +526,7 @@ struct ObservationSourceTests {
     #expect(fastModel.current == 2)
     #expect(slowModel.current == 0)
 
-    gate.setTerminalResult(.success(()))
+    gate.resolveAllInvocations(with: .success(()))
     let slowSettled = try await slow.checkpointAndPause()
     #expect(slowModel.current == 2)
 

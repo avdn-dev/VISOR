@@ -35,7 +35,7 @@ private final class NthPauseGate {
   }
 
   func open() {
-    operation.setTerminalResult(.success(()))
+    operation.resolveAllInvocations(with: .success(()))
   }
 
   // MARK: Private
@@ -131,7 +131,7 @@ struct DeadlineLifecycleTests {
       "VISOR failed while starting observation:"
     ) == true)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
   }
 
   @Test
@@ -161,7 +161,7 @@ struct DeadlineLifecycleTests {
     #expect(!actionCompleted)
     #expect(issues.entries.isEmpty)
 
-    actionGate.setTerminalResult(.success(()))
+    actionGate.resolveAllInvocations(with: .success(()))
     try await observation.value
     #expect(actionCompleted)
     #expect(issues.entries.isEmpty)
@@ -338,7 +338,7 @@ struct DeadlineLifecycleTests {
       "VISOR failed while running the observation session:"
     ) == true)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
   }
 
   @Test
@@ -400,7 +400,7 @@ struct DeadlineLifecycleTests {
 
     // The retired handler completes its final State write. The finished
     // journal ignores it, and only true join releases the reservation.
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
     try await trueJoin.wait()
     #expect(sut.state.reactedValue == 10)
 

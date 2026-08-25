@@ -94,7 +94,7 @@ struct ObservationSessionReentrancyTests {
     } catch let failure as _ObservationSourceFailure {
       guard case .protocolViolation = failure else {
         Issue.record("Expected a protocol violation, got \(failure)")
-        pauseGate.setTerminalResult(.success(()))
+        pauseGate.resolveAllInvocations(with: .success(()))
         return
       }
     }
@@ -103,7 +103,7 @@ struct ObservationSessionReentrancyTests {
     #expect(secondOperationCount == 0)
     #expect(session._visorIsReady == false)
 
-    pauseGate.setTerminalResult(.success(()))
+    pauseGate.resolveAllInvocations(with: .success(()))
     try await firstPause.value
 
     #expect(firstOperationCount == 1)
@@ -342,7 +342,7 @@ struct ObservationSessionReentrancyTests {
     try await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
-    otherGate.setTerminalResult(.success(()))
+    otherGate.resolveAllInvocations(with: .success(()))
     try await stopReturned.wait()
     #expect(!otherSession._visorIsReady)
     #expect(otherChannel.source._visorActiveSubscriptionCount == 0)
@@ -492,7 +492,7 @@ struct ObservationSessionReentrancyTests {
     try await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
-    otherGate.setTerminalResult(.success(()))
+    otherGate.resolveAllInvocations(with: .success(()))
     try await stopReturned.wait()
     #expect(!session._visorIsReady)
     #expect(firstChannel.source._visorActiveSubscriptionCount == 0)

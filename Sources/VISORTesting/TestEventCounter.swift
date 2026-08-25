@@ -33,15 +33,15 @@ public final class TestEventCounter: Sendable {
   /// - Throws: `CancellationError` when the waiting task is cancelled before
   ///   the event is acknowledged.
   public func wait() async throws(CancellationError) {
-    try await wait(for: 1)
+    try await wait(untilEventCount: 1)
   }
 
-  /// Waits until the requested number of events has been recorded.
+  /// Waits until at least the requested number of events has been recorded.
   ///
   /// - Throws: `CancellationError` when the waiting task is cancelled before
   ///   the requested count is acknowledged.
   public func wait(
-    for expectedCount: Int
+    untilEventCount expectedCount: Int
   ) async throws(CancellationError) {
     precondition(expectedCount > 0)
 

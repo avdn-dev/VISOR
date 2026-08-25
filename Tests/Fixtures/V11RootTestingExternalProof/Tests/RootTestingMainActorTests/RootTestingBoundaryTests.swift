@@ -12,12 +12,12 @@ struct RootTestingBoundaryTests {
     let invocation = operation.prepare(metadata: "request")
 
     // When
-    operation.resolve(invocation, with: .success(7))
+    operation.resolveAllInvocations(with: .success(7))
     let result = await Task.detached {
       await operation.run(invocation)
     }.value
-    try await operation.waitUntilStarted()
-    try await operation.waitUntilFinished()
+    try await operation.waitUntilStarted(count: 1)
+    try await operation.waitUntilFinished(count: 1)
 
     // Then
     #expect(invocation.ordinal == 1)

@@ -22,13 +22,13 @@ struct RootTestingBoundaryTests {
     }
 
     counter.record()
-    try await counter.wait()
+    try await counter.wait(untilEventCount: 1)
 
     let barrier = TestBarrier(participantCount: 2)
     let firstParticipant = Task {
       try await barrier.arriveAndWait()
     }
-    try await barrier.waitUntilArrived(1)
+    try await barrier.waitUntilArrived(count: 1)
     firstParticipant.cancel()
 
     await #expect(throws: CancellationError.self) {

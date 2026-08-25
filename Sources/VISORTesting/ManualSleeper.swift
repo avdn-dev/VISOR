@@ -39,7 +39,7 @@ nonisolated package final class ManualSleeper: Sendable {
   package func waitUntilPrepared(
     _ expectedCount: Int
   ) async throws(CancellationError) -> Sleep {
-    try await prepared.wait(for: expectedCount)
+    try await prepared.wait(untilEventCount: expectedCount)
     return preparedSleep(at: expectedCount - 1)
   }
 
@@ -56,7 +56,7 @@ nonisolated package final class ManualSleeper: Sendable {
         return matching[occurrence - 1]
       }
       expectedSleepCount = sleeps.count + 1
-      try await prepared.wait(for: expectedSleepCount)
+      try await prepared.wait(untilEventCount: expectedSleepCount)
     }
   }
 

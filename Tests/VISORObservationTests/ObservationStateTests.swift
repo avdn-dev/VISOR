@@ -391,7 +391,7 @@ struct ObservationStateTests {
 
     try await lifecycle.wait()
     consumer = nil
-    try await lifecycle.wait(for: 2)
+    try await lifecycle.wait(untilEventCount: 2)
 
     #expect(weakConsumer == nil)
   }

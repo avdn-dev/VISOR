@@ -64,7 +64,7 @@ public actor TestBarrier {
   /// - Throws: `CancellationError` when the waiting task is cancelled before
   ///   the requested arrival count is reached.
   public func waitUntilArrived(
-    _ expectedCount: Int
+    count expectedCount: Int
   ) async throws(CancellationError) {
     precondition(expectedCount > 0 && expectedCount <= participantCount)
     guard !Task.isCancelled else { throw CancellationError() }

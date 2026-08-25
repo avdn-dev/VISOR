@@ -106,7 +106,7 @@ struct ConcurrencyPrimitivesTests {
     #expect(didFinish.count == 0)
 
     // When
-    operation.setTerminalResult(.success(()))
+    operation.resolveAllInvocations(with: .success(()))
     await task.value
 
     // Then
@@ -140,7 +140,7 @@ struct ConcurrencyPrimitivesTests {
     let secondInvocation = operation.prepare()
     let first = Task { try await operation.run(firstInvocation) }
     let second = Task { try await operation.run(secondInvocation) }
-    try await operation.waitUntilStarted(2)
+    try await operation.waitUntilStarted(count: 2)
 
     // When
     operation.resolve(secondInvocation, with: .success(20))
@@ -149,7 +149,7 @@ struct ConcurrencyPrimitivesTests {
     // Then
     #expect(try await first.value == 10)
     #expect(try await second.value == 20)
-    try await operation.waitUntilFinished(2)
+    try await operation.waitUntilFinished(count: 2)
   }
 
   @Test
@@ -216,7 +216,7 @@ struct ConcurrencyPrimitivesTests {
     try await operation.waitUntilStarted()
 
     // When
-    operation.setTerminalResult(.success(7))
+    operation.resolveAllInvocations(with: .success(7))
 
     // Then
     #expect(try await first.value == 7)
@@ -235,7 +235,7 @@ struct ConcurrencyPrimitivesTests {
     // Given
     let counter = TestEventCounter()
     let acknowledgement = Task {
-      try await counter.wait(for: 2)
+      try await counter.wait(untilEventCount: 2)
       return counter.count
     }
 
@@ -298,7 +298,7 @@ struct ConcurrencyPrimitivesTests {
       try await barrier.arriveAndWait()
       return await barrier.isOpen
     }
-    try await barrier.waitUntilArrived(1)
+    try await barrier.waitUntilArrived(count: 1)
 
     // When
     let second = Task {
@@ -319,7 +319,7 @@ struct ConcurrencyPrimitivesTests {
     let first = Task {
       try await barrier.arriveAndWait()
     }
-    try await barrier.waitUntilArrived(1)
+    try await barrier.waitUntilArrived(count: 1)
 
     // When
     first.cancel()
@@ -345,7 +345,7 @@ struct ConcurrencyPrimitivesTests {
     let waitStarted = TestEventCounter()
     let observer = Task {
       waitStarted.record()
-      try await barrier.waitUntilArrived(1)
+      try await barrier.waitUntilArrived(count: 1)
     }
     try await waitStarted.wait()
     await Task.yield()

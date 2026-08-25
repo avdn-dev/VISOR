@@ -117,7 +117,7 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
     try await contentAppeared.wait()
     #expect(contentAppeared.count == 1)
     #expect(viewModel.state.reactedStatus == .loading)
@@ -172,7 +172,7 @@ extension ViewModelObservationOwnerTests {
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
 
     hostingView.layoutSubtreeIfNeeded()
-    try await contentAppeared.wait(for: 1)
+    try await contentAppeared.wait(untilEventCount: 1)
 
     #expect(contentAppeared.count == 1)
     #expect(contentDisappeared.count == 0)
@@ -182,7 +182,7 @@ extension ViewModelObservationOwnerTests {
 
     phase.value = .background
     hostingView.layoutSubtreeIfNeeded()
-    try await contentDisappeared.wait(for: 1)
+    try await contentDisappeared.wait(untilEventCount: 1)
 
     #expect(contentAppeared.count == 1)
     #expect(contentDisappeared.count == 1)
@@ -202,8 +202,8 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.setTerminalResult(.success(()))
-    try await contentAppeared.wait(for: 2)
+    reactionGate.resolveAllInvocations(with: .success(()))
+    try await contentAppeared.wait(untilEventCount: 2)
 
     #expect(contentAppeared.count == 2)
     #expect(contentDisappeared.count == 1)
@@ -216,7 +216,7 @@ extension ViewModelObservationOwnerTests {
 
     phase.value = .inactive
     hostingView.layoutSubtreeIfNeeded()
-    try await contentDisappeared.wait(for: 2)
+    try await contentDisappeared.wait(untilEventCount: 2)
 
     #expect(contentAppeared.count == 2)
     #expect(contentDisappeared.count == 2)
@@ -230,7 +230,7 @@ extension ViewModelObservationOwnerTests {
 
     phase.value = .active
     hostingView.layoutSubtreeIfNeeded()
-    try await contentAppeared.wait(for: 3)
+    try await contentAppeared.wait(untilEventCount: 3)
 
     #expect(contentAppeared.count == 3)
     #expect(contentDisappeared.count == 2)
@@ -243,7 +243,7 @@ extension ViewModelObservationOwnerTests {
 
     hostingView.rootView = AnyView(EmptyView())
     hostingView.layoutSubtreeIfNeeded()
-    try await contentDisappeared.wait(for: 3)
+    try await contentDisappeared.wait(untilEventCount: 3)
 
     #expect(contentAppeared.count == 3)
     #expect(contentDisappeared.count == 3)
@@ -299,7 +299,7 @@ extension ViewModelObservationOwnerTests {
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
     try await contentAppeared.wait()
     #expect(contentAppeared.count == 1)
 
@@ -409,8 +409,8 @@ extension ViewModelObservationOwnerTests {
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
 
     hostingView.layoutSubtreeIfNeeded()
-    try await contentAppeared.wait(for: 1)
-    try await failureAppeared.wait(for: 1)
+    try await contentAppeared.wait(untilEventCount: 1)
+    try await failureAppeared.wait(untilEventCount: 1)
 
     #expect(contentAppeared.count == 1)
     #expect(failureAppeared.count == 1)
@@ -700,7 +700,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
 
     #expect(owner._visorCanExposeContent(
       for: viewModel,
@@ -755,8 +755,8 @@ struct ViewModelObservationOwnerTests {
     #expect(viewModel.state.revision == 4)
     #expect(viewModel.state.reactedStatus == .idle)
 
-    reactionGate.setTerminalResult(.success(()))
-    try await ready.wait(for: 1)
+    reactionGate.resolveAllInvocations(with: .success(()))
+    try await ready.wait(untilEventCount: 1)
     #expect(owner._visorCanExposeContent(
       for: viewModel,
       isEnabled: true,
@@ -772,7 +772,7 @@ struct ViewModelObservationOwnerTests {
       for: viewModel,
       isEnabled: true,
     ))
-    try await stopped.wait(for: 1)
+    try await stopped.wait(untilEventCount: 1)
 
     #expect(service.activeObservationCountForProof == 0)
     #expect(statusService.activeObservationCountForProof == 0)
@@ -813,7 +813,7 @@ struct ViewModelObservationOwnerTests {
       )
     }
 
-    try await firstReady.wait(for: 1)
+    try await firstReady.wait(untilEventCount: 1)
     await statusService.publish(.loading)
     try await reactionGate.waitUntilStarted()
     #expect(firstOwner._visorCanExposeContent(
@@ -837,9 +837,9 @@ struct ViewModelObservationOwnerTests {
     #expect(contenderReady.count == 0)
     #expect(service.activeObservationCountForProof == 1)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
     await hostLifetime.value
-    try await contenderReady.wait(for: 1)
+    try await contenderReady.wait(untilEventCount: 1)
     #expect(contenderFailed.count == 0)
     #expect(service.activeObservationCountForProof == 1)
     #expect(statusService.activeObservationCountForProof == 1)
@@ -883,7 +883,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await firstReady.wait(for: 1)
+    try await firstReady.wait(untilEventCount: 1)
     let sleepsBeforeTeardown = sleeper.sleepCount
 
     await statusService.publish(.loading)
@@ -915,15 +915,15 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await replacementWaited.wait(for: 1)
+    try await replacementWaited.wait(untilEventCount: 1)
 
     #expect(replacementReady.count == 0)
     #expect(replacementFailed.count == 0)
     #expect(firstStopped.count == 0)
 
-    reactionGate.setTerminalResult(.success(()))
-    try await firstStopped.wait(for: 1)
-    try await replacementReady.wait(for: 1)
+    reactionGate.resolveAllInvocations(with: .success(()))
+    try await firstStopped.wait(untilEventCount: 1)
+    try await replacementReady.wait(untilEventCount: 1)
 
     #expect(replacementFailed.count == 0)
     #expect(replacement._visorCanExposeContent(
@@ -974,7 +974,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
     let sleepsBeforeTeardown = sleeper.sleepCount
 
     await statusService.publish(.loading)
@@ -996,7 +996,7 @@ struct ViewModelObservationOwnerTests {
       sleepsBeforeTeardown + 1
     )
     sleeper.wake(teardownSleep)
-    try await failed.wait(for: 1)
+    try await failed.wait(untilEventCount: 1)
 
     #expect(owner._visorGenerationCount == 1)
     #expect(stopped.count == 0)
@@ -1006,9 +1006,9 @@ struct ViewModelObservationOwnerTests {
     #expect(ready.count == 1)
     #expect(stopped.count == 0)
 
-    reactionGate.setTerminalResult(.success(()))
-    try await stopped.wait(for: 1)
-    try await ready.wait(for: 2)
+    reactionGate.resolveAllInvocations(with: .success(()))
+    try await stopped.wait(untilEventCount: 1)
+    try await ready.wait(untilEventCount: 2)
 
     #expect(owner._visorGenerationCount == 2)
     #expect(failed.count == 1)
@@ -1043,7 +1043,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await firstReady.wait(for: 1)
+    try await firstReady.wait(untilEventCount: 1)
     await statusService.publish(.loading)
     try await reactionGate.waitUntilStarted()
 
@@ -1063,9 +1063,9 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await secondWaited.wait(for: 1)
+    try await secondWaited.wait(untilEventCount: 1)
 
-    reactionGate.setTerminalResult(.success(()))
+    reactionGate.resolveAllInvocations(with: .success(()))
     await firstLifetime.value
     try await secondClaimGate.waitUntilStarted()
 
@@ -1087,16 +1087,16 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await thirdWaited.wait(for: 1)
+    try await thirdWaited.wait(untilEventCount: 1)
 
     #expect(secondFailed.count == 0)
     #expect(thirdFailed.count == 0)
     #expect(thirdReady.count == 0)
     #expect(service.activeObservationCountForProof == 0)
 
-    secondClaimGate.setTerminalResult(.success(()))
+    secondClaimGate.resolveAllInvocations(with: .success(()))
     await secondLifetime.value
-    try await thirdReady.wait(for: 1)
+    try await thirdReady.wait(untilEventCount: 1)
 
     #expect(secondOwner._visorFailure == nil)
     #expect(thirdOwner._visorFailure == nil)
@@ -1130,8 +1130,8 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await failed.wait(for: 1)
-    try await stopped.wait(for: 1)
+    try await failed.wait(untilEventCount: 1)
+    try await stopped.wait(untilEventCount: 1)
 
     #expect(!owner._visorCanExposeContent(
       for: viewModel,
@@ -1175,19 +1175,19 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
     #expect(viewModel.state.revision == 1)
     #expect(viewModel.state.status == .ready)
 
     owner._visorSetEnabled(false)
-    try await stopped.wait(for: 1)
+    try await stopped.wait(untilEventCount: 1)
     await service.publish(OwnerSnapshot(revision: 2))
     await statusService.publish(.held)
     #expect(viewModel.state.revision == 1)
     #expect(viewModel.state.status == .ready)
 
     owner._visorSetEnabled(true)
-    try await ready.wait(for: 2)
+    try await ready.wait(untilEventCount: 2)
     #expect(viewModel.state.revision == 2)
     #expect(viewModel.state.reactedRevision == 2)
     #expect(viewModel.state.status == .held)
@@ -1216,13 +1216,13 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
     #expect(service.activeObservationCountForProof == 1)
 
     owner._visorSetEnabled(false)
     owner._visorSetEnabled(true)
 
-    try await ready.wait(for: 2)
+    try await ready.wait(untilEventCount: 2)
     #expect(starts.activeSubscriptionCounts == [0, 0])
     #expect(service.activeObservationCountForProof == 1)
     #expect(owner._visorGenerationCount == 2)
@@ -1250,12 +1250,12 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
 
     owner._visorSetEnabled(false)
     owner._visorSetEnabled(true)
     owner._visorSetEnabled(false)
-    try await stopped.wait(for: 1)
+    try await stopped.wait(untilEventCount: 1)
 
     #expect(owner._visorGenerationCount == 1)
     #expect(service.activeObservationCountForProof == 0)
@@ -1288,13 +1288,13 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await firstReady.wait(for: 1)
+    try await firstReady.wait(untilEventCount: 1)
 
     await secondOwner._visorRun(
       viewModel: viewModel,
       initiallyEnabled: true,
     )
-    try await secondFailed.wait(for: 1)
+    try await secondFailed.wait(untilEventCount: 1)
 
     #expect(secondOwner._visorFailure == .duplicateOwner)
     #expect(!secondOwner._visorCanExposeContent(
@@ -1323,7 +1323,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await firstReady.wait(for: 1)
+    try await firstReady.wait(untilEventCount: 1)
     first.cancel()
     await first.value
 
@@ -1341,7 +1341,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await secondReady.wait(for: 1)
+    try await secondReady.wait(untilEventCount: 1)
 
     #expect(secondOwner._visorCanExposeContent(
       for: viewModel,
@@ -1374,11 +1374,11 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
 
     service.terminateObservationForProof()
-    try await failed.wait(for: 1)
-    try await stopped.wait(for: 1)
+    try await failed.wait(untilEventCount: 1)
+    try await stopped.wait(untilEventCount: 1)
 
     #expect(!owner._visorCanExposeContent(
       for: viewModel,
@@ -1394,8 +1394,8 @@ struct ViewModelObservationOwnerTests {
 
     owner._visorSetEnabled(false)
     owner._visorSetEnabled(true)
-    try await failed.wait(for: 2)
-    try await stopped.wait(for: 2)
+    try await failed.wait(untilEventCount: 2)
+    try await stopped.wait(untilEventCount: 2)
     #expect(owner._visorGenerationCount == 2)
     #expect(failed.count == 2)
 
@@ -1419,7 +1419,7 @@ struct ViewModelObservationOwnerTests {
         initiallyEnabled: true,
       )
     }
-    try await ready.wait(for: 1)
+    try await ready.wait(untilEventCount: 1)
 
     #expect(owner._visorCanExposeContent(
       for: firstViewModel,

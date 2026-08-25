@@ -41,7 +41,7 @@ struct SourceFencedObservationTests {
       try await gate.waitUntilStarted()
       #expect(sut.state.sourceValue == 10)
       #expect(sut.state.reactedValue == 1)
-      gate.setTerminalResult(.success(()))
+      gate.resolveAllInvocations(with: .success(()))
       await fencedAction.value
 
       test.expect(\.sourceValue, hasExactChanges: [10])

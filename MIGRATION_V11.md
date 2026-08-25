@@ -503,8 +503,16 @@ operation.resolve(invocation, with: .success(response))
 The operation is `Sendable` and isolation-neutral. Every call must use a
 prepared invocation; parameterless `run`, integer-addressed `resume`,
 success/failure convenience overloads, `finish`, and `completeAll` are removed.
-Resolve one invocation with `resolve(_:with:)`, or use `setTerminalResult(_:)`
+Resolve one invocation with `resolve(_:with:)`, or use
+`resolveAllInvocations(with:)`
 when the result must apply to every current and future invocation.
+
+The public concurrency helpers use explicit count vocabulary:
+
+- `waitUntilStarted(count:)`, `waitUntilCancelled(count:)`,
+  `waitUntilFinished(count:)`, and `waitUntilArrived(count:)`; and
+- `TestEventCounter.wait(untilEventCount:)` for a cumulative recorded-event
+  threshold.
 
 Direct and dynamically erased outer reference values cannot participate in strict history matching. Migrate historical assertions to stable value snapshots; production composition may still keep a reference field where its own nested Observation boundary is sufficient.
 

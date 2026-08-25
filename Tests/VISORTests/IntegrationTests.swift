@@ -52,7 +52,7 @@ private final class IntegrationEvent {
 
   func wait(for value: Int) async throws(CancellationError) {
     while !values.contains(value) {
-      try await recorded.wait(for: values.count + 1)
+      try await recorded.wait(untilEventCount: values.count + 1)
     }
   }
 

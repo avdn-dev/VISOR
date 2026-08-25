@@ -25,7 +25,7 @@ private final class RouterInputProbe {
   }
 
   func wait(for count: Int) async throws {
-    try await recorded.wait(for: count)
+    try await recorded.wait(untilEventCount: count)
   }
 
   // MARK: Private

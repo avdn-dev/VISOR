@@ -164,7 +164,7 @@ struct ObservationSessionContractTests {
 
     text.publish("two")
     #expect(log.text == "one")
-    gate.setTerminalResult(.success(()))
+    gate.resolveAllInvocations(with: .success(()))
     try await fence.value
 
     try await session._visorWithPause {

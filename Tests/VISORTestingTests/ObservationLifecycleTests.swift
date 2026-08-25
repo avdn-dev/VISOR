@@ -162,7 +162,7 @@ struct ObservationLifecycleTests {
 
     try await gate.waitUntilStarted()
     task.cancel()
-    gate.setTerminalResult(.success(()))
+    gate.resolveAllInvocations(with: .success(()))
 
     await #expect(throws: CancellationError.self) {
       try await task.value
@@ -200,7 +200,7 @@ struct ObservationLifecycleTests {
       #expect(issues == [
         "A perform window is already active for this State"
       ])
-      gate.setTerminalResult(.success(()))
+      gate.resolveAllInvocations(with: .success(()))
       await first.value
       test.expect(\.sourceValue, hasExactChanges: [1])
     }

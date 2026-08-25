@@ -22,7 +22,7 @@ private final class NavigationLifecycleProbe {
   }
 
   func wait(for event: NavigationLifecycleEvent, count: Int = 1) async throws {
-    try await counter(for: event).wait(for: count)
+    try await counter(for: event).wait(untilEventCount: count)
   }
 
   // MARK: Private

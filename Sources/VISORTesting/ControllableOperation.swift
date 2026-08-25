@@ -150,22 +150,25 @@ nonisolated public final class ControllableOperation<
     return try result.get()
   }
 
+  /// Waits until at least the requested number of invocations have started.
   public func waitUntilStarted(
-    _ expectedCount: Int = 1
+    count expectedCount: Int = 1
   ) async throws(CancellationError) {
-    try await started.wait(for: expectedCount)
+    try await started.wait(untilEventCount: expectedCount)
   }
 
+  /// Waits until at least the requested number of invocations have cancelled.
   public func waitUntilCancelled(
-    _ expectedCount: Int = 1
+    count expectedCount: Int = 1
   ) async throws(CancellationError) {
-    try await cancelled.wait(for: expectedCount)
+    try await cancelled.wait(untilEventCount: expectedCount)
   }
 
+  /// Waits until at least the requested number of invocations have finished.
   public func waitUntilFinished(
-    _ expectedCount: Int = 1
+    count expectedCount: Int = 1
   ) async throws(CancellationError) {
-    try await finished.wait(for: expectedCount)
+    try await finished.wait(untilEventCount: expectedCount)
   }
 
   /// Resolves one prepared invocation, whether or not it has started.
@@ -188,8 +191,13 @@ nonisolated public final class ControllableOperation<
     resume(resolution)
   }
 
-  /// Resolves every current and future invocation with the same result.
-  public func setTerminalResult(_ result: Result<Success, Failure>) {
+  /// Resolves every prepared, running, and future invocation with the same result.
+  ///
+  /// Invocations that have already finished keep their result. Calling this
+  /// method again replaces the result used by later invocations.
+  public func resolveAllInvocations(
+    with result: Result<Success, Failure>
+  ) {
     let resolutions = lock.withLock { state in
       state.terminalResult = result
       state.queuedResults.removeAll()
