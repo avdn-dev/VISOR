@@ -147,7 +147,7 @@ struct ObservationLifecycleTests {
 
   @Test
   @MainActor
-  func `Cancellation abandons the window and joins the source session`() async {
+  func `Cancellation abandons the window and joins the source session`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
     let gate = ControllableOperation<Void, Never>()
@@ -160,7 +160,7 @@ struct ObservationLifecycleTests {
       }
     }
 
-    await gate.waitUntilStarted()
+    try await gate.waitUntilStarted()
     task.cancel()
     gate.setTerminalResult(.success(()))
 
@@ -192,7 +192,7 @@ struct ObservationLifecycleTests {
         }
       }
 
-      await gate.waitUntilStarted()
+      try await gate.waitUntilStarted()
       await test.perform {
         rejectedOperationRan = true
       }
@@ -313,7 +313,7 @@ struct ObservationLifecycleTests {
 
   @Test
   @MainActor
-  func `Body error remains primary while teardown still joins`() async {
+  func `Body error remains primary while teardown still joins`() async throws {
     let service = TestingService()
     let sut = TestingViewModel(service: service)
 

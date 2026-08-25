@@ -40,14 +40,18 @@ struct ObservationSessionStartupHandoffTests {
       ],
       _visorAfterStartupHandoff: {
         handoffStarted.record()
-        await handoffGate.wait()
+        do {
+          try await handoffGate.wait()
+        } catch {
+          return
+        }
       },
     )
 
     let startup = Task { @MainActor in
       try await session._visorStart()
     }
-    await handoffStarted.wait()
+    try await handoffStarted.wait()
 
     do {
       try await session._visorWithPause {
@@ -88,7 +92,11 @@ struct ObservationSessionStartupHandoffTests {
       ],
       _visorAfterStartupHandoff: {
         channel._visorTerminate()
-        await failureObserved.wait()
+        do {
+          try await failureObserved.wait()
+        } catch {
+          return
+        }
       },
       _visorOnFailure: { failure in
         log.failures.append(failure)

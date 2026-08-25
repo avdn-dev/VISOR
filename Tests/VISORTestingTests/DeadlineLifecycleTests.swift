@@ -30,8 +30,8 @@ private final class NthPauseGate {
     await operation.run(operation.prepare())
   }
 
-  func waitUntilStarted() async {
-    await operation.waitUntilStarted()
+  func waitUntilStarted() async throws(CancellationError) {
+    try await operation.waitUntilStarted()
   }
 
   func open() {
@@ -117,10 +117,10 @@ struct DeadlineLifecycleTests {
       }
     }
 
-    await reactionGate.waitUntilStarted()
-    let readinessWatchdog = await sleeper.waitUntilPrepared(for: .seconds(1))
+    try await reactionGate.waitUntilStarted()
+    let readinessWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(1))
     sleeper.wake(readinessWatchdog)
-    let teardownWatchdog = await sleeper.waitUntilPrepared(for: .seconds(5))
+    let teardownWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(5))
     sleeper.wake(teardownWatchdog)
     try await observation.value
 
@@ -157,7 +157,7 @@ struct DeadlineLifecycleTests {
       }
     }
 
-    await actionGate.waitUntilStarted()
+    try await actionGate.waitUntilStarted()
     #expect(!actionCompleted)
     #expect(issues.entries.isEmpty)
 
@@ -193,10 +193,10 @@ struct DeadlineLifecycleTests {
       }
     }
 
-    await openingGate.waitUntilStarted()
-    let openingWatchdog = await sleeper.waitUntilPrepared(for: .seconds(2))
+    try await openingGate.waitUntilStarted()
+    let openingWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(2))
     sleeper.wake(openingWatchdog)
-    let teardownWatchdog = await sleeper.waitUntilPrepared(for: .seconds(5))
+    let teardownWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(5))
     sleeper.wake(teardownWatchdog)
     try await observation.value
 
@@ -239,10 +239,10 @@ struct DeadlineLifecycleTests {
       }
     }
 
-    await closingGate.waitUntilStarted()
-    let closingWatchdog = await sleeper.waitUntilPrepared(for: .seconds(3))
+    try await closingGate.waitUntilStarted()
+    let closingWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(3))
     sleeper.wake(closingWatchdog)
-    let teardownWatchdog = await sleeper.waitUntilPrepared(for: .seconds(5))
+    let teardownWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(5))
     sleeper.wake(teardownWatchdog)
     try await observation.value
 
@@ -279,10 +279,10 @@ struct DeadlineLifecycleTests {
       }
     }
 
-    await closingGate.waitUntilStarted()
-    let closingWatchdog = await sleeper.waitUntilPrepared(for: .seconds(3))
+    try await closingGate.waitUntilStarted()
+    let closingWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(3))
     sleeper.wake(closingWatchdog)
-    let teardownWatchdog = await sleeper.waitUntilPrepared(for: .seconds(5))
+    let teardownWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(5))
     sleeper.wake(teardownWatchdog)
     try await observation.value
 
@@ -296,7 +296,7 @@ struct DeadlineLifecycleTests {
 
   @Test
   @MainActor
-  func `Teardown preserves the body error and reports at observe`() async {
+  func `Teardown preserves the body error and reports at observe`() async throws {
     let service = TestingService()
     let reactionGate = ControllableOperation<Void, Never>()
     let sut = TestingViewModel(
@@ -320,13 +320,13 @@ struct DeadlineLifecycleTests {
         issueRecorder: issues.record,
       ) { _ in
         await service.publish(10)
-        await reactionGate.waitUntilStarted()
+        try await reactionGate.waitUntilStarted()
         throw DeadlineLifecycleError.body
       }
     }
 
-    await reactionGate.waitUntilStarted()
-    let teardownWatchdog = await sleeper.waitUntilPrepared(for: .seconds(5))
+    try await reactionGate.waitUntilStarted()
+    let teardownWatchdog = try await sleeper.waitUntilPrepared(for: .seconds(5))
     sleeper.wake(teardownWatchdog)
 
     await #expect(throws: DeadlineLifecycleError.body) {
@@ -364,12 +364,12 @@ struct DeadlineLifecycleTests {
       ) { _ in
         firstBodyRan = true
         await service.publish(10)
-        await reactionGate.waitUntilStarted()
+        try await reactionGate.waitUntilStarted()
       }
     }
 
-    await reactionGate.waitUntilStarted()
-    let teardownWatchdog = await firstSleeper.waitUntilPrepared(
+    try await reactionGate.waitUntilStarted()
+    let teardownWatchdog = try await firstSleeper.waitUntilPrepared(
       for: .seconds(5)
     )
     firstSleeper.wake(teardownWatchdog)
@@ -401,7 +401,7 @@ struct DeadlineLifecycleTests {
     // The retired handler completes its final State write. The finished
     // journal ignores it, and only true join releases the reservation.
     reactionGate.setTerminalResult(.success(()))
-    await trueJoin.wait()
+    try await trueJoin.wait()
     #expect(sut.state.reactedValue == 10)
 
     let laterIssues = DeadlineIssueLog()

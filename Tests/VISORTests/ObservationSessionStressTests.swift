@@ -48,7 +48,7 @@ struct ObservationSessionStressTests {
         }
       }
 
-    await barrier.wait(for: Self.waiterCount)
+    try await barrier.wait(for: Self.waiterCount)
     for index in waiters.indices where index.isMultiple(of: 2) {
       waiters[index].cancel()
     }
@@ -123,7 +123,7 @@ struct ObservationSessionStressTests {
         }
       }
 
-    await barrier.wait(for: Self.waiterCount)
+    try await barrier.wait(for: Self.waiterCount)
     await session._visorStop()
 
     for waiter in waiters {

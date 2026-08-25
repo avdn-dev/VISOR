@@ -84,7 +84,7 @@ struct ObservationSessionReentrancyTests {
         firstOperationCount += 1
       }
     }
-    await pauseGate.waitUntilStarted()
+    try await pauseGate.waitUntilStarted()
 
     do {
       try await session._visorWithPause {
@@ -138,7 +138,7 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await requestReturned.wait()
+    try await requestReturned.wait()
 
     #expect(!session._visorIsReady)
     await session._visorStop()
@@ -180,7 +180,7 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await pauseReturned.wait()
+    try await pauseReturned.wait()
 
     #expect(log.pauseWasRejected)
     #expect(log.unexpectedPauseFailure == nil)
@@ -227,7 +227,7 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await waitReturned.wait()
+    try await waitReturned.wait()
 
     #expect(log.waitWasRejected)
     #expect(log.unexpectedPauseFailure == nil)
@@ -318,7 +318,7 @@ struct ObservationSessionReentrancyTests {
     ])
     try await otherSession._visorStart()
     otherChannel.publish(1)
-    await otherGate.waitUntilStarted()
+    try await otherGate.waitUntilStarted()
 
     let channel = ObservationChannel(0)
     let stopStarted = TestEventCounter()
@@ -339,11 +339,11 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await stopStarted.wait()
+    try await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
     otherGate.setTerminalResult(.success(()))
-    await stopReturned.wait()
+    try await stopReturned.wait()
     #expect(!otherSession._visorIsReady)
     #expect(otherChannel.source._visorActiveSubscriptionCount == 0)
 
@@ -383,7 +383,7 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await checkpointReturned.wait()
+    try await checkpointReturned.wait()
 
     #expect(log.checkpointWasRejected)
     #expect(log.unexpectedPauseFailure == nil)
@@ -418,7 +418,7 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     channel.publish(1)
-    await requestReturned.wait()
+    try await requestReturned.wait()
     await session._visorStop()
 
     #expect(channel.source._visorActiveSubscriptionCount == 0)
@@ -450,7 +450,11 @@ struct ObservationSessionReentrancyTests {
           ] value in
             if value == 1 {
               Task { @MainActor in
-                await descendantRelease.wait()
+                do {
+                  try await descendantRelease.wait()
+                } catch {
+                  return
+                }
                 guard let session = reference.session else { return }
                 stopStarted.record()
                 await session._visorStop()
@@ -478,18 +482,18 @@ struct ObservationSessionReentrancyTests {
     try await session._visorStart()
 
     secondChannel.publish(1)
-    await otherGate.waitUntilStarted()
+    try await otherGate.waitUntilStarted()
     firstChannel.publish(1)
-    await descendantCreated.wait()
+    try await descendantCreated.wait()
     firstChannel.publish(2)
-    await laterRevisionHandled.wait()
+    try await laterRevisionHandled.wait()
 
     descendantRelease.record()
-    await stopStarted.wait()
+    try await stopStarted.wait()
     #expect(stopReturned.count == 0)
 
     otherGate.setTerminalResult(.success(()))
-    await stopReturned.wait()
+    try await stopReturned.wait()
     #expect(!session._visorIsReady)
     #expect(firstChannel.source._visorActiveSubscriptionCount == 0)
     #expect(secondChannel.source._visorActiveSubscriptionCount == 0)

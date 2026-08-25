@@ -160,7 +160,7 @@ struct ObservationSessionContractTests {
         #expect(log.text == "one")
       }
     }
-    await gate.waitUntilStarted()
+    try await gate.waitUntilStarted()
 
     text.publish("two")
     #expect(log.text == "one")

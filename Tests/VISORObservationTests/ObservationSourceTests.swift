@@ -49,7 +49,7 @@ struct ObservationSnapshotsTests {
         return value == 1
       }
     }
-    await checkedBaseline.wait()
+    try await checkedBaseline.wait()
 
     channel.publish(1)
 
@@ -57,7 +57,7 @@ struct ObservationSnapshotsTests {
   }
 
   @Test
-  func `Testing wait cooperates with test cancellation`() async {
+  func `Testing wait cooperates with test cancellation`() async throws {
     let channel = ObservationChannel(0)
     let checkedBaseline = TestEventCounter()
     let waiter = Task {
@@ -66,7 +66,7 @@ struct ObservationSnapshotsTests {
         return false
       }
     }
-    await checkedBaseline.wait()
+    try await checkedBaseline.wait()
 
     waiter.cancel()
 
@@ -476,7 +476,7 @@ struct ObservationSourceTests {
       try await consumer.checkpointAndPause()
     }
 
-    await gate.waitUntilStarted()
+    try await gate.waitUntilStarted()
     #expect(model.current == 0)
     gate.setTerminalResult(.success(()))
 
@@ -514,7 +514,7 @@ struct ObservationSourceTests {
     try fast.resume(after: fastStartup)
 
     channel.publish(1)
-    await gate.waitUntilStarted()
+    try await gate.waitUntilStarted()
 
     let fastFirst = try await fast.checkpointAndPause()
     #expect(fastModel.current == 1)

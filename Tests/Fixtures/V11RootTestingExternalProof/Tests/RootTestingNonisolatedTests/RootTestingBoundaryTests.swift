@@ -6,6 +6,41 @@ import VISORTesting
 @Suite("Root VISORTesting from a nonisolated target")
 struct RootTestingBoundaryTests {
   @Test
+  func `Public concurrency waits cooperate with downstream cancellation`() async throws {
+    let counter = TestEventCounter()
+    let counterWaitStarted = TestEventCounter()
+    let counterWait = Task {
+      counterWaitStarted.record()
+      try await counter.wait()
+    }
+    try await counterWaitStarted.wait()
+    await Task.yield()
+    counterWait.cancel()
+
+    await #expect(throws: CancellationError.self) {
+      try await counterWait.value
+    }
+
+    counter.record()
+    try await counter.wait()
+
+    let barrier = TestBarrier(participantCount: 2)
+    let firstParticipant = Task {
+      try await barrier.arriveAndWait()
+    }
+    try await barrier.waitUntilArrived(1)
+    firstParticipant.cancel()
+
+    await #expect(throws: CancellationError.self) {
+      try await firstParticipant.value
+    }
+
+    try await barrier.arriveAndWait()
+    #expect(await barrier.isOpen)
+    #expect(await barrier.arrivalCount == 2)
+  }
+
+  @Test
   func `Public observation errors can be handled downstream`() {
     let error = ObservationTestError.resultUnavailable
 

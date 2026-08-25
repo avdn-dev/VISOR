@@ -125,7 +125,7 @@ struct RecorderBoundaryTests {
           results.firstInfrastructureIssues.append(message)
         },
       ) { test in
-        await rendezvous.arriveAndWait()
+        try await rendezvous.arriveAndWait()
         results.activeObservationCount = service.activeObservationCount
         await test.perform(.setCount(11))
         results.firstRawCommitCount = test._rawCommitCount(\.count)
@@ -140,7 +140,7 @@ struct RecorderBoundaryTests {
           results.secondInfrastructureIssues.append(message)
         },
       ) { test in
-        await rendezvous.arriveAndWait()
+        try await rendezvous.arriveAndWait()
         results.activeObservationCount = service.activeObservationCount
         await test.perform(.setCount(22))
         results.secondRawCommitCount = test._rawCommitCount(\.count)

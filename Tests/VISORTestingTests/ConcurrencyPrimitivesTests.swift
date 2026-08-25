@@ -18,24 +18,24 @@ struct ConcurrencyPrimitivesTests {
     let operation = ControllableOperation<Int, ControlledOperationError>()
     let invocation = operation.prepare()
     let task = Task { try await operation.run(invocation) }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     operation.resolve(invocation, with: .success(42))
 
     // Then
     #expect(try await task.value == 42)
-    await operation.waitUntilFinished()
+    try await operation.waitUntilFinished()
     #expect(operation.finishedCount == 1)
   }
 
   @Test @MainActor
-  func `A controllable operation throws its supplied failure`() async {
+  func `A controllable operation throws its supplied failure`() async throws {
     // Given
     let operation = ControllableOperation<Int, ControlledOperationError>()
     let invocation = operation.prepare()
     let task = Task { try await operation.run(invocation) }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     operation.resolve(invocation, with: .failure(.expected))
@@ -61,7 +61,7 @@ struct ConcurrencyPrimitivesTests {
   }
 
   @Test @MainActor
-  func `Cooperative cancellation is acknowledged and finishes the invocation`() async {
+  func `Cooperative cancellation is acknowledged and finishes the invocation`() async throws {
     // Given
     let operation = ControllableOperation<Void, CancellationError>()
     let invocation = operation.prepare()
@@ -71,12 +71,12 @@ struct ConcurrencyPrimitivesTests {
         onCancellation: .failure(CancellationError()),
       )
     }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     task.cancel()
-    await operation.waitUntilCancelled()
-    await operation.waitUntilFinished()
+    try await operation.waitUntilCancelled()
+    try await operation.waitUntilFinished()
 
     // Then
     await #expect(throws: CancellationError.self) {
@@ -87,7 +87,7 @@ struct ConcurrencyPrimitivesTests {
   }
 
   @Test @MainActor
-  func `Non-cooperative cancellation is acknowledged without releasing the invocation`() async {
+  func `Non-cooperative cancellation is acknowledged without releasing the invocation`() async throws {
     // Given
     let operation = ControllableOperation<Void, Never>()
     let didFinish = TestEventCounter()
@@ -96,11 +96,11 @@ struct ConcurrencyPrimitivesTests {
       await operation.run(invocation)
       didFinish.record()
     }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     task.cancel()
-    await operation.waitUntilCancelled()
+    try await operation.waitUntilCancelled()
 
     // Then
     #expect(didFinish.count == 0)
@@ -114,22 +114,22 @@ struct ConcurrencyPrimitivesTests {
   }
 
   @Test @MainActor
-  func `Cancellation can cooperatively complete a non-throwing invocation`() async {
+  func `Cancellation can cooperatively complete a non-throwing invocation`() async throws {
     // Given
     let operation = ControllableOperation<Bool, Never>()
     let invocation = operation.prepare()
     let task = Task {
       await operation.run(invocation, onCancellation: .success(false))
     }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     task.cancel()
-    await operation.waitUntilCancelled()
+    try await operation.waitUntilCancelled()
 
     // Then
     #expect(await task.value == false)
-    await operation.waitUntilFinished()
+    try await operation.waitUntilFinished()
   }
 
   @Test @MainActor
@@ -140,7 +140,7 @@ struct ConcurrencyPrimitivesTests {
     let secondInvocation = operation.prepare()
     let first = Task { try await operation.run(firstInvocation) }
     let second = Task { try await operation.run(secondInvocation) }
-    await operation.waitUntilStarted(2)
+    try await operation.waitUntilStarted(2)
 
     // When
     operation.resolve(secondInvocation, with: .success(20))
@@ -149,7 +149,7 @@ struct ConcurrencyPrimitivesTests {
     // Then
     #expect(try await first.value == 10)
     #expect(try await second.value == 20)
-    await operation.waitUntilFinished(2)
+    try await operation.waitUntilFinished(2)
   }
 
   @Test
@@ -197,8 +197,8 @@ struct ConcurrencyPrimitivesTests {
     let longOperation = Task { try await longSleepOperation() }
 
     // When
-    let longSleep = await sleeper.waitUntilPrepared(for: .seconds(5))
-    let shortSleep = await sleeper.waitUntilPrepared(for: .seconds(1))
+    let longSleep = try await sleeper.waitUntilPrepared(for: .seconds(5))
+    let shortSleep = try await sleeper.waitUntilPrepared(for: .seconds(1))
     sleeper.wake(longSleep)
     sleeper.wake(shortSleep)
 
@@ -213,7 +213,7 @@ struct ConcurrencyPrimitivesTests {
     let operation = ControllableOperation<Int, ControlledOperationError>()
     let firstInvocation = operation.prepare()
     let first = Task { try await operation.run(firstInvocation) }
-    await operation.waitUntilStarted()
+    try await operation.waitUntilStarted()
 
     // When
     operation.setTerminalResult(.success(7))
@@ -231,11 +231,11 @@ struct ConcurrencyPrimitivesTests {
   }
 
   @Test @MainActor
-  func `An event counter acknowledges the requested count`() async {
+  func `An event counter acknowledges the requested count`() async throws {
     // Given
     let counter = TestEventCounter()
     let acknowledgement = Task {
-      await counter.wait(for: 2)
+      try await counter.wait(for: 2)
       return counter.count
     }
 
@@ -244,11 +244,11 @@ struct ConcurrencyPrimitivesTests {
     counter.record()
 
     // Then
-    #expect(await acknowledgement.value == 2)
+    #expect(try await acknowledgement.value == 2)
   }
 
   @Test
-  func `An event counter records synchronous events outside MainActor`() async {
+  func `An event counter records synchronous events outside MainActor`() async throws {
     // Given
     let counter = TestEventCounter()
 
@@ -258,29 +258,110 @@ struct ConcurrencyPrimitivesTests {
     }.value
 
     // Then
-    await counter.wait()
+    try await counter.wait()
     #expect(counter.count == 1)
   }
 
   @Test
-  func `A barrier releases every participant together`() async {
+  func `A cancelled event counter wait is removed without poisoning the counter`() async throws {
+    // Given
+    let counter = TestEventCounter()
+    let waitStarted = TestEventCounter()
+    let waiter = Task {
+      waitStarted.record()
+      try await counter.wait()
+    }
+    try await waitStarted.wait()
+    await Task.yield()
+
+    // When
+    waiter.cancel()
+
+    // Then
+    await #expect(throws: CancellationError.self) {
+      try await waiter.value
+    }
+
+    // When
+    counter.record()
+
+    // Then
+    try await counter.wait()
+    #expect(counter.count == 1)
+  }
+
+  @Test
+  func `A barrier releases every participant together`() async throws {
     // Given
     let barrier = TestBarrier(participantCount: 2)
     let first = Task {
-      await barrier.arriveAndWait()
+      try await barrier.arriveAndWait()
       return await barrier.isOpen
     }
-    await barrier.waitUntilArrived(1)
+    try await barrier.waitUntilArrived(1)
 
     // When
     let second = Task {
-      await barrier.arriveAndWait()
+      try await barrier.arriveAndWait()
       return await barrier.isOpen
     }
 
     // Then
-    #expect(await first.value)
-    #expect(await second.value)
+    #expect(try await first.value)
+    #expect(try await second.value)
     #expect(await barrier.arrivalCount == 2)
+  }
+
+  @Test
+  func `A cancelled barrier participant keeps its recorded arrival`() async throws {
+    // Given
+    let barrier = TestBarrier(participantCount: 2)
+    let first = Task {
+      try await barrier.arriveAndWait()
+    }
+    try await barrier.waitUntilArrived(1)
+
+    // When
+    first.cancel()
+
+    // Then
+    await #expect(throws: CancellationError.self) {
+      try await first.value
+    }
+    #expect(await barrier.arrivalCount == 1)
+
+    // When
+    try await barrier.arriveAndWait()
+
+    // Then
+    #expect(await barrier.isOpen)
+    #expect(await barrier.arrivalCount == 2)
+  }
+
+  @Test
+  func `A cancelled arrival observer does not poison later barrier use`() async throws {
+    // Given
+    let barrier = TestBarrier(participantCount: 1)
+    let waitStarted = TestEventCounter()
+    let observer = Task {
+      waitStarted.record()
+      try await barrier.waitUntilArrived(1)
+    }
+    try await waitStarted.wait()
+    await Task.yield()
+
+    // When
+    observer.cancel()
+
+    // Then
+    await #expect(throws: CancellationError.self) {
+      try await observer.value
+    }
+
+    // When
+    try await barrier.arriveAndWait()
+
+    // Then
+    #expect(await barrier.isOpen)
   }
 }

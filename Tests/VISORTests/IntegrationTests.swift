@@ -50,9 +50,9 @@ private final class IntegrationEvent {
     recorded.record()
   }
 
-  func wait(for value: Int) async {
+  func wait(for value: Int) async throws(CancellationError) {
     while !values.contains(value) {
-      await recorded.wait(for: values.count + 1)
+      try await recorded.wait(for: values.count + 1)
     }
   }
 
@@ -123,7 +123,7 @@ struct IntegrationTests {
     #expect(viewModel.state.count == 0)
 
     await service.publish(count: 42)
-    await event.wait(for: 42)
+    try await event.wait(for: 42)
     #expect(viewModel.state.count == 42)
 
     await session._visorStop()
@@ -147,8 +147,8 @@ struct IntegrationTests {
     try await secondSession._visorStart()
 
     await service.publish(count: 7)
-    await firstEvent.wait(for: 7)
-    await secondEvent.wait(for: 7)
+    try await firstEvent.wait(for: 7)
+    try await secondEvent.wait(for: 7)
 
     #expect(first.state.count == 7)
     #expect(second.state.count == 7)
@@ -173,7 +173,7 @@ struct IntegrationTests {
     router.present(sheet: .preferences)
 
     await service.publish(count: 10)
-    await event.wait(for: 10)
+    try await event.wait(for: 10)
 
     #expect(viewModel.state.count == 10)
     #expect(router.navigationPath == [.detail(id: "1")])

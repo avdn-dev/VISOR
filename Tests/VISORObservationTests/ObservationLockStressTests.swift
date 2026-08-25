@@ -41,10 +41,10 @@ struct ObservationLockStressTests {
     let publicationsPerWorker = 500
     let barrier = TestBarrier(participantCount: workerCount)
 
-    await withTaskGroup(of: Void.self) { group in
+    try await withThrowingTaskGroup(of: Void.self) { group in
       for worker in 0..<workerCount {
         group.addTask {
-          await barrier.arriveAndWait()
+          try await barrier.arriveAndWait()
           for publication in 0..<publicationsPerWorker {
             channel.publish(
               worker * publicationsPerWorker + publication + 1
@@ -52,6 +52,7 @@ struct ObservationLockStressTests {
           }
         }
       }
+      try await group.waitForAll()
     }
 
     let opened = try channel.source._visorOpen()
@@ -78,11 +79,11 @@ struct ObservationLockStressTests {
     #expect(first.source._visorGroupIdentity == second.source._visorGroupIdentity)
     #expect(second.source._visorGroupIdentity == third.source._visorGroupIdentity)
 
-    await withTaskGroup(of: Void.self) { group in
+    try await withThrowingTaskGroup(of: Void.self) { group in
       for (channelIndex, channel) in channels.enumerated() {
         for worker in 0..<workersPerChannel {
           group.addTask {
-            await barrier.arriveAndWait()
+            try await barrier.arriveAndWait()
             for publication in 0..<publicationsPerWorker {
               channel.publish(
                 channelIndex * 1_000_000
@@ -94,6 +95,7 @@ struct ObservationLockStressTests {
           }
         }
       }
+      try await group.waitForAll()
     }
 
     let observations = try _ObservationRuntime._visorPrepareAll(
@@ -126,12 +128,12 @@ struct ObservationLockStressTests {
       let checkpoint = try opened.subscription._visorCheckpointAndPause()
       let registrationRace = TestBarrier(participantCount: 2)
       let waiter = Task {
-        await registrationRace.arriveAndWait()
+        try await registrationRace.arriveAndWait()
         try await opened.subscription
           ._visorWaitUntilAcknowledged(checkpoint)
       }
 
-      await registrationRace.arriveAndWait()
+      try await registrationRace.arriveAndWait()
       waiter.cancel()
       await #expect(throws: CancellationError.self) {
         try await waiter.value
@@ -159,12 +161,12 @@ struct ObservationLockStressTests {
     for current in 1...250 {
       let barrier = TestBarrier(participantCount: 2)
       let publication = Task {
-        await barrier.arriveAndWait()
+        try await barrier.arriveAndWait()
         first.publish(current)
         second.publish(current)
       }
       let preparation = Task {
-        await barrier.arriveAndWait()
+        try await barrier.arriveAndWait()
         return try _ObservationRuntime._visorPrepareAll([
           first.source._visorErase(),
           second.source._visorErase(),
@@ -172,7 +174,7 @@ struct ObservationLockStressTests {
       }
 
       let observations = try await preparation.value
-      await publication.value
+      try await publication.value
       let captured = try snapshots(from: observations)
       #expect(
         isAllowedSequentialCut(
@@ -216,18 +218,18 @@ struct ObservationLockStressTests {
     for current in 1...250 {
       let barrier = TestBarrier(participantCount: 2)
       let publication = Task {
-        await barrier.arriveAndWait()
+        try await barrier.arriveAndWait()
         first.publish(current)
         second.publish(current)
       }
       let capture = Task {
-        await barrier.arriveAndWait()
+        try await barrier.arriveAndWait()
         return try _ObservationRuntime
           ._visorCheckpointAndPauseAll(subscriptions)
       }
 
       let checkpoints = try await capture.value
-      await publication.value
+      try await publication.value
       let firstCheckpoint = try checkpoints[0]._visorUnwrap(as: Int.self)
       let secondCheckpoint = try checkpoints[1]._visorUnwrap(as: Int.self)
       #expect(

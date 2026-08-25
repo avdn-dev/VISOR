@@ -21,8 +21,8 @@ private final class NavigationLifecycleProbe {
     counter(for: event).record()
   }
 
-  func wait(for event: NavigationLifecycleEvent, count: Int = 1) async {
-    await counter(for: event).wait(for: count)
+  func wait(for event: NavigationLifecycleEvent, count: Int = 1) async throws {
+    try await counter(for: event).wait(for: count)
   }
 
   // MARK: Private
@@ -234,7 +234,7 @@ private final class NavigationViewHost {
 @MainActor
 struct RouterStackLifecycleTests {
   @Test(.timeLimit(.minutes(1)))
-  func `Mounted RouterHost without a selected root activates the root Router`() async {
+  func `Mounted RouterHost without a selected root activates the root Router`() async throws {
     let router = Router<TestScene>()
     let probe = NavigationLifecycleProbe()
     let root = AnyView(RouterHost(
@@ -251,13 +251,13 @@ struct RouterStackLifecycleTests {
     })
     let host = NavigationViewHost(rootView: root)
     defer { host.close() }
-    await probe.wait(for: .homeAppeared)
+    try await probe.wait(for: .homeAppeared)
 
     #expect(router.isActive)
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `Mounted stack follows Router push and pop`() async {
+  func `Mounted stack follows Router push and pop`() async throws {
     let router = Router<TestScene>()
     let probe = NavigationLifecycleProbe()
     let root = AnyView(RouterStack(
@@ -279,19 +279,19 @@ struct RouterStackLifecycleTests {
 
     router.push(.nested)
     host.layout()
-    await probe.wait(for: .detailAppeared)
+    try await probe.wait(for: .detailAppeared)
 
     #expect(router.navigationPath == [.nested])
 
     router.popToRoot()
     host.layout()
-    await probe.wait(for: .detailDisappeared)
+    try await probe.wait(for: .detailDisappeared)
 
     #expect(router.navigationPath.isEmpty)
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `Mounted TabView activates the selected tab Router`() async {
+  func `Mounted TabView activates the selected tab Router`() async throws {
     let router = Router<TestScene>()
     let home = router.childRouter(for: .home)
     let settings = router.childRouter(for: .settings)
@@ -302,15 +302,15 @@ struct RouterStackLifecycleTests {
       NavigationTabLifecycleHost(router: router, probe: probe)
     ))
     defer { host.close() }
-    await probe.wait(for: .homeAppeared)
+    try await probe.wait(for: .homeAppeared)
 
     #expect(home.isActive)
     #expect(!settings.isActive)
 
     router.select(root: .settings)
     host.layout()
-    await probe.wait(for: .settingsAppeared)
-    await probe.wait(for: .homeDisappeared)
+    try await probe.wait(for: .settingsAppeared)
+    try await probe.wait(for: .homeDisappeared)
 
     #expect(!home.isActive)
     #expect(settings.isActive)
@@ -321,7 +321,7 @@ struct RouterStackLifecycleTests {
   }
 
   @Test(.timeLimit(.minutes(1)))
-  func `Mounted NavigationSplitView activates the selected root Router`() async {
+  func `Mounted NavigationSplitView activates the selected root Router`() async throws {
     let router = Router<TestScene>()
     let home = router.childRouter(for: .home)
     let settings = router.childRouter(for: .settings)
@@ -332,15 +332,15 @@ struct RouterStackLifecycleTests {
       NavigationSplitLifecycleHost(router: router, probe: probe)
     ))
     defer { host.close() }
-    await probe.wait(for: .homeAppeared)
+    try await probe.wait(for: .homeAppeared)
 
     #expect(home.isActive)
     #expect(!settings.isActive)
 
     router.select(root: .settings)
     host.layout()
-    await probe.wait(for: .settingsAppeared)
-    await probe.wait(for: .homeDisappeared)
+    try await probe.wait(for: .settingsAppeared)
+    try await probe.wait(for: .homeDisappeared)
 
     #expect(!home.isActive)
     #expect(settings.isActive)
@@ -375,14 +375,14 @@ struct RouterStackLifecycleTests {
     router.present(sheet: .preferences)
     let presentedRouter = try #require(router.sheetPresentation?.router)
     host.layout()
-    await probe.wait(for: .sheetAppeared)
+    try await probe.wait(for: .sheetAppeared)
 
     #expect(!router.isActive)
     #expect(presentedRouter.isActive)
 
     router.dismissSheet()
     host.layout()
-    await probe.wait(for: .sheetDisappeared)
+    try await probe.wait(for: .sheetDisappeared)
 
     #expect(router.presentingSheet == nil)
     #expect(!presentedRouter.isActive)

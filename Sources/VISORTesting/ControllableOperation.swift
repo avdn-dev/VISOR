@@ -150,16 +150,22 @@ nonisolated public final class ControllableOperation<
     return try result.get()
   }
 
-  public func waitUntilStarted(_ expectedCount: Int = 1) async {
-    await started.wait(for: expectedCount)
+  public func waitUntilStarted(
+    _ expectedCount: Int = 1
+  ) async throws(CancellationError) {
+    try await started.wait(for: expectedCount)
   }
 
-  public func waitUntilCancelled(_ expectedCount: Int = 1) async {
-    await cancelled.wait(for: expectedCount)
+  public func waitUntilCancelled(
+    _ expectedCount: Int = 1
+  ) async throws(CancellationError) {
+    try await cancelled.wait(for: expectedCount)
   }
 
-  public func waitUntilFinished(_ expectedCount: Int = 1) async {
-    await finished.wait(for: expectedCount)
+  public func waitUntilFinished(
+    _ expectedCount: Int = 1
+  ) async throws(CancellationError) {
+    try await finished.wait(for: expectedCount)
   }
 
   /// Resolves one prepared invocation, whether or not it has started.

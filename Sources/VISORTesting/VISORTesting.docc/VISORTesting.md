@@ -26,6 +26,11 @@ test must control. Prepare an invocation when its identity or metadata must be
 fixed before its task is scheduled, then pass that token to `run` and
 `resolve`. The operation is `Sendable` and has no actor-isolation requirement.
 
+Concurrency-control waits cooperate with task cancellation and throw
+`CancellationError` rather than retaining a suspended continuation. A
+``TestBarrier`` arrival remains counted when its participant is cancelled
+after arriving, so later participants can still open the one-shot barrier.
+
 ## Topics
 
 ### Observation scopes

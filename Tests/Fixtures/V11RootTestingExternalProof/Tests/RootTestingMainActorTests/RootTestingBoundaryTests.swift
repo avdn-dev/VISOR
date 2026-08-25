@@ -6,7 +6,7 @@ import VISORTesting
 @Suite("Root VISORTesting from a MainActor-by-default target")
 struct RootTestingBoundaryTests {
   @Test
-  func `Controllable operations remain isolation-neutral and Sendable`() async {
+  func `Controllable operations remain isolation-neutral and Sendable`() async throws {
     // Given
     let operation = ControllableOperation<Int, Never>()
     let invocation = operation.prepare(metadata: "request")
@@ -16,11 +16,14 @@ struct RootTestingBoundaryTests {
     let result = await Task.detached {
       await operation.run(invocation)
     }.value
+    try await operation.waitUntilStarted()
+    try await operation.waitUntilFinished()
 
     // Then
     #expect(invocation.ordinal == 1)
     #expect(invocation.metadata == "request")
     #expect(result == 7)
+    #expect(operation.finishedCount == 1)
   }
 
   @Test

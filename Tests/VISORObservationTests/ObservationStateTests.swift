@@ -380,7 +380,7 @@ struct ObservationStateTests {
 
   @Test
   @MainActor
-  func `A service-owned snapshot task releases its owner while waiting`() async {
+  func `A service-owned snapshot task releases its owner while waiting`() async throws {
     let channel = ObservationChannel(0)
     let lifecycle = TestEventCounter()
     var consumer: SnapshotConsumer? = SnapshotConsumer(
@@ -389,9 +389,9 @@ struct ObservationStateTests {
     )
     weak let weakConsumer = consumer
 
-    await lifecycle.wait()
+    try await lifecycle.wait()
     consumer = nil
-    await lifecycle.wait(for: 2)
+    try await lifecycle.wait(for: 2)
 
     #expect(weakConsumer == nil)
   }

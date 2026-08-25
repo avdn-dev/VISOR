@@ -24,8 +24,8 @@ private final class RouterInputProbe {
     recorded.record()
   }
 
-  func wait(for count: Int) async {
-    await recorded.wait(for: count)
+  func wait(for count: Int) async throws {
+    try await recorded.wait(for: count)
   }
 
   // MARK: Private
@@ -875,7 +875,7 @@ struct RouterTests {
 
   #if os(macOS)
   @Test(.timeLimit(.minutes(1)))
-  func `Mounted root stack follows a replacement Router input`() async {
+  func `Mounted root stack follows a replacement Router input`() async throws {
     let first = Router<TestScene>()
     let second = Router<TestScene>()
     let probe = RouterInputProbe()
@@ -894,14 +894,14 @@ struct RouterTests {
     let hostingView = NSHostingView(rootView: root(router: first))
     hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
     hostingView.layoutSubtreeIfNeeded()
-    await probe.wait(for: 1)
+    try await probe.wait(for: 1)
 
     #expect(probe.routerIDs.last == ObjectIdentifier(first))
     #expect(first.isActive)
 
     hostingView.rootView = root(router: second)
     hostingView.layoutSubtreeIfNeeded()
-    await probe.wait(for: 2)
+    try await probe.wait(for: 2)
 
     #expect(probe.routerIDs.last == ObjectIdentifier(second))
     #expect(!first.isActive)

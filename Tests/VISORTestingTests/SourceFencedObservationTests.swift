@@ -38,7 +38,7 @@ struct SourceFencedObservationTests {
         }
       }
 
-      await gate.waitUntilStarted()
+      try await gate.waitUntilStarted()
       #expect(sut.state.sourceValue == 10)
       #expect(sut.state.reactedValue == 1)
       gate.setTerminalResult(.success(()))
