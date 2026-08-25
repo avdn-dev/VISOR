@@ -75,6 +75,20 @@ struct TestDoubleGenerator {
     }
 
     if
+      !traits.isSendable,
+      let concurrentMethod = analysis.methods.first(where: \.isConcurrent)
+    {
+      context.diagnose(Diagnostic(
+        node: Syntax(node),
+        message: TestDoubleDiagnostic.concurrentRequirementRequiresSendable(
+          methodName: concurrentMethod.name,
+          macroName: kind.macroName,
+        ),
+      ))
+      return []
+    }
+
+    if
       let property = analysis.properties.first(where: {
         $0.observationState != nil
           && $0.defaultValueExpression == nil

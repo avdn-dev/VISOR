@@ -25,6 +25,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
   case duplicateTrait(trait: String, macroName: String)
   case unsupportedTrait(trait: String, macroName: String)
   case sendableSpyUnconstrainedGenericValues(methodName: String, genericNames: [String])
+  case concurrentRequirementRequiresSendable(methodName: String, macroName: String)
 
   // MARK: Internal
 
@@ -58,6 +59,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       "@\(macroName) received duplicate '.\(trait)' traits"
     case .unsupportedTrait(let trait, let macroName):
       "@\(macroName) does not support the '\(trait)' trait"
+    case .concurrentRequirementRequiresSendable(let methodName, let macroName):
+      "@\(macroName) requires the '.sendable' trait because '\(methodName)()' is @concurrent"
     case .sendableSpyUnconstrainedGenericValues(let methodName, let genericNames):
       sendableSpyUnconstrainedGenericValuesMessage(
         methodName: methodName,
@@ -98,6 +101,8 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
       MessageID(domain: "VISOR", id: "unsupportedTestDoubleTrait")
     case .sendableSpyUnconstrainedGenericValues:
       MessageID(domain: "VISOR", id: "sendableSpyUnconstrainedGenericValues")
+    case .concurrentRequirementRequiresSendable:
+      MessageID(domain: "VISOR", id: "concurrentRequirementRequiresSendable")
     }
   }
 
@@ -107,7 +112,7 @@ enum TestDoubleDiagnostic: DiagnosticMessage {
          .staticRequirementsNotSupported, .initialiserRequirementsNotSupported,
          .inheritedProtocolNotSupported, .sendableTraitRequired, .unsupportedRequirement,
          .duplicateTrait, .unsupportedTrait, .sendableSpyUnconstrainedGenericValues,
-         .observationStateBaselineRequired:
+         .observationStateBaselineRequired, .concurrentRequirementRequiresSendable:
       .error
     case .unknownTypeDefaults:
       .note

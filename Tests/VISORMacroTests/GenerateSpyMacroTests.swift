@@ -1771,6 +1771,34 @@ struct GenerateSpyMacroTests {
   }
 
   @Test
+  func `Rejects an ordinary spy for a concurrent requirement`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @GenerateSpy
+      protocol Worker {
+        @concurrent
+        func work() async
+      }
+      """,
+      expandedSource: """
+        protocol Worker {
+          @concurrent
+          func work() async
+        }
+        """,
+      diagnostics: [
+        DiagnosticSpec(
+          message: "@GenerateSpy requires the '.sendable' trait because 'work()' is @concurrent",
+          line: 1,
+          column: 1,
+          severity: .error,
+        )
+      ],
+      macros: testMacros,
+    )
+  }
+
+  @Test
   func `Generates lock-backed Sendable spy`() {
     assertMacroExpansionSwiftTesting(
       """

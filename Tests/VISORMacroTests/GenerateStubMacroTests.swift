@@ -1361,6 +1361,34 @@ func `Preserves escaping in method signature for stub`() {
 // MARK: - Sendable Generation
 
 @Test
+func `Rejects an ordinary stub for a concurrent requirement`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @GenerateStub
+    protocol Worker {
+      @concurrent
+      func work() async
+    }
+    """,
+    expandedSource: """
+      protocol Worker {
+        @concurrent
+        func work() async
+      }
+      """,
+    diagnostics: [
+      DiagnosticSpec(
+        message: "@GenerateStub requires the '.sendable' trait because 'work()' is @concurrent",
+        line: 1,
+        column: 1,
+        severity: .error,
+      )
+    ],
+    macros: testMacros,
+  )
+}
+
+@Test
 func `Generates lock-backed public Sendable stub with typed throws`() {
   assertMacroExpansionSwiftTesting(
     """

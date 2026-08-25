@@ -210,6 +210,12 @@ explicit isolation. Mark a UI-bound protocol `@MainActor`. With Swift 6.2's
 caller's actor; add `@concurrent` only when the requirement must always use the
 concurrent executor.
 
+An ordinary generated double cannot safely satisfy an `@concurrent`
+requirement because its mutable configuration and call history are not
+synchronised. `@GenerateStub` and `@GenerateSpy` therefore diagnose such a
+requirement and emit no peer. Select the `.sendable` trait to use the
+synchronised renderer, which preserves `@concurrent` on the generated method.
+
 ### Sendable doubles
 
 Opt into synchronised, checked `Sendable` generation when a double crosses isolation domains:
