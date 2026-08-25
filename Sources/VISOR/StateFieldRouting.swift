@@ -93,7 +93,6 @@ public protocol _StateMutationRecorder: AnyObject {
   func record(
     fieldID: ObjectIdentifier,
     fieldName: String,
-    oldValue: Any,
     newValue: Any,
   )
 }
@@ -135,7 +134,6 @@ extension _ViewModelState {
   /// Records a generated State mutation when a test scope is active.
   public func _visorRecordMutation<Value>(
     _ field: _StateField<Self, Value>,
-    oldValue: Value,
     newValue: Value,
   ) {
     guard let recorder = _visorMutationRecorder else { return }
@@ -143,7 +141,6 @@ extension _ViewModelState {
     recorder.record(
       fieldID: field.identity,
       fieldName: field.name,
-      oldValue: oldValue,
       newValue: newValue,
     )
   }

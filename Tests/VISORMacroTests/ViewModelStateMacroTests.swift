@@ -252,7 +252,6 @@ struct ViewModelStateMacroTests {
                 return
               }
 
-              let oldValue = _count
               if _visorShouldNotifyObservers(_count, newValue) {
                 withMutation(keyPath: \\.count) {
                   _count = newValue
@@ -263,7 +262,6 @@ struct ViewModelStateMacroTests {
               let resultingValue = _count
               _visorRecordMutation(
                 Self._visorField_count,
-                oldValue: oldValue,
                 newValue: resultingValue)
             }
             _modify {
@@ -278,13 +276,11 @@ struct ViewModelStateMacroTests {
                 return
               }
 
-              let oldValue = _count
               _$observationRegistrar.willSet(self, keyPath: \\.count)
               defer {
                 _$observationRegistrar.didSet(self, keyPath: \\.count)
                 _visorRecordMutation(
                   Self._visorField_count,
-                  oldValue: oldValue,
                   newValue: _count)
               }
               yield &_count

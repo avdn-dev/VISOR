@@ -137,7 +137,6 @@ private final class GatewayRecorder: _StateMutationRecorder {
   func record(
     fieldID _: ObjectIdentifier,
     fieldName: String,
-    oldValue _: Any,
     newValue _: Any,
   ) {
     fields.append(fieldName)

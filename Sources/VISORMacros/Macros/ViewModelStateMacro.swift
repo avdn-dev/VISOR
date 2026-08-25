@@ -294,7 +294,6 @@ public struct ViewModelStateFieldMacro: AccessorMacro, PeerMacro {
           return
         }
 
-        let oldValue = _\(raw: name)
         if _visorShouldNotifyObservers(_\(raw: name), newValue) {
           withMutation(keyPath: \\.\(raw: name)) {
             _\(raw: name) = newValue
@@ -305,7 +304,6 @@ public struct ViewModelStateFieldMacro: AccessorMacro, PeerMacro {
         let resultingValue = _\(raw: name)
         _visorRecordMutation(
           Self._visorField_\(raw: name),
-          oldValue: oldValue,
           newValue: resultingValue)
       }
       """
@@ -322,13 +320,11 @@ public struct ViewModelStateFieldMacro: AccessorMacro, PeerMacro {
           return
         }
 
-        let oldValue = _\(raw: name)
         _$observationRegistrar.willSet(self, keyPath: \\.\(raw: name))
         defer {
           _$observationRegistrar.didSet(self, keyPath: \\.\(raw: name))
           _visorRecordMutation(
             Self._visorField_\(raw: name),
-            oldValue: oldValue,
             newValue: _\(raw: name))
         }
         yield &_\(raw: name)

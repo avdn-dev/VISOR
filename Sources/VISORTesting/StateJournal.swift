@@ -7,7 +7,6 @@ import VISOR
 struct JournalEntry {
   let fieldID: ObjectIdentifier
   let fieldName: String
-  let oldValue: Any
   let newValue: Any
 }
 
@@ -151,7 +150,6 @@ final class StateJournal: _StateMutationRecorder {
   func record(
     fieldID: ObjectIdentifier,
     fieldName: String,
-    oldValue: Any,
     newValue: Any,
   ) {
     switch windowState {
@@ -204,7 +202,6 @@ final class StateJournal: _StateMutationRecorder {
     entries.append(JournalEntry(
       fieldID: fieldID,
       fieldName: fieldName,
-      oldValue: oldValue,
       newValue: newValue,
     ))
   }
