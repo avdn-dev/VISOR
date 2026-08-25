@@ -134,7 +134,7 @@ struct ObservationSessionContractTests {
   @Test(.timeLimit(.minutes(1))) @MainActor
   func `Whole-session fence pauses every lane before draining`() async throws {
     let integer = ObservationChannel(0)
-    let text = ObservationChannel("zero", groupedWith: integer)
+    let text = ObservationChannel("zero", coordinatedWith: integer)
     let gate = ControllableOperation<Void, Never>()
     let log = ObservationSessionContractLog()
     let session = _ObservationSession(lanes: [

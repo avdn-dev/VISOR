@@ -541,7 +541,7 @@ struct ObservationSourceTests {
     let lifecycle = ObservationChannel(0)
     let waveform = ObservationChannel(
       "quiet",
-      groupedWith: lifecycle,
+      coordinatedWith: lifecycle,
     )
     let independent = ObservationChannel(false)
 
@@ -561,7 +561,7 @@ struct ObservationSourceTests {
     let first = ObservationChannel(1)
     let second = ObservationChannel(
       "ready",
-      groupedWith: first,
+      coordinatedWith: first,
     )
 
     let prepared = try _ObservationRuntime._visorPrepareAll([
@@ -588,7 +588,7 @@ struct ObservationSourceTests {
     let first = ObservationChannel(0)
     let second = ObservationChannel(
       "old",
-      groupedWith: first,
+      coordinatedWith: first,
     )
 
     first.publish(1)
@@ -612,7 +612,7 @@ struct ObservationSourceTests {
     let first = ObservationChannel(1)
     let second = ObservationChannel(
       "ready",
-      groupedWith: first,
+      coordinatedWith: first,
     )
     let prepared = try _ObservationRuntime._visorPrepareAll([
       first.source._visorErase(),

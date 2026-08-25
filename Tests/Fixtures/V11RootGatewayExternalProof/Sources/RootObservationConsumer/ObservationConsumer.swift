@@ -50,10 +50,13 @@ public struct RootObservationConsumer: Sendable {
 
   public init(initialValue: Int) {
     let channel = ObservationChannel(initialValue)
-    let projectedChannel = ObservationChannel(RootProjectedSnapshot(
-      revision: initialValue,
-      label: "revision-\(initialValue)",
-    ))
+    let projectedChannel = ObservationChannel(
+      RootProjectedSnapshot(
+        revision: initialValue,
+        label: "revision-\(initialValue)",
+      ),
+      coordinatedWith: channel,
+    )
     self.channel = channel
     self.projectedChannel = projectedChannel
     source = channel.source

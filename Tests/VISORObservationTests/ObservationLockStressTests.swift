@@ -67,8 +67,8 @@ struct ObservationLockStressTests {
   @Test(.timeLimit(.minutes(1)))
   func `A chained three-channel group remains live under shared contention`() async throws {
     let first = ObservationChannel(0)
-    let second = ObservationChannel(0, groupedWith: first)
-    let third = ObservationChannel(0, groupedWith: second)
+    let second = ObservationChannel(0, coordinatedWith: first)
+    let third = ObservationChannel(0, coordinatedWith: second)
     let channels = [first, second, third]
     let workersPerChannel = 4
     let publicationsPerWorker = 250
@@ -156,7 +156,7 @@ struct ObservationLockStressTests {
   @Test(.timeLimit(.minutes(1)))
   func `Grouped preparation linearises with sequential publications`() async throws {
     let first = ObservationChannel(0)
-    let second = ObservationChannel(0, groupedWith: first)
+    let second = ObservationChannel(0, coordinatedWith: first)
 
     for current in 1...250 {
       let barrier = TestBarrier(participantCount: 2)
@@ -193,7 +193,7 @@ struct ObservationLockStressTests {
   @Test(.timeLimit(.minutes(1)))
   func `Grouped checkpoints linearise with sequential publications`() async throws {
     let first = ObservationChannel(0)
-    let second = ObservationChannel(0, groupedWith: first)
+    let second = ObservationChannel(0, coordinatedWith: first)
     let prepared = try _ObservationRuntime._visorPrepareAll([
       first.source._visorErase(),
       second.source._visorErase(),

@@ -87,7 +87,12 @@ actor ProfileService {
 
 Keep the channel private and expose the read-only source. Publish the full stable snapshot synchronously in the same isolation turn as the matching domain mutation. `Sendable` does not prove transitive value semantics; do not publish a snapshot whose contents can mutate later through an alias.
 
-Prefer one source per coherent producer snapshot. If separate performance lanes are necessary, construct them with `ObservationChannel(_:groupedWith:)`. Grouping coordinates session opening and checkpoints but does not batch sequential publications.
+Prefer one source per coherent producer snapshot. If separate performance
+lanes are necessary, construct them with
+`ObservationChannel(_:coordinatedWith:)`. A session captures participating
+coordinated baselines and checkpoint pause revisions under one lock, but waits
+for acknowledgement after releasing it. Coordination does not batch sequential
+publications or coordinate handler execution.
 
 When a class or actor can make one stored property its canonical snapshot, the
 equivalent producer is considerably smaller with `@ObservationState`:

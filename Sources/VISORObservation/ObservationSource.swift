@@ -273,11 +273,20 @@ nonisolated public final class ObservationChannel<Value: Sendable>: Sendable {
     source = ObservationSource(core: core)
   }
 
-  /// Creates another performance lane in the anchor channel's immutable
-  /// producer checkpoint group without introducing a third public concept.
+  /// Creates another performance lane coordinated with the anchor channel.
+  ///
+  /// When one observation session opens or checkpoints several coordinated
+  /// channels, their participating baselines or pause revisions are captured
+  /// under one coordination lock. Publication to any coordinated channel
+  /// therefore falls wholly before or after that multi-channel capture.
+  /// Checkpoint acknowledgement occurs after the capture lock is released.
+  ///
+  /// Coordination does not make sequential `publish` calls transactional,
+  /// coordinate handler execution, or add undeclared channels to a session.
+  /// Use one snapshot when values must share one publication revision.
   public init(
     _ initialSnapshot: sending Value,
-    groupedWith anchor: ObservationChannel<some Sendable>,
+    coordinatedWith anchor: ObservationChannel<some Sendable>,
   ) {
     let core = _ObservationCore(
       initialSnapshot,

@@ -237,16 +237,29 @@ with a diagnostic instead of changing the production protocol's semantics.
 
 ### Related performance lanes
 
-When one producer needs separate channels for performance, construct later lanes with `groupedWith:`:
+When one producer needs separate channels for performance, construct later lanes with `coordinatedWith:`:
 
 ```swift
 let lifecycle = ObservationChannel(LifecycleSnapshot.initial)
 let metering = ObservationChannel(
   MeteringSnapshot.silent,
-  groupedWith: lifecycle)
+  coordinatedWith: lifecycle)
 ```
 
-Grouping makes session opening and checkpoints atomic relative to each individual channel operation. It does not turn sequential `publish` calls into one batch transaction. Use one snapshot when fields must share one publication revision.
+Coordination creates an immutable control-plane domain. When one session opens
+several participating coordinated sources, it captures their baselines under
+one domain lock. A multi-source checkpoint captures every participating
+subscription's current revision and pause frontier under that same lock, and
+the corresponding resumptions are also applied together under the lock. A
+publication to any coordinated channel therefore falls wholly before or after
+each multi-source capture or resumption.
+
+The lock is released before checkpoint acknowledgements are awaited, so handler
+execution is not atomic across lanes. Each `publish` call is also a separate
+operation: a checkpoint may fall between two sequential publications.
+Coordination neither adds undeclared sources to a session nor turns separate
+publications into a batch transaction. Use one snapshot when fields must share
+one publication revision.
 
 ### Service-to-service observation
 
