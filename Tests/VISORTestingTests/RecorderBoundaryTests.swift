@@ -120,7 +120,7 @@ struct RecorderBoundaryTests {
     let firstScope = Task { @MainActor in
       try await _observeWithJournalPolicyForProof(
         first,
-        logicalCommitLimit: 8,
+        maximumCommitCountPerAction: 8,
         issueRecorder: { message, _ in
           results.firstInfrastructureIssues.append(message)
         },
@@ -135,7 +135,7 @@ struct RecorderBoundaryTests {
     let secondScope = Task { @MainActor in
       try await _observeWithJournalPolicyForProof(
         second,
-        logicalCommitLimit: 8,
+        maximumCommitCountPerAction: 8,
         issueRecorder: { message, _ in
           results.secondInfrastructureIssues.append(message)
         },
@@ -172,14 +172,14 @@ struct RecorderBoundaryTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8,
+      maximumCommitCountPerAction: 8,
       issueRecorder: { message, _ in
         firstInfrastructureIssues.append(message)
       },
     ) { firstTest in
       try await _observeWithJournalPolicyForProof(
         sut,
-        logicalCommitLimit: 8,
+        maximumCommitCountPerAction: 8,
         issueRecorder: { message, _ in
           secondInfrastructureIssues.append(message)
         },

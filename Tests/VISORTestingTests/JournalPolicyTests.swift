@@ -19,7 +19,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 4,
+      maximumCommitCountPerAction: 4,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       },
@@ -62,7 +62,7 @@ struct JournalPolicyTests {
     try await _observeWithJournalPolicyForProof(
       sut,
       sourceLocation: observeLocation,
-      logicalCommitLimit: 0,
+      maximumCommitCountPerAction: 0,
       issueRecorder: { message, location in
         issues.append((message, location))
       },
@@ -94,7 +94,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 2,
+      maximumCommitCountPerAction: 2,
       issueRecorder: { message, sourceLocation in
         infrastructureIssues.append(message)
         issueLocation = sourceLocation
@@ -136,7 +136,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 2,
+      maximumCommitCountPerAction: 2,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       },
@@ -167,7 +167,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 1,
+      maximumCommitCountPerAction: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       },
@@ -195,7 +195,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 1,
+      maximumCommitCountPerAction: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       },
@@ -230,7 +230,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 1,
+      maximumCommitCountPerAction: 1,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)
       },
@@ -308,7 +308,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8,
+      maximumCommitCountPerAction: 8,
       outsideWindowCapacity: 3,
       issueRecorder: { _, _ in },
     ) { test in
@@ -363,7 +363,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 16,
+      maximumCommitCountPerAction: 16,
       outsideWindowCapacity: 16,
       issueRecorder: { _, _ in },
     ) { test in
@@ -398,7 +398,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 8,
+      maximumCommitCountPerAction: 8,
       outsideWindowCapacity: 3,
       issueRecorder: { _, _ in },
     ) { test in
@@ -429,7 +429,7 @@ struct JournalPolicyTests {
 
     try await _observeWithJournalPolicyForProof(
       sut,
-      logicalCommitLimit: 1,
+      maximumCommitCountPerAction: 1,
       outsideWindowCapacity: 4,
       issueRecorder: { message, _ in
         infrastructureIssues.append(message)

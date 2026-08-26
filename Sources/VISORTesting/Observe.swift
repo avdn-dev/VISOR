@@ -98,7 +98,7 @@ package func _observeForProof<SUT: ViewModel>(
 package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
   _ sut: SUT,
   sourceLocation: SourceLocation = #_sourceLocation,
-  logicalCommitLimit: Int =
+  maximumCommitCountPerAction: Int =
     StateJournal.defaultMaximumCommitCountPerAction,
   outsideWindowCapacity: Int = StateJournal.defaultOutsideWindowCapacity,
   issueRecorder: @escaping ObservationTestIssueRecorder,
@@ -108,7 +108,7 @@ package func _observeWithJournalPolicyForProof<SUT: ViewModel>(
     sut,
     sourceLocation: sourceLocation,
     beforePauseDrain: { },
-    maximumCommitCountPerAction: logicalCommitLimit,
+    maximumCommitCountPerAction: maximumCommitCountPerAction,
     outsideWindowCapacity: outsideWindowCapacity,
     deadlinePolicy: .production,
     issueRecorder: issueRecorder,
