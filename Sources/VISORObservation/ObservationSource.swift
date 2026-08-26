@@ -798,7 +798,9 @@ nonisolated package enum _ObservationRuntime {
       )
     }
 
-    let groups = sourceGroups(sources)
+    let groups = stableGroups(sources, by: \.groupID) { index, source in
+      IndexedSource(index: index, source: source)
+    }
     let resolved = OSAllocatedUnfairLock(
       initialState: [PreparedResult]()
     )
@@ -853,7 +855,12 @@ nonisolated package enum _ObservationRuntime {
       )
     }
 
-    let groups = subscriptionGroups(subscriptions)
+    let groups = stableGroups(
+      subscriptions,
+      by: \.groupID,
+    ) { index, subscription in
+      IndexedSubscription(index: index, subscription: subscription)
+    }
     let checkpointResults = OSAllocatedUnfairLock(
       initialState: [CheckpointResult]()
     )
@@ -935,7 +942,9 @@ nonisolated package enum _ObservationRuntime {
   package static func _visorResumeAll(
     after checkpoints: [_AnyObservationCheckpoint]
   ) throws {
-    let groups = checkpointGroups(checkpoints)
+    let groups = stableGroups(checkpoints, by: \.groupID) { _, checkpoint in
+      checkpoint
+    }
     let outcomes = OSAllocatedUnfairLock(
       initialState: [_AnyResumeOutcome]()
     )
@@ -943,11 +952,11 @@ nonisolated package enum _ObservationRuntime {
     do {
       for entries in groups {
         try Task.checkCancellation()
-        guard let group = entries.first?.checkpoint.group else { continue }
+        guard let group = entries.first?.group else { continue }
         try group.withLock {
-          for entry in entries {
+          for checkpoint in entries {
             try Task.checkCancellation()
-            let outcome = try entry.checkpoint.resumeLockedOperation()
+            let outcome = try checkpoint.resumeLockedOperation()
             outcomes.withLock { $0.append(outcome) }
           }
         }
@@ -988,61 +997,21 @@ nonisolated package enum _ObservationRuntime {
     let subscription: _AnyObservationSubscription
   }
 
-  private struct IndexedCheckpoint: Sendable {
-    let checkpoint: _AnyObservationCheckpoint
-  }
-
-  private static func sourceGroups(
-    _ sources: [_AnyObservationSource]
-  ) -> [[IndexedSource]] {
+  private static func stableGroups<Element, Entry>(
+    _ elements: [Element],
+    by groupID: KeyPath<Element, _ObservationGroupID>,
+    transform: (Int, Element) -> Entry,
+  ) -> [[Entry]] {
     var positions = [_ObservationGroupID: Int]()
-    var result = [[IndexedSource]]()
-    for (index, source) in sources.enumerated() {
-      if let position = positions[source.groupID] {
-        result[position].append(IndexedSource(index: index, source: source))
+    var result = [[Entry]]()
+    for (index, element) in elements.enumerated() {
+      let groupID = element[keyPath: groupID]
+      let entry = transform(index, element)
+      if let position = positions[groupID] {
+        result[position].append(entry)
       } else {
-        positions[source.groupID] = result.count
-        result.append([IndexedSource(index: index, source: source)])
-      }
-    }
-    return result
-  }
-
-  private static func subscriptionGroups(
-    _ subscriptions: [_AnyObservationSubscription]
-  ) -> [[IndexedSubscription]] {
-    var positions = [_ObservationGroupID: Int]()
-    var result = [[IndexedSubscription]]()
-    for (index, subscription) in subscriptions.enumerated() {
-      if let position = positions[subscription.groupID] {
-        result[position].append(
-          IndexedSubscription(index: index, subscription: subscription)
-        )
-      } else {
-        positions[subscription.groupID] = result.count
-        result.append([
-          IndexedSubscription(index: index, subscription: subscription)
-        ])
-      }
-    }
-    return result
-  }
-
-  private static func checkpointGroups(
-    _ checkpoints: [_AnyObservationCheckpoint]
-  ) -> [[IndexedCheckpoint]] {
-    var positions = [_ObservationGroupID: Int]()
-    var result = [[IndexedCheckpoint]]()
-    for checkpoint in checkpoints {
-      if let position = positions[checkpoint.groupID] {
-        result[position].append(
-          IndexedCheckpoint(checkpoint: checkpoint)
-        )
-      } else {
-        positions[checkpoint.groupID] = result.count
-        result.append([
-          IndexedCheckpoint(checkpoint: checkpoint)
-        ])
+        positions[groupID] = result.count
+        result.append([entry])
       }
     }
     return result
