@@ -44,7 +44,7 @@ public nonisolated struct StubSequence<Value> {
   /// Exhaustion is a test-configuration error and fails immediately with a
   /// diagnostic naming `Value` and the call site.
   public mutating func next(
-    file: StaticString = #filePath,
+    file: StaticString = #file,
     line: UInt = #line,
   ) -> Value {
     guard let value = remainingValues.popLast() else {
