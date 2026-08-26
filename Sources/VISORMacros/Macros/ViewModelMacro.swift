@@ -16,44 +16,6 @@ private enum ViewModelFixIt: String, FixItMessage {
   }
 }
 
-// MARK: - SourceObservationSelection
-
-struct SourceObservationSelection {
-  let source: ExprSyntax
-  let selection: ExprSyntax?
-}
-
-extension AttributeSyntax {
-  var sourceObservationSelection: SourceObservationSelection? {
-    guard let arguments = arguments?.as(LabeledExprListSyntax.self) else {
-      return nil
-    }
-    guard
-      arguments.count == 1 || arguments.count == 2,
-      let source = arguments.first,
-      source.label?.text == "source"
-    else {
-      return nil
-    }
-    if arguments.count == 1 {
-      return SourceObservationSelection(
-        source: source.expression,
-        selection: nil,
-      )
-    }
-    guard
-      let selection = arguments.dropFirst().first,
-      selection.label?.text == "selecting"
-    else {
-      return nil
-    }
-    return SourceObservationSelection(
-      source: source.expression,
-      selection: selection.expression,
-    )
-  }
-}
-
 extension MacroExpansionContext {
   var isDirectViewModelStateContext: Bool {
     let classes = lexicalContext.compactMap { $0.as(ClassDeclSyntax.self) }
@@ -68,31 +30,6 @@ extension MacroExpansionContext {
     }
     return type.attributes.visorContains(named: "ViewModel")
   }
-}
-
-// MARK: - SourceBoundRecipe
-
-private struct SourceBoundRecipe {
-  let selection: ExprSyntax?
-  let fieldName: String
-}
-
-// MARK: - SourceReactionRecipe
-
-private struct SourceReactionRecipe {
-  let selection: ExprSyntax?
-  let methodName: String
-  let argumentLabel: String?
-  let isAsync: Bool
-}
-
-// MARK: - SourceObservationRecipeGroup
-
-private struct SourceObservationRecipeGroup {
-  let source: ExprSyntax
-  let sourceComponents: [String]?
-  var bounds = [SourceBoundRecipe]()
-  var reactions = [SourceReactionRecipe]()
 }
 
 // MARK: - ViewModelDependency
@@ -196,96 +133,6 @@ extension ExprSyntax {
   }
 }
 
-private func keyPathPropertyComponents(
-  from expression: ExprSyntax,
-  ownerName: String,
-) -> [String]? {
-  guard let keyPath = expression.as(KeyPathExprSyntax.self) else {
-    return nil
-  }
-  let components = keyPath.components.compactMap { component -> String? in
-    guard case .property(let property) = component.component else {
-      return nil
-    }
-    return property.declName.baseName.text
-  }
-  guard components.count == keyPath.components.count else { return nil }
-  guard components.first == ownerName else { return components }
-  return Array(components.dropFirst())
-}
-
-private func observationRoutingAttributes(
-  on declaration: some DeclSyntaxProtocol
-) -> [AttributeSyntax] {
-  let attributes: AttributeListSyntax? =
-    if let variable = declaration.as(VariableDeclSyntax.self) {
-      variable.attributes
-    } else if let function = declaration.as(FunctionDeclSyntax.self) {
-      function.attributes
-    } else if let type = declaration.as(ClassDeclSyntax.self) {
-      type.attributes
-    } else if let type = declaration.as(StructDeclSyntax.self) {
-      type.attributes
-    } else if let type = declaration.as(EnumDeclSyntax.self) {
-      type.attributes
-    } else {
-      nil
-    }
-
-  return attributes?.compactMap { $0.as(AttributeSyntax.self) }
-    .filter { attribute in
-      let name = attribute.attributeName.trimmedDescription
-        .split(separator: ".").last
-      return [
-        Substring(AttributeName.bound),
-        Substring(AttributeName.reaction),
-      ].contains(name)
-    } ?? []
-}
-
-private func nestedMemberBlock(
-  of declaration: DeclSyntax
-) -> MemberBlockSyntax? {
-  if let type = declaration.as(ClassDeclSyntax.self) {
-    return type.memberBlock
-  }
-  if let type = declaration.as(StructDeclSyntax.self) {
-    return type.memberBlock
-  }
-  if let type = declaration.as(EnumDeclSyntax.self) {
-    return type.memberBlock
-  }
-  if let type = declaration.as(ActorDeclSyntax.self) {
-    return type.memberBlock
-  }
-  if let declaration = declaration.as(ExtensionDeclSyntax.self) {
-    return declaration.memberBlock
-  }
-  return nil
-}
-
-private func containsObservationRoutingMarker(
-  in block: MemberBlockSyntax
-) -> Bool {
-  for member in block.members {
-    if !observationRoutingAttributes(on: member.decl).isEmpty {
-      return true
-    }
-    if
-      let nested = nestedMemberBlock(of: member.decl),
-      containsObservationRoutingMarker(in: nested)
-    {
-      return true
-    }
-  }
-  return false
-}
-
-private func routingMarkerName(_ attribute: AttributeSyntax) -> String {
-  String(attribute.attributeName.trimmedDescription
-    .split(separator: ".").last ?? "")
-}
-
 extension MemberBlockItemListSyntax {
   var visorHasUnconditionalDeinitialiser: Bool {
     contains { $0.decl.is(DeinitializerDeclSyntax.self) }
@@ -353,72 +200,6 @@ extension ClassDeclSyntax {
       return stateProperty.modifiers.stateFieldAccessPrefix == "public "
     }
     return viewModelSynthesisPlan(state: state)?.stateDeclaration != nil
-  }
-
-  fileprivate var hasRejectedSourceObservationDeclaration: Bool {
-    guard let state = nestedViewModelState else { return false }
-
-    for member in state.memberBlock.members {
-      let attributes = observationRoutingAttributes(on: member.decl)
-      let bounds = attributes.filter {
-        routingMarkerName($0) == AttributeName.bound
-      }
-      let hasOtherRoutingMarker = attributes.contains {
-        routingMarkerName($0) == AttributeName.reaction
-      }
-      if hasOtherRoutingMarker || bounds.count > 1 {
-        return true
-      }
-      if let attribute = bounds.first {
-        guard
-          let variable = member.decl.as(VariableDeclSyntax.self),
-          let field = stateFieldSpec(from: variable),
-          field.accessPrefix != "private ",
-          attribute.sourceObservationSelection != nil
-        else {
-          return true
-        }
-      }
-      if
-        let nested = nestedMemberBlock(of: member.decl),
-        containsObservationRoutingMarker(in: nested)
-      {
-        return true
-      }
-    }
-
-    for member in memberBlock.members {
-      if member.decl.as(ClassDeclSyntax.self)?.name.text == "State" {
-        continue
-      }
-      let attributes = observationRoutingAttributes(on: member.decl)
-      let reactions = attributes.filter {
-        routingMarkerName($0) == AttributeName.reaction
-      }
-      if attributes.count != reactions.count || reactions.count > 1 {
-        return true
-      }
-      if let reaction = reactions.first {
-        guard
-          reaction.sourceObservationSelection != nil,
-          let function = member.decl.as(FunctionDeclSyntax.self),
-          function.signature.parameterClause.parameters.count == 1,
-          function.signature.returnClause == nil,
-          function.signature.effectSpecifiers?.throwsClause == nil,
-          !function.modifiers.hasStateTypeStorageModifier
-        else {
-          return true
-        }
-      }
-      if
-        let nested = nestedMemberBlock(of: member.decl),
-        containsObservationRoutingMarker(in: nested)
-      {
-        return true
-      }
-    }
-
-    return false
   }
 
   fileprivate func viewModelSynthesisPlan(
@@ -510,57 +291,6 @@ extension ClassDeclSyntax {
   fileprivate func hasStableOrSynthesisedState(state: ClassDeclSyntax) -> Bool {
     stableViewModelStateProperty != nil ||
       viewModelSynthesisPlan(state: state)?.stateDeclaration != nil
-  }
-
-  fileprivate func diagnoseRejectedSourceObservationDeclarations(
-    in context: some MacroExpansionContext
-  ) {
-    guard let state = nestedViewModelState else { return }
-
-    for member in state.memberBlock.members {
-      let attributes = observationRoutingAttributes(on: member.decl)
-      let bounds = attributes.filter {
-        routingMarkerName($0) == AttributeName.bound
-      }
-      if bounds.count > 1 {
-        context.diagnose(Diagnostic(
-          node: Syntax(member.decl),
-          message: VISORDiagnostic.invalidSourceBoundDeclaration,
-        ))
-      }
-      for attribute in attributes where
-        routingMarkerName(attribute) == AttributeName.reaction
-      {
-        context.diagnose(Diagnostic(
-          node: Syntax(attribute),
-          message: VISORDiagnostic.invalidSourceReactionPlacement,
-        ))
-      }
-    }
-
-    for member in memberBlock.members {
-      if member.decl.as(ClassDeclSyntax.self)?.name.text == "State" {
-        continue
-      }
-      let attributes = observationRoutingAttributes(on: member.decl)
-      let reactions = attributes.filter {
-        routingMarkerName($0) == AttributeName.reaction
-      }
-      if reactions.count > 1 {
-        context.diagnose(Diagnostic(
-          node: Syntax(member.decl),
-          message: VISORDiagnostic.invalidSourceReactionDeclaration,
-        ))
-      }
-      for attribute in attributes where
-        routingMarkerName(attribute) == AttributeName.bound
-      {
-        context.diagnose(Diagnostic(
-          node: Syntax(attribute),
-          message: VISORDiagnostic.invalidSourceBoundPlacement,
-        ))
-      }
-    }
   }
 
   // MARK: Private
@@ -849,10 +579,15 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       return []
     }
 
+    let sourceObservationAnalysis = SourceObservationAnalysis(
+      viewModel: viewModel,
+      state: state,
+    )
     return sourceObservationMembers(
       for: viewModel,
       state: state,
       analysis: ClassAnalysis(viewModel),
+      sourceObservationAnalysis: sourceObservationAnalysis,
       in: context,
     )
   }
@@ -874,11 +609,15 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       viewModel.hasStableOrSynthesisedState(state: state),
       viewModel.hasConformanceCompatiblePublicState,
       viewModel.conditionalDeinitialisers.isEmpty,
-      state.conditionalDeinitialisers.isEmpty,
-      !viewModel.hasRejectedSourceObservationDeclaration
+      state.conditionalDeinitialisers.isEmpty
     else {
       return []
     }
+    let sourceObservationAnalysis = SourceObservationAnalysis(
+      viewModel: viewModel,
+      state: state,
+    )
+    guard !sourceObservationAnalysis.hasRejectedDeclaration else { return [] }
 
     var attributes: [AttributeSyntax] = ["@VISOR._ViewModelState"]
     if !state.hasExplicitMainActor {
@@ -928,11 +667,15 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       viewModel.conditionalDeinitialisers.isEmpty,
       state.conditionalDeinitialisers.isEmpty,
       viewModel.hasStableOrSynthesisedState(state: state),
-      viewModel.hasConformanceCompatiblePublicState,
-      !viewModel.hasRejectedSourceObservationDeclaration
+      viewModel.hasConformanceCompatiblePublicState
     else {
       return []
     }
+    let sourceObservationAnalysis = SourceObservationAnalysis(
+      viewModel: viewModel,
+      state: state,
+    )
+    guard !sourceObservationAnalysis.hasRejectedDeclaration else { return [] }
 
     return [makeProtocolExtension(for: type, conformingTo: "ViewModel")]
   }
@@ -943,6 +686,7 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
     for viewModel: ClassDeclSyntax,
     state: ClassDeclSyntax,
     analysis: ClassAnalysis,
+    sourceObservationAnalysis: SourceObservationAnalysis,
     in context: some MacroExpansionContext,
   ) -> [DeclSyntax] {
     for deinitialiser in viewModel.conditionalDeinitialisers {
@@ -964,8 +708,8 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       return []
     }
 
-    if viewModel.hasRejectedSourceObservationDeclaration {
-      viewModel.diagnoseRejectedSourceObservationDeclarations(in: context)
+    if sourceObservationAnalysis.hasRejectedDeclaration {
+      sourceObservationAnalysis.diagnose(in: context)
       return []
     }
 
@@ -1007,66 +751,7 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       ))
     }
 
-    var groups = [SourceObservationRecipeGroup]()
-
-    func groupIndex(for source: ExprSyntax) -> Int {
-      let components = keyPathPropertyComponents(
-        from: source,
-        ownerName: viewModel.name.text,
-      )
-      if
-        let components,
-        let index = groups.firstIndex(where: {
-          $0.sourceComponents == components
-        })
-      {
-        return index
-      }
-      groups.append(SourceObservationRecipeGroup(
-        source: source,
-        sourceComponents: components,
-      ))
-      return groups.index(before: groups.endIndex)
-    }
-
-    for member in state.memberBlock.members {
-      guard
-        let variable = member.decl.as(VariableDeclSyntax.self),
-        stateFieldSpec(from: variable) != nil,
-        let attribute = variable.attributes.visorAttribute(named: "Bound"),
-        let observation = attribute.sourceObservationSelection,
-        let binding = variable.bindings.first,
-        let identifier = binding.pattern.as(IdentifierPatternSyntax.self)
-      else {
-        continue
-      }
-      let entry = SourceBoundRecipe(
-        selection: observation.selection,
-        fieldName: identifier.identifier.text,
-      )
-      groups[groupIndex(for: observation.source)].bounds.append(entry)
-    }
-
-    for member in viewModel.memberBlock.members {
-      guard
-        let function = member.decl.as(FunctionDeclSyntax.self),
-        let attribute = function.attributes.visorAttribute(named: "Reaction"),
-        let observation = attribute.sourceObservationSelection,
-        function.signature.parameterClause.parameters.count == 1,
-        let parameter = function.signature.parameterClause.parameters.first
-      else {
-        continue
-      }
-      let entry = SourceReactionRecipe(
-        selection: observation.selection,
-        methodName: function.name.text,
-        argumentLabel: parameter.firstName.text == "_"
-          ? nil
-          : parameter.firstName.text,
-        isAsync: function.signature.effectSpecifiers?.asyncSpecifier != nil,
-      )
-      groups[groupIndex(for: observation.source)].reactions.append(entry)
-    }
+    let groups = sourceObservationAnalysis.groups
 
     let access = accessLevel(of: viewModel)
     let prefix = access == "public" || access == "open" ? "public " : ""

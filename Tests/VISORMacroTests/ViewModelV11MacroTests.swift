@@ -1011,6 +1011,63 @@ struct ViewModelV11MacroTests {
   }
 
   @Test
+  func `Duplicate source routing markers fail closed`() {
+    assertMacroExpansionSwiftTesting(
+      """
+      @MainActor
+      @Observable
+      @ViewModel
+      final class DuplicateSourceMarkerViewModel {
+        final class State {
+          @Bound(source: \\DuplicateSourceMarkerViewModel.service.source)
+          @Bound(source: \\DuplicateSourceMarkerViewModel.service.source)
+          var count = 0
+        }
+
+        let state = State()
+        let service: Service
+
+        @Reaction(source: \\DuplicateSourceMarkerViewModel.service.source)
+        @Reaction(source: \\DuplicateSourceMarkerViewModel.service.source)
+        func countChanged(_ count: Int) {}
+      }
+      """,
+      expandedSource: """
+        @MainActor
+        @Observable
+        final class DuplicateSourceMarkerViewModel {
+          final class State {
+            var count = 0
+          }
+
+          let state = State()
+          let service: Service
+          func countChanged(_ count: Int) {}
+        }
+        """,
+      diagnostics: [
+        DiagnosticSpec(
+          id: MessageID(domain: "VISOR", id: "invalidSourceBoundDeclaration"),
+          message:
+          "@Bound requires one ordinary stored State property using @Bound(source:) or @Bound(source:selecting:)",
+          line: 6,
+          column: 5,
+          severity: .error,
+        ),
+        DiagnosticSpec(
+          id: MessageID(domain: "VISOR", id: "invalidSourceReactionDeclaration"),
+          message:
+          "@Reaction requires one nonthrowing Void method parameter using @Reaction(source:) or @Reaction(source:selecting:)",
+          line: 14,
+          column: 3,
+          severity: .error,
+        ),
+      ],
+      macros: viewModelV11Macros,
+    )
+  }
+
+  @Test
   func `Invalid ViewModel and State shapes fail closed`() {
     assertMacroExpansionSwiftTesting(
       """
