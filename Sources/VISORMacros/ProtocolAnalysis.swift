@@ -568,13 +568,20 @@ private struct TypeAliasHandler {
   ) -> TypeSyntax {
     var identifierTypeSyntax = identifierTypeSyntax
 
-    // TODO: Handle 6.3 module selectors
-
     if var genericArgumentClause = identifierTypeSyntax.genericArgumentClause {
       for i in genericArgumentClause.arguments.indices {
         genericArgumentClause.arguments[i] = qualifiedType(for: genericArgumentClause.arguments[i])
       }
       identifierTypeSyntax.genericArgumentClause = genericArgumentClause
+    }
+
+    // SwiftSyntax 603 inserts a module selector before `name`; this shape check
+    // also compiles with SwiftSyntax 602.
+    guard
+      identifierTypeSyntax.firstToken(viewMode: .sourceAccurate)?.id
+      == identifierTypeSyntax.name.id
+    else {
+      return TypeSyntax(identifierTypeSyntax)
     }
 
     guard typeAliasNames.contains(identifierTypeSyntax.name.text) else {

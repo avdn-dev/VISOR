@@ -1332,6 +1332,32 @@ func `Handle typealias in attributed use site`() {
   )
 }
 
+@Test
+func `Preserves a module selector that disambiguates a typealias`() {
+  assertMacroExpansionSwiftTesting(
+    """
+    @GenerateStub
+    protocol TextService {
+      typealias String = Never
+      func accept(_ value: Swift::String)
+    }
+    """,
+    expandedSource: """
+      protocol TextService {
+        typealias String = Never
+        func accept(_ value: Swift::String)
+      }
+
+      @Observable
+      final class StubTextService: TextService {
+        func accept(_ value: Swift::String) {
+        }
+      }
+      """,
+    macros: testMacros,
+  )
+}
+
 // MARK: - Escaping Closures
 
 @Test
