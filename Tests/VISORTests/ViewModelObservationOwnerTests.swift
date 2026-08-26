@@ -12,6 +12,8 @@ private struct OwnerSnapshot: Sendable {
 }
 
 #if os(macOS)
+import AppKit
+
 private final class HostLeaseCandidate: Sendable { }
 
 @MainActor
@@ -49,6 +51,40 @@ private struct ScenePhaseHost<Content: View>: View {
   private let phase: HostScenePhase
   private let content: Content
 
+}
+
+private enum OwnerTab: Hashable {
+  case observed
+  case other
+}
+
+@MainActor
+@Observable
+private final class OwnerTabSelection {
+  var value = OwnerTab.observed
+}
+
+@MainActor
+private struct GeneratedOwnerTabHost: View {
+  @Bindable var selection: OwnerTabSelection
+
+  let contentAppeared: TestEventCounter
+  let contentDisappeared: TestEventCounter
+
+  var body: some View {
+    TabView(selection: $selection.value) {
+      GeneratedOwnerScreen(
+        contentAppeared: contentAppeared,
+        contentDisappeared: contentDisappeared,
+      )
+      .tabItem { Text("Observed") }
+      .tag(OwnerTab.observed)
+
+      Text("Other")
+        .tabItem { Text("Other") }
+        .tag(OwnerTab.other)
+    }
+  }
 }
 
 @MainActor
@@ -142,6 +178,71 @@ extension ViewModelObservationOwnerTests {
     viewModel._visorObservationOwnership._visorRelease(
       ownerID: ObjectIdentifier(candidate)
     )
+  }
+
+  @Test(.timeLimit(.minutes(1)))
+  @MainActor
+  func `Tab reactivation keeps content gated until observation is ready`() async throws {
+    let service = OwnerService()
+    let statusService = OwnerStatusService()
+    let reactionGate = ControllableOperation<Void, Never>()
+    let viewModel = OwnerSourceBackedViewModel(
+      service: service,
+      statusService: statusService,
+      reactionGate: reactionGate,
+    )
+    let factory = OwnerSourceBackedViewModel.Factory { viewModel }
+    let selection = OwnerTabSelection()
+    let contentAppeared = TestEventCounter()
+    let contentDisappeared = TestEventCounter()
+    let root = AnyView(
+      GeneratedOwnerTabHost(
+        selection: selection,
+        contentAppeared: contentAppeared,
+        contentDisappeared: contentDisappeared,
+      )
+      .environment(factory)
+    )
+    let hostingView = NSHostingView(rootView: root)
+    hostingView.frame = NSRect(x: 0, y: 0, width: 320, height: 200)
+    let window = NSWindow(
+      contentRect: hostingView.frame,
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false,
+    )
+    window.isReleasedWhenClosed = false
+    window.contentView = hostingView
+    window.orderFront(nil)
+    defer {
+      hostingView.rootView = AnyView(EmptyView())
+      hostingView.layoutSubtreeIfNeeded()
+      window.contentView = nil
+      window.close()
+    }
+
+    hostingView.layoutSubtreeIfNeeded()
+    try await contentAppeared.wait()
+
+    selection.value = .other
+    hostingView.layoutSubtreeIfNeeded()
+    try await contentDisappeared.wait()
+    await statusService.publish(.loading)
+
+    selection.value = .observed
+    hostingView.layoutSubtreeIfNeeded()
+    try await reactionGate.waitUntilStarted()
+
+    #expect(contentAppeared.count == 1)
+    #expect(service.activeObservationCountForProof == 1)
+    #expect(statusService.activeObservationCountForProof == 1)
+
+    reactionGate.resolveAllInvocations(with: .success(()))
+    try await contentAppeared.wait(untilEventCount: 2)
+
+    #expect(contentAppeared.count == 2)
+    #expect(viewModel.state.status == .loading)
+    #expect(viewModel.state.reactedStatus == .loading)
   }
 
   @Test(.timeLimit(.minutes(1)))

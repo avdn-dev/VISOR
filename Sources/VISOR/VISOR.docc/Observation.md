@@ -430,7 +430,7 @@ Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounti
 
 ### Readiness and infrastructure failure
 
-While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host presents labelled progress instead of exposing partial feature content. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
+While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host remains visually transparent instead of exposing partial feature content. The transparent placeholder fills its proposed container, so a short reacquisition such as returning to a tab does not introduce progress chrome or collapse the surrounding layout. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
 
 Supply both `pending` and `failure` views when a feature needs its own copy or
 layout:
@@ -442,10 +442,11 @@ layout:
   failure: ProfileUnavailableView())
 ```
 
-The brief pre-construction state remains transparent. Custom pending UI should
-have a meaningful accessibility label, and custom failure UI should explain the
-unavailable state without becoming a dead end. VISOR does not pass the
-technical failure into either view.
+The brief pre-construction state remains transparent. Use custom pending UI
+only when preparation is expected to be perceptible, give it a meaningful
+accessibility label, and make custom failure UI explain the unavailable state
+without becoming a dead end. VISOR does not pass the technical failure into
+either view.
 
 These failures mean VISOR can no longer guarantee a coherent State. Examples include a readiness deadline exceeded by an initial asynchronous reaction, unexpected source termination, duplicate production ownership, or an internal protocol violation. Production readiness has a 30-second monotonic infrastructure limit and teardown joining has a 10-second limit; neither constrains producer-owned domain work. Ordinary cancellation and scene-policy pausing are lifecycle events, not failures.
 

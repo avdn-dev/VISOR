@@ -43,10 +43,11 @@ import SwiftUI
 /// TextField("Name", text: bindableState[\.name])
 /// ```
 ///
-/// The default owner UI shows labelled progress while observation becomes
-/// ready and a generic unavailable state after an infrastructure failure. Use
-/// the custom-presentation overload when the feature needs its own copy or
-/// layout; ordinary domain failures still belong in ViewModel State.
+/// The default owner UI remains visually transparent while observation becomes
+/// ready and shows a generic unavailable state after an infrastructure failure.
+/// Use the custom-presentation overload when genuinely slow preparation needs
+/// visible pending UI or the feature needs its own failure copy or layout;
+/// ordinary domain failures still belong in ViewModel State.
 ///
 /// - Parameters:
 ///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.
@@ -80,9 +81,9 @@ public macro LazyViewModel<VM: ViewModel>(
 ///
 /// The pending and failure views replace VISOR's defaults after the ViewModel
 /// has been created. The brief transparent pre-construction state is retained.
-/// Supply a meaningful accessibility label in custom pending UI, and make a
-/// custom failure view explain the unavailable state without creating a dead
-/// end.
+/// Use visible pending UI only when preparation is expected to be perceptible,
+/// supply it with a meaningful accessibility label, and make a custom failure
+/// view explain the unavailable state without creating a dead end.
 ///
 /// - Parameters:
 ///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.

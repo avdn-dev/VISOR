@@ -97,7 +97,7 @@ public func _visorOwnedViewModelContent<VM: ViewModel>(
   _visorOwnedViewModelContent(
     for: viewModel,
     observationPolicy: observationPolicy,
-    pending: { ProgressView("Preparing Screen") },
+    pending: { Color.clear },
     failure: {
       ContentUnavailableView(
         "Unable to Load",
