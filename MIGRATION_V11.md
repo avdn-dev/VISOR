@@ -448,7 +448,23 @@ The call-site spelling is unchanged:
   observationPolicy: .alwaysObserving)
 ```
 
-Its semantics are now fully structured. The generated owner reconciles every source before exposing content and cancels and joins the source session when ownership ends. Hoist the annotated view to the stable root of any UI flow whose descendants retain that ViewModel.
+The generated owner reconciles every source before exposing content and cancels and joins the source session when ownership ends. Hoist the annotated view to the stable root of any UI flow whose descendants retain that ViewModel.
+
+### Navigation lifetime correction after 11.0.0
+
+Observation ownership now follows the annotated view's SwiftUI structural
+identity. Version 11.0.0 tied the session to an appearance task, so pushing a
+destination or changing tabs could withdraw content even though SwiftUI retained
+the screen. Nested ViewModels, drafts and scroll position could then be lost.
+
+No call-site changes are required. A retained screen now keeps observing while
+covered; returning to it does not restart the initial reactions or replace its
+content. Actual removal or ViewModel identity replacement cancels the retained
+root task, which joins the source session before releasing ownership. This does
+not promise retention when the application or SwiftUI itself removes the view.
+
+Scene pauses remain explicit content-withdrawing lifetime boundaries; they are
+not navigation-disappearance policies.
 
 Scene policies retain their names:
 

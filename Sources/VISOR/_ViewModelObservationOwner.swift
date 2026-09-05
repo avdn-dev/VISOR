@@ -117,6 +117,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
   // MARK: Lifecycle
 
   package init(
+    initiallyEnabled: Bool = true,
     _visorDidBecomeReady:
     @escaping @MainActor @Sendable () -> Void = { },
     _visorDidFail:
@@ -141,6 +142,8 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     didClaimOwnership = _visorDidClaimOwnership
     didEnterOwnershipWait = _visorDidEnterOwnershipWait
     deadlinePolicy = _visorDeadlinePolicy
+    desiredIsEnabled = initiallyEnabled
+    activationEpoch = initiallyEnabled ? ActivationEpoch() : nil
   }
 
   /// Works around a Swift 6.2.4 release optimiser crash for explicitly
@@ -175,15 +178,12 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
   /// supervisor retains the graph; the identity lease remains releasing until
   /// that supervisor reports the eventual true join.
   package func _visorRun(
-    viewModel: VM,
-    initiallyEnabled: Bool,
+    viewModel: VM
   ) async {
     let candidate = viewModel._visorObservationOwnership
     let ownerID = ObjectIdentifier(self)
     guard !isRunning else { return }
     isRunning = true
-    desiredIsEnabled = initiallyEnabled
-    activationEpoch = initiallyEnabled ? ActivationEpoch() : nil
     failedActivationEpoch = nil
     failedGenerationID = nil
     reportedGenerationFailureID = nil
@@ -225,7 +225,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
     } else if let generation {
       // The session's strongly retaining supervisor continues the real join.
       // Keep this identity lease in its releasing state until that hand-off is
-      // truly safe, even though the cancelled SwiftUI root may now return.
+      // truly safe, even though the cancelled observation root may now return.
       candidate._visorBeginRelease(ownerID: ownerID)
       generation.session._visorWhenStopped {
         candidate._visorRelease(ownerID: ownerID)
@@ -292,7 +292,7 @@ package final class _ViewModelObservationOwner<VM: ViewModel> {
 
   @ObservationIgnored private var ownership: _ViewModelObservationOwnership?
 
-  @ObservationIgnored private var desiredIsEnabled = false
+  @ObservationIgnored private var desiredIsEnabled: Bool
 
   @ObservationIgnored private var activationEpoch: ActivationEpoch?
 

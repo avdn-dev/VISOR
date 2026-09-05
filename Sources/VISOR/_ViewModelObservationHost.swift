@@ -11,7 +11,6 @@ import SwiftUI
 package struct _ViewModelObservationHost<
   VM: ViewModel,
   Content: View,
-  Suspended: View,
   Pending: View,
   Failure: View,
 >: View {
@@ -22,14 +21,12 @@ package struct _ViewModelObservationHost<
     viewModel: VM,
     observationPolicy: ObservationPolicy,
     @ViewBuilder content: @escaping (VM) -> Content,
-    @ViewBuilder suspended: @escaping () -> Suspended,
     @ViewBuilder pending: @escaping () -> Pending,
     @ViewBuilder failure: @escaping () -> Failure,
   ) {
     self.viewModel = viewModel
     self.observationPolicy = observationPolicy
     self.content = content
-    self.suspended = suspended
     self.pending = pending
     self.failure = failure
   }
@@ -39,7 +36,7 @@ package struct _ViewModelObservationHost<
   package var body: some View {
     Group {
       if !isEnabled {
-        suspended()
+        Color.clear
       } else if
         let owner,
         owner._visorCanExposeContent(
@@ -55,11 +52,10 @@ package struct _ViewModelObservationHost<
       }
     }
     .task {
-      // Every SwiftUI task lifetime receives a fresh contender. If a prior
-      // lifetime is still joining, the ViewModel token serialises hand-off.
-      let activeOwner = _ViewModelObservationOwner<VM>()
-      owner = activeOwner
-      await activeOwner._visorRun(
+      // Appearance starts ownership, but covering a destination does not end
+      // its SwiftUI identity. State releases this lifetime on actual removal.
+      guard lifetime == nil, !Task.isCancelled else { return }
+      lifetime = _ViewModelObservationLifetime(
         viewModel: viewModel,
         initiallyEnabled: isEnabled,
       )
@@ -71,15 +67,18 @@ package struct _ViewModelObservationHost<
 
   // MARK: Private
 
-  @State private var owner: _ViewModelObservationOwner<VM>?
+  @State private var lifetime: _ViewModelObservationLifetime<VM>?
   @Environment(\.scenePhase) private var scenePhase
 
   private let viewModel: VM
   private let observationPolicy: ObservationPolicy
   private let content: (VM) -> Content
-  private let suspended: () -> Suspended
   private let pending: () -> Pending
   private let failure: () -> Failure
+
+  private var owner: _ViewModelObservationOwner<VM>? {
+    lifetime?.owner
+  }
 
   private var isEnabled: Bool {
     observationPolicy._visorIsEnabled(in: scenePhase)
@@ -125,7 +124,6 @@ public func _visorOwnedViewModelContent<VM: ViewModel>(
     viewModel: viewModel,
     observationPolicy: observationPolicy,
     content: content,
-    suspended: { Color.clear },
     pending: pending,
     failure: failure,
   )

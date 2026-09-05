@@ -170,6 +170,13 @@ ProfileScreen()
 
 `ProfileScreen` does not expose actionable content until the source baseline has been reconciled. Both bindings select from one producer snapshot, so they share one source subscription and revision lane. State is a plain nested `final class`; `@ViewModel` supplies its Observation accessors and routed selectors.
 
+Observation follows the screen's SwiftUI structural identity, not each appearance.
+Pushing an editor or switching tabs keeps the retained screen's observation and
+content intact, including nested ViewModels, local State and scroll position.
+Removing the screen cancels observation and joins teardown before its ViewModel
+identity can be claimed again. Explicit scene-pause policies still withdraw
+content and reconcile fresh snapshots before restoring it.
+
 ## Observation declarations
 
 VISOR accepts exactly four source-backed declaration forms:

@@ -424,13 +424,22 @@ This keeps production Observation invalidation and test-history capture on the s
 
 `@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before exposing `content`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
 
-ViewModel retention, observation-session ownership, and producer ownership are separate lifetimes. Generated `@State` retains the ViewModel for the annotated view's SwiftUI structural identity. Within that identity, the host's structured task owns the observation session. Pausing or ending that session does not stop producer-owned channels or domain work; their owner manages that lifetime separately.
+ViewModel retention, observation-session ownership, and producer ownership are separate lifetimes. Generated `@State` retains the ViewModel for the annotated view's SwiftUI structural identity. Within that identity, host State retains a lifetime object that owns the observation root task. The appearance task only starts that lifetime; its cancellation does not end observation. Pausing or ending observation does not stop producer-owned channels or domain work; their owner manages that lifetime separately.
+
+Pushing another destination or switching tabs does not withdraw the retained
+screen's content or restart its initial reactions. Its subscriptions remain
+active, so edits from another screen continue to update State. Content identity,
+nested ViewModels and scroll position survive ordinary covering and return.
+Actual removal or ViewModel identity replacement releases the lifetime object
+and cancels its root task. That root joins the source session before releasing
+the identity lease. VISOR cannot preserve a subtree that the application or
+SwiftUI itself removes.
 
 Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounting two owners for the same ViewModel identity is rejected rather than creating duplicate subscriptions.
 
 ### Readiness and infrastructure failure
 
-While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host remains visually transparent instead of exposing partial feature content. The transparent placeholder fills its proposed container, so a short reacquisition such as returning to a tab does not introduce progress chrome or collapse the surrounding layout. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
+While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host remains visually transparent instead of exposing partial feature content. The transparent placeholder fills its proposed container, so initial preparation or resuming after an explicit scene pause does not introduce progress chrome or collapse the surrounding layout. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
 
 Supply both `pending` and `failure` views when a feature needs its own copy or
 layout:
@@ -472,6 +481,10 @@ Choose how the generated owner responds to scene phase:
 ```
 
 The default is `.alwaysObserving`. A pause policy revokes readiness, withdraws gated content, and cancels the generated source session. On reactivation, a fresh generation reconciles the latest snapshots before content returns. Use a pause policy when the gated content owns high-frequency renderer or presentation work that should also stop off-screen.
+
+Unlike navigation covering, a scene pause deliberately removes the content
+subtree, cancelling descendant view tasks and discarding their local State.
+Keep any draft that must survive this boundary in a longer-lived domain owner.
 
 ## Deliberate boundaries
 

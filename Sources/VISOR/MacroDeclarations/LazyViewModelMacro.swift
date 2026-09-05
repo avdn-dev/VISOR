@@ -31,6 +31,10 @@ import SwiftUI
 /// Generated `@State` retains one ViewModel for the annotated view's SwiftUI
 /// structural identity. The Content view is a pure function of state +
 /// onAction, trivially previewable with static state and no factory.
+/// Observation shares that structural lifetime: navigation covering and tab
+/// switches do not withdraw retained content or restart initial reactions.
+/// Actual removal cancels observation; explicit scene pauses still withdraw
+/// content and reconcile fresh snapshots before restoring it.
 ///
 /// **Read-only state:** Use the generated `state` alias for reading:
 /// ```swift

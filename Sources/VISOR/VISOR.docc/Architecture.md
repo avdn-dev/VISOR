@@ -358,9 +358,14 @@ This is the preferred navigation path for feature code.
 
 ## Scene lifetime
 
+Observation follows SwiftUI structural identity, not appearance. A navigation
+push or tab switch preserves the retained screen's observation and content;
+actual removal cancels and joins its session. Nested ViewModels and local view
+State therefore survive covering a screen without special hoisting or caches.
+
 The generated owner normally observes through all scene phases. Use `observationPolicy: .pauseInBackground` or `.pauseWhenInactive` when gated presentation or renderer work should stop with the scene.
 
-Pausing revokes readiness and cancels the source session. A later activation reconciles the latest source snapshots before content becomes actionable again. Producer-owned domain activity is independent and must have its own explicit lifetime.
+Pausing revokes readiness, withdraws the content subtree and cancels the source session. A later activation reconciles the latest source snapshots before content becomes actionable again. Producer-owned domain activity is independent and must have its own explicit lifetime.
 
 ## Loadable
 

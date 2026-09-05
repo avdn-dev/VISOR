@@ -15,6 +15,11 @@ import SwiftUI
 /// Use ``pauseInBackground`` or ``pauseWhenInactive`` only when the observation loop
 /// drives high-frequency work (polling, real-time rendering) that wastes resources
 /// when the UI is not visible.
+///
+/// These policies respond to scene phase, not navigation covering or tab
+/// selection. Observation belongs to the retained view's structural identity.
+/// A scene pause deliberately withdraws content and cancels descendant view
+/// tasks; resuming reconciles fresh snapshots before restoring content.
 public enum ObservationPolicy: Equatable, Sendable {
   /// Observation runs continuously regardless of scene phase.
   case alwaysObserving
