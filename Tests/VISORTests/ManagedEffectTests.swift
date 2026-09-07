@@ -70,6 +70,60 @@ struct ManagedEffectTests {
   }
 
   @Test
+  func `Cancel all removes pending work and permits new serial submissions`() async throws {
+    // Given
+    let queue = SerialEffectQueue()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = queue.enqueue { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    var cancelledStarts = 0
+    let pending = (0..<20).map { _ in queue.enqueue { cancelledStarts += 1 } }
+
+    // When
+    queue.cancelAll()
+    let new = queue.enqueue { 3 }
+    for handle in pending {
+      await #expect(throws: CancellationError.self) { try await handle.value() }
+    }
+    operation.resolve(invocation, with: .success(1))
+
+    // Then
+    #expect(try await new.value() == 3)
+    #expect(cancelledStarts == 0)
+    await #expect(throws: CancellationError.self) { try await first.value() }
+  }
+
+  @Test
+  func `Full queue delivers admission failure without executing preparation`() async throws {
+    // Given
+    let queue = SerialEffectQueue(capacity: 1)
+    let target = EffectRecipient()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = queue.enqueue { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    var didPrepare = false
+
+    // When
+    let rejected = queue.enqueue(for: target, operation: { () async throws -> Int in
+      didPrepare = true
+      return 2
+    }) { target, result in
+      if case .failure(let error) = result, error is EffectQueueFullError { target.failures += 1 }
+    }
+
+    // Then
+    #expect(target.failures == 1)
+    #expect(!didPrepare)
+    await #expect(throws: EffectQueueFullError.self) { try await rejected.value() }
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+    _ = try await first.value()
+  }
+
+  @Test
   func `Latest suppresses stale success even when preparation ignores cancellation`() async throws {
     // Given
     let effect = LatestEffect()
@@ -234,6 +288,155 @@ struct ManagedEffectTests {
     // Then
     #expect(reference == nil)
     await #expect(throws: CancellationError.self) { try await handle.value() }
+  }
+
+  @Test
+  func `Serial queue preserves order across awaits and a failed operation`() async throws {
+    // Given
+    let queue = SerialEffectQueue()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    var order = [Int]()
+    let first = queue.enqueue { order.append(1)
+      return await operation.run(invocation)
+    }
+    try await operation.waitUntilStarted()
+
+    // When
+    let failed = queue.enqueue { () async throws -> Int in
+      order.append(2)
+      throw ManagedEffectTestError.expected
+    }
+    let last = queue.enqueue { order.append(3)
+      return 3
+    }
+
+    // Then
+    #expect(order == [1])
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+    _ = try await last.value()
+
+    // Then
+    #expect(order == [1, 2, 3])
+    #expect(try await first.value() == 1)
+    await #expect(throws: ManagedEffectTestError.expected) { try await failed.value() }
+  }
+
+  @Test
+  func `Pending cancellation completes without starting or blocking later queued work`() async throws {
+    // Given
+    let queue = SerialEffectQueue()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = queue.enqueue { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    var ranCancelledWork = false
+    let pending = queue.enqueue { ranCancelledWork = true
+      return 2
+    }
+    let last = queue.enqueue { 3 }
+
+    // When
+    pending.cancel()
+
+    // Then
+    await #expect(throws: CancellationError.self) { try await pending.value() }
+    #expect(!ranCancelledWork)
+    #expect(operation.finishedCount == 0)
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+    _ = try await first.value()
+
+    // Then
+    #expect(try await last.value() == 3)
+  }
+
+  @Test
+  func `Cancelling serial work never overlaps the next invocation with cleanup`() async throws {
+    // Given
+    let queue = SerialEffectQueue()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = queue.enqueue { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    var nextStarted = false
+
+    // When
+    first.cancel()
+    let next = queue.enqueue { nextStarted = true
+      return 2
+    }
+    try await operation.waitUntilCancelled()
+
+    // Then
+    #expect(!nextStarted)
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+    _ = try await next.value()
+
+    // Then
+    #expect(nextStarted)
+    await #expect(throws: CancellationError.self) { try await first.value() }
+  }
+
+  @Test
+  func `Bounded queue rejects admission and becomes available after completion`() async throws {
+    // Given
+    let queue = SerialEffectQueue(capacity: 1)
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = queue.enqueue { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    var rejectedWorkStarted = false
+
+    // When
+    let rejected = queue.enqueue { rejectedWorkStarted = true
+      return 2
+    }
+
+    // Then
+    await #expect(throws: EffectQueueFullError.self) { try await rejected.value() }
+    #expect(!rejectedWorkStarted)
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+    _ = try await first.value()
+    let accepted = queue.enqueue { 3 }
+
+    // Then
+    #expect(try await accepted.value() == 3)
+  }
+
+  @Test
+  func `Releasing a queue cancels running and pending handles`() async throws {
+    // Given
+    var queue: SerialEffectQueue? = SerialEffectQueue()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let first = try #require(queue?.enqueue { await operation.run(invocation) })
+    try await operation.waitUntilStarted()
+    var pendingStarted = false
+    let pending = try #require(queue?.enqueue { pendingStarted = true
+      return 2
+    })
+
+    // When
+    queue = nil
+    try await operation.waitUntilCancelled()
+
+    // Then
+    await #expect(throws: CancellationError.self) { try await pending.value() }
+    #expect(!pendingStarted)
+
+    // When
+    operation.resolve(invocation, with: .success(1))
+
+    // Then
+    await #expect(throws: CancellationError.self) { try await first.value() }
   }
 
   @Test

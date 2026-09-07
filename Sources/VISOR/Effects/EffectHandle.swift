@@ -17,6 +17,13 @@ public struct EffectSupersededError: Error, Equatable, Sendable {
   public init() { }
 }
 
+// MARK: - EffectQueueFullError
+
+/// Indicates that a bounded serial queue could not accept another operation.
+public struct EffectQueueFullError: Error, Equatable, Sendable {
+  public init() { }
+}
+
 // MARK: - EffectHandle
 
 /// Identifies one submission, independently of subsequent work on its owner.

@@ -80,6 +80,10 @@ final class _EffectJob<Output: Sendable>: _AnyEffectJob {
     finishIfPendingCancellation()
   }
 
+  func reject() {
+    finish(.failure(EffectQueueFullError()))
+  }
+
   // MARK: Private
 
   private static var logger: Logger {
@@ -144,7 +148,7 @@ final class _EffectJob<Output: Sendable>: _AnyEffectJob {
 // MARK: - _EffectRuntime
 
 /// The public owner never appears in a running task's capture graph. Releasing
-/// it releases this runtime and cancels all outstanding jobs, including replaced
+/// it releases this runtime and cancels all outstanding jobs, including queued
 /// jobs whose handles are retained elsewhere.
 @MainActor
 final class _EffectRuntime {
@@ -163,6 +167,7 @@ final class _EffectRuntime {
 
   enum Policy {
     case latest
+    case serial(capacity: Int?)
   }
 
   func submit<Output: Sendable>(
@@ -174,6 +179,10 @@ final class _EffectRuntime {
       self?.finished(id)
     }
     let handle = EffectHandle(job: job)
+    if case .serial(let capacity) = policy, let capacity, jobs.count >= capacity {
+      job.reject()
+      return handle
+    }
     if case .latest = policy, let currentID {
       jobs[currentID]?.cancel(.superseded)
     }
@@ -183,6 +192,10 @@ final class _EffectRuntime {
     case .latest:
       currentID = job.id
       job.start()
+
+    case .serial:
+      pending.append(job.id)
+      startNext()
     }
     return handle
   }
@@ -203,10 +216,29 @@ final class _EffectRuntime {
   private var jobs = [UUID: any _AnyEffectJob]()
   private var cancellations = [UUID: _EffectCancellation]()
   private var currentID: UUID?
+  private var pending = [UUID]()
+  private var pendingIndex = 0
 
   private func finished(_ id: UUID) {
     jobs[id] = nil
     cancellations[id] = nil
     if currentID == id { currentID = nil }
+    if case .serial = policy { startNext() }
+  }
+
+  private func startNext() {
+    guard currentID == nil else { return }
+    while pendingIndex < pending.count {
+      let id = pending[pendingIndex]
+      pendingIndex += 1
+      guard let job = jobs[id] else { continue }
+      currentID = id
+      job.start()
+      break
+    }
+    if pendingIndex == pending.count {
+      pending.removeAll(keepingCapacity: true)
+      pendingIndex = 0
+    }
   }
 }
