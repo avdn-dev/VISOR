@@ -95,6 +95,30 @@ struct ManagedEffectTests {
   }
 
   @Test
+  func `Concurrent receivers deliver failures and successes independently`() async throws {
+    // Given
+    let effects = ConcurrentEffects()
+    let target = EffectRecipient()
+
+    // When
+    let failure = effects.run(for: target, operation: { () async throws -> Int in
+      throw ManagedEffectTestError.expected
+    }) { target, result in
+      if case .failure = result { target.failures += 1 }
+    }
+    let success = effects.run(for: target) { 2 } receive: { target, value in
+      target.values.append(value)
+    }
+    await effects.finish()
+
+    // Then
+    #expect(target.failures == 1)
+    #expect(target.values == [2])
+    #expect(try await success.value() == 2)
+    await #expect(throws: ManagedEffectTestError.expected) { try await failure.value() }
+  }
+
+  @Test
   func `Full queue delivers admission failure without executing preparation`() async throws {
     // Given
     let queue = SerialEffectQueue(capacity: 1)
@@ -262,6 +286,25 @@ struct ManagedEffectTests {
     #expect(completed)
     #expect(target.values.isEmpty)
     await #expect(throws: CancellationError.self) { try await handle.value() }
+  }
+
+  @Test
+  func `Cancelling a waiter does not cancel its operation`() async throws {
+    // Given
+    let effects = ConcurrentEffects()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    let handle = effects.run { await operation.run(invocation) }
+    try await operation.waitUntilStarted()
+    let waiter = Task { try await handle.value() }
+
+    // When
+    waiter.cancel()
+    operation.resolve(invocation, with: .success(3))
+
+    // Then
+    #expect(try await waiter.value == 3)
+    #expect(operation.cancelledCount == 0)
   }
 
   @Test
@@ -437,6 +480,31 @@ struct ManagedEffectTests {
 
     // Then
     await #expect(throws: CancellationError.self) { try await first.value() }
+  }
+
+  @Test
+  func `Concurrent effects overlap without replacing each other`() async throws {
+    // Given
+    let effects = ConcurrentEffects()
+    let operation = ControllableOperation<Int, Never>()
+    let firstInvocation = operation.prepare()
+    let secondInvocation = operation.prepare()
+
+    // When
+    let first = effects.run { await operation.run(firstInvocation) }
+    let second = effects.run { await operation.run(secondInvocation) }
+    try await operation.waitUntilStarted(count: 2)
+    operation.resolve(secondInvocation, with: .success(2))
+
+    // Then
+    #expect(try await second.value() == 2)
+    #expect(operation.cancelledCount == 0)
+
+    // When
+    operation.resolve(firstInvocation, with: .success(1))
+
+    // Then
+    #expect(try await first.value() == 1)
   }
 
   @Test

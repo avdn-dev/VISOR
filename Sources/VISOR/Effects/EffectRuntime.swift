@@ -168,6 +168,7 @@ final class _EffectRuntime {
   enum Policy {
     case latest
     case serial(capacity: Int?)
+    case concurrent
   }
 
   func submit<Output: Sendable>(
@@ -191,6 +192,9 @@ final class _EffectRuntime {
     switch policy {
     case .latest:
       currentID = job.id
+      job.start()
+
+    case .concurrent:
       job.start()
 
     case .serial:
