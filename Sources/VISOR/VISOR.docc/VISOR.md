@@ -67,6 +67,18 @@ There is no umbrella product. Import and link only the capabilities a target use
 - ``NoModalDestination``
 - ``NoRootDestination``
 
+### Action bindings and effects
+
+- <doc:BindingsAndEffects>
+- ``LatestEffect``
+- ``SerialEffectQueue``
+- ``ConcurrentEffects``
+- ``EffectHandle``
+- ``EffectOutcome``
+- ``EffectContext``
+- ``EffectSupersededError``
+- ``EffectQueueFullError``
+
 ### Testing
 
 - [Testing](Testing.md)

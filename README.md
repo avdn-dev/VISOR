@@ -10,6 +10,7 @@ VISOR gives those decisions one explicit shape:
 
 - Producers publish stable, `Sendable` snapshots through `ObservationChannel`; consumers receive the read-only `ObservationSource` capability.
 - `@ViewModel`, `@Bound`, and `@Reaction` generate MainActor State routing and cooperative observation recipes.
+- `@StateBinding` routes control writes through synchronous actions; typed effect owners manage replacement, FIFO, or concurrent work with completion handles.
 - `@LazyViewModel` owns the generated observation session, gates content on readiness, and applies scene-lifetime policy.
 - `VISORTesting` fences one structured action at a time and checks its complete State mutation history.
 - `VISORTestDoubles` generates stubs and spies without pulling the production or testing runtime into a service module.
@@ -200,6 +201,49 @@ func valueChanged(_ value: Value) async { ... }
 ```
 
 Source-backed `@Polled`, debounce, and throttle declarations are deliberately absent. Durable latest state belongs in a producer-owned source. Elapsed-time work belongs in an explicitly structured task with an injected `Clock`. Lossless events need an event-specific buffered contract rather than a latest-state source.
+
+## Action bindings and effects (11.1)
+
+Annotate a single-payload action to keep direct binding syntax while moving
+validation and side effects into the ViewModel:
+
+```swift
+enum Action {
+  @StateBinding(\State.isFocusEnabled)
+  case focusChanged(Bool)
+}
+
+func handle(_ action: Action) {
+  switch action {
+  case .focusChanged(let enabled):
+    updateState(\.isFocusEnabled, to: enabled)
+  }
+}
+
+// Inside @LazyViewModel content:
+Toggle("Focus Mode", isOn: bindableState[\.isFocusEnabled])
+```
+
+Binding writes call the handler synchronously. `updateState` and source
+projections commit without dispatching an action again. Existing async handlers
+remain supported for ViewModels without `@StateBinding`.
+
+Retain a `LatestEffect` for replaceable preparation, `SerialEffectQueue` for
+ordered events, or `ConcurrentEffects` for independent work. Each submission
+returns a handle with `value()`, `result`, and `cancel()`. The receiver API
+captures its target weakly and suppresses cancelled or superseded results:
+
+```swift
+search.run(for: self) { [service] in
+  try await service.search(query)
+} receive: { model, result in
+  model.applySearchResult(result)
+}
+```
+
+See [Action bindings and managed effects](Sources/VISOR/VISOR.docc/BindingsAndEffects.md)
+for toggling, queue admission, authored initialisers, lifetime, and complete
+effect testing. These APIs are additive in 11.1.
 
 ## Testing
 

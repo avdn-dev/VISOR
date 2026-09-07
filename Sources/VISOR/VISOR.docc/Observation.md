@@ -420,6 +420,13 @@ TextField("Search", text: bindableState[\.query])
 
 This keeps production Observation invalidation and test-history capture on the same synchronous route. Selectors are generated only for supported top-level stored fields whose getter is at least `fileprivate`; they do not recursively expose nested members.
 
+With `@StateBinding(\State.field)` on an action case, that field's selector
+proposes the write to synchronous `handle(_:)`. The handler commits using
+`updateState`. Source projections and `updateState` never dispatch binding
+actions. Use `viewModel.bindableState` for manually constructed models so
+authored initialisers receive their action routes before binding. See
+<doc:BindingsAndEffects> for full construction and completion semantics.
+
 ## Structured SwiftUI ownership
 
 `@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before exposing `content`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.

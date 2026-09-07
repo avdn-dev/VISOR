@@ -217,7 +217,13 @@ state[\.query] = "Swift"
 TextField("Search", text: $state[\.query])
 ```
 
-The gateway guarantees how a write travels; it does not decide which layer is authorised to make it. Use actions for validation, persistence, analytics, async work, or coupled mutations. Direct bindings are appropriate for genuinely local control input.
+Unannotated selectors commit directly and are appropriate for genuinely local
+control input. Use `@StateBinding(\State.field)` on an action case when a control
+requires validation, persistence, analytics, or coupled mutations. The same
+selector then synchronously proposes a value to `handle(_:)`; the handler uses
+`updateState` to commit without redispatching. Use `viewModel.bindableState` as
+the binding entry point, particularly with authored initialisers. See
+<doc:BindingsAndEffects> for the action-routing and effect-lifetime contracts.
 
 Selectors are flat. `\.settings` can route replacement or value write-back of the top-level field; VISOR does not generate `\.settings.theme` history. A nested mutable reference should own its own Observation boundary or be represented by a stable domain snapshot.
 

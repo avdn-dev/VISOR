@@ -4,6 +4,31 @@ VISOR 11 is a semantic observation and testing cutover, not a collection of one-
 
 Migrate one resolved SwiftPM graph together. Mixed package requirements cannot select both VISOR 10 and VISOR 11 in the same graph.
 
+## Additive APIs in 11.1
+
+Existing 11.0 consumers need no source changes. To opt into action-backed
+controls, add `@StateBinding(\State.field)` to a one-payload `Action` case and
+make `handle(_:)` synchronous and nonthrowing. Keep
+`bindableState[\.field]` in `@LazyViewModel` content; outside it, use
+`viewModel.bindableState[\.field]`. Factories and the canonical binding property
+connect routes for authored initialisers, which macros do not rewrite.
+
+Commit with `updateState`, not an annotated `state[\.field]` setter: the latter
+dispatches the action and would recurse inside its own handler. Source-driven
+updates do not dispatch binding actions. Unannotated fields and async handlers
+without `@StateBinding` retain their existing behaviour.
+
+Move replaceable async preparation into `LatestEffect`, ordered events into
+`SerialEffectQueue`, and independent work into `ConcurrentEffects`. Retain these
+owners; use the weak-target `for:operation:receive:` overload for result commits.
+Every submission returns a completion handle. Managed work is not automatically
+joined by `test.perform(.action)`; await a handle or the relevant owner's
+`finish()` inside `test.perform { ... }` when testing complete effects.
+
+See [Action bindings and managed effects](Sources/VISOR/VISOR.docc/BindingsAndEffects.md)
+for cancellation, failure, ordering, and lifetime guarantees. These APIs do not
+change source observation or make in-memory work durable.
+
 ## 1. Update products and imports
 
 Change the package requirement to `11.0.0` or later and declare products by responsibility:
