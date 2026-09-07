@@ -87,7 +87,7 @@ final class _EffectJob<Output: Sendable>: _AnyEffectJob {
   // MARK: Private
 
   private static var logger: Logger {
-    Logger(subsystem: "dev.avdn.VISOR", category: "Effects")
+    Logger(subsystem: "VISOR", category: "Effects")
   }
 
   private var operation: (@MainActor @Sendable (EffectContext) async throws -> Output)?
