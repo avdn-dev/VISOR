@@ -114,9 +114,15 @@ public protocol _ViewModelState: AnyObject {
 
   /// The active test mutation recorder, when the State is reserved by a test.
   var _visorMutationRecorder: (any _StateMutationRecorder)? { get set }
+  /// Optional synchronous action routes for annotated selectors.
+  var _visorStateBindingRoutes: _StateBindingRoutes<Self>? { get }
 }
 
 extension _ViewModelState {
+  public var _visorStateBindingRoutes: _StateBindingRoutes<Self>? {
+    nil
+  }
+
   /// Reads or writes State through a generated selector key path.
   public subscript<Value>(
     _ selection: KeyPath<_VISORSelectors, _StateField<Self, Value>>
@@ -127,6 +133,7 @@ extension _ViewModelState {
     }
     set {
       let field = Self._visorSelectors[keyPath: selection]
+      if _visorStateBindingRoutes?.propose(newValue, for: field) == true { return }
       field.write(newValue, to: self)
     }
   }
@@ -155,6 +162,7 @@ extension ViewModel {
     >,
     to value: Value,
   ) {
-    state[selection] = value
+    let field = State._visorSelectors[keyPath: selection]
+    field.write(value, to: state)
   }
 }

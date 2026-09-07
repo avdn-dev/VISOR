@@ -37,6 +37,8 @@ public protocol ViewModel: Observable, AnyObject {
   /// Describes cooperative observation sources to VISOR's package-owned
   /// runtime. `@ViewModel` generates this hook.
   func _visorBuildObservationRecipe(into visitor: _ObservationRecipeVisitor)
+  /// Connects generated synchronous action routes. Public only for macros.
+  func _visorConnectStateBindings()
   /// Dispatch an action. Implement sync or async as needed; the protocol requires `async`.
   func handle(_ action: Action) async
 }
@@ -44,6 +46,8 @@ public protocol ViewModel: Observable, AnyObject {
 extension ViewModel {
 
   // MARK: Public
+
+  public func _visorConnectStateBindings() { }
 
   public func _visorBuildObservationRecipe(
     into _: _ObservationRecipeVisitor

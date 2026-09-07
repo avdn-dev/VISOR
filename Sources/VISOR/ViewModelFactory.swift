@@ -85,7 +85,9 @@ public final class ViewModelFactory<VM: ViewModel> {
   /// - Precondition: This factory was created with ``init(_:)``. Calling this
   ///   method on a routed factory fails because no Router is supplied.
   public func makeViewModel() -> VM {
-    _make(nil)
+    let viewModel = _make(nil)
+    viewModel._visorConnectStateBindings()
+    return viewModel
   }
 
   /// Creates a ViewModel with the generated type-erased Router bridge.
@@ -97,7 +99,9 @@ public final class ViewModelFactory<VM: ViewModel> {
   /// - Precondition: A routed factory receives a non-nil Router whose
   ///   `NavigationScene` matches the type declared by ``routed(_:)``.
   public func _visorMakeViewModel(router: AnyObject?) -> VM {
-    _make(router)
+    let viewModel = _make(router)
+    viewModel._visorConnectStateBindings()
+    return viewModel
   }
 
   // MARK: Private

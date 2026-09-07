@@ -73,7 +73,7 @@ public struct LazyViewModelMacro: MemberMacro {
     }
 
     members.append(
-      "var bindableState: Bindable<\(raw: viewModelType).State> { Bindable(viewModel.state) }"
+      "var bindableState: Bindable<\(raw: viewModelType).State> { viewModel.bindableState }"
     )
 
     let ownedContent: ExprSyntax =

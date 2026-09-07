@@ -14,6 +14,8 @@ import SwiftSyntaxMacros
 struct VISORPlugin: CompilerPlugin {
   let providingMacros: [Macro.Type] = [
     BoundMacro.self,
+    StateBindingMacro.self,
+    ViewModelStateBindingsMacro.self,
     LazyViewModelMacro.self,
     ReactionMacro.self,
     ObservationStateMacro.self,

@@ -250,7 +250,9 @@ extension ClassDeclSyntax {
       ? DeclSyntax(stringLiteral: "\(prefix)let state: State")
       : nil
 
-    guard !dependencies.isEmpty || needsStateInitialisation else {
+    let stateBindings = StateBindingAnalysis(viewModel: self, state: state)
+    let connectsStateBindings = stateBindings.isValid && !stateBindings.bindings.isEmpty
+    guard !dependencies.isEmpty || needsStateInitialisation || connectsStateBindings else {
       return ViewModelSynthesisPlan(
         stateDeclaration: stateDeclaration,
         initialiserDeclaration: nil,
@@ -276,6 +278,7 @@ extension ClassDeclSyntax {
       }
     }
 
+    if connectsStateBindings { body.append("self._visorConnectStateBindings()") }
     let bodySource = body.joined(separator: "\n")
     let initialiser = DeclSyntax(stringLiteral: """
       \(prefix)init(\(parameters)) {
@@ -620,6 +623,11 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
     guard !sourceObservationAnalysis.hasRejectedDeclaration else { return [] }
 
     var attributes: [AttributeSyntax] = ["@VISOR._ViewModelState"]
+    let stateBindings = StateBindingAnalysis(viewModel: viewModel, state: state)
+    if stateBindings.isValid, !stateBindings.bindings.isEmpty {
+      let fields = stateBindings.bindings.map { "\"\($0.fieldName)\"" }.joined(separator: ", ")
+      attributes.append(AttributeSyntax(stringLiteral: "@VISOR._ViewModelStateBindings(\(fields))"))
+    }
     if !state.hasExplicitMainActor {
       attributes.insert("@MainActor", at: 0)
     }
@@ -751,6 +759,10 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
       ))
     }
 
+    let stateBindings = StateBindingAnalysis(viewModel: viewModel, state: state)
+    stateBindings.diagnose(in: context)
+    guard stateBindings.isValid else { return [] }
+
     let groups = sourceObservationAnalysis.groups
 
     let access = accessLevel(of: viewModel)
@@ -768,6 +780,23 @@ public struct ViewModelMacro: MemberMacro, MemberAttributeMacro, ExtensionMacro 
     }
     if let initialiserDeclaration = synthesisPlan?.initialiserDeclaration {
       members.append(initialiserDeclaration)
+    }
+
+    if !stateBindings.bindings.isEmpty {
+      let routes = stateBindings.bindings.map { binding in
+        let argument = binding.label.map { "\($0): value" } ?? "value"
+        return """
+          routes.register(State._visorSelectors.\(binding.fieldName)) { [weak self] value in
+            self?.handle(.\(binding.caseName)(\(argument)))
+          }
+          """
+      }.joined(separator: "\n")
+      members.append(DeclSyntax(stringLiteral: """
+        \(prefix)func _visorConnectStateBindings() {
+          guard let routes = state._visorStateBindingRoutes, routes.connect(owner: self) else { return }
+          \(routes)
+        }
+        """))
     }
 
     // Swift 6.2.4 can crash in release builds while synthesising destruction
