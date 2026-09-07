@@ -121,4 +121,14 @@ verify_hidden_type _ObservationRecipe
 verify_inaccessible _visorIdentity
 verify_inaccessible _visorMakeObservationRecipes
 
+run_rejected_batch \
+  RootGatewayAccessControlProbe \
+  "binding payload type contract" \
+  -Xswiftc -DVISOR_PROBE_BINDING_PAYLOAD
+
+case "$probe_output" in
+  *"cannot convert value of type 'Int' to expected argument type 'String'"*) ;;
+  *) report_missing_diagnostic "binding payload type" ;;
+esac
+
 echo "Root gateway metadata and observation lifecycle controls remain package-inaccessible."
