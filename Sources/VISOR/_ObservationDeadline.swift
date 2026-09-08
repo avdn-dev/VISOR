@@ -175,67 +175,6 @@ nonisolated enum _ObservationDeadlineRaceOutcome<Value: Sendable>:
   case callerCancellation
 }
 
-// MARK: - _ObservationDeadlineRaceLatch
-
-/// A one-shot race latch. Its lock protects only non-suspending state changes;
-/// continuations are removed while locked and always resumed after unlocking.
-nonisolated private final class _ObservationDeadlineRaceLatch<Value: Sendable>:
-  Sendable
-{
-
-  // MARK: Internal
-
-  typealias Outcome = _ObservationDeadlineRaceOutcome<Value>
-
-  @discardableResult
-  func resolve(_ outcome: Outcome) -> Bool {
-    let resolution: (didWin: Bool, waiters: [Waiter]) =
-      lock.withLock { state in
-        guard state.outcome == nil else { return (false, []) }
-        state.outcome = outcome
-        let waiters = Array(state.waiters.values)
-        state.waiters.removeAll(keepingCapacity: false)
-        return (true, waiters)
-      }
-    for waiter in resolution.waiters {
-      waiter.resume(returning: outcome)
-    }
-    return resolution.didWin
-  }
-
-  func wait() async -> Outcome {
-    let id = UUID()
-    return await withCheckedContinuation { continuation in
-      let immediate: Outcome? = lock.withLock { state in
-        if let outcome = state.outcome {
-          return outcome
-        }
-        state.waiters[id] = continuation
-        return nil
-      }
-      if let immediate {
-        continuation.resume(returning: immediate)
-      }
-    }
-  }
-
-  func hasResolved() -> Bool {
-    lock.withLock { $0.outcome != nil }
-  }
-
-  // MARK: Private
-
-  private typealias Waiter = CheckedContinuation<Outcome, Never>
-
-  private struct State: Sendable {
-    var outcome: Outcome?
-    var waiters = [UUID: Waiter]()
-  }
-
-  private let lock = OSAllocatedUnfairLock(initialState: State())
-
-}
-
 // MARK: - _ObservationDeadlinePreparationAborted
 
 nonisolated struct _ObservationDeadlinePreparationAborted: Error { }
@@ -369,7 +308,7 @@ extension _ObservationSession {
     operation:
     @escaping @MainActor (Preparation) async throws -> Value,
   ) async -> _ObservationControlCompletion<Value> {
-    let race = _ObservationDeadlineRaceLatch<Value>()
+    let race = OneShotLatch<_ObservationDeadlineRaceOutcome<Value>>()
     let duration = deadlinePolicy.duration(for: phase)
     let armedWatchdog = deadlinePolicy.makeWatchdog(duration)
     let didResolveDeadline = deadlinePolicy.didResolveDeadline
@@ -397,7 +336,7 @@ extension _ObservationSession {
     let preparation: _ObservationControlCompletion<Preparation>
     do {
       preparation = .success(
-        try synchronousPreparation { race.hasResolved() }
+        try synchronousPreparation { race.resolvedValue != nil }
       )
     } catch is _ObservationDeadlinePreparationAborted {
       // The watchdog already owns the race. Do not publish a second outcome or

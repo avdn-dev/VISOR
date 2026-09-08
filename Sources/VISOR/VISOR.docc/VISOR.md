@@ -79,6 +79,10 @@ There is no umbrella product. Import and link only the capabilities a target use
 - ``EffectSupersededError``
 - ``EffectQueueFullError``
 
+### Async coordination
+
+- ``OneShotLatch``
+
 ### Testing
 
 - [Testing](Testing.md)

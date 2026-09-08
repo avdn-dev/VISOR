@@ -1,6 +1,7 @@
 .build/
 .swiftpm/
 Package.resolved
-RELEASE_NOTES.md
+# Local release-note drafts, including versioned filenames.
+[Rr][Ee][Ll][Ee][Aa][Ss][Ee][-_ ][Nn][Oo][Tt][Ee][Ss]*.[Mm][Dd]
 DESLOPPIFY_CATALOG.md
 .DS_Store

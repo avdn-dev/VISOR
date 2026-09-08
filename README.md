@@ -245,6 +245,15 @@ See [Action bindings and managed effects](Sources/VISOR/VISOR.docc/BindingsAndEf
 for toggling, queue admission, authored initialisers, lifetime, and complete
 effect testing. These APIs are additive in 11.1.
 
+## One-shot coordination
+
+`OneShotLatch<Value>` shares one winning `Sendable` value with every current and
+future waiter. `resolve(_:)` is synchronous, thread-safe, and returns whether
+that call won; `wait()` suspends without blocking, and `resolvedValue` provides
+a synchronous snapshot. The latch owns no tasks, deadlines, or cancellation
+policy. Its owner must resolve it on every terminal path, using `Result` or a
+domain-specific outcome when failures or cancellation are possible.
+
 ## Testing
 
 Import `VISORTesting` in Swift Testing targets:
