@@ -171,6 +171,10 @@ final class _EffectRuntime {
     case concurrent
   }
 
+  var pendingCount: Int {
+    pending.count
+  }
+
   func submit<Output: Sendable>(
     operation: @escaping @MainActor @Sendable (EffectContext) async throws -> Output,
     receivesFailures: Bool = true,
@@ -221,29 +225,25 @@ final class _EffectRuntime {
   private var jobs = [UUID: any _AnyEffectJob]()
   private var cancellations = [UUID: _EffectCancellation]()
   private var currentID: UUID?
-  private var pending = [UUID]()
-  private var pendingIndex = 0
+  private var pending = _EffectPendingQueue()
 
   private func finished(_ id: UUID) {
     jobs[id] = nil
     cancellations[id] = nil
     if currentID == id { currentID = nil }
-    if case .serial = policy { startNext() }
+    if case .serial = policy {
+      pending.remove(id)
+      startNext()
+    }
   }
 
   private func startNext() {
     guard currentID == nil else { return }
-    while pendingIndex < pending.count {
-      let id = pending[pendingIndex]
-      pendingIndex += 1
+    while let id = pending.popFirst() {
       guard let job = jobs[id] else { continue }
       currentID = id
       job.start()
       break
-    }
-    if pendingIndex == pending.count {
-      pending.removeAll(keepingCapacity: true)
-      pendingIndex = 0
     }
   }
 }

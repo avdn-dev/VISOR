@@ -198,6 +198,10 @@ failure-capable receiver is notified synchronously during `enqueue`. This is
 rejection, not backpressure; choose a capacity and handle admission failures
 deliberately.
 
+Starting or cancelling a pending entry removes its ID from the queue immediately.
+A continuously occupied queue retains bookkeeping for pending work, rather
+than accumulating IDs from completed or cancelled submissions.
+
 Queues are in-memory, not durable delivery systems. Every accepted operation is
 attempted only while the queue remains alive and is not explicitly cancelled.
 Keep a queue in a service if work must outlive a screen; use persisted jobs if
