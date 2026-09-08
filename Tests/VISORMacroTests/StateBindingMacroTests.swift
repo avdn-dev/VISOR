@@ -76,6 +76,106 @@ struct StateBindingMacroTests {
   }
 
   @Test
+  func `Conditionally declared Action enums receive a diagnostic before route synthesis`() throws {
+    // Given
+    let model = try modelWithMembers(#"""
+    #if os(macOS)
+    enum Action {
+      @StateBinding(\State.count) case changed(Int)
+    }
+    #elseif DEBUG
+    #if FEATURE
+    enum Action {
+      @StateBinding(\State.count) case changed(Int)
+    }
+    #endif
+    #else
+    enum Action {
+      @StateBinding(\State.count) case changed(Int)
+    }
+    #endif
+    func handle(_ action: Action) {}
+    """#)
+    let context = BasicMacroExpansionContext()
+
+    // When
+    let analysis = try analyse(model)
+    let members = try ViewModelMacro.expansion(
+      of: AttributeSyntax(stringLiteral: "@ViewModel"),
+      providingMembersOf: model,
+      conformingTo: [],
+      in: context,
+    )
+
+    // Then
+    #expect(analysis.diagnostics.map { $0.1.rawValue } == Array(repeating: "conditional", count: 3))
+    #expect(context.diagnostics.map(\.message) == Array(repeating: StateBindingDiagnostic.conditional.message, count: 3))
+    #expect(members.isEmpty)
+  }
+
+  @Test
+  func `Conditional Action enums without bindings remain supported`() throws {
+    // Given
+    let model = try modelWithMembers(#"""
+    #if DEBUG
+    enum Action { case refresh }
+    #else
+    enum Action {
+      case reload
+      @MainActor
+      @Observable
+      @ViewModel
+      final class NestedModel {
+        final class State { private(set) var count = 0 }
+        enum Action {
+          @StateBinding(\State.count) case changed(Int)
+        }
+        func handle(_ action: Action) {}
+      }
+    }
+    #endif
+    func handle(_ action: Action) async {}
+    """#)
+
+    // When
+    let analysis = try analyse(model)
+
+    // Then
+    #expect(analysis.isValid)
+    #expect(analysis.bindings.isEmpty)
+  }
+
+  @Test
+  func `Conditional nested models do not contribute bindings to their enclosing model`() throws {
+    // Given
+    let model = try modelWithMembers(#"""
+    enum Action {
+      @StateBinding(\State.count) case changed(Int)
+    }
+    func handle(_ action: Action) {}
+    #if DEBUG
+    @MainActor
+    @Observable
+    @ViewModel
+    final class NestedModel {
+      final class State { private(set) var count = 0 }
+      enum Action {
+        @StateBinding(\State.count) case changed(Int)
+      }
+      func handle(_ action: Action) {}
+    }
+    #endif
+    """#)
+
+    // When
+    let analysis = try analyse(model)
+
+    // Then
+    #expect(analysis.isValid)
+    #expect(analysis.bindings.count == 1)
+  }
+
+  @Test
   func `Labelled payloads and explicit Void return types synthesise weak synchronous routing`() throws {
     // Given
     let model = try model(
@@ -134,6 +234,15 @@ struct StateBindingMacroTests {
     action: String,
     handler: String = "func handle(_ action: Action) {}",
   ) throws -> ClassDeclSyntax {
+    try modelWithMembers("""
+      enum Action {
+        \(action)
+      }
+      \(handler)
+      """)
+  }
+
+  private func modelWithMembers(_ members: String) throws -> ClassDeclSyntax {
     try #require(DeclSyntax(stringLiteral: """
       @MainActor
       @Observable
@@ -145,10 +254,7 @@ struct StateBindingMacroTests {
           let constant = 0
           var computed: Int { count }
         }
-        enum Action {
-          \(action)
-        }
-        \(handler)
+        \(members)
       }
       """).as(ClassDeclSyntax.self))
   }

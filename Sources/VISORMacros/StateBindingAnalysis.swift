@@ -49,6 +49,12 @@ struct StateBindingAnalysis {
   // MARK: Lifecycle
 
   init(viewModel: ClassDeclSyntax, state: ClassDeclSyntax) {
+    for member in viewModel.memberBlock.members {
+      guard let conditional = member.decl.as(IfConfigDeclSyntax.self) else { continue }
+      for attribute in conditionalActionBindings(in: conditional) {
+        diagnostics.append((Syntax(attribute), .conditional))
+      }
+    }
     let action = viewModel.memberBlock.members.compactMap {
       $0.decl.as(EnumDeclSyntax.self)
     }.first { $0.name.text == "Action" }
@@ -161,10 +167,35 @@ func stateBindingField(_ attribute: AttributeSyntax) -> String? {
   return property.declName.baseName.text
 }
 
+// MARK: - Conditional action bindings
+
+/// Searches conditional members without crossing into a nested model's scope.
+private func conditionalActionBindings(in conditional: IfConfigDeclSyntax) -> [AttributeSyntax] {
+  conditional.clauses.flatMap { clause -> [AttributeSyntax] in
+    guard case .decls(let members) = clause.elements else { return [] }
+    return members.flatMap { member -> [AttributeSyntax] in
+      if let nested = member.decl.as(IfConfigDeclSyntax.self) {
+        return conditionalActionBindings(in: nested)
+      }
+      guard
+        let action = member.decl.as(EnumDeclSyntax.self),
+        action.name.text == "Action"
+      else { return [] }
+      let visitor = ConditionalBindingVisitor(viewMode: .sourceAccurate)
+      visitor.walk(action)
+      return visitor.attributes
+    }
+  }
+}
+
 // MARK: - ConditionalBindingVisitor
 
 private final class ConditionalBindingVisitor: SyntaxVisitor {
   var attributes = [AttributeSyntax]()
+
+  override func visit(_: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+    .skipChildren
+  }
 
   override func visit(_ node: AttributeSyntax) -> SyntaxVisitorContinueKind {
     if node.attributeName.trimmedDescription.split(separator: ".").last == "StateBinding" {

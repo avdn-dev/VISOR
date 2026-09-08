@@ -123,12 +123,18 @@ verify_inaccessible _visorMakeObservationRecipes
 
 run_rejected_batch \
   RootGatewayAccessControlProbe \
-  "binding payload type contract" \
-  -Xswiftc -DVISOR_PROBE_BINDING_PAYLOAD
+  "binding payload and conditional declaration contracts" \
+  -Xswiftc -DVISOR_PROBE_BINDING_PAYLOAD \
+  -Xswiftc -DVISOR_PROBE_CONDITIONAL_BINDING_ACTION
 
 case "$probe_output" in
   *"cannot convert value of type 'Int' to expected argument type 'String'"*) ;;
   *) report_missing_diagnostic "binding payload type" ;;
+esac
+
+case "$probe_output" in
+  *"@StateBinding cases must be declared directly in Action, outside conditional compilation blocks"*) ;;
+  *) report_missing_diagnostic "conditional Action binding" ;;
 esac
 
 echo "Root gateway metadata and observation lifecycle controls remain package-inaccessible."

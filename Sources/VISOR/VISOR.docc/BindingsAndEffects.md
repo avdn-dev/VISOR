@@ -53,7 +53,10 @@ behaviour.
 The key path must be `\State.field`, selecting one supported top-level stored
 field with an accessible getter. Only one action may bind each field. Payload
 types are checked by the compiler. Cases with multiple payloads, default values,
-multiple declarations, or conditional compilation are diagnosed.
+multiple declarations, or conditional compilation are diagnosed. This includes
+an `Action` enum placed inside `#if`, `#elseif`, or `#else` in the ViewModel;
+keep the enum and its annotated cases outside those blocks. Conditional Action
+enums without binding annotations remain supported.
 
 Opting in requires a synchronous, nonthrowing `handle(_ action: Action)` in the
 ViewModel declaration. Existing async handlers remain supported for ViewModels
