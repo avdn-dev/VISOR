@@ -255,6 +255,54 @@ struct ManagedEffectTests {
   }
 
   @Test
+  func `Cancellation callbacks can replace the incoming latest invocation`() async throws {
+    // Given
+    let target = EffectRecipient()
+    let operation = ControllableOperation<Int, Never>()
+    let invocation = operation.prepare()
+    var replacement: EffectHandle<Int>?
+    var starts = [Int]()
+    let first = target.latest.run(for: target) {
+      starts.append(1)
+      return await withTaskCancellationHandler {
+        await operation.run(invocation)
+      } onCancel: { [weak target] in
+        // This invocation is only cancelled synchronously from MainActor below.
+        MainActor.assumeIsolated {
+          guard let target else { return }
+          replacement = target.latest.run(for: target) {
+            starts.append(3)
+            return 3
+          } receive: { target, value in
+            target.values.append(value)
+          }
+        }
+      }
+    } receive: { target, value in
+      target.values.append(value)
+    }
+    try await operation.waitUntilStarted()
+
+    // When
+    let second = target.latest.run(for: target) {
+      starts.append(2)
+      return 2
+    } receive: { target, value in
+      target.values.append(value)
+    }
+    operation.resolve(invocation, with: .success(1))
+    let newest = try #require(replacement)
+    _ = try await newest.value()
+    await target.latest.finish()
+
+    // Then
+    #expect(starts == [1, 3])
+    #expect(target.values == [3])
+    await #expect(throws: EffectSupersededError.self) { try await first.value() }
+    await #expect(throws: EffectSupersededError.self) { try await second.value() }
+  }
+
+  @Test
   func `Cancelling a running handle waits for cleanup and suppresses delivery`() async throws {
     // Given
     let effect = LatestEffect()

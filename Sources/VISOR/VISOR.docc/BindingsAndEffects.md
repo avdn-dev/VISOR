@@ -167,6 +167,10 @@ until it unwinds. Receiver protection cannot undo external side effects already
 performed by the operation. Do not use latest-wins for ordered persistence or
 operations where every event must be attempted.
 
+Replacement is registered before the previous operation is cancelled. If a
+cancellation callback synchronously submits newer work to the same effect,
+that re-entrant submission becomes current and supersedes the incoming work.
+
 ### Preserve every accepted event
 
 Capture each accepted value when submitting to a serial queue:

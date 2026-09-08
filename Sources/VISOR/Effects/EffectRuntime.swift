@@ -184,14 +184,15 @@ final class _EffectRuntime {
       job.reject()
       return handle
     }
-    if case .latest = policy, let currentID {
-      jobs[currentID]?.cancel(.superseded)
-    }
     jobs[job.id] = job
     cancellations[job.id] = job.cancellation
     switch policy {
     case .latest:
+      let previous = currentID.flatMap { jobs[$0] }
       currentID = job.id
+      // Cancellation handlers can submit newer work synchronously. Publish
+      // this invocation first and preserve any re-entrant replacement.
+      previous?.cancel(.superseded)
       job.start()
 
     case .concurrent:
