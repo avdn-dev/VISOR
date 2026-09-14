@@ -26,10 +26,10 @@ run_tests() {
 
   case "$test_configuration" in
     debug)
-      run_stage "$test_description debug tests" swift test "$@"
+      run_stage "$test_description debug tests" swift test --disable-build-manifest-caching "$@"
       ;;
     release)
-      run_stage "$test_description release tests" swift test -c release "$@"
+      run_stage "$test_description release tests" swift test --disable-build-manifest-caching -c release "$@"
       ;;
     all)
       run_tests "$test_description" debug "$@"
