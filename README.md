@@ -325,7 +325,7 @@ deep linking.
 
 For upgrades, consult the [observation migration guide](MIGRATION_V11.md),
 [binding migration guide](MIGRATION_V12.md), and
-[action completion migration guide](MIGRATION_V13.md).
+[action completion and lazy view migration guide](MIGRATION_V13.md).
 
 ## Licence
 
