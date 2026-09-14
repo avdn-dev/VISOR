@@ -88,15 +88,16 @@ public final class ViewModelFactory<VM: ViewModel> {
     _make(nil)
   }
 
+  // MARK: Package
+
   /// Creates a ViewModel with the generated type-erased Router bridge.
   ///
-  /// This method is public only because attached macro expansions are
-  /// type-checked in the consuming module. Call ``makeViewModel()`` from
-  /// application code.
+  /// The lazy view host resolves this bridge only when it mounts. Application
+  /// code creates non-routed models through ``makeViewModel()``.
   ///
   /// - Precondition: A routed factory receives a non-nil Router whose
   ///   `NavigationScene` matches the type declared by ``routed(_:)``.
-  public func _visorMakeViewModel(router: AnyObject?) -> VM {
+  package func _visorMakeViewModel(router: AnyObject?) -> VM {
     _make(router)
   }
 

@@ -101,7 +101,7 @@ private struct GeneratedOwnerScreen: View {
   let contentDisappeared: TestEventCounter
   var contentIdentityAppeared: (UUID) -> Void = { _ in }
 
-  var content: some View {
+  func readyContent(state: OwnerSourceBackedViewModel.State) -> some View {
     Text("Revision \(state.revision)")
       .background(ObservationContentIdentityProbe(appeared: contentIdentityAppeared))
       .onAppear(perform: contentAppeared.record)
@@ -118,7 +118,7 @@ private struct GeneratedScenePhaseOwnerScreen: View {
   let contentAppeared: TestEventCounter
   let contentDisappeared: TestEventCounter
 
-  var content: some View {
+  func readyContent(state: OwnerSourceBackedViewModel.State) -> some View {
     Text("Revision \(state.revision)")
       .onAppear(perform: contentAppeared.record)
       .onDisappear(perform: contentDisappeared.record)
@@ -218,7 +218,7 @@ extension ViewModelObservationOwnerTests {
     let disappeared = TestEventCounter()
     let root = AnyView(
       ScenePhaseHost(phase: phase) {
-        _visorOwnedViewModelContent(for: viewModel, observationPolicy: .pauseInBackground) { _ in
+        testOwnedViewModelContent(for: viewModel, observationPolicy: .pauseInBackground) { _ in
           ObservationContentIdentityProbe { contentIdentities.append($0) }
             .task {
               await renderer.run(renderer.prepare(), onCancellation: .success(()))
@@ -412,7 +412,7 @@ extension ViewModelObservationOwnerTests {
     let contentDisappeared = TestEventCounter()
 
     let root = AnyView(
-      _visorOwnedViewModelContent(for: viewModel) { _ in
+      testOwnedViewModelContent(for: viewModel) { _ in
         Text("Ready")
           .onAppear(perform: contentAppeared.record)
           .onDisappear(perform: contentDisappeared.record)
@@ -469,7 +469,7 @@ extension ViewModelObservationOwnerTests {
     let contentAppeared = TestEventCounter()
 
     let root = AnyView(
-      _visorOwnedViewModelContent(
+      testOwnedViewModelContent(
         for: viewModel,
         pending: {
           ProgressView("Preparing profile")
@@ -672,13 +672,9 @@ extension ViewModelObservationOwnerTests {
     contentAppeared: TestEventCounter,
     failureAppeared: TestEventCounter,
   ) -> some View {
-    _ViewModelObservationHost(
-      viewModel: viewModel,
+    testOwnedViewModelContent(
+      for: viewModel,
       observationPolicy: .alwaysObserving,
-      content: { _ in
-        Text("Ready")
-          .onAppear(perform: contentAppeared.record)
-      },
       pending: { ProgressView("Preparing Screen") },
       failure: {
         ContentUnavailableView(
@@ -686,6 +682,9 @@ extension ViewModelObservationOwnerTests {
           systemImage: "exclamationmark.triangle",
         )
         .onAppear(perform: failureAppeared.record)
+      },
+      content: { _ in
+        Text("Ready").onAppear(perform: contentAppeared.record)
       },
     )
   }

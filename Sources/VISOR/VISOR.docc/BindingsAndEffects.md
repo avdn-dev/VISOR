@@ -33,7 +33,10 @@ final class SettingsViewModel {
 
 @LazyViewModel(SettingsViewModel.self)
 struct SettingsView: View {
-  var content: some View {
+  func readyContent(
+    state: SettingsViewModel.State,
+    bindings: ViewModelBindings<SettingsViewModel>
+  ) -> some View {
     Toggle("Focus Mode", isOn: bindings.isFocusEnabled)
   }
 }
@@ -110,7 +113,7 @@ final class PickerViewModel {
   }
 }
 
-// Inside @LazyViewModel content:
+// Inside readyContent(state:bindings:):
 // .sheet(isPresented: bindings.isPickerPresented) { PickerContent() }
 ```
 
@@ -141,9 +144,12 @@ State and all binding writes do nothing. Binding creation does not read field
 values or dispatch initial actions.
 
 Both synthesised and authored initialisers work without connection hooks or
-factory preparation. `@LazyViewModel` exposes `bindings` as a convenience for
-`viewModel.bindings`. Use this retained namespace rather than constructing
-`ViewModelBindings(model)` in a view body.
+factory preparation. `@LazyViewModel` supplies bindings through an explicit
+`readyContent(state:bindings:)` parameter. They share the retained binding root
+and add a write guard for the current observation generation, preserving SwiftUI
+transactions. After pause, failure or removal, retained bindings reject writes;
+a later ready generation supplies fresh bindings. Do not construct
+`ViewModelBindings(model)` in a view body to bypass this guard.
 
 State contains only values, Observation and mutation recording—not its owner's
 action routes. Even if two models share State, each binding dispatches only to

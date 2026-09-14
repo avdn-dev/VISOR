@@ -165,7 +165,7 @@ extension DocumentationViewModel.State {
 @MainActor
 @LazyViewModel(DocumentationViewModel.self)
 struct DocumentationScreen: View {
-  var content: some View {
+  func readyContent(state: DocumentationViewModel.State, viewModel: DocumentationViewModel) -> some View {
     DocumentationContent(state: state) { action in
       viewModel.handle(action)
     }

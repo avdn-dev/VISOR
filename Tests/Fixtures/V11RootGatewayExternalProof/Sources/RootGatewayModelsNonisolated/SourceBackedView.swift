@@ -6,16 +6,20 @@ import VISOR
 @LazyViewModel(
   NonisolatedSourceBackedViewModel.self,
   observationPolicy: .pauseInBackground,
-  pending: ProgressView("Preparing source-backed screen"),
-  failure: ContentUnavailableView(
-    "Source-Backed Screen Unavailable",
-    systemImage: "exclamationmark.triangle",
-  ),
 )
 public struct NonisolatedSourceBackedView: View {
   public init() { }
 
-  public var content: some View {
+  public func readyContent(state: NonisolatedSourceBackedViewModel.State) -> some View {
     Text("Revision \(state.revision)")
   }
+
+  var pendingContent: some View {
+    ProgressView("Preparing source-backed screen")
+  }
+
+  var failureContent: some View {
+    ContentUnavailableView("Source-Backed Screen Unavailable", systemImage: "exclamationmark.triangle")
+  }
+
 }

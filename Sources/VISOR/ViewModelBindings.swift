@@ -12,19 +12,46 @@ import SwiftUI
 @MainActor
 @dynamicMemberLookup
 public struct ViewModelBindings<Model: ViewModel> {
+
+  // MARK: Lifecycle
+
   /// Creates the binding root. Generated models retain this value lazily once.
   /// Application code should use `viewModel.bindings`, not recreate it in a view.
   public init(_ model: Model) {
     _visorStorage = _ViewModelBindingStorage(model)
   }
 
+  // MARK: Public
+
   public subscript<Value>(
     dynamicMember selection: KeyPath<Model._VISORBindingSelectors, _ViewModelBinding<Model, Value>>
   ) -> Binding<Value> {
-    Bindable(_visorStorage)[selection]
+    let binding = Bindable(_visorStorage)[selection]
+    guard let writeGuard else { return binding }
+    return Binding(
+      get: { binding.wrappedValue },
+      set: { value, transaction in
+        guard writeGuard() else { return }
+        binding.transaction(transaction).wrappedValue = value
+      },
+    )
   }
 
+  // MARK: Package
+
+  package func _visorGuarded(_ canWrite: @escaping @MainActor () -> Bool) -> Self {
+    var bindings = self
+    bindings.writeGuard = canWrite
+    return bindings
+  }
+
+  // MARK: Internal
+
   let _visorStorage: _ViewModelBindingStorage<Model>
+
+  // MARK: Private
+
+  private var writeGuard: (@MainActor () -> Bool)?
 }
 
 // MARK: - _ViewModelBinding

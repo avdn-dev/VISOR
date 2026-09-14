@@ -246,7 +246,7 @@ struct StateBindingMacroTests {
   }
 
   @Test
-  func `A view-owned bindings member is preserved with an alias warning`() throws {
+  func `A view-owned bindings member is rejected as an ambiguous readiness alias`() throws {
     let view = try #require(DeclSyntax(stringLiteral: """
       struct Screen: View {
         let bindings = 0
@@ -261,7 +261,7 @@ struct StateBindingMacroTests {
       in: context,
     ).map(\.description).joined(separator: "\n")
     #expect(!members.contains("var bindings:"))
-    #expect(context.diagnostics.first?.diagMessage.severity == .warning)
+    #expect(context.diagnostics.first?.diagMessage.severity == .error)
   }
 
   @Test(arguments: [true, false])

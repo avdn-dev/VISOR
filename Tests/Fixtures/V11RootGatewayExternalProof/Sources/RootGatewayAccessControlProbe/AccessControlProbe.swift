@@ -49,7 +49,7 @@ public func compileRootGatewayAccessBoundary() {
   _ = sourceBackedView.body
 
   #if VISOR_PROBE_LAZY_VIEW_MODEL
-  _ = sourceBackedView.viewModel
+  _ = sourceBackedView.state
   #endif
 
   #if VISOR_PROBE_FIELD_NAME

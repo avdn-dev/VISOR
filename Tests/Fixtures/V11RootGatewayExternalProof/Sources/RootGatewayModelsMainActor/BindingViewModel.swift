@@ -78,9 +78,26 @@ public final class MainActorBindingViewModel {
 @MainActor
 @LazyViewModel(MainActorBindingViewModel.self)
 public struct MainActorBindingView: View {
+
+  // MARK: Lifecycle
+
   public init() { }
 
-  public var content: some View {
+  // MARK: Public
+
+  public var body: some View {
+    content
+      .navigationTitle(state?.displayOnly ?? "Settings")
+      .toolbar {
+        Button("Enable") { send(.enabledChanged(true)) }
+          .disabled(state == nil)
+      }
+  }
+
+  public func readyContent(
+    state _: MainActorBindingViewModel.State,
+    bindings: ViewModelBindings<MainActorBindingViewModel>,
+  ) -> some View {
     VStack {
       Toggle("Enabled", isOn: bindings.isEnabled)
       Toggle("Disabled", isOn: bindings.isDisabled)

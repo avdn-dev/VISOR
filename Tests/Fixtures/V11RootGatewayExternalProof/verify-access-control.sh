@@ -86,7 +86,7 @@ run_rejected_batch \
   -Xswiftc -DVISOR_PROBE_ROUTER_SELECTION_SOURCE_SETTER \
   -Xswiftc -DVISOR_PROBE_ROUTER_SELECTION_CHANNEL
 
-verify_inaccessible viewModel internal
+verify_inaccessible state internal
 verify_inaccessible name
 verify_inaccessible identity
 verify_inaccessible isDirectReference

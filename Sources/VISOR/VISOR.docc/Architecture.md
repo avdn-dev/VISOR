@@ -58,9 +58,9 @@ final class DashboardViewModel {
 
 @LazyViewModel(DashboardViewModel.self)
 struct DashboardView: View {
-  var content: some View {
+  func readyContent(state: DashboardViewModel.State) -> some View {
     DashboardContent(state: state) { action in
-      viewModel.handle(action)
+      send(action)
     }
   }
 }
@@ -108,7 +108,40 @@ struct DashboardContent: View {
 }
 ```
 
-The `@LazyViewModel` view owns integration. The macro resolves its factory, creates the ViewModel lazily, mounts one structured observation owner, and exposes `content` only after all source baselines and immediate reactions are ready.
+The `@LazyViewModel` view owns integration. The macro resolves its factory,
+creates the ViewModel lazily, and mounts one structured observation owner. It
+supplies nonoptional State to `readyContent(state:)` only after source baselines
+and immediate reactions have reconciled.
+
+Generated `content` is a stable lifecycle slot. Write an ordinary `body` around
+it to keep titles, toolbar items and navigation containers present from the first
+render through preparation, readiness, pause and failure. Without an authored
+body, the macro generates `body { content }`.
+
+```swift
+var body: some View {
+  content
+    .navigationTitle("Dashboard")
+    .toolbar {
+      Button("Refresh") { send(.refresh) }
+        .disabled(state == nil)
+    }
+}
+```
+
+The surrounding view's `state` is optional and only exposes coherent State while
+ready. The `state` parameter inside `readyContent` is nonoptional. Request
+`bindings: ViewModelBindings<DashboardViewModel>` as an additional parameter for
+controls. Integration requiring model presentation APIs can explicitly request
+`viewModel: DashboardViewModel` in the same method; there are no implicit
+nonoptional model or binding properties.
+
+`send` returns the accepted action's completion, or `nil` when readiness rejects
+dispatch. It does not queue rejected actions. Supplied bindings reject writes
+from an ended observation generation. Domain admission and guarded dismissal
+remain feature responsibilities. Custom `pendingContent` and `failureContent`
+properties replace the default transparent preparation and generic unavailable
+views.
 
 The Content view is a pure function of State and action closures. It does not resolve factories, subscribe to services, or construct dependencies. This keeps previews and rendering tests small.
 

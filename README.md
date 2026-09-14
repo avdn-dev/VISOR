@@ -142,9 +142,9 @@ final class ProfileViewModel {
 
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileScreen: View {
-  var content: some View {
+  func readyContent(state: ProfileViewModel.State) -> some View {
     ProfileContent(state: state) {
-      viewModel.handle(.refresh)
+      send(.refresh)
     }
   }
 }
@@ -171,7 +171,7 @@ ProfileScreen()
   })
 ```
 
-`ProfileScreen` does not expose actionable content until the source baseline has been reconciled. Both bindings select from one producer snapshot, so they share one source subscription and revision lane. State is a plain nested `final class`; `@ViewModel` supplies its Observation accessors and routed selectors.
+`ProfileScreen` receives nonoptional State in `readyContent(state:)` only after the source baseline has been reconciled. An authored `body` can decorate generated `content` with titles and toolbar items that render immediately; its optional `state` provides coherent values when ready. `send` rejects dispatch while unavailable. See [View and Content](Sources/VISOR/VISOR.docc/Architecture.md#view-and-content) for the presentation contract. Both bindings select from one producer snapshot, so they share one source subscription and revision lane. State is a plain nested `final class`; `@ViewModel` supplies its Observation accessors and routed selectors.
 
 Observation follows the screen's SwiftUI structural identity, not each appearance.
 Removing the screen cancels observation and joins teardown before its ViewModel
@@ -222,7 +222,7 @@ func handle(_ action: Action) -> ActionCompletion {
   return .completed
 }
 
-// Inside @LazyViewModel content:
+// Inside readyContent(state:bindings:), using the supplied bindings:
 Toggle("Focus Mode", isOn: bindings.isFocusEnabled)
 ```
 
@@ -246,7 +246,7 @@ var isPickerPresented: Bool { activeSheet == .picker }
 @StateBinding(\State.isPickerPresented)
 case pickerPresentationChanged(Bool)
 
-// Inside @LazyViewModel content:
+// Inside readyContent(state:bindings:), using the supplied bindings:
 Toggle("Picker", isOn: bindings.isPickerPresented)
 ```
 

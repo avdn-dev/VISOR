@@ -15,7 +15,7 @@ private let downstreamObservationPolicy = ObservationPolicy.pauseWhenInactive
   observationPolicy: downstreamObservationPolicy,
 )
 private struct QualifiedLazySourceBackedView: View {
-  var content: some View {
+  func readyContent(state: RootGatewayModelsMainActor.MainActorSourceBackedViewModel.State) -> some View {
     Text("Revision \(state.revision)")
   }
 }

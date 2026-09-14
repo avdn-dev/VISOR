@@ -9,7 +9,7 @@ import VISOR
 public struct MainActorSourceBackedView: View {
   public init() { }
 
-  public var content: some View {
+  public func readyContent(state: MainActorSourceBackedViewModel.State) -> some View {
     Text("Revision \(state.revision)")
   }
 }

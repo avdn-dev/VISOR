@@ -1,11 +1,3 @@
-//
-//  LazyViewModelMacro.swift
-//  VISOR
-//
-//  Created by Anh Nguyen on 5/2/2026.
-//
-
-import SwiftBasicFormat
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -22,181 +14,137 @@ public struct LazyViewModelMacro: MemberMacro {
     conformingTo _: [TypeSyntax],
     in context: some MacroExpansionContext,
   ) throws -> [DeclSyntax] {
-    guard let structDecl = declaration.as(StructDeclSyntax.self) else {
+    guard let view = declaration.as(StructDeclSyntax.self) else {
       context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.notAStruct(macroName: "LazyViewModel")))
       return []
     }
-
-    guard let arguments = parseArguments(from: node, in: context) else {
+    guard
+      case .argumentList(let arguments) = node.arguments,
+      let first = arguments.first,
+      let type = first.expression.as(MemberAccessExprSyntax.self),
+      type.declName.baseName.text == "self",
+      let base = type.base
+    else {
+      diagnose("@LazyViewModel requires (ViewModel.self)", at: node, in: context)
       return []
     }
-
-    let viewModelType = arguments.viewModelType
-    let observationPolicy = arguments.observationPolicy
-
-    let hasContent = structDecl.hasContentProperty
-    let hasStateMember = structDecl.hasMemberNamed("state")
-
-    // Validate: must have content
-    if !hasContent {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingContent(macroName: "LazyViewModel")))
+    let model = base.trimmedDescription
+    let policy = arguments.first { $0.label?.text == "observationPolicy" }?.expression.trimmedDescription
+      ?? ".alwaysObserving"
+    guard arguments.dropFirst().allSatisfy({ $0.label?.text == "observationPolicy" }) else {
+      diagnose("@LazyViewModel uses pendingContent and failureContent properties for custom presentation", at: node, in: context)
       return []
     }
-
-    let access = accessLevel(of: structDecl)
-    // Only propagate public/open to generated members. Other access levels
-    // (internal, package, fileprivate, private) are inherited from the type,
-    // avoiding "more accessible than enclosing type" build errors.
-    let prefix = (access == "public" || access == "open") ? "\(access) " : ""
-
+    for name in [
+      "content",
+      "state",
+      "bindings",
+      "viewModel",
+      "send",
+      "_visorPresentation",
+      "_visorScenePhase",
+    ] {
+      guard !view.hasMemberNamed(name) else {
+        diagnose("@LazyViewModel reserves '\(name)'; implement readyContent(state:) and optionally body", at: node, in: context)
+        return []
+      }
+    }
+    let methods = view.memberBlock.members.compactMap { $0.decl.as(FunctionDeclSyntax.self) }
+      .filter { $0.name.text == "readyContent" }
+    guard methods.count == 1, let ready = methods.first else {
+      diagnose("@LazyViewModel requires one func readyContent(state:) returning a View", at: node, in: context)
+      return []
+    }
+    let parameters = ready.signature.parameterClause.parameters
+    let labels = parameters.map { $0.firstName.text }
+    guard
+      labels.contains("state"), Set(labels).count == labels.count,
+      labels.allSatisfy({ ["state", "bindings", "viewModel"].contains($0) }),
+      ready.signature.effectSpecifiers == nil,
+      ready.signature.returnClause != nil,
+      ready.genericParameterClause == nil,
+      !ready.modifiers.contains(where: { ["static", "class", "mutating"].contains($0.name.text) }),
+      parameters.allSatisfy({ $0.defaultValue == nil && $0.ellipsis == nil })
+    else {
+      diagnose(
+        "readyContent requires a synchronous nonthrowing state parameter, with optional bindings and viewModel parameters",
+        at: ready,
+        in: context,
+      )
+      return []
+    }
+    let access = accessLevel(of: view)
+    let prefix = access == "public" || access == "open" ? "public " : ""
+    let call = labels.map { label in
+      switch label {
+      case "state": "state: _visorModel.state"
+      case "bindings": "bindings: _visorBindings"
+      default: "viewModel: _visorModel"
+      }
+    }.joined(separator: ", ")
+    let pending = view.hasMemberNamed("pendingContent") ? "pendingContent" : "Color.clear"
+    let failure = view.hasMemberNamed("failureContent")
+      ? "failureContent"
+      : """
+        ContentUnavailableView(
+            "Unable to Load",
+            systemImage: "exclamationmark.triangle",
+            description: Text("This screen could not be prepared.")
+        )
+        """
     var members: [DeclSyntax] = [
-      "@Environment(\\._visorRouter) private var hostRouter",
-      "@Environment(VISOR.ViewModelFactory<\(raw: viewModelType)>.self) private var factory",
-    ]
-
-    members.append(contentsOf: [
-      "@State private var _viewModel: \(raw: viewModelType)?",
+      "@Environment(\\.scenePhase) private var _visorScenePhase",
+      "@State private var _visorPresentation = VISOR._LazyViewModelPresentation<\(raw: model)>()",
       """
-      var viewModel: \(raw: viewModelType) {
-          guard let vm = _viewModel else {
-              preconditionFailure("@LazyViewModel internal error: \(raw: viewModelType) viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-          }
-          return vm
+      var state: \(raw: model).State? {
+          _visorPresentation._visorState(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
       }
       """,
-    ])
-
-    if hasStateMember {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.lazyViewModelStateAliasCollision))
-    } else {
-      members.append("var state: \(raw: viewModelType).State { viewModel.state }")
-    }
-
-    if structDecl.hasMemberNamed("bindings") {
-      context.diagnose(Diagnostic(
-        node: node,
-        message: BindingNamespaceDiagnostic(macroName: "LazyViewModel", name: "bindings"),
-      ))
-    } else {
-      members.append(
-        "var bindings: VISOR.ViewModelBindings<\(raw: viewModelType)> { viewModel.bindings }"
-      )
-    }
-
-    let ownedContent: ExprSyntax =
-      if let pending = arguments.pending, let failure = arguments.failure {
-        """
-        VISOR._visorOwnedViewModelContent(
-            for: viewModel,
-            observationPolicy: \(raw: observationPolicy),
-            pending: {
-                \(pending)
-            },
-            failure: {
-                \(failure)
-            }
-        ) { _ in
-            content
-        }
-        """
-      } else {
-        """
-        VISOR._visorOwnedViewModelContent(
-            for: viewModel,
-            observationPolicy: \(raw: observationPolicy)
-        ) { _ in
-            content
-        }
-        """
-      }
-
-    members.append(
       """
-      \(raw: prefix)var body: some View {
-          Group {
-              if let viewModel = _viewModel {
-                  \(ownedContent)
-              } else {
-                  Color.clear
-              }
-          }
-          .task {
-              if _viewModel == nil {
-                  _viewModel = factory._visorMakeViewModel(router: hostRouter)
-              }
+      var send: VISOR._LazyViewModelActionSender<\(raw: model)> {
+          _visorPresentation._visorSender(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
+      }
+      """,
+      """
+      var content: some View {
+          VISOR._visorLazyViewModelContent(
+              presentation: _visorPresentation,
+              observationPolicy: \(raw: policy),
+              pending: { \(raw: pending) },
+              failure: { \(raw: failure) }
+          ) { _visorModel, _visorBindings in
+              readyContent(\(raw: call))
           }
       }
-      """
-    )
-
+      """,
+    ]
+    if !view.hasMemberNamed("body") {
+      members.append("\(raw: prefix)var body: some View { content }")
+    }
     return members
   }
 
   // MARK: Private
 
-  private struct Arguments {
-    let viewModelType: String
-    let observationPolicy: String
-    let pending: ExprSyntax?
-    let failure: ExprSyntax?
-  }
-
-  private static func parseArguments(
-    from node: AttributeSyntax,
+  private static func diagnose(
+    _ message: String,
+    at node: some SyntaxProtocol,
     in context: some MacroExpansionContext,
-  ) -> Arguments? {
-    // Stage 1: Must have an argument list
-    guard case .argumentList(let arguments) = node.arguments, let firstArg = arguments.first else {
-      context.diagnose(Diagnostic(node: node, message: VISORDiagnostic.missingArguments(macroName: "LazyViewModel")))
-      return nil
-    }
+  ) {
+    context.diagnose(Diagnostic(node: node, message: LazyViewDiagnostic(message: message)))
+  }
+}
 
-    // Stage 2: Preserve the complete type expression before `.self`. The macro
-    // declaration's VM.Type constraint remains the source of truth for whether
-    // the expression names a ViewModel type.
-    guard
-      let memberAccess = firstArg.expression.as(MemberAccessExprSyntax.self),
-      memberAccess.declName.baseName.text == "self",
-      let baseType = memberAccess.base
-    else {
-      context.diagnose(Diagnostic(node: Syntax(firstArg), message: VISORDiagnostic.missingSelfSuffix(macroName: "LazyViewModel")))
-      return nil
-    }
+// MARK: - LazyViewDiagnostic
 
-    let viewModelType = baseType.trimmedDescription
+private struct LazyViewDiagnostic: DiagnosticMessage {
+  let message: String
 
-    // Stage 3: Preserve any valid ObservationPolicy expression. Swift type
-    // checks it against the public macro declaration, avoiding a duplicated
-    // case list that can drift when ObservationPolicy evolves.
-    let observationPolicy = arguments.dropFirst().first {
-      $0.label?.text == "observationPolicy"
-    }?.expression.trimmedDescription ?? ".alwaysObserving"
-
-    let pending = arguments.dropFirst().first {
-      $0.label?.text == "pending"
-    }.map { normalisedExpression($0.expression) }
-    let failure = arguments.dropFirst().first {
-      $0.label?.text == "failure"
-    }.map { normalisedExpression($0.expression) }
-
-    guard (pending == nil) == (failure == nil) else {
-      context.diagnose(Diagnostic(
-        node: node,
-        message: VISORDiagnostic.lazyViewModelPresentationPairRequired,
-      ))
-      return nil
-    }
-
-    return Arguments(
-      viewModelType: viewModelType,
-      observationPolicy: observationPolicy,
-      pending: pending,
-      failure: failure,
-    )
+  var diagnosticID: MessageID {
+    MessageID(domain: "VISOR", id: "lazyViewPresentation")
   }
 
-  /// Re-indents source syntax without changing literal contents.
-  private static func normalisedExpression(_ expression: ExprSyntax) -> ExprSyntax {
-    expression.trimmed.formatted().cast(ExprSyntax.self)
+  var severity: DiagnosticSeverity {
+    .error
   }
 }

@@ -418,7 +418,7 @@ SwiftUI controls use model-owned bindings for properties selected by
 TextField("Search", text: viewModel.bindings.query)
 ```
 
-Inside a `@LazyViewModel` view, the generated convenience is:
+Inside `readyContent(state:bindings:)`, use the explicitly supplied bindings:
 
 ```swift
 TextField("Search", text: bindings.query)
@@ -435,7 +435,7 @@ authored initialisers require no special preparation. See
 
 ## Structured SwiftUI ownership
 
-`@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before exposing `content`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
+`@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before invoking `readyContent(state:)`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
 
 ViewModel retention, observation-session ownership, and producer ownership are separate lifetimes. Generated `@State` retains the ViewModel for the annotated view's SwiftUI structural identity. Within that identity, host State retains a lifetime object that owns the observation root task. The appearance task only starts that lifetime; its cancellation does not end observation. Pausing or ending observation does not stop producer-owned channels or domain work; their owner manages that lifetime separately.
 
@@ -452,21 +452,20 @@ Hoist `@LazyViewModel` to the stable SwiftUI root of a longer-lived flow. Mounti
 
 While an enabled owner is reconciling its initial source snapshots and immediate reactions, the generated host remains visually transparent instead of exposing partial feature content. The transparent placeholder fills its proposed container, so initial preparation or resuming after an explicit scene pause does not introduce progress chrome or collapse the surrounding layout. A terminal observation-infrastructure failure withdraws feature content and presents a generic unavailable state; its technical cause is recorded in the VISOR system log rather than displayed to the user.
 
-Supply both `pending` and `failure` views when a feature needs its own copy or
-layout:
+Declare `pendingContent` and `failureContent` properties when a feature needs
+custom preparation or infrastructure-failure presentation. Each is optional;
+the generated `content` slot supplies defaults when absent. Pending presentation
+also covers the first render before ViewModel construction.
 
-```swift
-@LazyViewModel(
-  ProfileViewModel.self,
-  pending: ProfilePreparationView(),
-  failure: ProfileUnavailableView())
-```
+Keep persistent navigation titles, toolbar items and destination-owned navigation
+containers in an authored `body` around `content`. The outer body's optional
+`state` is nil while the model is unavailable. VISOR supplies nonoptional State
+only as the `readyContent(state:)` parameter, after full reconciliation.
 
-The brief pre-construction state remains transparent. Use custom pending UI
-only when preparation is expected to be perceptible, give it a meaningful
-accessibility label, and make custom failure UI explain the unavailable state
-without becoming a dead end. VISOR does not pass the technical failure into
-either view.
+Use visible pending UI when preparation is expected to be perceptible, give it
+a meaningful accessibility label, and ensure failure presentation has an
+appropriate exit. VISOR does not expose technical infrastructure errors to the
+presentation builders. Ordinary domain failures still belong in State.
 
 These failures mean VISOR can no longer guarantee a coherent State. Examples include a readiness deadline exceeded by an initial asynchronous reaction, unexpected source termination, duplicate production ownership, or an internal protocol violation. Production readiness has a 30-second monotonic infrastructure limit and teardown joining has a 10-second limit; neither constrains producer-owned domain work. Ordinary cancellation and scene-policy pausing are lifecycle events, not failures.
 

@@ -1,116 +1,57 @@
-//
-//  LazyViewModelMacro.swift
-//  VISOR
-//
-//  Created by Anh Nguyen on 5/2/2026.
-//
-
 import SwiftUI
 
-// MARK: - Single ViewModel Macro
-
-/// Attach to a View struct to enable lazy view model initialisation.
-/// Auto-generates factory environment, viewModel property, and body.
+/// Retains a lazily constructed model and one structured observation lifetime.
 ///
-/// The generated body performs lazy initialisation once, then delegates
-/// observation to VISOR's structured, readiness-gated owner through an opaque
-/// runtime bridge.
+/// Implement `readyContent(state:)`, optionally accepting `bindings` and a
+/// `viewModel` parameter for integration that requires the prepared model.
+/// These parameters are supplied only after initial source projections and
+/// immediate reactions have reconciled.
 ///
-/// **View/Content pattern:**
 /// ```swift
-/// @LazyViewModel(DashboardViewModel.self)
-/// struct DashboardView: View {
-///   var content: some View {
-///     DashboardContent(state: state) { action in
-///       viewModel.handle(action)
-///     }
+/// @LazyViewModel(LibraryViewModel.self)
+/// struct LibraryView: View {
+///   var body: some View {
+///     content
+///       .navigationTitle("Library")
+///       .toolbar {
+///         Button("Refresh") { send(.refresh) }
+///           .disabled(state?.canRefresh != true)
+///       }
+///   }
+///
+///   func readyContent(state: LibraryViewModel.State) -> some View {
+///     LibraryContent(state: state, onAction: { send($0) })
 ///   }
 /// }
 /// ```
+/// `content` is the generated lifecycle slot. An authored `body` places stable
+/// navigation and presentation around it; otherwise `body { content }` is
+/// generated. Optional `pendingContent` and `failureContent` properties replace
+/// the transparent preparation and generic unavailable defaults. Preparation
+/// presentation includes the first render, before model construction.
 ///
-/// Generated `@State` retains one ViewModel for the annotated view's SwiftUI
-/// structural identity. The Content view is a pure function of state +
-/// onAction, trivially previewable with static state and no factory.
-/// Observation shares that structural lifetime: navigation covering and tab
-/// switches do not withdraw retained content or restart initial reactions.
-/// Actual removal cancels observation; explicit scene pauses still withdraw
-/// content and reconcile fresh snapshots before restoring it.
+/// The view's generated `state` is optional and returns a value only while the
+/// model is ready. The explicit `state` parameter in `readyContent` is
+/// nonoptional. There are no implicit nonoptional model or binding properties.
 ///
-/// **Read-only state:** Use the generated `state` alias for reading:
-/// ```swift
-/// Text(state.title)
-/// ```
+/// `send` dispatches synchronously and returns the action's `ActionCompletion`,
+/// or `nil` when readiness does not permit dispatch. Rejected actions are never
+/// queued. Supplied bindings reject writes after their observation generation
+/// ends. Domain-specific admission and dismissal guards remain model-owned.
 ///
-/// **Bindings:** Use `bindings` for properties selected by `@StateBinding` actions:
-/// ```swift
-/// Toggle("Enabled", isOn: bindings.isEnabled)
-/// TextField("Name", text: bindings.name)
-/// ```
-///
-/// The default owner UI remains visually transparent while observation becomes
-/// ready and shows a generic unavailable state after an infrastructure failure.
-/// Use the custom-presentation overload when genuinely slow preparation needs
-/// visible pending UI or the feature needs its own failure copy or layout;
-/// ordinary domain failures still belong in ViewModel State.
-///
-/// - Parameters:
-///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.
-///   - observationPolicy: Controls whether observation pauses based on scene phase.
-///     Defaults to `.alwaysObserving`. Use `.pauseInBackground` or `.pauseWhenInactive` for
-///     view models driving high-frequency work that wastes resources when the UI is not visible.
-///
-/// > The generated `viewModel` property fails with a diagnostic precondition if accessed
-/// > before initialisation. The generated `body` renders `content` only while the backing
-/// > `@State` contains a ViewModel; its task creates that instance when the owner mounts.
+/// Navigation covering and tab switches preserve observation. Actual removal
+/// cancels and joins the observation lifetime; scene pause policies withdraw
+/// ready content until fresh source snapshots have reconciled on resumption.
 @attached(
   member,
   names: named(body),
-  named(_viewModel),
-  named(viewModel),
+  named(content),
   named(state),
-  named(bindings),
-  named(factory),
-  named(hostRouter),
-  named(scenePhase)
+  named(send),
+  named(_visorPresentation),
+  named(_visorScenePhase)
 )
 public macro LazyViewModel<VM: ViewModel>(
   _ viewModelType: VM.Type,
   observationPolicy: ObservationPolicy = .alwaysObserving,
-) = #externalMacro(
-  module: "VISORMacros",
-  type: "LazyViewModelMacro",
-)
-
-/// Custom-presentation form of ``LazyViewModel(_:observationPolicy:)``.
-///
-/// The pending and failure views replace VISOR's defaults after the ViewModel
-/// has been created. The brief transparent pre-construction state is retained.
-/// Use visible pending UI only when preparation is expected to be perceptible,
-/// supply it with a meaningful accessibility label, and make a custom failure
-/// view explain the unavailable state without creating a dead end.
-///
-/// - Parameters:
-///   - viewModelType: The concrete ViewModel type instantiated and retained in generated `@State`.
-///   - observationPolicy: Controls whether observation pauses based on scene phase.
-///   - pending: UI shown while VISOR reconciles initial observation state.
-///   - failure: UI shown when VISOR can no longer guarantee coherent State.
-@attached(
-  member,
-  names: named(body),
-  named(_viewModel),
-  named(viewModel),
-  named(state),
-  named(bindings),
-  named(factory),
-  named(hostRouter),
-  named(scenePhase)
-)
-public macro LazyViewModel<VM: ViewModel, Pending: View, Failure: View>(
-  _ viewModelType: VM.Type,
-  observationPolicy: ObservationPolicy = .alwaysObserving,
-  pending: Pending,
-  failure: Failure,
-) = #externalMacro(
-  module: "VISORMacros",
-  type: "LazyViewModelMacro",
-)
+) = #externalMacro(module: "VISORMacros", type: "LazyViewModelMacro")

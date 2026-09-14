@@ -1,1073 +1,133 @@
-//
-//  LazyViewModelMacroTests.swift
-//  VISOR
-//
-//  Created by Anh Nguyen on 17/2/2026.
-//
-
+import SwiftSyntax
+import SwiftSyntaxMacroExpansion
 import SwiftSyntaxMacros
 import Testing
-
-#if canImport(VISORMacros)
 import VISORMacros
 
-private let testMacros: [String: Macro.Type] = [
-  "LazyViewModel": LazyViewModelMacro.self
-]
-
-// MARK: - LazyViewModelMacroTests
-
-@Suite("LazyViewModel Macro")
+@Suite("Lazy view presentation macro")
 struct LazyViewModelMacroTests {
 
+  // MARK: Internal
+
   @Test
-  func `Unified mode delegates observation lifetime to runtime bridge`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
-      public struct MyView: View {
-        var content: some View { Text("") }
+  func `Authored body stays outside the generated readiness slot`() throws {
+    // Given
+    let source = """
+      struct Screen: View {
+        var body: some View { content.navigationTitle("Library") }
+        func readyContent(state: Model.State) -> some View { Text(state.title) }
       }
-      """,
-      expandedSource: """
-        public struct MyView: View {
-          var content: some View { Text("") }
+      """
 
-            @Environment(\\._visorRouter) private var hostRouter
+    // When
+    let (members, diagnostics) = try expand(source)
 
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
+    // Then
+    #expect(diagnostics.isEmpty)
+    #expect(!members.contains("var body:"))
+    #expect(members.contains("var state: Model.State?"))
+    #expect(members.contains("var content: some View"))
+    #expect(members.contains("readyContent(state: _visorModel.state)"))
+    #expect(members.contains("_visorPresentation._visorSender"))
+    #expect(!members.contains("preconditionFailure"))
+    #expect(!members.contains("var viewModel:"))
+    #expect(!members.contains("var bindings:"))
+  }
 
-            @State private var _viewModel: MyVM?
+  @Test(arguments: ["", "public ", "package ", "private ", "fileprivate "])
+  func `Default body has the access required by its view`(access: String) throws {
+    // Given
+    let source = """
+      \(access)struct Screen: View {
+        func readyContent(state: Model.State) -> some View { Text(state.title) }
+      }
+      """
 
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
+    // When
+    let (members, diagnostics) = try expand(source)
 
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            public var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .pauseInBackground
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
+    // Then
+    #expect(diagnostics.isEmpty)
+    #expect(members.contains("var body: some View { content }"))
+    #expect(members.contains("public var body:") == (access == "public "))
   }
 
   @Test
-  func `Content mode generates correct expansion`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      struct MyView: View {
-        var content: some View { Text("") }
+  func `Bindings and model integration are explicit ready parameters`() throws {
+    // Given
+    let source = """
+      struct Screen: View {
+        func readyContent(
+          bindings: ViewModelBindings<Model>, state: Model.State, viewModel: Model
+        ) -> some View { Toggle(state.title, isOn: bindings.enabled) }
+        var pendingContent: some View { ProgressView() }
+        var failureContent: some View { Text("Unavailable") }
       }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
+      """
 
-            @Environment(\\._visorRouter) private var hostRouter
+    // When
+    let (members, diagnostics) = try expand(source, policy: ".pauseWhenInactive")
 
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
+    // Then
+    #expect(diagnostics.isEmpty)
+    #expect(members.contains("readyContent(bindings: _visorBindings, state: _visorModel.state, viewModel: _visorModel)"))
+    #expect(members.contains("pending: { pendingContent }"))
+    #expect(members.contains("failure: { failureContent }"))
+    #expect(members.contains("observationPolicy: .pauseWhenInactive"))
   }
 
-  @Test
-  func `Custom pending and failure views flow into the runtime bridge`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(
-        MyVM.self,
-        observationPolicy: .pauseInBackground,
-        pending: ProgressView("Preparing profile"),
-        failure: ContentUnavailableView(
-          "Profile Unavailable",
-          systemImage: "person.crop.circle.badge.exclamationmark"))
-      struct MyView: View {
-        var content: some View { Text("") }
+  @Test(arguments: ["state", "bindings", "viewModel", "content", "send", "_visorPresentation"])
+  func `Reserved members are rejected instead of leaving ambiguous aliases`(name: String) throws {
+    // Given
+    let source = """
+      struct Screen: View {
+        var \(name) = 1
+        func readyContent(state: Model.State) -> some View { Text("") }
       }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
+      """
 
-            @Environment(\\._visorRouter) private var hostRouter
+    // When
+    let (members, diagnostics) = try expand(source)
 
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .pauseInBackground,
-                            pending: {
-                                ProgressView("Preparing profile")
-                            },
-                            failure: {
-                                ContentUnavailableView(
-                                    "Profile Unavailable",
-                                    systemImage: "person.crop.circle.badge.exclamationmark")
-                            }
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
+    // Then
+    #expect(members.isEmpty)
+    #expect(diagnostics.count == 1)
+    #expect(diagnostics.first?.contains("reserves '\(name)'") == true)
   }
 
-  @Test
-  func `Public struct propagates access to body only`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      public struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        public struct MyView: View {
-          var content: some View { Text("") }
+  @Test(arguments: [
+    "var readyContent: some View { Text(\"\") }",
+    "func readyContent() -> some View { Text(\"\") }",
+    "func readyContent(state: Model.State) async -> some View { Text(\"\") }",
+    "func readyContent(state: Model.State) throws -> some View { Text(\"\") }",
+    "static func readyContent(state: Model.State) -> some View { Text(\"\") }",
+    "func readyContent(state: Model.State, unexpected: Int) -> some View { Text(\"\") }",
+    "func readyContent(state: Model.State, bindings: Int = 0) -> some View { Text(\"\") }",
+  ])
+  func `Invalid ready declarations receive an actionable diagnostic`(declaration: String) throws {
+    // Given
+    let source = "struct Screen: View { \(declaration) }"
 
-            @Environment(\\._visorRouter) private var hostRouter
+    // When
+    let (members, diagnostics) = try expand(source)
 
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            public var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
+    // Then
+    #expect(members.isEmpty)
+    #expect(diagnostics.count == 1)
+    #expect(diagnostics.first?.contains("readyContent") == true)
   }
 
-  @Test
-  func `Private struct inherits access — no explicit modifier on generated body`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      private struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        private struct MyView: View {
-          var content: some View { Text("") }
+  // MARK: Private
 
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
+  private func expand(_ source: String, policy: String = ".alwaysObserving") throws -> (String, [String]) {
+    let view = try #require(DeclSyntax(stringLiteral: source).as(StructDeclSyntax.self))
+    let context = BasicMacroExpansionContext()
+    let members = try LazyViewModelMacro.expansion(
+      of: AttributeSyntax(stringLiteral: "@LazyViewModel(Model.self, observationPolicy: \(policy))"),
+      providingMembersOf: view,
+      conformingTo: [],
+      in: context,
     )
+    return (members.map(\.description).joined(separator: "\n"), context.diagnostics.map(\.message))
   }
-
-  @Test
-  func `Fileprivate struct inherits access — no explicit modifier on generated body`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      fileprivate struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        fileprivate struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Package struct inherits access — no explicit modifier on generated body`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      package struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        package struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Nested struct inside fileprivate type inherits enclosing access`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      fileprivate class Container {
-        @LazyViewModel(MyVM.self)
-        struct InnerView: View {
-          var content: some View { Text("") }
-        }
-      }
-      """,
-      expandedSource: """
-        fileprivate class Container {
-          struct InnerView: View {
-            var content: some View { Text("") }
-
-              @Environment(\\._visorRouter) private var hostRouter
-
-              @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-              @State private var _viewModel: MyVM?
-
-              var viewModel: MyVM {
-                  guard let vm = _viewModel else {
-                      preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                  }
-                  return vm
-              }
-
-              var state: MyVM.State {
-                  viewModel.state
-              }
-
-              var bindings: VISOR.ViewModelBindings<MyVM> {
-                  viewModel.bindings
-              }
-
-              var body: some View {
-                  Group {
-                      if let viewModel = _viewModel {
-                          VISOR._visorOwnedViewModelContent(
-                              for: viewModel,
-                              observationPolicy: .alwaysObserving
-                          ) { _ in
-                              content
-                          }
-                      } else {
-                          Color.clear
-                      }
-                  }
-                  .task {
-                      if _viewModel == nil {
-                          _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                      }
-                  }
-              }
-          }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when applied to class`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyViewModel.self)
-      class NotAStruct: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        class NotAStruct: View {
-          var content: some View { Text("") }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel can only be applied to structs", line: 1, column: 1, severity: .error)
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when missing content`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyViewModel.self)
-      struct MyView: View {
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel requires: var content: some View", line: 1, column: 1, severity: .error)
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when no argument provided`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel requires (ViewModel.self) argument", line: 1, column: 1, severity: .error)
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when only one custom presentation view is provided`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyViewModel.self, pending: ProgressView("Preparing"))
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(
-          message: "@LazyViewModel custom presentation requires both 'pending' and 'failure' views",
-          line: 1,
-          column: 1,
-          severity: .error,
-        )
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when argument missing .self suffix`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyViewModel)
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(
-          message: "@LazyViewModel argument must use .self suffix (e.g., MyViewModel.self)",
-          line: 1,
-          column: 16,
-          severity: .error,
-        )
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Error when applied to enum`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyViewModel.self)
-      enum NotAStruct {
-      }
-      """,
-      expandedSource: """
-        enum NotAStruct {
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(message: "@LazyViewModel can only be applied to structs", line: 1, column: 1, severity: .error)
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Explicit alwaysObserving produces same expansion as default`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self, observationPolicy: .alwaysObserving)
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `pauseInBackground delegates policy to runtime bridge`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .pauseInBackground
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `pauseWhenInactive delegates policy to runtime bridge`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self, observationPolicy: .pauseWhenInactive)
-      struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .pauseWhenInactive
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Public struct with pauseInBackground propagates access`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self, observationPolicy: .pauseInBackground)
-      public struct MyView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        public struct MyView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: MyVM.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            public var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .pauseInBackground
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `State alias collision skips alias and emits warning`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      struct MyView: View {
-        var state: Int = 0
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          var state: Int = 0
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(
-          message: "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member",
-          line: 1,
-          column: 1,
-          severity: .warning,
-        )
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `State alias collision with multi-binding let declaration`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(MyVM.self)
-      struct MyView: View {
-        let title = "", state = 0
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct MyView: View {
-          let title = "", state = 0
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<MyVM>.self) private var factory
-
-            @State private var _viewModel: MyVM?
-
-            var viewModel: MyVM {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: MyVM viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var bindings: VISOR.ViewModelBindings<MyVM> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: .alwaysObserving
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      diagnostics: [
-        DiagnosticSpec(
-          message: "@LazyViewModel could not generate 'state' because this view already declares a member named 'state'; use viewModel.state or rename the existing member",
-          line: 1,
-          column: 1,
-          severity: .warning,
-        )
-      ],
-      macros: testMacros,
-    )
-  }
-
-  @Test
-  func `Qualified generic type and policy expression are preserved`() {
-    assertMacroExpansionSwiftTesting(
-      """
-      @LazyViewModel(
-        Feature.GenericViewModel<LiveService>.self,
-        observationPolicy: featurePolicy)
-      struct FeatureView: View {
-        var content: some View { Text("") }
-      }
-      """,
-      expandedSource: """
-        struct FeatureView: View {
-          var content: some View { Text("") }
-
-            @Environment(\\._visorRouter) private var hostRouter
-
-            @Environment(VISOR.ViewModelFactory<Feature.GenericViewModel<LiveService>>.self) private var factory
-
-            @State private var _viewModel: Feature.GenericViewModel<LiveService>?
-
-            var viewModel: Feature.GenericViewModel<LiveService> {
-                guard let vm = _viewModel else {
-                    preconditionFailure("@LazyViewModel internal error: Feature.GenericViewModel<LiveService> viewModel accessed while _viewModel is nil — content should only render after initialisation.")
-                }
-                return vm
-            }
-
-            var state: Feature.GenericViewModel<LiveService>.State {
-                viewModel.state
-            }
-
-            var bindings: VISOR.ViewModelBindings<Feature.GenericViewModel<LiveService>> {
-                viewModel.bindings
-            }
-
-            var body: some View {
-                Group {
-                    if let viewModel = _viewModel {
-                        VISOR._visorOwnedViewModelContent(
-                            for: viewModel,
-                            observationPolicy: featurePolicy
-                        ) { _ in
-                            content
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .task {
-                    if _viewModel == nil {
-                        _viewModel = factory._visorMakeViewModel(router: hostRouter)
-                    }
-                }
-            }
-        }
-        """,
-      macros: testMacros,
-    )
-  }
-
 }
-#endif
