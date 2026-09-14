@@ -34,11 +34,12 @@ private final class ProjectionBindingModel {
 
   var actions = [Action]()
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     actions.append(action)
     switch action {
     case .pickerPresentationChanged(let value):
-      guard !value, state.activeSheet == .picker else { return }
+      guard !value, state.activeSheet == .picker else { return .completed }
       updateState(\.activeSheet, to: nil)
 
     case .titleChanged(let value):
@@ -47,6 +48,7 @@ private final class ProjectionBindingModel {
     case .activeSheetChanged(let value):
       updateState(\.activeSheet, to: value)
     }
+    return .completed
   }
 }
 
@@ -73,8 +75,10 @@ private final class SourceProjectionBindingModel {
   let source: ObservationSource<Int>
   var handledCount = 0
 
-  func handle(_: Action) {
+  @discardableResult
+  func handle(_: Action) -> ActionCompletion {
     handledCount += 1
+    return .completed
   }
 }
 
@@ -118,11 +122,13 @@ private final class CustomProjectionBindingModel {
   let state: State
   var handledCount = 0
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     handledCount += 1
     switch action {
     case .enabledChanged(let value): state.settings.isEnabled = value
     }
+    return .completed
   }
 }
 

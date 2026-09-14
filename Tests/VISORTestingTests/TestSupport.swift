@@ -93,11 +93,13 @@ final class TestingViewModel {
   let state = State()
   let service: TestingService
 
-  func handle(_ action: Action) async {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .setCount(let value):
       updateState(\.count, to: value)
     }
+    return .completed
   }
 
   // MARK: Private

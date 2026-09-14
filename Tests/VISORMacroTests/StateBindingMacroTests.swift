@@ -34,22 +34,19 @@ struct StateBindingMacroTests {
     #expect(analysis.diagnostics.map { $0.1.rawValue } == [expected])
   }
 
-  @Test(arguments: [
-    "func handle(_ action: Action) async {}",
-    "func handle(_ action: Action) throws {}",
-    "func handle(action: Action) {}",
-    "nonisolated func handle(_ action: Action) {}",
-    "static func handle(_ action: Action) {}",
-  ])
-  func `Binding actions require a synchronous instance handler`(handler: String) throws {
+  @Test(arguments: ["ActionCompletion", "VISOR.ActionCompletion", "CompletionAlias"])
+  func `Binding analysis leaves handler return type checking to protocol conformance`(returnType: String) throws {
     // Given
-    let model = try model(action: #"@StateBinding(\State.count) case changed(Int)"#, handler: handler)
+    let model = try model(
+      action: #"@StateBinding(\State.count) case changed(Int)"#,
+      handler: "func handle(_ action: Action) -> \(returnType) { .completed }",
+    )
 
     // When
     let analysis = try analyse(model)
 
     // Then
-    #expect(analysis.diagnostics.map { $0.1.rawValue } == ["synchronousHandler"])
+    #expect(analysis.isValid)
   }
 
   @Test
@@ -93,7 +90,7 @@ struct StateBindingMacroTests {
       @StateBinding(\State.count) case changed(Int)
     }
     #endif
-    func handle(_ action: Action) {}
+    func handle(_ action: Action) -> ActionCompletion { .completed }
     """#)
     let context = BasicMacroExpansionContext()
 
@@ -129,11 +126,11 @@ struct StateBindingMacroTests {
         enum Action {
           @StateBinding(\State.count) case changed(Int)
         }
-        func handle(_ action: Action) {}
+        func handle(_ action: Action) -> ActionCompletion { .completed }
       }
     }
     #endif
-    func handle(_ action: Action) async {}
+    func handle(_ action: Action) -> ActionCompletion { .completed }
     """#)
 
     // When
@@ -151,7 +148,7 @@ struct StateBindingMacroTests {
     enum Action {
       @StateBinding(\State.count) case changed(Int)
     }
-    func handle(_ action: Action) {}
+    func handle(_ action: Action) -> ActionCompletion { .completed }
     #if DEBUG
     @MainActor
     @Observable
@@ -161,7 +158,7 @@ struct StateBindingMacroTests {
       enum Action {
         @StateBinding(\State.count) case changed(Int)
       }
-      func handle(_ action: Action) {}
+      func handle(_ action: Action) -> ActionCompletion { .completed }
     }
     #endif
     """#)
@@ -175,11 +172,11 @@ struct StateBindingMacroTests {
   }
 
   @Test
-  func `Labelled payloads and explicit Void return types synthesise typed synchronous forwarding`() throws {
+  func `Labelled payloads synthesise synchronous forwarding that discards completion`() throws {
     // Given
     let model = try model(
       action: #"@StateBinding(\State.count) case changed(value: Int)"#,
-      handler: "func handle(_ action: Action) -> Void {}",
+      handler: "func handle(_ action: Action) -> ActionCompletion { .completed }",
     )
     let context = BasicMacroExpansionContext()
 
@@ -198,7 +195,7 @@ struct StateBindingMacroTests {
     #expect(context.diagnostics.isEmpty)
     #expect(!members.contains("_visorConnectStateBindings"))
     #expect(!members.contains("[weak self]"))
-    #expect(members.contains("model.handle(.changed(value: value))"))
+    #expect(members.contains("_ = model.handle(.changed(value: value))"))
     #expect(!members.contains("Task {"))
   }
 
@@ -234,7 +231,7 @@ struct StateBindingMacroTests {
       enum Action {
         @StateBinding(\\State.count) case changed(Int)
       }
-      func handle(_ action: Action) {}
+      func handle(_ action: Action) -> ActionCompletion { .completed }
       """)
     let context = BasicMacroExpansionContext()
     let members = try ViewModelMacro.expansion(
@@ -292,7 +289,7 @@ struct StateBindingMacroTests {
     #expect(!members.contains("_visorBinding_computed"))
   }
 
-  @Test(arguments: ["", "enum Action { case changed(Int) }\nfunc handle(_ action: Action) async {}"])
+  @Test(arguments: ["", "enum Action { case changed(Int) }\nfunc handle(_ action: Action) -> ActionCompletion { .completed }"])
   func `Models without binding actions still conform with an empty binding namespace`(members: String) throws {
     // Given
     let model = try modelWithMembers(members)
@@ -319,7 +316,7 @@ struct StateBindingMacroTests {
 
   private func model(
     action: String,
-    handler: String = "func handle(_ action: Action) {}",
+    handler: String = "func handle(_ action: Action) -> ActionCompletion { .completed }",
   ) throws -> ClassDeclSyntax {
     try modelWithMembers("""
       enum Action {

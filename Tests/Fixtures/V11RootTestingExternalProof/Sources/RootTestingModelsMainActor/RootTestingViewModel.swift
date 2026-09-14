@@ -37,19 +37,31 @@ public final class MainActorRootTestingViewModel {
 
   public enum Action {
     case setCount(Int)
+    case publishAndSetCount(Int)
   }
 
   public let state = State()
   public let service: RootTestingService
 
-  public func handle(_ action: Action) async {
+  @discardableResult
+  public func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .setCount(let value):
       updateState(\.count, to: value)
+    case .publishAndSetCount(let value):
+      return commands.run(for: self) { [service] in
+        service.publish(value)
+        return value
+      } receive: { model, value in
+        model.updateState(\.count, to: value)
+      }.completion
     }
+    return .completed
   }
 
   // MARK: Private
+
+  private let commands = ConcurrentEffects()
 
   @Reaction(source: \MainActorRootTestingViewModel.service.source)
   private func sourceChanged(_ value: Int) {

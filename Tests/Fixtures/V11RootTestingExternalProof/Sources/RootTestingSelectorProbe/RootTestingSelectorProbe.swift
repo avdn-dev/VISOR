@@ -41,7 +41,10 @@ final class RootSelectorProbeViewModel {
 
   let state = State()
 
-  func handle(_: Action) { }
+  @discardableResult
+  func handle(_: Action) -> ActionCompletion {
+    .completed
+  }
 }
 
 #if VISOR_PROBE_BOUND_PROJECTION_SELECTOR

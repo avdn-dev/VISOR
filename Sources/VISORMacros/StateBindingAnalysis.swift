@@ -18,7 +18,6 @@ enum StateBindingDiagnostic: String, DiagnosticMessage {
   case declaration
   case selection
   case duplicate
-  case synchronousHandler
   case conditional
 
   // MARK: Internal
@@ -29,7 +28,6 @@ enum StateBindingDiagnostic: String, DiagnosticMessage {
     case .declaration: "@StateBinding requires one case with exactly one associated value"
     case .selection: "@StateBinding must select one accessible, routed stored State field or synchronous get-only computed State property"
     case .duplicate: "each State field can have only one @StateBinding action"
-    case .synchronousHandler: "@StateBinding requires synchronous, nonthrowing handle(_ action: Action); move async work into managed effects"
     case .conditional: "@StateBinding cases must be declared directly in Action, outside conditional compilation blocks"
     }
   }
@@ -115,29 +113,6 @@ struct StateBindingAnalysis {
         caseName: element.name.trimmedDescription,
         label: label == "_" ? nil : label,
       ))
-    }
-
-    guard !bindings.isEmpty else { return }
-    let hasSynchronousHandler = viewModel.memberBlock.members.contains { member in
-      guard
-        let function = member.decl.as(FunctionDeclSyntax.self),
-        function.name.text == "handle",
-        function.signature.parameterClause.parameters.count == 1,
-        let parameter = function.signature.parameterClause.parameters.first,
-        parameter.firstName.text == "_",
-        parameter.type.trimmedDescription == "Action",
-        function.signature.effectSpecifiers == nil,
-        function.signature.returnClause.map({
-          ["Void", "Swift.Void", "()"].contains($0.type.trimmedDescription)
-        }) ?? true,
-        !function.modifiers.contains(where: {
-          ["static", "class", "nonisolated"].contains($0.name.text)
-        })
-      else { return false }
-      return true
-    }
-    if !hasSynchronousHandler {
-      diagnostics.append((Syntax(action.name), .synchronousHandler))
     }
   }
 

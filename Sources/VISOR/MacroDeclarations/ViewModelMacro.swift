@@ -39,22 +39,30 @@
 ///     case delete(Item.ID)
 ///   }
 ///
-///   func handle(_ action: Action) async {
+///   @discardableResult
+///   func handle(_ action: Action) -> ActionCompletion {
 ///     switch action {
 ///     case .refresh:
 ///       state[\.items] = .loading
-///       let result = await service.fetchAll()
-///       state[\.items] = .loaded(result)
+///       return refresh.run(for: self) { [service] in
+///         await service.fetchAll()
+///       } receive: { model, items in
+///         model.updateState(\.items, to: .loaded(items))
+///       }.completion
 ///     case .delete(let id):
-///       do {
+///       return deletions.run(for: self) { [service] in
 ///         try await service.delete(id)
-///       } catch {
-///         state[\.items] = .failure(.deleteFailed)
-///       }
+///       } receive: { model, result in
+///         if case .failure = result {
+///           model.updateState(\.items, to: .failure(.deleteFailed))
+///         }
+///       }.completion
 ///     }
 ///   }
 ///
 ///   private let service: ItemsService
+///   private let refresh = LatestEffect()
+///   private let deletions = ConcurrentEffects()
 ///
 ///   init(service: ItemsService) {
 ///     self.service = service

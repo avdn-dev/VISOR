@@ -183,3 +183,18 @@ do
 done
 
 echo "Only annotated properties expose bindings; computed properties retain their stored-field mutation boundaries."
+
+run_rejected_batch \
+  RootGatewayAccessControlProbe \
+  "synchronous action completion contracts" \
+  -Xswiftc -DVISOR_PROBE_ACTION_HANDLER
+
+for rejected_model in LegacyAsyncHandler LegacyVoidHandler AsyncCompletionHandler
+do
+  case "$probe_output" in
+    *"type '$rejected_model' does not conform to protocol 'ViewModel'"*) ;;
+    *) report_missing_diagnostic "$rejected_model action handler" ;;
+  esac
+done
+
+echo "ViewModel actions require synchronous dispatch returning ActionCompletion."

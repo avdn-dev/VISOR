@@ -16,7 +16,10 @@ final class MismatchedBindingViewModel {
     case changed(String)
   }
 
-  func handle(_: Action) { }
+  @discardableResult
+  func handle(_: Action) -> ActionCompletion {
+    .completed
+  }
 }
 #endif
 
@@ -50,7 +53,10 @@ final class MismatchedProjectionViewModel {
     case changed(String)
   }
 
-  func handle(_: Action) { }
+  @discardableResult
+  func handle(_: Action) -> ActionCompletion {
+    .completed
+  }
 }
 #endif
 
@@ -70,7 +76,10 @@ final class ConditionalBindingViewModel {
   }
   #endif
 
-  func handle(_: Action) { }
+  @discardableResult
+  func handle(_: Action) -> ActionCompletion {
+    .completed
+  }
 }
 #endif
 

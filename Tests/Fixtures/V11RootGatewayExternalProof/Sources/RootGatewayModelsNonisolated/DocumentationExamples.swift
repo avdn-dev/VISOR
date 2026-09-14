@@ -137,11 +137,13 @@ final class DocumentationViewModel {
   let state = State()
   let consumer: RootObservationConsumer
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .showDetail(let id):
       router.push(.detail(id: id))
     }
+    return .completed
   }
 
   // MARK: Private

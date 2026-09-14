@@ -86,12 +86,14 @@ private final class LeakAsyncActionViewModel {
 
   let state = State()
 
-  func handle(_ action: Action) async {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .load:
       updateState(\.items, to: .loading)
       updateState(\.items, to: .loaded(["done"]))
     }
+    return .completed
   }
 }
 
@@ -171,7 +173,7 @@ struct MemoryLeakTests {
     var viewModel: LeakAsyncActionViewModel? = LeakAsyncActionViewModel()
     weak let weakViewModel = viewModel
 
-    await viewModel?.handle(.load)
+    await viewModel?.handle(.load).wait()
     #expect(viewModel?.state.items == .loaded(["done"]))
 
     viewModel = nil

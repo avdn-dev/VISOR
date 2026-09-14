@@ -98,7 +98,7 @@ struct StateProjectionMacroTests {
         enum Action {
           @StateBinding(\\State.projected) case changed(Int)
         }
-        func handle(_ action: Action) {}
+        func handle(_ action: Action) -> ActionCompletion { .completed }
       }
       """).as(ClassDeclSyntax.self))
     let state = try #require(model.memberBlock.members.compactMap {

@@ -18,7 +18,7 @@ import Observation
 ///
 /// - ViewModels use a plain nested `final class State` retained by a stored
 ///   `let state` property.
-/// - Actions are dispatched via `handle(_:)`. Implement sync or async as needed.
+/// - Actions dispatch synchronously via `handle(_:)` and return a completion value.
 /// - State changes use generated mutation selectors; UI action proposals use `bindings`.
 @MainActor
 public protocol ViewModel: Observable, AnyObject {
@@ -46,8 +46,11 @@ public protocol ViewModel: Observable, AnyObject {
   /// Describes cooperative observation sources to VISOR's package-owned
   /// runtime. `@ViewModel` generates this hook.
   func _visorBuildObservationRecipe(into visitor: _ObservationRecipeVisitor)
-  /// Dispatch an action. Implement sync or async as needed; the protocol requires `async`.
-  func handle(_ action: Action) async
+  /// Dispatches an action immediately and returns the completion of its work.
+  /// Return `.completed` for synchronous work or an effect handle's `completion`.
+  /// Callers may ignore the value or explicitly await its `wait()` method.
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion
 }
 
 extension ViewModel {
@@ -69,5 +72,6 @@ extension ViewModel {
 
 extension ViewModel where Action == Never {
   /// Handles the uninhabited default action without requiring boilerplate.
-  public func handle(_: Never) async { }
+  @discardableResult
+  public func handle(_: Never) -> ActionCompletion { }
 }

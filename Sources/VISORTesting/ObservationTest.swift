@@ -78,7 +78,8 @@ public final class ObservationTest<SUT: ViewModel> {
 
   // MARK: Public
 
-  /// Performs one ViewModel action and fences all participating sources.
+  /// Dispatches one ViewModel action, joins its returned completion, and fences
+  /// all participating sources. Unrelated effects are not joined.
   public func perform(
     _ action: SUT.Action,
     sourceLocation: SourceLocation = #_sourceLocation,
@@ -91,7 +92,7 @@ public final class ObservationTest<SUT: ViewModel> {
       return
     }
 
-    await sut.handle(action)
+    await sut.handle(action).wait()
     _ = await closeWindow(sourceLocation: sourceLocation)
   }
 

@@ -10,6 +10,17 @@ struct BindingAndEffectTests {
   // MARK: Internal
 
   @Test
+  func `Generic action dispatch returns public completion without an async overload`() async {
+    let model = MainActorBindingViewModel()
+    let immediate = dispatch(.enabledChanged(true), to: model)
+    #expect(model.state.isEnabled)
+    await immediate.wait()
+    let preparation = dispatch(.prepare(42), to: model)
+    await ActionCompletion.all([immediate, preparation]).wait()
+    #expect(model.state.preparedValue == 42)
+  }
+
+  @Test
   func `Public binding cases dispatch immediately through the model`() {
     // Given
     let model = MainActorBindingViewModel()
@@ -97,6 +108,10 @@ struct BindingAndEffectTests {
   }
 
   // MARK: Private
+
+  private func dispatch<Model: ViewModel>(_ action: Model.Action, to model: Model) -> ActionCompletion {
+    model.handle(action)
+  }
 
   private func bindings<Model: ViewModel>(for model: Model) -> ViewModelBindings<Model> {
     model.bindings

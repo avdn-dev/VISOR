@@ -22,7 +22,7 @@ import SwiftUI
 /// struct DashboardView: View {
 ///   var content: some View {
 ///     DashboardContent(state: state) { action in
-///       Task { await viewModel.handle(action) }
+///       viewModel.handle(action)
 ///     }
 ///   }
 /// }

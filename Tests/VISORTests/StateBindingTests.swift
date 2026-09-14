@@ -26,14 +26,16 @@ private final class BindingActionModel {
 
   var actions = [Action]()
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     actions.append(action)
     switch action {
     case .enabledChanged(let value): updateState(\.isEnabled, to: value)
     case .nameChanged(let value):
-      guard !value.isEmpty else { return }
+      guard !value.isEmpty else { return .completed }
       updateState(\.name, to: value.uppercased())
     }
+    return .completed
   }
 }
 
@@ -65,11 +67,13 @@ private final class CustomInitialisedBindingModel {
   let state: State
   var handledCount = 0
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     handledCount += 1
     switch action {
     case .valueChanged(let value): updateState(\.value, to: value)
     }
+    return .completed
   }
 }
 
@@ -92,11 +96,13 @@ private final class SourceBindingModel {
   let source: ObservationSource<Int>
   var handledCount = 0
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     handledCount += 1
     switch action {
     case .valueChanged(let value): updateState(\.value, to: value)
     }
+    return .completed
   }
 }
 
@@ -294,15 +300,16 @@ private final class QueuedBindingModel {
 
   let persist: @MainActor @Sendable (Bool) async -> Void
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .enabledChanged(let enabled):
       updateState(\.isEnabled, to: enabled)
-      writes.enqueue(for: self) { [persist] in
+      return writes.enqueue(for: self) { [persist] in
         await persist(enabled)
       } receive: { model, _ in
         model.updateState(\.completedWrites, to: model.state.completedWrites + 1)
-      }
+      }.completion
     }
   }
 

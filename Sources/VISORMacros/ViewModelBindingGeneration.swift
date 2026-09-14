@@ -19,7 +19,7 @@ func viewModelBindingMembers(
         for: \(model).self,
         keyPath: \\State.\(name)
       ) { model, value in
-        model.handle(.\(binding.caseName)(\(argument)))
+        _ = model.handle(.\(binding.caseName)(\(argument)))
       }
       """)
   }

@@ -40,11 +40,13 @@ public final class MainActorBindingViewModel {
     case enabledChanged(Bool)
     @StateBinding(\State.isDisabled)
     case disabledChanged(Bool)
+    case prepare(Int)
   }
 
   public private(set) var handledValues = [Bool]()
 
-  public func handle(_ action: Action) {
+  @discardableResult
+  public func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .enabledChanged(let value):
       handledValues.append(value)
@@ -53,7 +55,11 @@ public final class MainActorBindingViewModel {
     case .disabledChanged(let value):
       handledValues.append(!value)
       updateState(\.isEnabled, to: !value)
+
+    case .prepare(let value):
+      return prepare(value).completion
     }
+    return .completed
   }
 
   public func prepare(_ value: Int) -> EffectHandle<Int> {

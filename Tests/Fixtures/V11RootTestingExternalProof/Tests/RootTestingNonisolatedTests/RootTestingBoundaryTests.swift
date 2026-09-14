@@ -66,6 +66,11 @@ struct RootTestingBoundaryTests {
       }
       test.expect(\.sourceValue, hasExactChanges: [3])
       test.expect(\.reactedValue, alwaysSatisfies: { $0 > 0 })
+
+      await test.perform(.publishAndSetCount(9))
+      test.expect(\.count, hasExactChanges: [9])
+      test.expect(\.sourceValue, hasExactChanges: [9])
+      test.expect(\.reactedValue, hasExactChanges: [9])
     }
   }
 }

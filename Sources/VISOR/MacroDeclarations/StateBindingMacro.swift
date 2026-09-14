@@ -2,7 +2,8 @@
 ///
 /// Apply to a single-payload case in a `@ViewModel`'s nested `Action` enum.
 /// Only properties selected by this annotation gain generated model bindings.
-/// The model must implement synchronous `handle(_:)`. The handler owns the
+/// The model implements synchronous `handle(_:)` returning `ActionCompletion`.
+/// Binding setters discard that completion. The handler owns the
 /// commit through `updateState(_:to:)`; rejecting a proposed value is allowed.
 /// Source projections and `updateState` never dispatch a binding action.
 /// Select a stored field or a synchronous, get-only computed property declared
