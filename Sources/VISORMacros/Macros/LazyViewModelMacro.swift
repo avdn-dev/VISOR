@@ -45,20 +45,28 @@ public struct LazyViewModelMacro: MemberMacro {
       "_visorScenePhase",
     ] {
       guard !view.hasMemberNamed(name) else {
-        diagnose("@LazyViewModel reserves '\(name)'; implement readyContent(state:) and optionally body", at: node, in: context)
+        diagnose(
+          "@LazyViewModel reserves '\(name)'; implement readyContent(state:) or readyContent(viewModel:), and optionally body",
+          at: node,
+          in: context,
+        )
         return []
       }
     }
     let methods = view.memberBlock.members.compactMap { $0.decl.as(FunctionDeclSyntax.self) }
       .filter { $0.name.text == "readyContent" }
     guard methods.count == 1, let ready = methods.first else {
-      diagnose("@LazyViewModel requires one func readyContent(state:) returning a View", at: node, in: context)
+      diagnose(
+        "@LazyViewModel requires exactly one readyContent method accepting state or viewModel and returning a View",
+        at: node,
+        in: context,
+      )
       return []
     }
     let parameters = ready.signature.parameterClause.parameters
     let labels = parameters.map { $0.firstName.text }
     guard
-      labels.contains("state"), Set(labels).count == labels.count,
+      labels.contains("state") || labels.contains("viewModel"), Set(labels).count == labels.count,
       labels.allSatisfy({ ["state", "bindings", "viewModel"].contains($0) }),
       ready.signature.effectSpecifiers == nil,
       ready.signature.returnClause != nil,
@@ -67,7 +75,7 @@ public struct LazyViewModelMacro: MemberMacro {
       parameters.allSatisfy({ $0.defaultValue == nil && $0.ellipsis == nil })
     else {
       diagnose(
-        "readyContent requires a synchronous nonthrowing state parameter, with optional bindings and viewModel parameters",
+        "readyContent must be synchronous and nonthrowing, accepting state or viewModel with optional bindings",
         at: ready,
         in: context,
       )

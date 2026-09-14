@@ -435,7 +435,7 @@ authored initialisers require no special preparation. See
 
 ## Structured SwiftUI ownership
 
-`@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before invoking `readyContent(state:)`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
+`@LazyViewModel` mounts one structured observation owner for its ViewModel identity. It reconciles every baseline projection and immediate reaction before invoking `readyContent`, supervises the running source lanes, and requests cancellation and joined teardown when ownership ends.
 
 ViewModel retention, observation-session ownership, and producer ownership are separate lifetimes. Generated `@State` retains the ViewModel for the annotated view's SwiftUI structural identity. Within that identity, host State retains a lifetime object that owns the observation root task. The appearance task only starts that lifetime; its cancellation does not end observation. Pausing or ending observation does not stop producer-owned channels or domain work; their owner manages that lifetime separately.
 
@@ -459,8 +459,9 @@ also covers the first render before ViewModel construction.
 
 Keep persistent navigation titles, toolbar items and destination-owned navigation
 containers in an authored `body` around `content`. The outer body's optional
-`state` is nil while the model is unavailable. VISOR supplies nonoptional State
-only as the `readyContent(state:)` parameter, after full reconciliation.
+`state` is nil while the model is unavailable. After full reconciliation,
+`readyContent` can receive nonoptional State directly or access it through its
+explicit `viewModel` parameter. Both signatures share the same readiness check.
 
 Use visible pending UI when preparation is expected to be perceptible, give it
 a meaningful accessibility label, and ensure failure presentation has an

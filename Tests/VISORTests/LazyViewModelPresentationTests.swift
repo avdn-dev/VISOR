@@ -234,8 +234,8 @@ private struct PresentationScreen: View {
       .onAppear(perform: failed)
   }
 
-  func readyContent(state: PresentationModel.State) -> some View {
-    Text(state.title)
+  func readyContent(viewModel: PresentationModel) -> some View {
+    Text(viewModel.state.title)
       .onAppear(perform: ready)
   }
 }

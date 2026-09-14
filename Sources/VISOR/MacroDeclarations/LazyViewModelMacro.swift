@@ -2,10 +2,11 @@ import SwiftUI
 
 /// Retains a lazily constructed model and one structured observation lifetime.
 ///
-/// Implement `readyContent(state:)`, optionally accepting `bindings` and a
-/// `viewModel` parameter for integration that requires the prepared model.
-/// These parameters are supplied only after initial source projections and
-/// immediate reactions have reconciled.
+/// Implement exactly one `readyContent` method accepting `state`, `viewModel`,
+/// or both, and optionally `bindings`. Request `viewModel` when integration
+/// requires the prepared model; its `state` is available without a separate
+/// parameter. Parameters can appear in any order and are supplied only after
+/// initial source projections and immediate reactions have reconciled.
 ///
 /// ```swift
 /// @LazyViewModel(LibraryViewModel.self)
@@ -31,8 +32,9 @@ import SwiftUI
 /// presentation includes the first render, before model construction.
 ///
 /// The view's generated `state` is optional and returns a value only while the
-/// model is ready. The explicit `state` parameter in `readyContent` is
-/// nonoptional. There are no implicit nonoptional model or binding properties.
+/// model is ready. Inside `readyContent`, both an explicit `state` parameter
+/// and `viewModel.state` provide nonoptional prepared State. There are no
+/// implicit nonoptional model or binding properties.
 ///
 /// `send` dispatches synchronously and returns the action's `ActionCompletion`,
 /// or `nil` when readiness does not permit dispatch. Rejected actions are never

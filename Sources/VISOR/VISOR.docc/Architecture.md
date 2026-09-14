@@ -110,8 +110,8 @@ struct DashboardContent: View {
 
 The `@LazyViewModel` view owns integration. The macro resolves its factory,
 creates the ViewModel lazily, and mounts one structured observation owner. It
-supplies nonoptional State to `readyContent(state:)` only after source baselines
-and immediate reactions have reconciled.
+invokes `readyContent` with prepared State or the model only after source
+baselines and immediate reactions have reconciled.
 
 Generated `content` is a stable lifecycle slot. Write an ordinary `body` around
 it to keep titles, toolbar items and navigation containers present from the first
@@ -130,11 +130,23 @@ var body: some View {
 ```
 
 The surrounding view's `state` is optional and only exposes coherent State while
-ready. The `state` parameter inside `readyContent` is nonoptional. Request
-`bindings: ViewModelBindings<DashboardViewModel>` as an additional parameter for
-controls. Integration requiring model presentation APIs can explicitly request
-`viewModel: DashboardViewModel` in the same method; there are no implicit
+ready. Declare exactly one `readyContent` method accepting `state`, `viewModel`,
+or both. Both the State parameter and `viewModel.state` are nonoptional prepared
+State. Request `bindings: ViewModelBindings<DashboardViewModel>` as an additional
+parameter for controls. Parameters can appear in any order; there are no implicit
 nonoptional model or binding properties.
+
+When integration needs the model, a separate State parameter is unnecessary:
+
+```swift
+func readyContent(viewModel: DashboardViewModel) -> some View {
+  DashboardContent(
+    state: viewModel.state,
+    onAction: { viewModel.handle($0) })
+}
+```
+
+The selected parameters do not change readiness or observation ownership.
 
 `send` returns the accepted action's completion, or `nil` when readiness rejects
 dispatch. It does not queue rejected actions. Supplied bindings reject writes

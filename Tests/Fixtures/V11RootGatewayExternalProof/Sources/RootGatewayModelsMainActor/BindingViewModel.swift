@@ -95,10 +95,11 @@ public struct MainActorBindingView: View {
   }
 
   public func readyContent(
-    state _: MainActorBindingViewModel.State,
+    viewModel: MainActorBindingViewModel,
     bindings: ViewModelBindings<MainActorBindingViewModel>,
   ) -> some View {
     VStack {
+      Text(viewModel.state.displayOnly)
       Toggle("Enabled", isOn: bindings.isEnabled)
       Toggle("Disabled", isOn: bindings.isDisabled)
     }

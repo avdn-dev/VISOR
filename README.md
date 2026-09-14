@@ -173,6 +173,12 @@ ProfileScreen()
 
 `ProfileScreen` receives nonoptional State in `readyContent(state:)` only after the source baseline has been reconciled. An authored `body` can decorate generated `content` with titles and toolbar items that render immediately; its optional `state` provides coherent values when ready. `send` rejects dispatch while unavailable. See [View and Content](Sources/VISOR/VISOR.docc/Architecture.md#view-and-content) for the presentation contract. Both bindings select from one producer snapshot, so they share one source subscription and revision lane. State is a plain nested `final class`; `@ViewModel` supplies its Observation accessors and routed selectors.
 
+Each view implements exactly one `readyContent` method, accepting `state`,
+`viewModel`, or both, with optional `bindings`. A view that needs model access
+can use `readyContent(viewModel:)` and read `viewModel.state` directly; it does
+not need a redundant State parameter. Every form receives prepared values at
+the same readiness boundary.
+
 Observation follows the screen's SwiftUI structural identity, not each appearance.
 Removing the screen cancels observation and joins teardown before its ViewModel
 identity can be claimed again. Explicit scene-pause policies still withdraw
