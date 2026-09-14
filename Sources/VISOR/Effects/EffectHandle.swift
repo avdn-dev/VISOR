@@ -41,6 +41,11 @@ public struct EffectHandle<Output: Sendable>: Sendable {
 
   // MARK: Public
 
+  /// A join-only action completion for this exact submission, erasing its output.
+  public var completion: ActionCompletion {
+    ActionCompletion(handle: self)
+  }
+
   /// Waits for the operation and synchronous delivery to finish.
   public var result: EffectOutcome<Output> {
     get async { await job.result }

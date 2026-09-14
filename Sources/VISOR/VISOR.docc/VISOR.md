@@ -70,6 +70,7 @@ There is no umbrella product. Import and link only the capabilities a target use
 ### Action bindings and effects
 
 - <doc:BindingsAndEffects>
+- ``ActionCompletion``
 - ``LatestEffect``
 - ``SerialEffectQueue``
 - ``ConcurrentEffects``
