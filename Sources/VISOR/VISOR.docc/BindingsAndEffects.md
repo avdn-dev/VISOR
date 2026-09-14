@@ -21,11 +21,13 @@ final class SettingsViewModel {
     case focusChanged(Bool)
   }
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .focusChanged(let enabled):
       updateState(\.isFocusEnabled, to: enabled)
     }
+    return .completed
   }
 }
 
@@ -37,7 +39,8 @@ struct SettingsView: View {
 }
 ```
 
-A binding setter immediately calls `handle(_:)` with the proposed value. The
+A binding setter immediately calls `handle(_:)` with the proposed value and
+discards its returned completion. The
 handler decides whether to reject, normalise, or commit it. There is no task,
 implicit mutation, deduplication, or initial action dispatch. Every write is an
 event, including a write equal to the current value. Labelled payloads, such as
@@ -68,10 +71,11 @@ an `Action` enum placed inside `#if`, `#elseif`, or `#else` in the ViewModel;
 keep the enum and its annotated cases outside those blocks. Conditional Action
 enums without binding annotations remain supported.
 
-Opting in requires a synchronous, nonthrowing `handle(_ action: Action)` in the
-ViewModel declaration. Existing async handlers remain supported for ViewModels
-without action bindings. Move asynchronous work from a binding handler into an
-effect owner; no separate reducer or dispatch API is required.
+Every ViewModel action uses the same synchronous, nonthrowing
+`handle(_ action: Action) -> ActionCompletion` contract, with or without bindings.
+Swift checks the handler through protocol conformance; binding analysis does not
+restrict the spelling of its return type. Move asynchronous work into an effect
+owner and return its completion; no separate reducer or dispatch API is required.
 
 ### Bind a computed projection
 
@@ -95,12 +99,14 @@ final class PickerViewModel {
     case pickerPresentationChanged(Bool)
   }
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .pickerPresentationChanged(let presented):
-      guard !presented, state.activeSheet == .picker else { return }
+      guard !presented, state.activeSheet == .picker else { return .completed }
       updateState(\.activeSheet, to: nil)
     }
+    return .completed
   }
 }
 
@@ -144,6 +150,62 @@ action routes. Even if two models share State, each binding dispatches only to
 its own model. Raw `Bindable(model.state)[\.field]` writes remain ordinary
 stored-field mutations and **never** invoke an annotated action. Controls that
 dispatch actions must use `model.bindings.field`.
+
+## Dispatch and join an action
+
+`handle(_:)` accepts an action synchronously on MainActor. Return `.completed`
+for synchronous work, including a rejected proposal with nothing to await.
+Return an effect handle's `.completion` for asynchronous work:
+
+```swift
+@discardableResult
+func handle(_ action: Action) -> ActionCompletion {
+  switch action {
+  case .nameChanged(let name):
+    updateState(\.name, to: name)
+    return .completed
+  case .save:
+    let name = state.name
+    return writes.enqueue(for: self) { [service] in
+      try await service.save(name)
+    } receive: { model, result in
+      model.applySaveResult(result)
+    }.completion
+  }
+}
+
+model.handle(.save)              // Dispatch; the owner keeps the work alive.
+await model.handle(.save).wait() // Dispatch another action and join its work.
+```
+
+Each call dispatches a new action. To join an action already dispatched, retain
+its returned completion and call `await completion.wait()`. Copies and multiple
+waiters all join the same work. From another actor, reaching `handle(_:)` itself
+requires an actor hop; that is separate from waiting for its accepted work.
+
+``ActionCompletion`` is join-only: termination is not success. It joins operation
+unwinding and any permitted synchronous result delivery. Cancelled or superseded
+submissions skip receiver delivery. Keep domain outcomes and failure policy in
+the interactor or service; the ViewModel maps those outcomes into presentation
+State. Expose a result-bearing domain operation when a caller needs an output or
+error. The original effect handle retains its `result`, `value()` and explicit
+`cancel()` APIs.
+
+Dropping completion does not cancel work. Cancelling a waiter neither cancels
+the command nor abandons the join. It does not extend the effect owner's lifetime;
+releasing the owner still requests cancellation. If a cancelled operation never
+unwinds, its completion never finishes.
+
+For an action that submits several operations, return
+`ActionCompletion.all([first.completion, second.completion])`. This joins all
+supplied work without starting tasks or changing its scheduling policy. An empty
+collection is complete. Unrelated work and future submissions are never included.
+Do not await an action's completion from work included in that completion.
+
+The handler must return the work it promises to join. Returning `.completed`
+after starting asynchronous work deliberately excludes that work. Unstructured
+tasks spawned by an operation or its receiver are also excluded. Completion
+adds no automatic source fence; `test.perform` adds one for participating sources.
 
 ## Choose an effect owner
 
@@ -206,21 +268,22 @@ Use replacement for preparation and explicit cancellation when turning off:
 ```swift
 private let focusPreparation = LatestEffect()
 
-func handle(_ action: Action) {
+@discardableResult
+func handle(_ action: Action) -> ActionCompletion {
   switch action {
   case .focusChanged(let enabled):
     updateState(\.isFocusEnabled, to: enabled)
     guard enabled else {
       focusPreparation.cancel()
       updateState(\.focusConfiguration, to: nil)
-      return
+      return .completed
     }
 
-    focusPreparation.run(for: self) { [focusService] in
+    return focusPreparation.run(for: self) { [focusService] in
       try await focusService.prepareConfiguration()
     } receive: { model, result in
       model.applyFocusPreparation(result)
-    }
+    }.completion
   }
 }
 ```
@@ -228,6 +291,11 @@ func handle(_ action: Action) {
 Rapid on/off/on input commits immediately. The cancelled preparation cannot
 later overwrite the current configuration through its receiver. The next
 `run` is reusable after cancellation.
+
+Turning off returns `.completed` after requesting cancellation and clearing the
+configuration; it does not join the previous preparation's unwinding. Its
+original completion can still join that work. If turning off must promise that
+cleanup has finished, retain and return that preparation's completion instead.
 
 Cancellation is cooperative: old preparation can overlap newer preparation
 until it unwinds. Receiver protection cannot undo external side effects already
@@ -333,9 +401,19 @@ target weakly for you.
 
 ## Test complete effects
 
-`test.perform(.action)` awaits the handler, not unrelated managed tasks spawned
-by a synchronous handler. Join an exact handle, or the relevant owner's
-snapshot, inside the observation window:
+`test.perform(.action)` dispatches synchronously, joins the returned
+`ActionCompletion`, then fences participating sources. Assert synchronous
+acceptance and asynchronous result delivery in one window:
+
+```swift
+try await observe(model) { test in
+  await test.perform(.save)
+  // Assert committed State history here.
+}
+```
+
+For result-bearing methods or binding-driven tests, explicitly join an exact
+handle or the relevant owner's snapshot inside the observation window:
 
 ```swift
 try await observe(model) { test in

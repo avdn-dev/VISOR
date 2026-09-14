@@ -49,8 +49,10 @@ final class DashboardViewModel {
 
   let state = State()
 
-  func handle(_ action: Action) async {
-    // Perform the requested work and update State.
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
+    // Commit synchronous work, or return an effect handle's completion.
+    .completed
   }
 }
 
@@ -58,7 +60,7 @@ final class DashboardViewModel {
 struct DashboardView: View {
   var content: some View {
     DashboardContent(state: state) { action in
-      Task { await viewModel.handle(action) }
+      viewModel.handle(action)
     }
   }
 }
@@ -134,11 +136,13 @@ final class CounterViewModel {
     case increment
   }
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .increment:
       updateState(\.count, to: state.count + 1)
     }
+    return .completed
   }
 }
 ```
@@ -151,6 +155,7 @@ The shape is intentional:
 - State is a plain `final class`. `@ViewModel` attaches its MainActor Observation accessors and routed field selectors.
 - `state` is a stored `let`, preserving one State identity for SwiftUI ownership and scoped testing. `@ViewModel` synthesises it when safe, or accepts an authored property for custom construction.
 - An `Action` enum is optional. Read-only ViewModels use the default `Never` action.
+- `handle(_:)` synchronously accepts an action and returns `ActionCompletion`. Controls discard it; callers that need completion use `await model.handle(.action).wait()`.
 
 For a public ViewModel, nested State must be public enough to satisfy the generated conformance. A synthesised `state` property and memberwise initialiser inherit that public access.
 
@@ -344,11 +349,13 @@ final class GalleryViewModel {
     self.router = router
   }
 
-  func handle(_ action: Action) {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .openPhoto(let id):
       router.push(.detail(id: id))
     }
+    return .completed
   }
 }
 

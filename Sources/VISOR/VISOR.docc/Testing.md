@@ -58,7 +58,7 @@ Only one `observe` scope may reserve a State identity at a time. The `Observatio
 Each `perform` creates one action window:
 
 1. atomically capture every supported State baseline and activate the journal;
-2. run and await the structured operation;
+2. dispatch the action and join its returned completion, or await the supplied operation;
 3. pause every participating source at a finite frontier;
 4. drain and acknowledge the resulting generated bindings and reactions; and
 5. close a replayable history window.
@@ -85,7 +85,18 @@ let value = try await test.perform {
 }
 ```
 
-The structured operation's return is the action boundary. Fire-and-forget work launched inside it does not extend the window; a later mutation is outside matching input and is retained only as bounded diagnostic context. Await domain completion directly rather than adding a sleep or polling the State.
+For `perform(.action)`, the handler's returned `ActionCompletion` defines the
+work to join. It includes the selected effects' operation unwinding and
+synchronous delivery, but not unrelated submissions. The source fence then
+includes their participating source projections and reactions. A joined failure
+or cancellation is not success; assert the model's domain outcome as needed.
+
+For closure-based `perform`, the supplied operation's return is the action
+boundary. Explicitly call `await sut.handle(.action).wait()` inside such a
+closure when the action's completion matters. Fire-and-forget work does not
+extend the window; later mutations are outside matching input and are retained
+only as bounded diagnostic context. Await completion rather than sleeping or
+polling State.
 
 One closed window supports several non-consuming expectations. A later `perform` starts a new baseline and history.
 

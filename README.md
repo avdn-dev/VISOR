@@ -127,19 +127,24 @@ final class ProfileViewModel {
     self.profileService = profileService
   }
 
-  func handle(_ action: Action) async {
+  @discardableResult
+  func handle(_ action: Action) -> ActionCompletion {
     switch action {
     case .refresh:
-      await profileService.refresh()
+      return refresh.run { [profileService] in
+        await profileService.refresh()
+      }.completion
     }
   }
+
+  private let refresh = LatestEffect()
 }
 
 @LazyViewModel(ProfileViewModel.self)
 struct ProfileScreen: View {
   var content: some View {
     ProfileContent(state: state) {
-      Task { await viewModel.handle(.refresh) }
+      viewModel.handle(.refresh)
     }
   }
 }
@@ -208,11 +213,13 @@ enum Action {
   case focusChanged(Bool)
 }
 
-func handle(_ action: Action) {
+@discardableResult
+func handle(_ action: Action) -> ActionCompletion {
   switch action {
   case .focusChanged(let enabled):
     updateState(\.isFocusEnabled, to: enabled)
   }
+  return .completed
 }
 
 // Inside @LazyViewModel content:
@@ -222,8 +229,10 @@ Toggle("Focus Mode", isOn: bindings.isFocusEnabled)
 Only properties selected by `@StateBinding` actions expose generated bindings;
 unannotated fields have no binding selector. Binding writes call the handler
 synchronously. `updateState` and source
-projections commit without dispatching an action again. Existing async handlers
-remain supported for ViewModels without `@StateBinding`. Each model lazily
+projections commit without dispatching an action again. Every action handler
+returns `ActionCompletion`: `.completed` for synchronous work, or an effect
+handle's `.completion` for asynchronous work. Call `await model.handle(.action).wait()`
+when completion matters; binding setters discard the value. Each model lazily
 retains one stable binding root, including models with authored initialisers.
 Raw State writes never dispatch actions.
 
@@ -295,7 +304,7 @@ func refreshPublishesACompleteStateHistory() async throws {
 }
 ```
 
-`observe` starts and reconciles the generated session before entering the body. Each `perform` captures an action baseline, awaits the structured operation, and fences every participating source before closing the replayable window. `hasExactChanges` matches the complete distinct post-baseline trace; `alwaysSatisfies` checks the baseline and every completed commit.
+`observe` starts and reconciles the generated session before entering the body. Each `perform` captures an action baseline, joins the handler's returned completion (or awaits the supplied operation), and fences every participating source before closing the replayable window. `hasExactChanges` matches the complete distinct post-baseline trace; `alwaysSatisfies` checks the baseline and every completed commit.
 
 Generated doubles live in their own product:
 
@@ -314,8 +323,9 @@ nonisolated protocol AnalyticsService: Sendable {
 The DocC catalogue covers architecture, observation, testing, navigation, and
 deep linking.
 
-For upgrades, consult the [observation migration guide](MIGRATION_V11.md) and
-[binding migration guide](MIGRATION_V12.md).
+For upgrades, consult the [observation migration guide](MIGRATION_V11.md),
+[binding migration guide](MIGRATION_V12.md), and
+[action completion migration guide](MIGRATION_V13.md).
 
 ## Licence
 
