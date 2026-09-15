@@ -39,6 +39,37 @@ struct RouterSelectionTests {
     #expect(try await values.next() == .some(nil))
   }
 
+  @Test
+  func `Router paths are observable across the public package boundary`() async throws {
+    // Given
+    let root = Router<Scene>.preview(root: .home)
+    let child = root.childRouter(for: .home)
+    let source = pathSource(for: child)
+    let values = source.makeAsyncIterator()
+    @Bindable var bindableRouter = child
+
+    // When
+    let baseline = try await values.next()
+
+    // Then
+    #expect(baseline == [])
+
+    // When
+    child.push(.detail)
+
+    // Then
+    #expect(source.currentSnapshot() == [.detail])
+    #expect(try await values.next() == [.detail])
+    #expect(root.navigationPathValues.currentSnapshot().isEmpty)
+
+    // When
+    $bindableRouter.navigationPath.wrappedValue = []
+
+    // Then
+    #expect(source.currentSnapshot().isEmpty)
+    #expect(try await values.next() == [])
+  }
+
   // MARK: Private
 
   private nonisolated enum Scene: NavigationScene {
@@ -57,5 +88,11 @@ struct RouterSelectionTests {
     for router: Router<Scene>
   ) -> ObservationSource<Scene.Root?> {
     router.selectedRootValues
+  }
+
+  private nonisolated func pathSource(
+    for router: Router<Scene>
+  ) -> ObservationSource<[Scene.Push]> {
+    router.navigationPathValues
   }
 }

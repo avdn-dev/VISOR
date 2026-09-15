@@ -181,8 +181,10 @@ public final class Router<Scene: NavigationScene> {
   ///
   /// The setter remains public so a custom `NavigationStack` hosted by
   /// ``RouterHost`` can bind to it. Use ``push(_:)`` and ``popToRoot()`` for
-  /// imperative changes.
-  public var navigationPath = [Scene.Push]()
+  /// imperative changes. ``navigationPathValues`` publishes this node's path
+  /// synchronously, including empty and equal assignments.
+  @ObservationState(observedAs: .values)
+  @ObservationIgnored public var navigationPath = [Scene.Push]()
 
   /// The currently selected top-level destination.
   ///

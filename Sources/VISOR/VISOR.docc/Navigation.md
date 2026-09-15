@@ -231,6 +231,22 @@ The source belongs to the same Router node as its property. To observe tree-wide
 selection, inject the scene's root Router: `select(root:)` from a child updates
 that root's property and source, not the child's local selection.
 
+### Observing Navigation Paths
+
+Use ``Router/navigationPathValues`` with `@Bound` or `@Reaction` to reconcile
+``Router/navigationPath`` in a ViewModel. Assignments, in-place edits and SwiftUI
+binding writes publish synchronously, including empty and equal paths. The
+source delivers the current path and latest revisions, not a lossless event
+history.
+
+Observe the branch or modal Router whose path you need: root navigation actions
+can update an active child without changing the root's path.
+
+Path and root-selection sources publish independently.
+``Router/selectAndPush(root:destination:)`` updates the destination child's path
+first; reactions across the two sources have no guaranteed order or atomic
+combined snapshot.
+
 ### Root and Modal Children
 
 Each root destination receives a cached child Router with its own navigation
