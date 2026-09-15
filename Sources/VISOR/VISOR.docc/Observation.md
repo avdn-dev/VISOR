@@ -177,6 +177,13 @@ final class TransitionalService {
 }
 ```
 
+Assignments follow `@Observable`'s notification policy: statically `Equatable`
+values compare by equality, other class values compare by identity, and other
+values always notify. Every assignment still replaces the snapshot and
+publishes a VISOR source revision, even when Apple Observation is not notified.
+This is source publication, not a lossless event log: busy consumers can still
+coalesce intermediate revisions.
+
 Use `ObservationSource.constant(_:)` for one retained immutable fallback,
 such as generated test-double state. Do not recreate a constant source from a
 computed property because each call would create another source identity.

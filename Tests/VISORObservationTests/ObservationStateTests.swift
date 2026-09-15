@@ -199,6 +199,12 @@ private final class ObservableObservationStateProducer {
   @ObservationState
   @ObservationIgnored private(set) var snapshot = ObservationStateSnapshot()
 
+  @ObservationState
+  @ObservationIgnored var reference = ObservationStateReference(count: 0)
+
+  @ObservationState
+  @ObservationIgnored var equatableReference = EquatableObservationStateReference(count: 0)
+
   func update(count: Int, label: String) {
     withMutableSnapshot { snapshot in
       snapshot.count = count
@@ -207,9 +213,61 @@ private final class ObservableObservationStateProducer {
   }
 }
 
+// MARK: - ObservationStateReference
+
+private final class ObservationStateReference: Sendable {
+
+  // MARK: Lifecycle
+
+  init(count: Int) {
+    self.count = count
+  }
+
+  // MARK: Internal
+
+  let count: Int
+}
+
+// MARK: - EquatableObservationStateReference
+
+private final class EquatableObservationStateReference: Equatable, Sendable {
+
+  // MARK: Lifecycle
+
+  init(count: Int) {
+    self.count = count
+  }
+
+  // MARK: Internal
+
+  let count: Int
+
+  static func ==(lhs: EquatableObservationStateReference, rhs: EquatableObservationStateReference) -> Bool {
+    lhs.count == rhs.count
+  }
+}
+
+// MARK: - GenericObservableObservationStateProducer
+
+@MainActor
+@Observable
+private final class GenericObservableObservationStateProducer<Value: Sendable> {
+
+  // MARK: Lifecycle
+
+  init(value: Value) {
+    self.value = value
+  }
+
+  // MARK: Internal
+
+  @ObservationState
+  @ObservationIgnored var value: Value
+}
+
 // MARK: - ObservationStateTests
 
-@Suite("Producer observation state")
+@Suite("Producer observation state", .timeLimit(.minutes(1)))
 struct ObservationStateTests {
   @Test
   func `Inferred concrete State types publish through generated sequences`() {
@@ -369,6 +427,105 @@ struct ObservationStateTests {
     #expect(producer.snapshot.count == 3)
     #expect(producer.snapshot.label == "complete")
     #expect(producer.snapshotSnapshots.currentSnapshot().count == 3)
+  }
+
+  @Test @MainActor
+  func `Equal assignments publish without invalidating Apple Observation`() async throws {
+    let producer = ObservableObservationStateProducer()
+    let snapshots = producer.snapshotSnapshots.makeAsyncIterator()
+    #expect(try await snapshots.next() == ObservationStateSnapshot())
+
+    let changeCount = OSAllocatedUnfairLock(initialState: 0)
+    withObservationTracking {
+      _ = producer.snapshot
+    } onChange: {
+      changeCount.withLock { $0 += 1 }
+    }
+
+    producer.update(count: 0, label: "initial")
+
+    #expect(try await snapshots.next() == ObservationStateSnapshot())
+    #expect(changeCount.withLock { $0 } == 0)
+
+    producer.update(count: 1, label: "updated")
+
+    #expect(try await snapshots.next() == ObservationStateSnapshot(count: 1, label: "updated"))
+    #expect(changeCount.withLock { $0 } == 1)
+  }
+
+  @Test @MainActor
+  func `Reference assignments compare identity and still publish every replacement`() async throws {
+    let producer = ObservableObservationStateProducer()
+    let original = producer.reference
+    let snapshots = producer.referenceSnapshots.makeAsyncIterator()
+    #expect(try await snapshots.next() === original)
+
+    let changeCount = OSAllocatedUnfairLock(initialState: 0)
+    withObservationTracking {
+      _ = producer.reference
+    } onChange: {
+      changeCount.withLock { $0 += 1 }
+    }
+
+    producer.reference = original
+
+    #expect(try await snapshots.next() === original)
+    #expect(changeCount.withLock { $0 } == 0)
+
+    let replacement = ObservationStateReference(count: 0)
+    producer.reference = replacement
+
+    #expect(producer.reference === replacement)
+    #expect(try await snapshots.next() === replacement)
+    #expect(changeCount.withLock { $0 } == 1)
+  }
+
+  @Test @MainActor
+  func `Equatable references compare equality but retain and publish the replacement`() async throws {
+    let producer = ObservableObservationStateProducer()
+    let original = producer.equatableReference
+    let snapshots = producer.equatableReferenceSnapshots.makeAsyncIterator()
+    #expect(try await snapshots.next() === original)
+
+    let changeCount = OSAllocatedUnfairLock(initialState: 0)
+    withObservationTracking {
+      _ = producer.equatableReference
+    } onChange: {
+      changeCount.withLock { $0 += 1 }
+    }
+
+    let equalReplacement = EquatableObservationStateReference(count: 0)
+    producer.equatableReference = equalReplacement
+
+    #expect(producer.equatableReference === equalReplacement)
+    #expect(producer.equatableReferenceSnapshots.currentSnapshot() === equalReplacement)
+    #expect(try await snapshots.next() === equalReplacement)
+    #expect(changeCount.withLock { $0 } == 0)
+
+    let changedReplacement = EquatableObservationStateReference(count: 1)
+    producer.equatableReference = changedReplacement
+
+    #expect(try await snapshots.next() === changedReplacement)
+    #expect(changeCount.withLock { $0 } == 1)
+  }
+
+  @Test @MainActor
+  func `Values without a static equality constraint always notify and publish`() async throws {
+    let producer = GenericObservableObservationStateProducer(value: 0)
+    let snapshots = producer.valueSnapshots.makeAsyncIterator()
+    #expect(try await snapshots.next() == 0)
+
+    let changeCount = OSAllocatedUnfairLock(initialState: 0)
+    withObservationTracking {
+      _ = producer.value
+    } onChange: {
+      changeCount.withLock { $0 += 1 }
+    }
+
+    producer.value = 0
+
+    #expect(try await snapshots.next() == 0)
+    #expect(changeCount.withLock { $0 } == 1)
   }
 
   @Test

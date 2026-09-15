@@ -89,6 +89,10 @@ public struct ObservationStateMacro: AccessorMacro, PeerMacro {
         """
       setter = """
         set {
+          guard shouldNotifyObservers(\(raw: property.channelName).source.currentSnapshot(), newValue) else {
+            \(raw: property.channelName).publish(newValue)
+            return
+          }
           withMutation(keyPath: \\.\(raw: property.name)) {
             \(raw: property.channelName).publish(newValue)
           }

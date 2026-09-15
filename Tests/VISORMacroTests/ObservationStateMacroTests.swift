@@ -466,6 +466,10 @@ struct ObservationStateMacroTests {
                 return __visorObservationStatePlaybackChannel.source.currentSnapshot()
               }
               set {
+                guard shouldNotifyObservers(__visorObservationStatePlaybackChannel.source.currentSnapshot(), newValue) else {
+                  __visorObservationStatePlaybackChannel.publish(newValue)
+                  return
+                }
                 withMutation(keyPath: \\.playback) {
                   __visorObservationStatePlaybackChannel.publish(newValue)
                 }

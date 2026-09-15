@@ -95,7 +95,11 @@ public macro ObservationStateRequirements() = #externalMacro(
 /// `@ObservationIgnored` immediately below `@ObservationState`. The compiler
 /// expands both macros from the authored declaration, so they would otherwise
 /// both try to provide its accessors. `@ObservationState` still registers the
-/// scalar's reads and mutations with Apple Observation.
+/// scalar's reads and mutations with Apple Observation. Assignments use
+/// `@Observable`'s notification policy: statically `Equatable` values compare by
+/// equality, other class values compare by identity, and other values always
+/// notify. Every assignment still replaces the snapshot and publishes a VISOR
+/// source revision, including assignments that do not notify Apple Observation.
 @attached(
   accessor,
   names: named(init),
