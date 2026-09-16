@@ -32,7 +32,8 @@ struct LazyViewModelMacroTests {
     #expect(!members.contains("preconditionFailure"))
     #expect(!members.contains("var viewModel:"))
     #expect(!members.contains("var bindings:"))
-    #expect(members.contains("private var _visorPresentation = SwiftUI.State(initialValue:"))
+    #expect(members
+      .contains("private var _visorPresentation = VISOR._LazyViewModelState<VISOR._LazyViewModelPresentation<Model>>()"))
     #expect(members.contains("presentation: _visorPresentation.wrappedValue,"))
     #expect(!members.contains("@State"))
   }

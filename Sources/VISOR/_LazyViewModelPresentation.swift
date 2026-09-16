@@ -5,7 +5,7 @@ import SwiftUI
 /// expansions can retain it; the observation lifetime remains in the host.
 @MainActor
 @Observable
-public final class _LazyViewModelPresentation<VM: ViewModel> {
+public final class _LazyViewModelPresentation<VM: ViewModel>: _LazyViewModelStateValue {
 
   // MARK: Lifecycle
 

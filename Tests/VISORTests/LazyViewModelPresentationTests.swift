@@ -252,20 +252,24 @@ extension LazyViewModelPresentationTests {
     var pendingRendered = false
     let ready = TestEventCounter()
     let failed = TestEventCounter()
-    let screen = PresentationScreen(
-      shell: { title in
-        if firstRenderCreations == nil { firstRenderCreations = creations }
-        titles.append(title)
-      },
-      pending: { pendingRendered = true },
-      ready: ready.record,
-      failed: failed.record,
-    )
-    .environment(PresentationModel.Factory {
-      creations += 1
-      return PresentationModel(source: channel.source, preparation: preparation)
-    })
-    let view = NSHostingView(rootView: AnyView(screen))
+    var screenCreations = 0
+    func makeScreen() -> some View {
+      screenCreations += 1
+      return PresentationScreen(
+        shell: { title in
+          if firstRenderCreations == nil { firstRenderCreations = creations }
+          titles.append(title)
+        },
+        pending: { pendingRendered = true },
+        ready: ready.record,
+        failed: failed.record,
+      )
+      .environment(PresentationModel.Factory {
+        creations += 1
+        return PresentationModel(source: channel.source, preparation: preparation)
+      })
+    }
+    let view = NSHostingView(rootView: AnyView(makeScreen()))
     view.frame = NSRect(x: 0, y: 0, width: 320, height: 240)
     defer {
       view.rootView = AnyView(EmptyView())
@@ -293,11 +297,14 @@ extension LazyViewModelPresentationTests {
     #expect(titles.last == "Prepared library")
     #expect(creations == 1)
 
-    // When - reconstructing the parent keeps the installed State storage
-    view.rootView = AnyView(screen)
-    view.layoutSubtreeIfNeeded()
+    // When - fresh view values keep the installed State storage
+    for _ in 0..<10 {
+      view.rootView = AnyView(makeScreen())
+      view.layoutSubtreeIfNeeded()
+    }
 
     // Then
+    #expect(screenCreations == 11)
     #expect(titles.last == "Prepared library")
     #expect(creations == 1)
 

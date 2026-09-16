@@ -100,11 +100,11 @@ public struct LazyViewModelMacro: MemberMacro {
             description: Text("This screen could not be prepared.")
         )
         """
-    // Store the DynamicProperty directly: nesting SwiftUI's State macro in a
-    // member macro breaks generated initialisers under whole-module compilation.
+    // Keep State's lazy initialisation in an authored DynamicProperty: nesting
+    // its macro here breaks generated initialisers under whole-module compilation.
     var members: [DeclSyntax] = [
       "@Environment(\\.scenePhase) private var _visorScenePhase",
-      "private var _visorPresentation = SwiftUI.State(initialValue: VISOR._LazyViewModelPresentation<\(raw: model)>())",
+      "private var _visorPresentation = VISOR._LazyViewModelState<VISOR._LazyViewModelPresentation<\(raw: model)>>()",
       """
       var state: \(raw: model).State? {
           _visorPresentation.wrappedValue._visorState(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)

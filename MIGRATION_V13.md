@@ -6,6 +6,13 @@ action handling uses synchronous dispatch returning an explicit, join-only
 prepared feature content. Migrate both the action handlers and their views as
 part of the same upgrade.
 
+## Building with Xcode 27
+
+With Xcode 27, SwiftUI's State macro defers presentation-holder construction until
+needed. Earlier supported toolchains retain eager State property-wrapper
+initialisation. This affects holder allocation only: model ownership and
+lifecycle are unchanged, and no source migration is required.
+
 ## Replace the handler contract
 
 The protocol requirement changes from:

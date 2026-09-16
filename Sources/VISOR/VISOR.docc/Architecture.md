@@ -113,6 +113,10 @@ creates the ViewModel lazily, and mounts one structured observation owner. It
 invokes `readyContent` with prepared State or the model only after source
 baselines and immediate reactions have reconciled.
 
+Fresh view values with the same SwiftUI identity reuse the installed presentation
+holder and model; a new identity receives new storage. Model construction starts
+in the mounted content's lifecycle task, not in the holder's initialiser.
+
 Generated `content` is a stable lifecycle slot. Write an ordinary `body` around
 it to keep titles, toolbar items and navigation containers present from the first
 render through preparation, readiness, pause and failure. Without an authored
