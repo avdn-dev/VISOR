@@ -27,7 +27,9 @@ import SwiftUI
 /// ```
 /// `content` is the generated lifecycle slot. An authored `body` places stable
 /// navigation and presentation around it; otherwise `body { content }` is
-/// generated. Optional `pendingContent` and `failureContent` properties replace
+/// generated. The generated view retains its presentation in a stored
+/// `SwiftUI.State` dynamic property, accessed directly to avoid nesting
+/// property macros inside this member macro. Optional `pendingContent` and `failureContent` properties replace
 /// the transparent preparation and generic unavailable defaults. Preparation
 /// presentation includes the first render, before model construction.
 ///

@@ -20,6 +20,7 @@ private final class EffectRecipient {
   // MARK: Internal
 
   var values = [Int]()
+  var starts = [Int]()
   var failures = 0
   let latest = LatestEffect()
 }
@@ -261,9 +262,8 @@ struct ManagedEffectTests {
     let operation = ControllableOperation<Int, Never>()
     let invocation = operation.prepare()
     var replacement: EffectHandle<Int>?
-    var starts = [Int]()
     let first = target.latest.run(for: target) {
-      starts.append(1)
+      target.starts.append(1)
       return await withTaskCancellationHandler {
         await operation.run(invocation)
       } onCancel: { [weak target] in
@@ -271,7 +271,7 @@ struct ManagedEffectTests {
         MainActor.assumeIsolated {
           guard let target else { return }
           replacement = target.latest.run(for: target) {
-            starts.append(3)
+            target.starts.append(3)
             return 3
           } receive: { target, value in
             target.values.append(value)
@@ -285,7 +285,7 @@ struct ManagedEffectTests {
 
     // When
     let second = target.latest.run(for: target) {
-      starts.append(2)
+      target.starts.append(2)
       return 2
     } receive: { target, value in
       target.values.append(value)
@@ -296,7 +296,7 @@ struct ManagedEffectTests {
     await target.latest.finish()
 
     // Then
-    #expect(starts == [1, 3])
+    #expect(target.starts == [1, 3])
     #expect(target.values == [3])
     await #expect(throws: EffectSupersededError.self) { try await first.value() }
     await #expect(throws: EffectSupersededError.self) { try await second.value() }

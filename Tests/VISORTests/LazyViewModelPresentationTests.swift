@@ -293,6 +293,14 @@ extension LazyViewModelPresentationTests {
     #expect(titles.last == "Prepared library")
     #expect(creations == 1)
 
+    // When - reconstructing the parent keeps the installed State storage
+    view.rootView = AnyView(screen)
+    view.layoutSubtreeIfNeeded()
+
+    // Then
+    #expect(titles.last == "Prepared library")
+    #expect(creations == 1)
+
     // When
     channel._visorTerminate()
     try await failed.wait()
