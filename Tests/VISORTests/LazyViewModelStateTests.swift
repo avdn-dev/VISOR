@@ -47,10 +47,10 @@ private struct LazyStateScreen: View {
   }
 
   var body: some View {
-    LazyStateProbe(value: storage.wrappedValue, count: storage.wrappedValue.count, report: report)
+    LazyStateProbe(value: storage, count: storage.count, report: report)
   }
 
-  private var storage = _LazyViewModelState<LazyStateValue>()
+  @_LazyViewModelState private var storage: LazyStateValue
   private let report: (LazyStateValue, Int) -> Void
 }
 

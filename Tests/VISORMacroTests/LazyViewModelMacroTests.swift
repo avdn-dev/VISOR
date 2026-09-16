@@ -28,13 +28,13 @@ struct LazyViewModelMacroTests {
     #expect(members.contains("var state: Model.State?"))
     #expect(members.contains("var content: some View"))
     #expect(members.contains("readyContent(state: _visorModel.state)"))
-    #expect(members.contains("_visorPresentation.wrappedValue._visorSender"))
+    #expect(members.contains("_visorPresentation._visorSender"))
     #expect(!members.contains("preconditionFailure"))
     #expect(!members.contains("var viewModel:"))
     #expect(!members.contains("var bindings:"))
     #expect(members
-      .contains("private var _visorPresentation = VISOR._LazyViewModelState<VISOR._LazyViewModelPresentation<Model>>()"))
-    #expect(members.contains("presentation: _visorPresentation.wrappedValue,"))
+      .contains("@VISOR._LazyViewModelState private var _visorPresentation: VISOR._LazyViewModelPresentation<Model>"))
+    #expect(members.contains("presentation: _visorPresentation,"))
     #expect(!members.contains("@State"))
   }
 

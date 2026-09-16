@@ -102,23 +102,24 @@ public struct LazyViewModelMacro: MemberMacro {
         """
     // Keep State's lazy initialisation in an authored DynamicProperty: nesting
     // its macro here breaks generated initialisers under whole-module compilation.
+    // A property wrapper keeps storage out of the view's memberwise initialiser.
     var members: [DeclSyntax] = [
       "@Environment(\\.scenePhase) private var _visorScenePhase",
-      "private var _visorPresentation = VISOR._LazyViewModelState<VISOR._LazyViewModelPresentation<\(raw: model)>>()",
+      "@VISOR._LazyViewModelState private var _visorPresentation: VISOR._LazyViewModelPresentation<\(raw: model)>",
       """
       var state: \(raw: model).State? {
-          _visorPresentation.wrappedValue._visorState(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
+          _visorPresentation._visorState(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
       }
       """,
       """
       var send: VISOR._LazyViewModelActionSender<\(raw: model)> {
-          _visorPresentation.wrappedValue._visorSender(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
+          _visorPresentation._visorSender(observationPolicy: \(raw: policy), scenePhase: _visorScenePhase)
       }
       """,
       """
       var content: some View {
           VISOR._visorLazyViewModelContent(
-              presentation: _visorPresentation.wrappedValue,
+              presentation: _visorPresentation,
               observationPolicy: \(raw: policy),
               pending: { \(raw: pending) },
               failure: { \(raw: failure) }

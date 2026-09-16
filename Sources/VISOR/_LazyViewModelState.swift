@@ -3,6 +3,7 @@ import SwiftUI
 /// Retains generated view state without expanding a property macro inside a
 /// member macro. State retains SwiftUI's native initialisation behaviour.
 @MainActor
+@propertyWrapper
 public struct _LazyViewModelState<Value: _LazyViewModelStateValue>: DynamicProperty {
 
   // MARK: Lifecycle
