@@ -18,12 +18,7 @@ import VISORObservation
 ///     var isAuthenticated = false
 ///   }
 ///
-///   let state = State()
 ///   private let connectionService: ConnectionService
-///
-///   init(connectionService: ConnectionService) {
-///     self.connectionService = connectionService
-///   }
 /// }
 /// ```
 ///

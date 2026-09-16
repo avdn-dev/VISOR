@@ -47,8 +47,6 @@ final class DashboardViewModel {
 
   enum Action { case refresh }
 
-  let state = State()
-
   @discardableResult
   func handle(_ action: Action) -> ActionCompletion {
     // Commit synchronous work, or return an effect handle's completion.
@@ -223,7 +221,15 @@ Swift 6.2.4 can crash in release optimisation while synthesising destruction for
 
 ### State initialisation
 
-When no ViewModel initialiser is authored, `@ViewModel` synthesises one from uninitialised stored `let` dependencies. It also synthesises `state` when State can be constructed from declaration defaults or required `@Bound` fields. Fields selecting the same source are seeded from one coherent current snapshot:
+When no ViewModel initialiser is authored, `@ViewModel` synthesises one from
+uninitialised stored `let` dependencies. It also synthesises `let state: State`
+when State construction is supported. The nested `State` type remains authored;
+the macro does not generate a memberwise State initialiser.
+
+State can use declaration defaults or a single synchronous, nonthrowing,
+nonfailable, nongeneric, nonvariadic initialiser whose required parameters match
+`@Bound` fields sourced from injected dependencies. Fields selecting the same
+source are seeded from one coherent current snapshot:
 
 ```swift
 final class State {
@@ -241,7 +247,9 @@ let service: ProfileService
 // `@ViewModel` synthesises `let state: State` and `init(service:)`.
 ```
 
-Write the property and initialiser explicitly when construction needs a derived value, side effect, multiple State initialisers, or any other policy VISOR cannot prove:
+Write the property and initialiser explicitly when construction needs a derived
+value, side effect, multiple State initialisers, or any other policy VISOR cannot
+prove. An authored ViewModel initialiser disables synthesis of both members:
 
 ```swift
 let state: State
@@ -391,12 +399,7 @@ final class GalleryViewModel {
     case openPhoto(id: String)
   }
 
-  let state = State()
   private let router: Router<AppScene>
-
-  init(router: Router<AppScene>) {
-    self.router = router
-  }
 
   @discardableResult
   func handle(_ action: Action) -> ActionCompletion {

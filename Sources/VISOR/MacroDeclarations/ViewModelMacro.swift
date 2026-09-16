@@ -11,14 +11,16 @@
 /// Share behaviour through composition and injected protocols, not inheritance.
 /// The macro adds VISOR-owned Observation accessors to a plain nested
 /// `final class State`, groups `@Bound(source:)` and `@Reaction(source:)`
-/// entries into declarative recipes, and requires a stable stored `let state`.
+/// entries into declarative recipes, and synthesises a stable stored `let state`
+/// and dependency initialiser when State construction is unambiguous.
 /// It also generates `ViewModel` conformance, a stable model-owned `bindings`
 /// namespace, and `typealias Factory = ViewModelFactory<ClassName>`.
 ///
 /// ## Source-backed State + Action pattern
 ///
-/// Define a plain nested `final class State`, retain it in `let state`, and use
-/// cooperative `ObservationSource` key paths:
+/// Define a plain nested `final class State` and uninitialised stored `let`
+/// dependencies, and use cooperative `ObservationSource` key paths. Omit the
+/// ViewModel's `state` property and initialiser to use synthesis:
 ///
 /// ```swift
 /// @MainActor
@@ -32,7 +34,6 @@
 ///       selecting: \ItemsSnapshot.isAuthenticated)
 ///     var isAuthenticated = false
 ///   }
-///   let state = State()
 ///
 ///   enum Action {
 ///     case refresh
@@ -63,12 +64,10 @@
 ///   private let service: ItemsService
 ///   private let refresh = LatestEffect()
 ///   private let deletions = ConcurrentEffects()
-///
-///   init(service: ItemsService) {
-///     self.service = service
-///   }
 /// }
 /// ```
+///
+/// See <doc:Architecture#State-initialisation> for construction rules.
 @attached(
   member,
   names:

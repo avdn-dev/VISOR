@@ -11,12 +11,7 @@ import VISORObservation
 /// @ViewModel
 /// final class ContentViewModel {
 ///   final class State { var title = "" }
-///   let state = State()
 ///   private let contentService: ContentService
-///
-///   init(contentService: ContentService) {
-///     self.contentService = contentService
-///   }
 ///
 ///   @Reaction(
 ///     source: \ContentViewModel.contentService.source,

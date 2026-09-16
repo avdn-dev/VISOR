@@ -338,18 +338,13 @@ final class SyncViewModel {
     private(set) var status = Status.idle
   }
 
-  let state = State()
   let service: SyncService
-
-  init(service: SyncService) {
-    self.service = service
-  }
 }
 ```
 
-The outer class must explicitly spell `@MainActor`, `@Observable`, and `@ViewModel`. Its nested `State` is a plain `final class`, not an `@Observable` class, and is held by a stable stored `let state`. `@ViewModel` supplies State's MainActor Observation accessors, routed selectors, recipe, and factory.
+The outer class must explicitly spell `@MainActor`, `@Observable`, and `@ViewModel`. Its nested `State` is a plain `final class`, not an `@Observable` class. `@ViewModel` synthesises `let state: State` and `init(service:)` here, alongside State's MainActor Observation accessors, routed selectors, recipe, and factory.
 
-State fields may have declaration defaults or be assigned by a custom State initialiser. Source projections replace those placeholders during startup before a generated SwiftUI owner exposes content or `VISORTesting.observe` enters its body.
+State fields may have declaration defaults or be assigned by a custom State initialiser. Source projections replace those placeholders during startup before a generated SwiftUI owner exposes content or `VISORTesting.observe` enters its body. See [State initialisation](Architecture.md#state-initialisation) for construction rules.
 
 ## Accepted declaration forms
 

@@ -37,7 +37,7 @@ public protocol ViewModel: Observable, AnyObject {
   var bindings: ViewModelBindings<Self> { get }
 
   /// The current stable view state. Conforming models retain this as a stored
-  /// `let state` property.
+  /// `let state` property, synthesised by `@ViewModel` when construction allows it.
   var state: State { get }
   /// An inert per-instance token used by VISOR's hidden SwiftUI owner to
   /// serialise observation generations for this ViewModel identity.

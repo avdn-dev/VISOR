@@ -120,12 +120,7 @@ final class ProfileViewModel {
 
   enum Action { case refresh }
 
-  let state = State()
   let profileService: ProfileService
-
-  init(profileService: ProfileService) {
-    self.profileService = profileService
-  }
 
   @discardableResult
   func handle(_ action: Action) -> ActionCompletion {
@@ -171,7 +166,12 @@ ProfileScreen()
   })
 ```
 
-`ProfileScreen` receives nonoptional State in `readyContent(state:)` only after the source baseline has been reconciled. An authored `body` can decorate generated `content` with titles and toolbar items that render immediately; its optional `state` provides coherent values when ready. `send` rejects dispatch while unavailable. See [View and Content](Sources/VISOR/VISOR.docc/Architecture.md#view-and-content) for the presentation contract. Both bindings select from one producer snapshot, so they share one source subscription and revision lane. State is a plain nested `final class`; `@ViewModel` supplies its Observation accessors and routed selectors.
+`@ViewModel` synthesises `let state: State` and `init(profileService:)` here.
+The nested `State` type remains authored; the macro supplies its Observation
+accessors and routed selectors. For construction rules, see
+[State initialisation](Sources/VISOR/VISOR.docc/Architecture.md#state-initialisation).
+
+`ProfileScreen` receives nonoptional State in `readyContent(state:)` only after the source baseline has been reconciled. An authored `body` can decorate generated `content` with titles and toolbar items that render immediately; its optional `state` provides coherent values when ready. `send` rejects dispatch while unavailable. See [View and Content](Sources/VISOR/VISOR.docc/Architecture.md#view-and-content) for the presentation contract. Both projections select from one producer snapshot, so they share one source subscription and revision lane.
 
 Each view implements exactly one `readyContent` method, accepting `state`,
 `viewModel`, or both, with optional `bindings`. A view that needs model access
