@@ -61,6 +61,10 @@ struct TestDoubleGenerator {
       return []
     }
 
+    // Global-actor ownership already makes a conforming class safe to share.
+    // Keep that ownership rather than introducing a nonisolated async witness.
+    let isMainActor = protocolDecl.attributes.visorContains(named: "MainActor")
+    let usesSendableStorage = traits.isSendable && !isMainActor
     let analysis = ProtocolAnalysis(protocolDecl)
     guard
       validateProtocolForTestDouble(
@@ -107,7 +111,7 @@ struct TestDoubleGenerator {
     }
 
     if
-      kind == .spy, traits.isSendable,
+      kind == .spy, usesSendableStorage,
       let unsupportedMethod = analysis.methods.lazy.compactMap({ method -> (ProtocolMethodInfo, [String])? in
         let genericNames = unconstrainedGenericParameterNamesRequiringSendableStorage(in: method)
         return genericNames.isEmpty ? nil : (method, genericNames)
@@ -126,7 +130,7 @@ struct TestDoubleGenerator {
     let namePlan = TestDoubleNamePlan(
       kind: kind,
       analysis: analysis,
-      isSendable: traits.isSendable,
+      isSendable: usesSendableStorage,
     )
     if hasUnknownTypeDefaults(properties: analysis.properties, methods: analysis.methods) {
       context.diagnose(Diagnostic(
@@ -146,16 +150,16 @@ struct TestDoubleGenerator {
       access: accessLevel(of: protocolDecl),
       analysis: analysis,
       names: namePlan,
-      isSendable: traits.isSendable,
+      isSendable: usesSendableStorage,
     )
-    var members = traits.isSendable
+    var members = usesSendableStorage
       ? SendableTestDoubleRenderer().render(plan)
       : OrdinaryTestDoubleRenderer().render(plan)
     members.append(contentsOf: initialiserMembers(access: plan.access))
 
     let prefix = plan.access.isEmpty ? "" : "\(plan.access) "
-    let isolation = plan.isSendable ? "nonisolated " : ""
-    let sendableConformance = plan.isSendable ? ", Sendable" : ""
+    let isolation = isMainActor ? "@MainActor " : (plan.isSendable ? "nonisolated " : "")
+    let sendableConformance = traits.isSendable ? ", Sendable" : ""
     let body = members.joined(separator: "\n")
     let result: DeclSyntax = """
       @Observable

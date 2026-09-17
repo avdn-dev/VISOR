@@ -324,6 +324,13 @@ nonisolated protocol AnalyticsService: Sendable {
 }
 ```
 
+### Actor-isolated test doubles
+
+For a protocol explicitly isolated to `@MainActor`, `.sendable` generated doubles
+retain MainActor ownership instead of introducing nonisolated async witnesses.
+Measurement closures and results can remain non-Sendable when they stay on that
+actor. Nonisolated Sendable protocols continue to use lock-protected storage.
+
 ## Documentation
 
 The DocC catalogue covers architecture, observation, testing, navigation, and
