@@ -689,7 +689,7 @@ func validateProtocolForTestDouble(
       continue
 
     case "Sendable", "Swift.Sendable":
-      guard traits.isSendable else {
+      guard traits.isSendable || protocolDecl.attributes.visorContains(named: "MainActor") else {
         context.diagnose(Diagnostic(
           node: Syntax(protocolDecl),
           message: TestDoubleDiagnostic.sendableTraitRequired(macroName: macroName),

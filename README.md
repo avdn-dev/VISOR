@@ -331,6 +331,10 @@ retain MainActor ownership instead of introducing nonisolated async witnesses.
 Measurement closures and results can remain non-Sendable when they stay on that
 actor. Nonisolated Sendable protocols continue to use lock-protected storage.
 
+An explicitly MainActor-isolated protocol may also inherit `Sendable` with
+ordinary `@GenerateSpy` and `@GenerateStub`; the actor already protects their
+mutable storage, so `.sendable` is optional for these protocols.
+
 ## Documentation
 
 The DocC catalogue covers architecture, observation, testing, navigation, and
