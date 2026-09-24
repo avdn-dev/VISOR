@@ -50,6 +50,17 @@ public final class _LazyViewModelPresentation<VM: ViewModel>: _LazyViewModelStat
     return model
   }
 
+  /// Reappearance may restore only the owner that still holds this model's
+  /// non-releasing lease. Readiness is separate: a paused owner remains valid.
+  package func restoreOwner(_ retainedOwner: _ViewModelObservationOwner<VM>, isEnabled: Bool) {
+    guard
+      let model,
+      model._visorObservationOwnership._visorIsActionable(ownerID: ObjectIdentifier(retainedOwner))
+    else { return }
+    retainedOwner._visorSetEnabled(isEnabled)
+    owner = retainedOwner
+  }
+
   package func readyModel(isEnabled: Bool) -> VM? {
     guard let model, let owner, owner._visorCanExposeContent(for: model, isEnabled: isEnabled) else {
       return nil

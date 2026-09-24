@@ -131,7 +131,16 @@ struct LazyViewModelPresentationTests {
 
     // When
     try await stopped.wait()
-    owner._visorSetEnabled(true)
+    // A paused owner retains its lease even though it cannot expose content.
+    let unrelatedOwner = _ViewModelObservationOwner<PresentationModel>()
+    presentation.owner = unrelatedOwner
+    presentation.restoreOwner(owner, isEnabled: true)
+
+    // Then
+    #expect(presentation.owner === owner)
+    #expect(!owner._visorIsReady)
+
+    // When
     try await preparation.waitUntilStarted(count: 2)
     preparation.resolveAllInvocations(with: .success(()))
     try await ready.wait(untilEventCount: 2)
@@ -183,9 +192,77 @@ struct LazyViewModelPresentationTests {
     #expect(presentation._visorSend(.enabledChanged(true), observationPolicy: .alwaysObserving, scenePhase: .active) == nil)
     #expect(!model.state.enabled)
     #expect(owner._visorFailure != nil)
+
+    // When - reappearance must preserve a terminal failure in the current epoch.
+    let failure = owner._visorFailure
+    presentation.owner = nil
+    presentation.restoreOwner(owner, isEnabled: true)
+
+    // Then
+    #expect(presentation.owner === owner)
+    #expect(owner._visorFailure == failure)
+    #expect(owner._visorGenerationCount == 1)
+    #expect(presentation._visorState(observationPolicy: .alwaysObserving, scenePhase: .active) == nil)
     root.cancel()
     await root.value
   }
+
+  @Test(.timeLimit(.minutes(1)))
+  func `Releasing and released owners cannot displace the current presentation`() async throws {
+    // Given
+    let channel = ObservationChannel("Tracking")
+    let preparation = ControllableOperation<Void, Never>()
+    let model = PresentationModel(source: channel.source, preparation: preparation)
+    let presentation = _LazyViewModelPresentation<PresentationModel>()
+    _ = presentation.prepare(factory: PresentationModel.Factory { model }, router: nil)
+    let ready = TestEventCounter()
+    let originalOwner = _ViewModelObservationOwner<PresentationModel>(
+      _visorDidBecomeReady: ready.record
+    )
+    presentation.owner = originalOwner
+    let originalRoot = Task { await originalOwner._visorRun(viewModel: model) }
+    defer { originalRoot.cancel() }
+    try await preparation.waitUntilStarted()
+    preparation.resolveAllInvocations(with: .success(()))
+    try await ready.wait()
+    let replacementOwner = _ViewModelObservationOwner<PresentationModel>(
+      _visorDidBecomeReady: ready.record
+    )
+
+    // When - cancellation revokes the lease before MainActor teardown can run.
+    originalRoot.cancel()
+    presentation.owner = replacementOwner
+    presentation.restoreOwner(originalOwner, isEnabled: true)
+
+    // Then
+    #expect(presentation.owner === replacementOwner)
+    #expect(presentation._visorState(observationPolicy: .alwaysObserving, scenePhase: .active) == nil)
+
+    // When - a replacement becomes ready after the old root has joined.
+    await originalRoot.value
+    let replacementRoot = Task { await replacementOwner._visorRun(viewModel: model) }
+    defer { replacementRoot.cancel() }
+    try await preparation.waitUntilStarted(count: 2)
+    preparation.resolveAllInvocations(with: .success(()))
+    try await ready.wait(untilEventCount: 2)
+    presentation.restoreOwner(originalOwner, isEnabled: false)
+
+    // Then
+    #expect(presentation.owner === replacementOwner)
+    #expect(presentation._visorState(observationPolicy: .alwaysObserving, scenePhase: .active)?.title == "Tracking")
+    #expect(presentation._visorSend(.enabledChanged(true), observationPolicy: .alwaysObserving, scenePhase: .active) != nil)
+    #expect(model.state.enabled)
+    #expect(originalOwner._visorGenerationCount == 1)
+    #expect(replacementOwner._visorGenerationCount == 1)
+
+    // When
+    replacementRoot.cancel()
+    await replacementRoot.value
+
+    // Then
+    #expect(!model._visorObservationOwnership._visorIsActionable(ownerID: ObjectIdentifier(replacementOwner)))
+  }
+
 }
 
 #if os(macOS)
@@ -316,6 +393,105 @@ extension LazyViewModelPresentationTests {
     // Then
     #expect(titles.last.map { $0 == nil } == true)
     #expect(creations == 1)
+  }
+}
+#endif
+
+#if os(macOS)
+extension LazyViewModelPresentationTests {
+  @Test(.timeLimit(.minutes(1)))
+  func `Reappearing content restores only the current observation owner`() async throws {
+    // Given
+    let channel = ObservationChannel("Tracking")
+    let preparation = ControllableOperation<Void, Never>()
+    let model = PresentationModel(source: channel.source, preparation: preparation)
+    let presentation = _LazyViewModelPresentation<PresentationModel>()
+    let appeared = TestEventCounter()
+    let disappeared = TestEventCounter()
+    let failed = TestEventCounter()
+    let transientAppeared = TestEventCounter()
+    var creations = 0
+    let content = _visorLazyViewModelContent(
+      presentation: presentation,
+      observationPolicy: .alwaysObserving,
+      pending: { Text("Preparing") },
+      failure: { Text("Unavailable").onAppear(perform: failed.record) },
+      ready: { model, _ in
+        Text(model.state.title)
+          .onAppear(perform: appeared.record)
+          .onDisappear(perform: disappeared.record)
+      },
+    )
+    .environment(PresentationModel.Factory {
+      creations += 1
+      return model
+    })
+    let retained = NSHostingView(rootView: AnyView(content))
+    retained.frame = NSRect(x: 0, y: 0, width: 320, height: 240)
+    let window = NSWindow(
+      contentRect: retained.frame,
+      styleMask: [.titled],
+      backing: .buffered,
+      defer: false,
+    )
+    window.isReleasedWhenClosed = false
+    window.contentView = retained
+    window.orderFront(nil)
+    defer {
+      retained.rootView = AnyView(EmptyView())
+      retained.layoutSubtreeIfNeeded()
+      window.contentView = nil
+      window.close()
+    }
+    retained.layoutSubtreeIfNeeded()
+    try await preparation.waitUntilStarted()
+    preparation.resolveAllInvocations(with: .success(()))
+    try await appeared.wait()
+    let originalOwner = try #require(presentation.owner)
+
+    // When - a transient descendant mounts while the original tab remains retained.
+    window.contentView = nil
+    try await disappeared.wait()
+    let transient = NSHostingView(rootView: AnyView(
+      content.onAppear(perform: transientAppeared.record)
+    ))
+    transient.frame = retained.frame
+    window.contentView = transient
+    transient.layoutSubtreeIfNeeded()
+    try await failed.wait()
+    let rejectedOwner = try #require(presentation.owner)
+
+    // Then
+    #expect(presentation.owner !== originalOwner)
+    #expect(originalOwner._visorIsReady)
+
+    // When - returning to the original structural identity must restore its owner.
+    window.contentView = retained
+    retained.layoutSubtreeIfNeeded()
+    try await appeared.wait(untilEventCount: 2)
+
+    // Then
+    #expect(presentation.owner === originalOwner)
+    #expect(presentation._visorState(observationPolicy: .alwaysObserving, scenePhase: .active)?.title == "Tracking")
+    #expect(presentation._visorSend(.enabledChanged(true), observationPolicy: .alwaysObserving, scenePhase: .active) != nil)
+    #expect(model.state.enabled)
+    #expect(presentation.model === model)
+    #expect(creations == 1)
+    #expect(originalOwner._visorGenerationCount == 1)
+
+    // When - a rejected host returns after the legitimate owner has recovered.
+    window.contentView = transient
+    transient.layoutSubtreeIfNeeded()
+    try await transientAppeared.wait(untilEventCount: 2)
+
+    // Then
+    #expect(rejectedOwner._visorFailure == .duplicateOwner)
+    #expect(presentation.owner === originalOwner)
+    #expect(presentation._visorState(observationPolicy: .alwaysObserving, scenePhase: .active)?.title == "Tracking")
+    #expect(presentation._visorSend(.enabledChanged(false), observationPolicy: .alwaysObserving, scenePhase: .active) != nil)
+    #expect(!model.state.enabled)
+    #expect(creations == 1)
+    #expect(originalOwner._visorGenerationCount == 1)
   }
 }
 #endif

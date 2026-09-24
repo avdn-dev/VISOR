@@ -34,6 +34,10 @@ private struct _LazyViewModelContent<VM: ViewModel, Content: View, Pending: View
       self.lifetime = lifetime
       presentation.owner = lifetime.owner
     }
+    .onAppear {
+      guard let lifetime else { return }
+      presentation.restoreOwner(lifetime.owner, isEnabled: isEnabled)
+    }
     .onChange(of: isEnabled) { _, enabled in
       lifetime?.owner._visorSetEnabled(enabled)
     }
