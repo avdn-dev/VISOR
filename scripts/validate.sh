@@ -101,6 +101,39 @@ clean_documentation_workspace() {
 
 trap clean_documentation_workspace EXIT
 
+install_documentation_entry_points() {
+  documentation_site=$1
+
+  for landing_page_file in \
+    "$documentation_site/data/documentation.json" \
+    "$documentation_site/documentation/index.html"
+  do
+    if [ ! -f "$landing_page_file" ]; then
+      printf 'missing combined documentation landing page: %s\n' \
+        "$landing_page_file" >&2
+      return 1
+    fi
+  done
+
+  # DocC's renderer has no route for the site root, so the copy of its shell
+  # there reports a missing page. Send the root to the combined landing page,
+  # and keep the shell for unknown paths so they render DocC's not-found page.
+  cp "$documentation_site/documentation/index.html" "$documentation_site/404.html"
+  cat >"$documentation_site/index.html" <<'EOF'
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0; url=documentation/">
+  <title>VISOR Documentation</title>
+</head>
+<body>
+  <p><a href="documentation/">VISOR Documentation</a></p>
+</body>
+</html>
+EOF
+}
+
 run_documentation() {
   documentation_workspace=$(mktemp -d /tmp/visor-docc-validation.XXXXXX)
   module_cache="$documentation_workspace/module-cache"
@@ -146,6 +179,9 @@ run_documentation() {
     --warnings-as-errors \
     --transform-for-static-hosting \
     --hosting-base-path VISOR
+
+  run_stage "Documentation site entry points" \
+    install_documentation_entry_points "$documentation_output"
 }
 
 run_complete_validation() {
