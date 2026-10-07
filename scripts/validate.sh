@@ -19,6 +19,19 @@ usage() {
     >&2
 }
 
+# CI sets VISOR_SWIFT_SYNTAX_VERSION to a release that has a prebuilt for its
+# toolchain, so SwiftPM can skip compiling swift-syntax from source.
+pin_swift_syntax() {
+  pin_description=$1
+  shift
+
+  if [ -n "${VISOR_SWIFT_SYNTAX_VERSION:-}" ]; then
+    printf '\n==> %s\n' "$pin_description swift-syntax $VISOR_SWIFT_SYNTAX_VERSION pin"
+    swift package "$@" resolve
+    swift package "$@" resolve --version "$VISOR_SWIFT_SYNTAX_VERSION" swift-syntax
+  fi
+}
+
 run_tests() {
   test_description=$1
   test_configuration=$2
@@ -69,6 +82,8 @@ run_style_check() {
 run_root_tests() {
   test_configuration=$1
 
+  pin_swift_syntax "Root"
+
   case "$test_configuration" in
     release|all) run_style_check ;;
   esac
@@ -77,8 +92,10 @@ run_root_tests() {
 }
 
 run_api_contracts() {
+  pin_swift_syntax "Gateway" --package-path Tests/Fixtures/V11RootGatewayExternalProof
   run_stage "Gateway access-control contracts" \
     sh Tests/Fixtures/V11RootGatewayExternalProof/verify-access-control.sh
+  pin_swift_syntax "Testing" --package-path Tests/Fixtures/V11RootTestingExternalProof
   run_stage "Testing selector contracts" \
     sh Tests/Fixtures/V11RootTestingExternalProof/verify-selector-contracts.sh
 }
@@ -164,6 +181,8 @@ run_documentation() {
       ;;
   esac
 
+  pin_swift_syntax "Root"
+
   printf '\n==> %s\n' "Combined public-product DocC archive"
   CLANG_MODULE_CACHE_PATH="$module_cache" \
   SWIFTPM_MODULECACHE_OVERRIDE="$module_cache" \
@@ -192,6 +211,7 @@ run_complete_validation() {
     Tests/Fixtures/V11RootTestingExternalProof \
     Tests/Fixtures/V11RootTestDoublesExternalProof
   do
+    pin_swift_syntax "$proof_package" --package-path "$proof_package"
     run_tests "$proof_package" all --package-path "$proof_package"
   done
 
@@ -227,6 +247,7 @@ case "$mode" in
     fi
     configuration=$1
     proof_package=$2
+    pin_swift_syntax "$proof_package" --package-path "$proof_package"
     run_tests "$proof_package" "$configuration" --package-path "$proof_package"
     ;;
   api)

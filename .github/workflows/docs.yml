@@ -17,6 +17,8 @@ jobs:
     runs-on: macos-26
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      # The only swift-syntax release with a prebuilt for Xcode 26.3's Swift 6.2.4.
+      VISOR_SWIFT_SYNTAX_VERSION: 602.0.0
     steps:
       - uses: actions/checkout@v4
 

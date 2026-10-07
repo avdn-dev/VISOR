@@ -9,6 +9,8 @@ on:
 
 env:
   DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+  # The only swift-syntax release with a prebuilt for Xcode 26.3's Swift 6.2.4.
+  VISOR_SWIFT_SYNTAX_VERSION: 602.0.0
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,7 +29,7 @@ jobs:
 
       - name: Verify lazy State and downstream initialisers in Release
         run: |
-          unset DEVELOPER_DIR
+          unset DEVELOPER_DIR VISOR_SWIFT_SYNTAX_VERSION
           xcodebuild -version
           scripts/validate.sh root release
           scripts/validate.sh external release Tests/Fixtures/V11RootGatewayExternalProof
