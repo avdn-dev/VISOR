@@ -1332,6 +1332,8 @@ func `Handle typealias in attributed use site`() {
   )
 }
 
+// swift-syntax parses module selectors from 603.
+#if canImport(SwiftSyntax603)
 @Test
 func `Preserves a module selector that disambiguates a typealias`() {
   assertMacroExpansionSwiftTesting(
@@ -1357,6 +1359,7 @@ func `Preserves a module selector that disambiguates a typealias`() {
     macros: testMacros,
   )
 }
+#endif
 
 // MARK: - Escaping Closures
 
