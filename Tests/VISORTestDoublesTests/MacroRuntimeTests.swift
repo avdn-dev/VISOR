@@ -409,20 +409,56 @@ struct GenerateSpyMacroRuntimeTests {
   }
 
   @Test
-  func `Spy call counts participate in Observation tracking`() async {
+  func `Spy call recording does not notify observers`() async {
     let spy = SpyAnalyticsService()
 
-    await confirmation { confirmed in
+    await confirmation(expectedCount: 0) { changed in
       withObservationTracking {
         _ = spy.trackEventCallCount
+        _ = spy.trackEventReceivedInvocations
+        _ = spy.calls
       } onChange: {
-        confirmed()
+        changed()
       }
 
       spy.trackEvent("test")
     }
 
     #expect(spy.trackEventCallCount == 1)
+  }
+
+  @Test
+  func `Spy called during tracked work does not invalidate that work`() async {
+    let spy = SpyAnalyticsService()
+
+    await confirmation(expectedCount: 0) { invalidated in
+      withObservationTracking {
+        spy.trackEvent("during")
+      } onChange: {
+        invalidated()
+      }
+
+      spy.trackEvent("after")
+    }
+
+    #expect(spy.trackEventReceivedInvocations == ["during", "after"])
+  }
+
+  @Test
+  func `Sendable spy called during tracked work does not invalidate that work`() async {
+    let spy = SpyRuntimeSendableGenericSpyService()
+
+    await confirmation(expectedCount: 0) { invalidated in
+      withObservationTracking {
+        spy.consume(1, tag: "during")
+      } onChange: {
+        invalidated()
+      }
+
+      spy.consume(2, tag: "after")
+    }
+
+    #expect(spy.consumeCallCount == 2)
   }
 
   @Test

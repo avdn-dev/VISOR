@@ -171,7 +171,7 @@ struct TestDoubleGenerationPlan {
         storageType: "[\(callTypeName)]",
         storageDefaultExpression: "[]",
         ordinaryInitialiser: "[]",
-        isObservationIgnored: false,
+        isObservationIgnored: Self.isRecordingObservationIgnored,
       )
     } else {
       callLogProperty = nil
@@ -205,6 +205,11 @@ struct TestDoubleGenerationPlan {
   }
 
   // MARK: Private
+
+  /// Call recording stays out of Observation, so a spy called while its caller is being
+  /// tracked, such as from a SwiftUI update, cannot invalidate that caller. Tests wait for
+  /// calls through implementation closures instead.
+  private static let isRecordingObservationIgnored = true
 
   private static func methodPlan(
     _ method: ProtocolMethodInfo,
@@ -258,7 +263,7 @@ struct TestDoubleGenerationPlan {
       storageType: "Int",
       storageDefaultExpression: "0",
       ordinaryInitialiser: "0",
-      isObservationIgnored: false,
+      isObservationIgnored: isRecordingObservationIgnored,
     )
     let storedProperties = [callCountProperty]
       + receivedProperties
@@ -398,7 +403,6 @@ struct TestDoubleGenerationPlan {
   ) -> [TestDoubleStoredPropertyPlan] {
     guard !parameters.isEmpty else { return [] }
     let containsFunction = parameters.contains { isFunctionType($0.storageType) }
-    let ignored = containsFunction
 
     if parameters.count == 1, let parameter = parameters.first {
       let type = parameter.storageType
@@ -418,7 +422,7 @@ struct TestDoubleGenerationPlan {
           storageType: "\(wrappedType)?",
           storageDefaultExpression: "nil",
           ordinaryInitialiser: nil,
-          isObservationIgnored: ignored,
+          isObservationIgnored: isRecordingObservationIgnored,
         ),
         TestDoubleStoredPropertyPlan(
           name: receivedInvocations,
@@ -426,7 +430,7 @@ struct TestDoubleGenerationPlan {
           storageType: "[\(wrappedType)]",
           storageDefaultExpression: "[]",
           ordinaryInitialiser: "[]",
-          isObservationIgnored: ignored,
+          isObservationIgnored: isRecordingObservationIgnored,
         ),
       ]
     }
@@ -448,7 +452,7 @@ struct TestDoubleGenerationPlan {
         storageType: "\(wrappedType)?",
         storageDefaultExpression: "nil",
         ordinaryInitialiser: nil,
-        isObservationIgnored: ignored,
+        isObservationIgnored: isRecordingObservationIgnored,
       ),
       TestDoubleStoredPropertyPlan(
         name: receivedInvocations,
@@ -456,7 +460,7 @@ struct TestDoubleGenerationPlan {
         storageType: "[\(wrappedType)]",
         storageDefaultExpression: "[]",
         ordinaryInitialiser: "[]",
-        isObservationIgnored: ignored,
+        isObservationIgnored: isRecordingObservationIgnored,
       ),
     ]
   }

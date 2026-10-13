@@ -122,6 +122,7 @@ struct GenerateSpyMacroTests {
         final class SpyDataService: DataService {
           var items: [Item] = []
           // -- fetch --
+          @ObservationIgnored
           var fetchCallCount = 0
           var fetchResult: Result<[Item], any Error> = .success([])
           @ObservationIgnored
@@ -135,8 +136,11 @@ struct GenerateSpyMacroTests {
             return try fetchResult.get()
           }
           // -- save --
+          @ObservationIgnored
           var saveCallCount = 0
+          @ObservationIgnored
           var saveReceivedItem: Item?
+          @ObservationIgnored
           var saveReceivedInvocations: [Item] = []
           var saveResult: Result<Void, any Error> = .success(())
           @ObservationIgnored
@@ -156,6 +160,7 @@ struct GenerateSpyMacroTests {
             case fetch
             case save(item: Item)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -195,6 +200,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyTypedThrowingService: TypedThrowingService {
           // -- perform --
+          @ObservationIgnored
           var performCallCount = 0
           var performResult: Result<Void, OperationError> = .success(())
           @ObservationIgnored
@@ -209,6 +215,7 @@ struct GenerateSpyMacroTests {
             try performResult.get()
           }
           // -- fetchValue --
+          @ObservationIgnored
           var fetchValueCallCount = 0
           var fetchValueResult: Result<String, FetchError> = .success("value")
           @ObservationIgnored
@@ -225,6 +232,7 @@ struct GenerateSpyMacroTests {
             case perform
             case fetchValue
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -251,8 +259,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyLogService: LogService {
           // -- log --
+          @ObservationIgnored
           var logCallCount = 0
+          @ObservationIgnored
           var logReceivedMessage: String?
+          @ObservationIgnored
           var logReceivedInvocations: [String] = []
           @ObservationIgnored
           var logImplementation: ((String) -> Void)?
@@ -264,6 +275,7 @@ struct GenerateSpyMacroTests {
             logImplementation?(message)
           }
           // -- reset --
+          @ObservationIgnored
           var resetCallCount = 0
           @ObservationIgnored
           var resetImplementation: (() -> Void)?
@@ -276,6 +288,7 @@ struct GenerateSpyMacroTests {
             case log(message: String)
             case reset
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -300,8 +313,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpySearchService: SearchService {
           // -- search --
+          @ObservationIgnored
           var searchCallCount = 0
+          @ObservationIgnored
           var searchReceivedArguments: (query: String, limit: Int)?
+          @ObservationIgnored
           var searchReceivedInvocations: [(query: String, limit: Int)] = []
           var searchResult: Result<[String], any Error> = .success([])
           @ObservationIgnored
@@ -319,6 +335,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case search(query: String, limit: Int)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -343,8 +360,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyEventRecording: EventRecording {
           // -- record --
+          @ObservationIgnored
           var recordCallCount = 0
+          @ObservationIgnored
           var recordReceivedArguments: (argument1Generated: Int, argument1: String)?
+          @ObservationIgnored
           var recordReceivedInvocations: [(argument1Generated: Int, argument1: String)] = []
           @ObservationIgnored
           var recordImplementation: ((Int, String) -> Void)?
@@ -358,6 +378,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case record(argument1Generated: Int, argument1: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -382,8 +403,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyKeywordRecording: KeywordRecording {
           // -- store --
+          @ObservationIgnored
           var storeCallCount = 0
+          @ObservationIgnored
           var storeReceivedDefault: String?
+          @ObservationIgnored
           var storeReceivedInvocations: [String] = []
           @ObservationIgnored
           var storeImplementation: ((String) -> Void)?
@@ -397,6 +421,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case store(default: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -425,6 +450,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyThemeService: ThemeService {
           // -- currentTheme --
+          @ObservationIgnored
           var currentThemeCallCount = 0
           var currentThemeReturnValue: Theme?
           @ObservationIgnored
@@ -441,6 +467,7 @@ struct GenerateSpyMacroTests {
             return value
           }
           // -- preferredTheme --
+          @ObservationIgnored
           var preferredThemeCallCount = 0
           var preferredThemeReturnValue: Theme = Theme.system
           @ObservationIgnored
@@ -454,6 +481,7 @@ struct GenerateSpyMacroTests {
             return preferredThemeReturnValue
           }
           // -- loadUser --
+          @ObservationIgnored
           var loadUserCallCount = 0
           var loadUserResult: Result<User, any Error> = .success(User.guest)
           @ObservationIgnored
@@ -471,6 +499,7 @@ struct GenerateSpyMacroTests {
             case preferredTheme
             case loadUser
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -555,8 +584,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyItemService: ItemService {
           // -- perform --
+          @ObservationIgnored
           var performCallCount = 0
+          @ObservationIgnored
           var performReceivedItem: Item?
+          @ObservationIgnored
           var performReceivedInvocations: [Item] = []
           var performResult: Result<Void, any Error> = .success(())
           @ObservationIgnored
@@ -575,6 +607,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case perform(item: Item)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -601,8 +634,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyLoadService: LoadService {
           // -- loadById --
+          @ObservationIgnored
           var loadByIdCallCount = 0
+          @ObservationIgnored
           var loadByIdReceivedId: String?
+          @ObservationIgnored
           var loadByIdReceivedInvocations: [String] = []
           var loadByIdReturnValue: Item?
           @ObservationIgnored
@@ -621,8 +657,11 @@ struct GenerateSpyMacroTests {
             return value
           }
           // -- loadMatching --
+          @ObservationIgnored
           var loadMatchingCallCount = 0
+          @ObservationIgnored
           var loadMatchingReceivedQuery: String?
+          @ObservationIgnored
           var loadMatchingReceivedInvocations: [String] = []
           var loadMatchingReturnValue: [Item] = []
           @ObservationIgnored
@@ -641,6 +680,7 @@ struct GenerateSpyMacroTests {
             case load(id: String)
             case load(query: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -677,6 +717,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyMixedService: MixedService {
           // -- fetch --
+          @ObservationIgnored
           var fetchCallCount = 0
           var fetchReturnValue: [Item] = []
           @ObservationIgnored
@@ -690,8 +731,11 @@ struct GenerateSpyMacroTests {
             return fetchReturnValue
           }
           // -- sendEvent --
+          @ObservationIgnored
           var sendEventCallCount = 0
+          @ObservationIgnored
           var sendEventReceivedEvent: String?
+          @ObservationIgnored
           var sendEventReceivedInvocations: [String] = []
           @ObservationIgnored
           var sendEventImplementation: ((String) -> Void)?
@@ -703,8 +747,11 @@ struct GenerateSpyMacroTests {
             sendEventImplementation?(event)
           }
           // -- sendError --
+          @ObservationIgnored
           var sendErrorCallCount = 0
+          @ObservationIgnored
           var sendErrorReceivedError: any Error?
+          @ObservationIgnored
           var sendErrorReceivedInvocations: [any Error] = []
           @ObservationIgnored
           var sendErrorImplementation: ((any Error) -> Void)?
@@ -720,6 +767,7 @@ struct GenerateSpyMacroTests {
             case send(event: String)
             case send(error: any Error)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -747,6 +795,7 @@ struct GenerateSpyMacroTests {
         public final class SpyDataService: DataService {
           public var items: [Item] = []
           // -- fetch --
+          @ObservationIgnored
           public var fetchCallCount = 0
           public var fetchResult: Result<[Item], any Error> = .success([])
           @ObservationIgnored
@@ -762,6 +811,7 @@ struct GenerateSpyMacroTests {
           public enum Call {
             case fetch
           }
+          @ObservationIgnored
           public var calls: [Call] = []
           public init() {
           }
@@ -791,6 +841,7 @@ struct GenerateSpyMacroTests {
         package final class SpyDataService: DataService {
           package var items: [Item] = []
           // -- fetch --
+          @ObservationIgnored
           package var fetchCallCount = 0
           package var fetchResult: Result<[Item], any Error> = .success([])
           @ObservationIgnored
@@ -806,6 +857,7 @@ struct GenerateSpyMacroTests {
           package enum Call {
             case fetch
           }
+          @ObservationIgnored
           package var calls: [Call] = []
           package init() {
           }
@@ -835,6 +887,7 @@ struct GenerateSpyMacroTests {
         fileprivate final class SpyDataService: DataService {
           fileprivate var items: [Item] = []
           // -- fetch --
+          @ObservationIgnored
           fileprivate var fetchCallCount = 0
           fileprivate var fetchResult: Result<[Item], any Error> = .success([])
           @ObservationIgnored
@@ -850,6 +903,7 @@ struct GenerateSpyMacroTests {
           fileprivate enum Call {
             case fetch
           }
+          @ObservationIgnored
           fileprivate var calls: [Call] = []
         }
         """,
@@ -877,6 +931,7 @@ struct GenerateSpyMacroTests {
         private final class SpyDataService: DataService {
           private var items: [Item] = []
           // -- fetch --
+          @ObservationIgnored
           private var fetchCallCount = 0
           private var fetchResult: Result<[Item], any Error> = .success([])
           @ObservationIgnored
@@ -892,6 +947,7 @@ struct GenerateSpyMacroTests {
           private enum Call {
             case fetch
           }
+          @ObservationIgnored
           private var calls: [Call] = []
         }
         """,
@@ -922,6 +978,7 @@ struct GenerateSpyMacroTests {
           var status: ExtractionStatus = ExtractionStatus.idle
           var count: Int = 0
           // -- reset --
+          @ObservationIgnored
           var resetCallCount = 0
           @ObservationIgnored
           var resetImplementation: (() -> Void)?
@@ -933,6 +990,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case reset
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -983,6 +1041,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyResultService: ResultService {
           // -- execute --
+          @ObservationIgnored
           var executeCallCount = 0
           var executeReturnValue: Result<String, any Error>?
           @ObservationIgnored
@@ -1001,6 +1060,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case execute
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1033,8 +1093,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyBatchService: BatchService {
           // -- process --
+          @ObservationIgnored
           var processCallCount = 0
+          @ObservationIgnored
           var processReceivedBatch: Set<String>?
+          @ObservationIgnored
           var processReceivedInvocations: [Set<String>] = []
           @ObservationIgnored
           var processImplementation: ((Set<String>) -> Void)?
@@ -1048,6 +1111,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case process(batch: Set<String>)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1072,8 +1136,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyWorkRunner: WorkRunner {
           // -- run --
+          @ObservationIgnored
           var runCallCount = 0
+          @ObservationIgnored
           var runReceivedName: String?
+          @ObservationIgnored
           var runReceivedInvocations: [String] = []
           func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T {
             runCallCount += 1
@@ -1085,6 +1152,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case run(name: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1109,8 +1177,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyConstrainedRunner: ConstrainedRunner {
           // -- run --
+          @ObservationIgnored
           var runCallCount = 0
+          @ObservationIgnored
           var runReceivedName: String?
+          @ObservationIgnored
           var runReceivedInvocations: [String] = []
           func run<T>(_ name: String, _ body: () async throws -> T) async rethrows -> T where T: Sendable {
             runCallCount += 1
@@ -1122,6 +1193,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case run(name: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1146,8 +1218,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyGenericSink: GenericSink {
           // -- consume --
+          @ObservationIgnored
           var consumeCallCount = 0
+          @ObservationIgnored
           var consumeReceivedArguments: (value: Any, tag: String)?
+          @ObservationIgnored
           var consumeReceivedInvocations: [(value: Any, tag: String)] = []
           func consume<T>(_ value: T, tag: String) {
             consumeCallCount += 1
@@ -1158,6 +1233,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case consume(value: Any, tag: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1182,6 +1258,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyVoidRunner: VoidRunner {
           // -- run --
+          @ObservationIgnored
           var runCallCount = 0
           func run(_ body: () throws -> Void) rethrows {
             runCallCount += 1
@@ -1191,6 +1268,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case run
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1334,8 +1412,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyFooService: FooService {
           // -- processFoo --
+          @ObservationIgnored
           var processFooCallCount = 0
+          @ObservationIgnored
           var processFooReceivedFoo: FooService.Foo?
+          @ObservationIgnored
           var processFooReceivedInvocations: [FooService.Foo] = []
           var processFooReturnValue: FooService.Foo?
           @ObservationIgnored
@@ -1356,6 +1437,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case processFoo(foo: FooService.Foo)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1392,8 +1474,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpySaveService: SaveService {
           // -- save --
+          @ObservationIgnored
           var saveCallCount = 0
+          @ObservationIgnored
           var saveReceivedItem: Item?
+          @ObservationIgnored
           var saveReceivedInvocations: [Item] = []
           var saveResult: Result<Void, any Error> = .success(())
           @ObservationIgnored
@@ -1412,6 +1497,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case save(item: Item)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1436,6 +1522,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyRefreshService: RefreshService {
           // -- refresh --
+          @ObservationIgnored
           var refreshCallCount = 0
           @ObservationIgnored
           var refreshImplementation: (() async -> Void)?
@@ -1450,6 +1537,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case refresh
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1474,8 +1562,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyMotionService: MotionService {
           // -- waitForFirstData --
+          @ObservationIgnored
           var waitForFirstDataCallCount = 0
+          @ObservationIgnored
           var waitForFirstDataReceivedTimeout: Duration?
+          @ObservationIgnored
           var waitForFirstDataReceivedInvocations: [Duration] = []
           var waitForFirstDataReturnValue: Bool = false
           @ObservationIgnored
@@ -1493,6 +1584,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case waitForFirstData(timeout: Duration)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1517,8 +1609,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpySearchService: SearchService {
           // -- search --
+          @ObservationIgnored
           var searchCallCount = 0
+          @ObservationIgnored
           var searchReceivedArguments: (query: String, limit: Int)?
+          @ObservationIgnored
           var searchReceivedInvocations: [(query: String, limit: Int)] = []
           var searchResult: Result<[Result], any Error> = .success([])
           @ObservationIgnored
@@ -1536,6 +1631,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case search(query: String, limit: Int)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1563,6 +1659,7 @@ struct GenerateSpyMacroTests {
         final class SpyCollisionService: CollisionService {
           var fetchImplementation: Bool = false
           // -- fetch --
+          @ObservationIgnored
           var fetchCallCount = 0
           var fetchReturnValue: Item?
           @ObservationIgnored
@@ -1581,6 +1678,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case fetch
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1621,6 +1719,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyCollisionService: CollisionService {
           // -- reset --
+          @ObservationIgnored
           var resetCallCount = 0
           @ObservationIgnored
           var resetImplementationClosure: (() -> Void)?
@@ -1630,6 +1729,7 @@ struct GenerateSpyMacroTests {
             resetImplementationClosure?()
           }
           // -- resetImplementation --
+          @ObservationIgnored
           var resetImplementationCallCount = 0
           @ObservationIgnored
           var resetImplementationImplementation: (() -> Void)?
@@ -1642,6 +1742,7 @@ struct GenerateSpyMacroTests {
             case reset
             case resetImplementation
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1674,6 +1775,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyCallbackService: CallbackService {
           // -- register --
+          @ObservationIgnored
           var registerCallCount = 0
           @ObservationIgnored
           var registerReceivedCallback: ((String) -> Void)?
@@ -1691,6 +1793,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case register(callback: (String) -> Void)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1715,6 +1818,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyHandlerService: HandlerService {
           // -- handle --
+          @ObservationIgnored
           var handleCallCount = 0
           @ObservationIgnored
           var handleReceivedCompletion: (@Sendable (String) -> Void)?
@@ -1732,6 +1836,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case handle(completion: @Sendable (String) -> Void)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1756,6 +1861,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyMigratorService: MigratorService {
           // -- registerMigrations --
+          @ObservationIgnored
           var registerMigrationsCallCount = 0
           @ObservationIgnored
           var registerMigrationsImplementation: ((inout DatabaseMigrator) -> Void)?
@@ -1767,6 +1873,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case registerMigrations(migrator: DatabaseMigrator)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1791,8 +1898,11 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpyProcessorService: ProcessorService {
           // -- process --
+          @ObservationIgnored
           var processCallCount = 0
+          @ObservationIgnored
           var processReceivedName: String?
+          @ObservationIgnored
           var processReceivedInvocations: [String] = []
           @ObservationIgnored
           var processImplementation: ((String, inout String) -> Void)?
@@ -1806,6 +1916,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case process(name: String, output: String)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1830,6 +1941,7 @@ struct GenerateSpyMacroTests {
         @Observable
         final class SpySwapperService: SwapperService {
           // -- swap --
+          @ObservationIgnored
           var swapCallCount = 0
           @ObservationIgnored
           var swapImplementation: ((inout Int, inout Int) -> Void)?
@@ -1841,6 +1953,7 @@ struct GenerateSpyMacroTests {
           enum Call {
             case swap(a: Int, b: Int)
           }
+          @ObservationIgnored
           var calls: [Call] = []
         }
         """,
@@ -1903,52 +2016,43 @@ struct GenerateSpyMacroTests {
           private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
           var recordCallCount: Int {
             get {
-              access(keyPath: \\.recordCallCount)
               return _testDoubleStorage.withValue {
                   $0.recordCallCount
               }
             }
             set {
-              withMutation(keyPath: \\.recordCallCount) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.recordCallCount
-                    }) { state in
-                  state.recordCallCount = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordCallCount
+                  }) { state in
+                state.recordCallCount = newValue
               }
             }
           }
           var recordReceivedValue: Int? {
             get {
-              access(keyPath: \\.recordReceivedValue)
               return _testDoubleStorage.withValue {
                   $0.recordReceivedValue
               }
             }
             set {
-              withMutation(keyPath: \\.recordReceivedValue) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.recordReceivedValue
-                    }) { state in
-                  state.recordReceivedValue = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordReceivedValue
+                  }) { state in
+                state.recordReceivedValue = newValue
               }
             }
           }
           var recordReceivedInvocations: [Int] {
             get {
-              access(keyPath: \\.recordReceivedInvocations)
               return _testDoubleStorage.withValue {
                   $0.recordReceivedInvocations
               }
             }
             set {
-              withMutation(keyPath: \\.recordReceivedInvocations) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.recordReceivedInvocations
-                    }) { state in
-                  state.recordReceivedInvocations = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.recordReceivedInvocations
+                  }) { state in
+                state.recordReceivedInvocations = newValue
               }
             }
           }
@@ -1968,18 +2072,15 @@ struct GenerateSpyMacroTests {
           }
           var calls: [Call] {
             get {
-              access(keyPath: \\.calls)
               return _testDoubleStorage.withValue {
                   $0.calls
               }
             }
             set {
-              withMutation(keyPath: \\.calls) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.calls
-                    }) { state in
-                  state.calls = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
@@ -2046,18 +2147,15 @@ struct GenerateSpyMacroTests {
           private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
           var workCallCount: Int {
             get {
-              access(keyPath: \\.workCallCount)
               return _testDoubleStorage.withValue {
                   $0.workCallCount
               }
             }
             set {
-              withMutation(keyPath: \\.workCallCount) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.workCallCount
-                    }) { state in
-                  state.workCallCount = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.workCallCount
+                  }) { state in
+                state.workCallCount = newValue
               }
             }
           }
@@ -2094,18 +2192,15 @@ struct GenerateSpyMacroTests {
           }
           var calls: [Call] {
             get {
-              access(keyPath: \\.calls)
               return _testDoubleStorage.withValue {
                   $0.calls
               }
             }
             set {
-              withMutation(keyPath: \\.calls) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.calls
-                    }) { state in
-                  state.calls = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
@@ -2189,69 +2284,57 @@ struct GenerateSpyMacroTests {
           private let _testDoubleStorage = VISORTestDoubles._TestDoubleStorage(_Storage())
           var consumeCallCount: Int {
             get {
-              access(keyPath: \\.consumeCallCount)
               return _testDoubleStorage.withValue {
                   $0.consumeCallCount
               }
             }
             set {
-              withMutation(keyPath: \\.consumeCallCount) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.consumeCallCount
-                    }) { state in
-                  state.consumeCallCount = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeCallCount
+                  }) { state in
+                state.consumeCallCount = newValue
               }
             }
           }
           var consumeReceivedValue: (any Sendable)? {
             get {
-              access(keyPath: \\.consumeReceivedValue)
               return _testDoubleStorage.withValue {
                   $0.consumeReceivedValue
               }
             }
             set {
-              withMutation(keyPath: \\.consumeReceivedValue) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.consumeReceivedValue
-                    }) { state in
-                  state.consumeReceivedValue = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeReceivedValue
+                  }) { state in
+                state.consumeReceivedValue = newValue
               }
             }
           }
           var consumeReceivedInvocations: [(any Sendable)] {
             get {
-              access(keyPath: \\.consumeReceivedInvocations)
               return _testDoubleStorage.withValue {
                   $0.consumeReceivedInvocations
               }
             }
             set {
-              withMutation(keyPath: \\.consumeReceivedInvocations) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.consumeReceivedInvocations
-                    }) { state in
-                  state.consumeReceivedInvocations = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.consumeReceivedInvocations
+                  }) { state in
+                state.consumeReceivedInvocations = newValue
               }
             }
           }
           var calls: [Call] {
             get {
-              access(keyPath: \\.calls)
               return _testDoubleStorage.withValue {
                   $0.calls
               }
             }
             set {
-              withMutation(keyPath: \\.calls) {
-                _testDoubleStorage.withMutation(retiring: {
-                        $0.calls
-                    }) { state in
-                  state.calls = newValue
-                }
+              _testDoubleStorage.withMutation(retiring: {
+                      $0.calls
+                  }) { state in
+                state.calls = newValue
               }
             }
           }
